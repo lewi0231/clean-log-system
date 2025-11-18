@@ -1,0 +1,17 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit",
+    "source.sortMembers": "explicit"
+  },
+  "[sql]": {
+    "editor.defaultFormatter": null
+  },
+  "sql.dialect": "postgresql",
+  "mssql.intelliSense.enableIntelliSense": false,
+  "files.associations": {
+    "**/supabase/**/*.sql": "postgresql"
+  },
+  "sql.validate.enable": true,
+  "sql.validate.ignore": ["**/supabase/**/*.sql"]
+}
