@@ -1,18 +1,35 @@
 "use client";
+import { log } from "@/lib/logger";
 import { useEffect, useState } from "react";
 
-export const UseIsScrollTop = () => {
+export const useIsScrollTop = () => {
   const [isTop, setIsTop] = useState(true);
 
   useEffect(() => {
+    log.debug("useIsScrollTop: Initializing scroll listener");
+
     const handleScrollTop = () => {
-      if (window.scrollY === 0) setIsTop(true);
-      else setIsTop(false);
+      const scrollY = window.scrollY;
+      const newIsTop = scrollY === 0;
+
+      setIsTop((prevIsTop) => {
+        if (newIsTop !== prevIsTop) {
+          log.debug("useIsScrollTop: Scroll position changed", {
+            scrollY,
+            isTop: newIsTop,
+          });
+          return newIsTop;
+        }
+        return prevIsTop;
+      });
     };
 
     window.addEventListener("scroll", handleScrollTop);
 
-    return () => window.removeEventListener("scroll", handleScrollTop);
+    return () => {
+      log.debug("useIsScrollTop: Cleaning up scroll listener");
+      window.removeEventListener("scroll", handleScrollTop);
+    };
   }, []);
 
   return { isTop };

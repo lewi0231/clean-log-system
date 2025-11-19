@@ -1,3 +1,4 @@
 {
-  "deno.enable": true
+  // it seems that subfolders arent able to override the below
+  // "deno.enable": false
 }

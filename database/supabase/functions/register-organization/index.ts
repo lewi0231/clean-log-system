@@ -1,12 +1,13 @@
 // supabase/functions/register-organization/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "server";
+
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
-};
+} as const;
 
 function generateOrgCode(businessName: string): string {
   // Take first 4 letters, uppercase
@@ -24,7 +25,7 @@ function generateOrgCode(businessName: string): string {
 }
 
 async function ensureUniqueOrgCode(
-  supabase: any,
+  supabase: SupabaseClient,
   baseCode: string
 ): Promise<string> {
   let code = baseCode;
@@ -52,7 +53,11 @@ serve(async (req) => {
   }
 
   try {
-    const { business_name, admin_email, password } = await req.json();
+    const {
+      organisation: business_name,
+      email: admin_email,
+      password,
+    } = await req.json();
 
     // Validate input
     if (!business_name || !admin_email || !password) {
@@ -76,11 +81,11 @@ serve(async (req) => {
 
     // Calculate trial end date (14 days from now)
     const trialEndsAt = new Date();
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
     // 1. Create organization
     const { data: org, error: orgError } = await supabase
-      .from("organizations")
+      .from("organization")
       .insert({
         name: business_name,
         org_code: orgCode,
@@ -92,7 +97,7 @@ serve(async (req) => {
     if (orgError) throw orgError;
 
     // 2. Create admin user in Supabase Auth
-    const { data: authData, error: authError } =
+    const { data: _authData, error: authError } =
       await supabase.auth.admin.createUser({
         email: admin_email,
         password: password,
@@ -103,7 +108,7 @@ serve(async (req) => {
 
     // 3. Link user to organization
     const { error: linkError } = await supabase
-      .from("organization_users")
+      .from("organization_user")
       .insert({
         organization_id: org.id,
         email: admin_email,
@@ -133,9 +138,11 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Registration error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Registration failed";
     return new Response(
       JSON.stringify({
-        error: error.message || "Registration failed",
+        error: errorMessage,
       }),
       {
         status: 500,
