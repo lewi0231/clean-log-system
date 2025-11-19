@@ -366,3 +366,62 @@ entrypoint = "./functions/register-organization/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/register-organization/*.html" ]
+[functions.get-organization-id]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-organization-id/deno.json"
+entrypoint = "./functions/get-organization-id/index.ts"
+
+[functions.create-worker]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-worker/deno.json"
+entrypoint = "./functions/create-worker/index.ts"
+
+[functions.update-worker]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-worker/deno.json"
+entrypoint = "./functions/update-worker/index.ts"
+
+[functions.delete-worker]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-worker/deno.json"
+entrypoint = "./functions/delete-worker/index.ts"
+
+[functions.list-workers]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-workers/deno.json"
+entrypoint = "./functions/list-workers/index.ts"
+
+[functions.create-location]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-location/deno.json"
+entrypoint = "./functions/create-location/index.ts"
+
+[functions.update-location]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-location/deno.json"
+entrypoint = "./functions/update-location/index.ts"
+
+[functions.delete-location]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-location/deno.json"
+entrypoint = "./functions/delete-location/index.ts"
+
+[functions.list-locations]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-locations/deno.json"
+entrypoint = "./functions/list-locations/index.ts"
+
+[functions.list-workers-and-locations]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-workers-and-locations/deno.json"
+entrypoint = "./functions/list-workers-and-locations/index.ts"
