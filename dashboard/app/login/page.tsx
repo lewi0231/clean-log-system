@@ -150,7 +150,7 @@ export default function Login() {
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <Button
-            className="w-full"
+            className="w-full cursor-pointer"
             type="submit"
             onClick={handleLogin}
             disabled={isLoading}

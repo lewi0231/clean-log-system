@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { log } from "@/lib/logger";
+import { Worker } from "@/lib/types";
 import { workerSchema } from "@/lib/validations";
 import { useEffect, useState } from "react";
 
@@ -19,15 +21,15 @@ interface WorkerFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: (
-    workerData: { name: string; email: string; phone: string },
+    workerData: {
+      name: string;
+      email: string;
+      phone: string;
+      active?: boolean;
+    },
     workerId?: string
   ) => void | Promise<void>;
-  worker?: {
-    id: string;
-    name: string;
-    email: string | null;
-    phone: string | null;
-  } | null;
+  worker?: Worker | null;
 }
 
 export default function WorkerForm({
@@ -39,6 +41,7 @@ export default function WorkerForm({
   const [name, setName] = useState(worker?.name || "");
   const [email, setEmail] = useState(worker?.email || "");
   const [phone, setPhone] = useState(worker?.phone || "");
+  const [active, setActive] = useState(worker?.active ?? false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
@@ -103,9 +106,16 @@ export default function WorkerForm({
       setName("");
       setEmail("");
       setPhone("");
+      setActive(false);
       setErrors({});
       onOpenChange(false);
-      await onSuccess(validatedData, worker?.id);
+
+      // Include active status in edit mode
+      const dataToSend = isEditMode
+        ? { ...validatedData, active }
+        : validatedData;
+
+      await onSuccess(dataToSend, worker?.id);
     } catch (error) {
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("WorkerForm: Submission failed", { error: error.message });
@@ -126,6 +136,7 @@ export default function WorkerForm({
       setName(worker?.name || "");
       setEmail(worker?.email || "");
       setPhone(worker?.phone || "");
+      setActive(worker?.active ?? false);
       setErrors({});
     }
   }, [open, worker]);
@@ -179,9 +190,16 @@ export default function WorkerForm({
               placeholder="john@example.com"
               aria-invalid={!!errors.email}
               required
+              disabled={isEditMode}
+              className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
             />
             {errors.email && (
               <p className="text-sm text-destructive">{errors.email}</p>
+            )}
+            {isEditMode && (
+              <p className="text-xs text-muted-foreground">
+                Email cannot be changed after worker creation
+              </p>
             )}
           </div>
           <div className="space-y-2">
@@ -205,6 +223,26 @@ export default function WorkerForm({
               <p className="text-sm text-destructive">{errors.phone}</p>
             )}
           </div>
+          {isEditMode && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="active">Active Status</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {worker?.auth_user_id
+                      ? "Toggle whether this worker is authorized to access the system"
+                      : "Worker must accept invitation before they can be activated"}
+                  </p>
+                </div>
+                <Switch
+                  id="active"
+                  checked={active}
+                  onCheckedChange={setActive}
+                  disabled={!worker?.auth_user_id}
+                />
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button

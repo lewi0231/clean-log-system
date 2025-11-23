@@ -1,9 +1,9 @@
 export interface Worker {
   id: string;
   name: string;
-  email: string | null;
+  email: string;
   phone: string | null;
-  pin_code: string;
+  auth_user_id: string | null;
   active: boolean;
   created_at: string;
 }
@@ -17,4 +17,45 @@ export interface Location {
   phone: string | null;
   active: boolean;
   created_at: string;
+}
+
+export type FieldType =
+  | "text"
+  | "number"
+  | "email"
+  | "phone"
+  | "select"
+  | "textarea"
+  | "date"
+  | "boolean";
+
+export interface ValidationRules {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+  customMessage?: string;
+}
+
+export interface FieldConfig {
+  id: string;
+  organization_id: string;
+  name: string;
+  label: string;
+  field_type: FieldType;
+  description: string | null;
+  required: boolean;
+  order_position: number;
+  validation_rules: ValidationRules | null;
+  options: string[] | null; // For select fields
+  version: number;
+  active: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizationSettings {
+  use_predefined_locations: boolean;
 }

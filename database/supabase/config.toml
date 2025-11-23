@@ -425,3 +425,33 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/list-workers-and-locations/deno.json"
 entrypoint = "./functions/list-workers-and-locations/index.ts"
+
+[functions.update-organization-settings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-organization-settings/deno.json"
+entrypoint = "./functions/update-organization-settings/index.ts"
+
+[functions.update-field-config]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-field-config/deno.json"
+entrypoint = "./functions/update-field-config/index.ts"
+
+[functions.reorder-field-configs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/reorder-field-configs/deno.json"
+entrypoint = "./functions/reorder-field-configs/index.ts"
+
+[functions.list-field-configs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-field-configs/deno.json"
+entrypoint = "./functions/list-field-configs/index.ts"
+
+[functions.get-organization-settings]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-organization-settings/deno.json"
+entrypoint = "./functions/get-organization-settings/index.ts"

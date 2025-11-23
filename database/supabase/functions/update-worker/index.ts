@@ -13,11 +13,31 @@ serve(async (req) => {
   }
 
   try {
-    const { id, name, email, phone } = await req.json();
+    const { id, name, email, phone, active } = await req.json();
 
-    if (!id || !name || !email || !phone) {
+    if (!id) {
+      return new Response(JSON.stringify({ error: "Worker ID is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Build update object with only provided fields
+    const updateData: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      active?: boolean;
+    } = {};
+
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (active !== undefined) updateData.active = active;
+
+    if (Object.keys(updateData).length === 0) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "At least one field must be provided" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -32,11 +52,7 @@ serve(async (req) => {
 
     const { data: worker, error: workerError } = await supabase
       .from("worker")
-      .update({
-        name,
-        email,
-        phone,
-      })
+      .update(updateData)
       .eq("id", id)
       .select()
       .single();

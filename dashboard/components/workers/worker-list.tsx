@@ -31,7 +31,7 @@ interface WorkerListProps {
   onDeleteWorker: (workerId: string) => Promise<void>;
   onUpdateWorker: (
     workerId: string,
-    workerData: { name: string; email: string; phone: string }
+    workerData: { name: string; email: string; phone: string; active?: boolean }
   ) => Promise<void>;
 }
 
@@ -58,7 +58,12 @@ export default function WorkerList({
   };
 
   const handleFormSuccess = async (
-    workerData: { name: string; email: string; phone: string },
+    workerData: {
+      name: string;
+      email: string;
+      phone: string;
+      active?: boolean;
+    },
     workerId?: string
   ) => {
     setIsFormOpen(false);
@@ -87,7 +92,6 @@ export default function WorkerList({
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>PIN Code</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -96,7 +100,7 @@ export default function WorkerList({
           <TableBody>
             {workers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={6} className="text-center py-8">
                   No workers found. Add your first worker to get started.
                 </TableCell>
               </TableRow>
@@ -106,7 +110,6 @@ export default function WorkerList({
                   <TableCell className="font-medium">{worker.name}</TableCell>
                   <TableCell>{worker.email || "-"}</TableCell>
                   <TableCell>{worker.phone || "-"}</TableCell>
-                  <TableCell>{worker.pin_code}</TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
@@ -128,14 +131,14 @@ export default function WorkerList({
                         size="icon"
                         onClick={() => handleEdit(worker)}
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-4 w-4 cursor-pointer" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeletingWorker(worker)}
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="cursor-pointer h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </TableCell>

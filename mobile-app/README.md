@@ -10,10 +10,33 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Configure environment variables
+
+   Create a `.env` file in the root of the `mobile-app` directory with:
+
+   ```bash
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+   **⚠️ Important for Expo Go and Local Development:**
+
+   - If using a local Supabase instance (localhost), you **cannot** use `localhost` or `127.0.0.1` in Expo Go
+   - Expo Go runs on a physical device/emulator that cannot access `localhost` on your computer
+   - Instead, use your computer's local network IP address (e.g., `http://192.168.1.XXX:54321`)
+   - Find your local IP: `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
+   - For production/cloud Supabase instances, use the full HTTPS URL
+
+3. Start the app
 
    ```bash
    npx expo start
+   ```
+
+   If you encounter issues, try clearing the cache:
+
+   ```bash
+   npx expo start --clear
    ```
 
 In the output, you'll find options to open the app in a

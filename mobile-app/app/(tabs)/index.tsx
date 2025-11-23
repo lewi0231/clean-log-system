@@ -1,6 +1,8 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { useState } from "react";
+import { useOrganization } from "@/hooks/useOrganization";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
 
@@ -17,6 +19,7 @@ const LOCATION_OPTIONS = [
 ];
 
 export default function HomeScreen() {
+  const { organizationId } = useOrganization();
   // Use empty string as a safe "no selection" value for pickers
   const [selectedName, setSelectedName] = useState<string>("");
   const [selectedLocation, setSelectedLocation] = useState<string>("");
@@ -25,6 +28,46 @@ export default function HomeScreen() {
 
   const soapsValue = Number(soaps) || 0;
   const wipesValue = Number(wipes) || 0;
+
+  // Fetch field configs when organization is available
+  useEffect(() => {
+    if (!organizationId) {
+      console.log("📋 Field Configs: Waiting for organization ID...");
+      return;
+    }
+
+    async function fetchFieldConfigs() {
+      try {
+        console.log("📋 Field Configs: Fetching for organization", {
+          organizationId,
+        });
+
+        const { data, error } = await supabase.functions.invoke(
+          "list-field-configs",
+          {
+            body: { organization_id: organizationId },
+          }
+        );
+
+        if (error) {
+          console.error("📋 Field Configs: Error", error);
+          return;
+        }
+
+        console.log("📋 Field Configs: Response received", {
+          success: data?.success,
+          fieldConfigs: data?.field_configs,
+          fullResponse: JSON.stringify(data, null, 2),
+        });
+      } catch (err) {
+        console.error("📋 Field Configs: Failed to fetch", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    }
+
+    fetchFieldConfigs();
+  }, [organizationId]);
 
   const handleSubmit = () => {
     console.log({
