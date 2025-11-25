@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { FieldType, ValidationRules } from "@/lib/types";
 import { useEffect, useState } from "react";
 
@@ -27,10 +28,10 @@ export default function ValidationRulesEditor({
 
   const updateRule = (
     key: keyof ValidationRules,
-    value: number | string | undefined
+    value: number | string | boolean | undefined
   ) => {
     const newRules = { ...rules };
-    if (value === undefined || value === "") {
+    if (value === undefined || (typeof value === "string" && value === "")) {
       delete newRules[key];
     } else {
       newRules[key] = value as never;
@@ -43,8 +44,9 @@ export default function ValidationRulesEditor({
     fieldType
   );
   const isNumberBased = fieldType === "number";
+  const isGroupedBreakdown = fieldType === "grouped_breakdown";
 
-  if (!isTextBased && !isNumberBased) {
+  if (!isTextBased && !isNumberBased && !isGroupedBreakdown) {
     return null;
   }
 
@@ -136,6 +138,57 @@ export default function ValidationRulesEditor({
             />
           </div>
         </div>
+      )}
+
+      {isGroupedBreakdown && (
+        <>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="min_items">Min Items</Label>
+              <Input
+                id="min_items"
+                type="number"
+                min="0"
+                value={rules.min_items ?? ""}
+                onChange={(e) =>
+                  updateRule(
+                    "min_items",
+                    e.target.value ? parseInt(e.target.value) : undefined
+                  )
+                }
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="max_items">Max Items</Label>
+              <Input
+                id="max_items"
+                type="number"
+                min="1"
+                value={rules.max_items ?? ""}
+                onChange={(e) =>
+                  updateRule(
+                    "max_items",
+                    e.target.value ? parseInt(e.target.value) : undefined
+                  )
+                }
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="allow_zero_quantities"
+              checked={rules.allow_zero_quantities ?? false}
+              onCheckedChange={(checked) =>
+                updateRule("allow_zero_quantities", checked)
+              }
+            />
+            <Label htmlFor="allow_zero_quantities" className="cursor-pointer">
+              Allow zero quantities
+            </Label>
+          </div>
+        </>
       )}
 
       <div className="space-y-2">

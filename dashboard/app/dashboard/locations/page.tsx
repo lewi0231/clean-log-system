@@ -249,6 +249,21 @@ export default function LocationsPage() {
         </p>
       </div>
 
+      <div className="mb-6 p-4 bg-muted rounded-lg">
+        <p className="text-sm text-muted-foreground">
+          These locations will appear as select options in the mobile app when
+          the &quot;Use Predefined Locations&quot; setting is enabled. You can
+          also configure custom location fields in{" "}
+          <a
+            href="/dashboard/mobile-config"
+            className="text-primary hover:underline font-medium"
+          >
+            Mobile Config
+          </a>
+          .
+        </p>
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1" />
         <Button onClick={() => setIsLocationFormOpen(true)}>

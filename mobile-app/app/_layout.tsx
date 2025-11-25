@@ -1,38 +1,21 @@
 import {
   DarkTheme,
   DefaultTheme,
-  ThemeProvider,
+  ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
+import "../global.css";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuth } from "@/hooks/useAuth";
-import { User } from "@supabase/supabase-js";
+import { ThemeProvider } from "@/lib/theme-context";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export const unstable_settings = {
   anchor: "(tabs)",
 };
-
-function RootLayoutNavigation({ user }: { user: User | null }) {
-  return (
-    <Stack>
-      {user ? (
-        <>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="modal"
-            options={{ presentation: "modal", title: "Modal" }}
-          />
-        </>
-      ) : (
-        <Stack.Screen name="login" />
-      )}
-    </Stack>
-  );
-}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -47,11 +30,25 @@ export default function RootLayout() {
     );
   }
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <RootLayoutNavigation user={user} />
-      </Stack>
-      <StatusBar style="auto" />
+    <ThemeProvider defaultTheme={colorScheme || "light"}>
+      <NavigationThemeProvider
+        value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+      >
+        <Stack>
+          {user ? (
+            <>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="modal"
+                options={{ presentation: "modal", title: "Modal" }}
+              />
+            </>
+          ) : (
+            <Stack.Screen name="login" />
+          )}
+        </Stack>
+        <StatusBar style="auto" />
+      </NavigationThemeProvider>
     </ThemeProvider>
   );
 }

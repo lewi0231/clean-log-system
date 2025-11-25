@@ -1,16 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Building2, LayoutDashboard, Settings, Users } from "lucide-react";
+import { Building2, Settings, Smartphone, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
-  {
-    name: "Dashboard",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
   {
     name: "Workers",
     href: "/dashboard/workers",
@@ -20,6 +15,11 @@ const navigation = [
     name: "Locations",
     href: "/dashboard/locations",
     icon: Building2,
+  },
+  {
+    name: "Mobile Config",
+    href: "/dashboard/mobile-config",
+    icon: Smartphone,
   },
   {
     name: "Settings",
@@ -34,7 +34,7 @@ export default function DashboardSidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r bg-background">
       <div className="flex h-16 items-center border-b px-6">
-        <h2 className="text-lg font-semibold">Admin</h2>
+        <h2 className="text-lg font-semibold">Dashboard</h2>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigation.map((item) => {

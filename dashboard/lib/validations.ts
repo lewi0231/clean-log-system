@@ -26,7 +26,9 @@ export const fieldTypeSchema = z.enum([
   "select",
   "textarea",
   "date",
+  "time",
   "boolean",
+  "grouped_breakdown",
 ]);
 
 export const validationRulesSchema = z
@@ -37,6 +39,9 @@ export const validationRulesSchema = z
     max: z.number().optional(),
     pattern: z.string().optional(),
     customMessage: z.string().optional(),
+    min_items: z.number().int().min(0).optional(),
+    max_items: z.number().int().min(1).optional(),
+    allow_zero_quantities: z.boolean().optional(),
   })
   .refine(
     (data) => {
@@ -61,24 +66,53 @@ export const validationRulesSchema = z
       message: "Min value must be less than or equal to max value",
       path: ["min"],
     }
+  )
+  .refine(
+    (data) => {
+      if (data.min_items !== undefined && data.max_items !== undefined) {
+        return data.min_items <= data.max_items;
+      }
+      return true;
+    },
+    {
+      message: "Min items must be less than or equal to max items",
+      path: ["min_items"],
+    }
   );
 
-export const fieldConfigSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Name is required")
-    .regex(
-      /^[a-z0-9_]+$/,
-      "Name must contain only lowercase letters, numbers, and underscores"
-    ),
-  label: z.string().min(1, "Label is required"),
-  field_type: fieldTypeSchema,
-  description: z.string().nullable(),
-  required: z.boolean().default(false),
-  order_position: z.number().int().min(0).optional(),
-  validation_rules: validationRulesSchema.nullable(),
-  options: z.array(z.string().min(1)).nullable(),
-});
+export const fieldConfigSchema = z
+  .object({
+    name: z
+      .string()
+      .min(1, "Name is required")
+      .regex(
+        /^[a-z0-9_]+$/,
+        "Name must contain only lowercase letters, numbers, and underscores"
+      ),
+    label: z.string().min(1, "Label is required"),
+    field_type: fieldTypeSchema,
+    description: z.string().nullable(),
+    required: z.boolean().default(false),
+    order_position: z.number().int().min(0).optional(),
+    validation_rules: validationRulesSchema.nullable(),
+    options: z.array(z.string().min(1)).nullable(),
+  })
+  .refine(
+    (data) => {
+      if (
+        data.field_type === "select" ||
+        data.field_type === "grouped_breakdown"
+      ) {
+        return data.options !== null && data.options.length > 0;
+      }
+      return true;
+    },
+    {
+      message:
+        "Options are required for select and grouped_breakdown field types",
+      path: ["options"],
+    }
+  );
 
 export type FieldConfigFormData = z.infer<typeof fieldConfigSchema>;
 

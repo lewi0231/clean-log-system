@@ -27,7 +27,9 @@ export type FieldType =
   | "select"
   | "textarea"
   | "date"
-  | "boolean";
+  | "time"
+  | "boolean"
+  | "grouped_breakdown";
 
 export interface ValidationRules {
   minLength?: number;
@@ -36,6 +38,9 @@ export interface ValidationRules {
   max?: number;
   pattern?: string;
   customMessage?: string;
+  min_items?: number;
+  max_items?: number;
+  allow_zero_quantities?: boolean;
 }
 
 export interface FieldConfig {

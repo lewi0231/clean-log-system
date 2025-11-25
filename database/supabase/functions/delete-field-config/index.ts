@@ -27,14 +27,15 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Soft delete by setting active to false and archived_at
+    // TODO - think about the logic here - we're hard deleting - may want to archive in the future. Or warn the user that all this data will be lost.
     const { error: deleteError } = await supabase
       .from("organization_field_configs")
-      .update({
-        active: false,
-        archived_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .delete()
+      // .update({
+      //   active: false,
+      //   archived_at: new Date().toISOString(),
+      //   updated_at: new Date().toISOString(),
+      // })
       .eq("id", id);
 
     if (deleteError) throw deleteError;

@@ -1,307 +1,42 @@
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { useOrganization } from "@/hooks/useOrganization";
-import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput } from "react-native";
-import { Dropdown } from "react-native-element-dropdown";
-
-const NAME_OPTIONS = [
-  { label: "Alice", value: "Alice" },
-  { label: "Bob", value: "Bob" },
-  { label: "Charlie", value: "Charlie" },
-];
-
-const LOCATION_OPTIONS = [
-  { label: "EasyAuto Warehouse", value: "EasyAuto Warehouse" },
-  { label: "Reynella Kia", value: "Reynella Kia" },
-  { label: "Toyota Hillcrest [New]", value: "Toyota Hillcrest [New]" },
-];
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
-  const { organizationId } = useOrganization();
-  // Use empty string as a safe "no selection" value for pickers
-  const [selectedName, setSelectedName] = useState<string>("");
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
-  const [soaps, setSoaps] = useState<string>("0");
-  const [wipes, setWipes] = useState<string>("0");
+  const router = useRouter();
 
-  const soapsValue = Number(soaps) || 0;
-  const wipesValue = Number(wipes) || 0;
-
-  // Fetch field configs when organization is available
-  useEffect(() => {
-    if (!organizationId) {
-      console.log("📋 Field Configs: Waiting for organization ID...");
-      return;
-    }
-
-    async function fetchFieldConfigs() {
-      try {
-        console.log("📋 Field Configs: Fetching for organization", {
-          organizationId,
-        });
-
-        const { data, error } = await supabase.functions.invoke(
-          "list-field-configs",
-          {
-            body: { organization_id: organizationId },
-          }
-        );
-
-        if (error) {
-          console.error("📋 Field Configs: Error", error);
-          return;
-        }
-
-        console.log("📋 Field Configs: Response received", {
-          success: data?.success,
-          fieldConfigs: data?.field_configs,
-          fullResponse: JSON.stringify(data, null, 2),
-        });
-      } catch (err) {
-        console.error("📋 Field Configs: Failed to fetch", {
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
-      }
-    }
-
-    fetchFieldConfigs();
-  }, [organizationId]);
-
-  const handleSubmit = () => {
-    console.log({
-      name: selectedName || "(none)",
-      location: selectedLocation || "(none)",
-      soaps: soapsValue,
-      wipe: wipesValue,
-    });
-
-    setSelectedName("");
-    setSelectedLocation("");
-    setWipes("0");
-    setSoaps("0");
+  const handleMakeNewEntry = () => {
+    router.push("./new-entry");
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      keyboardShouldPersistTaps="handled"
-    >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Clean Log</ThemedText>
-      </ThemedView>
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
+      <View className="flex-1 items-center justify-center px-6">
+        <View className="items-center mb-8">
+          <View className="bg-blue-100 rounded-full p-6 mb-4">
+            <Ionicons name="document-text-outline" size={64} color="#007AFF" />
+          </View>
+          <Text className="text-3xl font-bold text-foreground mb-2 text-center">
+            Clean Log
+          </Text>
+          <Text className="text-base text-muted-foreground text-center">
+            Track your entries and stay organized
+          </Text>
+        </View>
 
-      {/* Name field */}
-      <ThemedView style={styles.fieldContainer}>
-        <ThemedText type="subtitle" style={styles.label}>
-          Name
-        </ThemedText>
-        <Dropdown
-          style={styles.dropdown}
-          placeholderStyle={styles.placeholder}
-          selectedTextStyle={styles.selectedText}
-          itemTextStyle={styles.itemText}
-          containerStyle={styles.dropdownContainer}
-          itemContainerStyle={styles.dropdownItem}
-          activeColor="#f0f0f0"
-          data={NAME_OPTIONS}
-          labelField="label"
-          valueField="value"
-          placeholder="Select a name..."
-          value={selectedName || null}
-          onChange={(item) => {
-            setSelectedName(item.value);
-          }}
-        />
-      </ThemedView>
-
-      {/* Location field */}
-      <ThemedView style={styles.fieldContainer}>
-        <ThemedText type="subtitle" style={styles.label}>
-          Location
-        </ThemedText>
-        <Dropdown
-          style={styles.dropdown}
-          placeholderStyle={styles.placeholder}
-          selectedTextStyle={styles.selectedText}
-          itemTextStyle={styles.itemText}
-          containerStyle={styles.dropdownContainer}
-          itemContainerStyle={styles.dropdownItem}
-          activeColor="#f0f0f0"
-          data={LOCATION_OPTIONS}
-          labelField="label"
-          valueField="value"
-          placeholder="Select a location..."
-          value={selectedLocation || null}
-          onChange={(item) => {
-            setSelectedLocation(item.value);
-          }}
-        />
-      </ThemedView>
-
-      {/* Soaps numeric input */}
-      <ThemedView style={styles.fieldContainer}>
-        <ThemedText type="subtitle" style={styles.label}>
-          Soaps
-        </ThemedText>
-        <TextInput
-          style={styles.input}
-          keyboardType="number-pad"
-          value={soaps}
-          onChangeText={setSoaps}
-        />
-      </ThemedView>
-
-      {/* Wipes numeric input */}
-      <ThemedView style={styles.fieldContainer}>
-        <ThemedText type="subtitle" style={styles.label}>
-          Wipes
-        </ThemedText>
-        <TextInput
-          style={styles.input}
-          keyboardType="number-pad"
-          value={wipes}
-          onChangeText={setWipes}
-        />
-      </ThemedView>
-
-      {/* Submit button - using Pressable instead of Button */}
-      <Pressable
-        style={({ pressed }) => [
-          styles.button,
-          pressed && styles.buttonPressed,
-        ]}
-        onPress={handleSubmit}
-      >
-        <ThemedText style={styles.buttonText}>Submit</ThemedText>
-      </Pressable>
-    </ScrollView>
+        <Pressable
+          onPress={handleMakeNewEntry}
+          className="bg-blue-500 rounded-xl py-5 px-12 items-center justify-center w-full max-w-sm active:bg-blue-600 active:scale-[0.98] shadow-lg"
+        >
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="add-circle" size={24} color="#fff" />
+            <Text className="text-white text-lg font-semibold">
+              Make New Entry
+            </Text>
+          </View>
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    marginTop: 20,
-  },
-  contentContainer: {
-    padding: 20,
-    gap: 20,
-  },
-  titleContainer: {
-    marginBottom: 8,
-    paddingBottom: 16,
-    backgroundColor: "inherit",
-  },
-  fieldContainer: {
-    gap: 10,
-    marginBottom: 8,
-    backgroundColor: "inherit",
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 4,
-    color: "#333",
-  },
-  input: {
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    borderColor: "#e0e0e0",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    // Modern shadow effect
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2, // Android shadow
-  },
-  dropdown: {
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    borderColor: "#e0e0e0",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    // Modern shadow effect
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2, // Android shadow
-  },
-  dropdownContainer: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#e0e0e0",
-    marginTop: 4,
-    // Enhanced shadow for dropdown menu
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5, // Android shadow
-  },
-  dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  placeholder: {
-    color: "#999",
-    fontSize: 16,
-  },
-  selectedText: {
-    color: "#1a1a1a",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  itemText: {
-    color: "#333",
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: "#007AFF", // iOS blue, or use your brand color
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-    // Modern shadow
-    shadowColor: "#007AFF",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5, // Android shadow
-  },
-  buttonPressed: {
-    backgroundColor: "#0051D5", // Darker when pressed
-    transform: [{ scale: 0.98 }], // Slight scale down for feedback
-    shadowOpacity: 0.2,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  subtitle: {
-    backgroundColor: "lightgray",
-  },
-});

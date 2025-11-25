@@ -69,6 +69,8 @@ export default function FieldConfigForm({
 
   const isEditMode = !!fieldConfig;
   const isSelectField = fieldType === "select";
+  const isGroupedBreakdownField = fieldType === "grouped_breakdown";
+  const requiresOptions = isSelectField || isGroupedBreakdownField;
 
   useEffect(() => {
     if (open) {
@@ -105,7 +107,7 @@ export default function FieldConfigForm({
       description: description || null,
       required,
       validation_rules: validationRules,
-      options: isSelectField ? options : null,
+      options: requiresOptions ? options : null,
     });
 
     if (!result.success) {
@@ -257,7 +259,7 @@ export default function FieldConfigForm({
               value={fieldType}
               onValueChange={(value) => {
                 setFieldType(value as FieldType);
-                if (value !== "select") {
+                if (value !== "select" && value !== "grouped_breakdown") {
                   setOptions([]);
                   setOptionsInput("");
                 }
@@ -274,7 +276,11 @@ export default function FieldConfigForm({
                 <SelectItem value="select">Select</SelectItem>
                 <SelectItem value="textarea">Textarea</SelectItem>
                 <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="time">Time</SelectItem>
                 <SelectItem value="boolean">Boolean</SelectItem>
+                <SelectItem value="grouped_breakdown">
+                  Grouped Breakdown
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -291,23 +297,33 @@ export default function FieldConfigForm({
             />
           </div>
 
-          {isSelectField && (
+          {requiresOptions && (
             <div className="space-y-2">
-              <Label htmlFor="options">Options (Comma-separated)</Label>
+              <Label htmlFor="options">
+                {isGroupedBreakdownField
+                  ? "Groups (Comma-separated)"
+                  : "Options (Comma-separated)"}
+              </Label>
               <Input
                 id="options"
                 name="options"
                 type="text"
                 value={optionsInput}
                 onChange={(e) => handleOptionsChange(e.target.value)}
-                placeholder="Option 1, Option 2, Option 3"
+                placeholder={
+                  isGroupedBreakdownField
+                    ? "Group 1, Group 2, Group 3"
+                    : "Option 1, Option 2, Option 3"
+                }
                 aria-invalid={!!errors.options}
               />
               {errors.options && (
                 <p className="text-sm text-destructive">{errors.options}</p>
               )}
               <p className="text-xs text-muted-foreground">
-                Separate multiple options with commas
+                {isGroupedBreakdownField
+                  ? "Separate multiple groups with commas (e.g., brand names)"
+                  : "Separate multiple options with commas"}
               </p>
             </div>
           )}
