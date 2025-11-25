@@ -1,16 +1,11 @@
-import {
-  GroupedBreakdownField,
-  GroupedBreakdownItem,
-} from "@/components/group-breakdown-field";
+import { FieldRenderer } from "@/components/field-renderer";
 import { Badge } from "@/components/ui/badge";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Select, SelectItem } from "@/components/ui/select";
 import { useColleagues } from "@/hooks/use-colleagues";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
+import { useEntryForm } from "@/hooks/use-entry-form";
 import { useLocations } from "@/hooks/use-locations";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
-import { FieldConfig } from "@/types/field-config";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -20,9 +15,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,8 +26,16 @@ export default function NewEntryScreen() {
   const { user } = useAuth();
   const { locations } = useLocations(organizationId);
   const { colleagues } = useColleagues(organizationId);
-  const { fieldConfigs, fieldValues, resetFieldValues, updateFieldValue } =
-    useFieldConfigs(organizationId);
+  const {
+    fieldConfigs,
+    fieldValues,
+    errors,
+    updateFieldValue,
+    buildSubmissionData,
+    validateInputs,
+    resetForm,
+    clearFieldError,
+  } = useEntryForm({ organizationId });
 
   // Find the current user's colleague ID
   const currentUserColleagueId = useMemo(() => {
@@ -68,33 +69,20 @@ export default function NewEntryScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserColleagueId]);
 
-  // Fetch field configs when organization is available
-  useEffect(() => {
-    if (!organizationId) {
-      console.log("📋 Field Configs: Waiting for organization ID...");
-      return;
-    }
-  }, [organizationId]);
-
   const handleSubmit = async () => {
     // Build submission data from field configs and values
-    const submissionData: Record<string, any> = {};
-    fieldConfigs.forEach((config) => {
-      const value = fieldValues[config.id];
-      if (config.field_type === "grouped_breakdown") {
-        submissionData[config.name] = value || [];
-      } else {
-        submissionData[config.name] = value ?? (config.required ? null : "");
-      }
-    });
+    const submissionData = buildSubmissionData();
 
     // Add colleague and location to submission if selected
     if (selectedColleagues.length > 0) {
       submissionData.colleague_ids = selectedColleagues;
     }
+    // TODO - location may not be required to be displayed - need to account for this - low priority
     if (selectedLocation) {
       submissionData.location_id = selectedLocation;
     }
+
+    if (!validateInputs(submissionData)) return;
 
     console.log("📤 Form Submission:", submissionData);
 
@@ -105,28 +93,7 @@ export default function NewEntryScreen() {
         text: "OK",
         onPress: () => {
           // Reset form values
-          const resetValues: Record<
-            string,
-            string | number | boolean | GroupedBreakdownItem[]
-          > = {};
-          fieldConfigs.forEach((config) => {
-            if (config.field_type === "number") {
-              resetValues[config.id] = 0;
-            } else if (config.field_type === "boolean") {
-              resetValues[config.id] = false;
-            } else if (config.field_type === "grouped_breakdown") {
-              resetValues[config.id] = [];
-            } else if (config.field_type === "time") {
-              // For time fields, reset to current time as HH:mm string
-              const now = new Date();
-              const hours = now.getHours().toString().padStart(2, "0");
-              const minutes = now.getMinutes().toString().padStart(2, "0");
-              resetValues[config.id] = `${hours}:${minutes}`;
-            } else {
-              resetValues[config.id] = "";
-            }
-          });
-          resetFieldValues(resetValues);
+          resetForm();
 
           // Reset colleague and location selections
           // Re-add current user on reset
@@ -168,241 +135,6 @@ export default function NewEntryScreen() {
       colleague.name.charAt(0).toUpperCase() +
       colleague.name.substring(1).toLowerCase()
     );
-  };
-
-  const renderField = (config: FieldConfig) => {
-    const value = fieldValues[config.id];
-    const placeholder = config.required
-      ? `${config.label} *`
-      : config.description || config.label;
-
-    switch (config.field_type) {
-      case "text":
-      case "email":
-      case "phone":
-        return (
-          <TextInput
-            key={config.id}
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground"
-            placeholder={placeholder}
-            placeholderTextColor="#999"
-            value={String(value || "")}
-            onChangeText={(text) => updateFieldValue(config.id, text)}
-            keyboardType={
-              config.field_type === "email"
-                ? "email-address"
-                : config.field_type === "phone"
-                ? "phone-pad"
-                : "default"
-            }
-            autoCapitalize={
-              config.field_type === "email" ? "none" : "sentences"
-            }
-            autoComplete={
-              config.field_type === "email"
-                ? "email"
-                : config.field_type === "phone"
-                ? "tel"
-                : "off"
-            }
-          />
-        );
-
-      case "number":
-        return (
-          <TextInput
-            key={config.id}
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground"
-            placeholder={placeholder}
-            placeholderTextColor="#999"
-            value={String(value || "0")}
-            onChangeText={(text) => {
-              const numValue = text === "" ? 0 : Number(text) || 0;
-              updateFieldValue(config.id, numValue);
-            }}
-            keyboardType="number-pad"
-          />
-        );
-
-      case "textarea":
-        return (
-          <TextInput
-            key={config.id}
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 pt-3.5 text-base text-foreground min-h-[100px]"
-            placeholder={placeholder}
-            placeholderTextColor="#999"
-            value={String(value || "")}
-            onChangeText={(text) => updateFieldValue(config.id, text)}
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-        );
-
-      case "select":
-        if (!config.options || config.options.length === 0) {
-          return (
-            <Text key={config.id} className="text-red-500 text-sm py-2">
-              No options configured for {config.label}
-            </Text>
-          );
-        }
-        // Use Select component for select fields
-        return (
-          <Select
-            key={config.id}
-            value={String(value || "")}
-            onValueChange={(selectedValue) =>
-              updateFieldValue(config.id, selectedValue)
-            }
-            placeholder={placeholder}
-            size="medium"
-          >
-            {config.options.map((option) => (
-              <SelectItem key={option} value={option}>
-                {option}
-              </SelectItem>
-            ))}
-          </Select>
-        );
-
-      case "grouped_breakdown":
-        return (
-          <GroupedBreakdownField
-            key={config.id}
-            config={config}
-            value={(fieldValues[config.id] as GroupedBreakdownItem[]) || []}
-            onChange={(items) => updateFieldValue(config.id, items)}
-          />
-        );
-
-      case "boolean":
-        return (
-          <View
-            key={config.id}
-            className="flex-row items-center justify-between py-2"
-          >
-            <Text className="text-base font-semibold text-foreground flex-1">
-              {config.label}
-            </Text>
-            <Switch
-              value={Boolean(value)}
-              onValueChange={(newValue) =>
-                updateFieldValue(config.id, newValue)
-              }
-              trackColor={{ false: "#767577", true: "#007AFF" }}
-              thumbColor="#fff"
-            />
-          </View>
-        );
-
-      case "date":
-        // Convert string value to Date for DateTimePicker
-        let dateValue: Date | undefined = undefined;
-        if (value) {
-          if (typeof value === "string" && value !== "") {
-            const parsedDate = new Date(value);
-            if (!isNaN(parsedDate.getTime())) {
-              dateValue = parsedDate;
-            }
-          }
-        }
-
-        // Validate date value
-        const isValidDate =
-          dateValue instanceof Date && !isNaN(dateValue.getTime());
-
-        return (
-          <DateTimePicker
-            key={config.id}
-            mode="single"
-            value={isValidDate ? dateValue : undefined}
-            onValueChange={(selectedDate) => {
-              if (selectedDate instanceof Date) {
-                // Store as ISO string for consistency
-                updateFieldValue(config.id, selectedDate.toISOString());
-              } else {
-                updateFieldValue(config.id, "");
-              }
-            }}
-            placeholder={placeholder}
-            disabled={false}
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5"
-            size="md"
-            variant="outline"
-          />
-        );
-
-      case "time":
-        // For time fields, we use today's date with the selected time
-        // The date part will be ignored when submitting
-        let timeValue: Date | undefined = undefined;
-        if (value) {
-          if (typeof value === "string" && value !== "") {
-            // Try to parse as time string (HH:mm) or ISO string
-            const timeMatch = value.match(/^(\d{2}):(\d{2})$/);
-            if (timeMatch) {
-              // Format: HH:mm
-              const today = new Date();
-              today.setHours(parseInt(timeMatch[1], 10));
-              today.setMinutes(parseInt(timeMatch[2], 10));
-              today.setSeconds(0);
-              timeValue = today;
-            } else {
-              // Try parsing as ISO string
-              const parsedDate = new Date(value);
-              if (!isNaN(parsedDate.getTime())) {
-                timeValue = parsedDate;
-              }
-            }
-          }
-        }
-
-        // If no value, initialize with current time and set it as the value
-        if (!timeValue) {
-          timeValue = new Date();
-          // Initialize the field value if it's empty
-          if (!value || value === "") {
-            const hours = timeValue.getHours().toString().padStart(2, "0");
-            const minutes = timeValue.getMinutes().toString().padStart(2, "0");
-            updateFieldValue(config.id, `${hours}:${minutes}`);
-          }
-        }
-
-        return (
-          <DateTimePicker
-            key={config.id}
-            mode="time"
-            value={timeValue}
-            onValueChange={(selectedTime) => {
-              if (selectedTime instanceof Date) {
-                // Store as time string (HH:mm) for easy handling
-                const hours = selectedTime
-                  .getHours()
-                  .toString()
-                  .padStart(2, "0");
-                const minutes = selectedTime
-                  .getMinutes()
-                  .toString()
-                  .padStart(2, "0");
-                updateFieldValue(config.id, `${hours}:${minutes}`);
-              }
-            }}
-            placeholder={placeholder || "Select time"}
-            disabled={false}
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5"
-            size="lg"
-            variant="outline"
-          />
-        );
-
-      default:
-        return (
-          <Text key={config.id} className="text-red-500 text-sm py-2">
-            Unknown field type: {config.field_type}
-          </Text>
-        );
-    }
   };
 
   return (
@@ -502,7 +234,13 @@ export default function NewEntryScreen() {
                     {config.description}
                   </Text>
                 )}
-                {renderField(config)}
+                <FieldRenderer
+                  config={config}
+                  value={fieldValues[config.id]}
+                  error={errors[config.name]}
+                  onChange={(value) => updateFieldValue(config.id, value)}
+                  onErrorClear={() => clearFieldError(config.name)}
+                />
               </View>
             ))
           )}

@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FieldConfig, FieldType, ValidationRules } from "@/lib/types";
+import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
 import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import FieldConfigForm from "./field-config-form";

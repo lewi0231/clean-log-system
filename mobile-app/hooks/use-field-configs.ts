@@ -1,7 +1,10 @@
 import { GroupedBreakdownItem } from "@/components/group-breakdown-field";
 import { supabase } from "@/lib/supabase";
-import { FieldConfig } from "@/types/field-config";
+import { createSchemaFromFieldConfig } from "@/lib/utils";
+import { FieldConfig } from "@/shared/types/field-config";
 import { useEffect, useState } from "react";
+
+export type FieldErrors = Partial<Record<FieldConfig["name"], string>>;
 
 export function useFieldConfigs(organizationId: string | null) {
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
@@ -88,5 +91,11 @@ export function useFieldConfigs(organizationId: string | null) {
     fetchFieldConfigs();
   }, [organizationId]);
 
-  return { fieldValues, fieldConfigs, resetFieldValues, updateFieldValue };
+  return {
+    fieldValues,
+    fieldConfigs,
+    resetFieldValues,
+    updateFieldValue,
+    FieldConfigSchema: createSchemaFromFieldConfig(fieldConfigs),
+  };
 }

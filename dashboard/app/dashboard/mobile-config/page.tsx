@@ -13,7 +13,7 @@ import {
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { FieldConfig, FieldType, ValidationRules } from "@/lib/types";
+import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
 import { Plus } from "lucide-react";
 import { useEffect, useOptimistic, useState, useTransition } from "react";
 

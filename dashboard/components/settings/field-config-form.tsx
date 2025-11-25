@@ -21,8 +21,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { log } from "@/lib/logger";
-import { FieldConfig, FieldType, ValidationRules } from "@/lib/types";
 import { fieldConfigSchema } from "@/lib/validations";
+import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
 import { useEffect, useState } from "react";
 import ValidationRulesEditor from "./validation-rules-editor";
 
