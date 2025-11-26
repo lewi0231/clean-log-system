@@ -2,12 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
+import { useLocations } from "@/hooks/use-locations";
+import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
-import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
 import { Building2, Users } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
 export default function Dashboard() {
   const {
@@ -15,77 +17,30 @@ export default function Dashboard() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
-  const [stats, setStats] = useState({
-    workers: 0,
-    activeWorkers: 0,
-    locations: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { workers, loading: workersLoading } = useWorkers();
+  const { locations, loading: locationsLoading } = useLocations();
 
-  useEffect(() => {
-    if (organizationId) {
-      const fetchStats = async () => {
-        try {
-          setLoading(true);
-          log.debug("Dashboard: Fetching stats");
+  const loading = workersLoading || locationsLoading;
 
-          const { data, error: fetchError } = await supabase.functions.invoke(
-            "list-workers-and-locations",
-            {
-              body: { organization_id: organizationId },
-            }
-          );
-
-          if (fetchError) {
-            throw fetchError;
-          }
-
-          if (data?.workers && data?.locations) {
-            const activeWorkers = data.workers.filter(
-              (w: { active: boolean }) => w.active
-            ).length;
-            setStats({
-              workers: data.workers.length,
-              activeWorkers,
-              locations: data.locations.length,
-            });
-            log.info("Dashboard: Stats fetched successfully", {
-              workersCount: data.workers.length,
-              locationsCount: data.locations.length,
-            });
-          }
-        } catch (err) {
-          log.error("Dashboard: Failed to fetch stats", {
-            error: err instanceof Error ? err.message : "Unknown error",
-          });
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchStats();
-    }
-  }, [organizationId]);
+  const stats = useMemo(() => {
+    const activeWorkers = workers.filter((w) => w.active).length;
+    return {
+      workers: workers.length,
+      activeWorkers,
+      locations: locations.length,
+    };
+  }, [workers, locations]);
 
   if (orgLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading dashboard..." fullScreen />;
   }
 
   if (orgError || !organizationId) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-destructive">
-            {orgError || "Failed to load organization"}
-          </p>
-        </div>
-      </div>
+      <ErrorState
+        message={orgError || "Failed to load organization"}
+        fullScreen
+      />
     );
   }
 

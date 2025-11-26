@@ -4,8 +4,10 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { useColleagues } from "@/hooks/use-colleagues";
 import { useEntryForm } from "@/hooks/use-entry-form";
 import { useLocations } from "@/hooks/use-locations";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
+import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -23,6 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function NewEntryScreen() {
   const router = useRouter();
   const { organizationId } = useOrganization();
+  const { settings } = useOrganizationSettings(organizationId);
   const { user } = useAuth();
   const { locations } = useLocations(organizationId);
   const { colleagues } = useColleagues(organizationId);
@@ -36,6 +39,8 @@ export default function NewEntryScreen() {
     resetForm,
     clearFieldError,
   } = useEntryForm({ organizationId });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Find the current user's colleague ID
   const currentUserColleagueId = useMemo(() => {
@@ -70,6 +75,8 @@ export default function NewEntryScreen() {
   }, [currentUserColleagueId]);
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+
     // Build submission data from field configs and values
     const submissionData = buildSubmissionData();
 
@@ -77,38 +84,92 @@ export default function NewEntryScreen() {
     if (selectedColleagues.length > 0) {
       submissionData.colleague_ids = selectedColleagues;
     }
-    // TODO - location may not be required to be displayed - need to account for this - low priority
+
     if (selectedLocation) {
       submissionData.location_id = selectedLocation;
     }
 
     if (!validateInputs(submissionData)) return;
 
-    console.log("📤 Form Submission:", submissionData);
+    console.log(
+      "📤 Form Submission: submitting to edge function",
+      submissionData
+    );
 
-    // TODO: Add actual API call here
-    // For now, just show success and navigate back
-    Alert.alert("Success", "Entry submitted successfully!", [
-      {
-        text: "OK",
-        onPress: () => {
-          // Reset form values
-          resetForm();
+    setIsSubmitting(true);
+    try {
+      const { data, error: fetchError } = await supabase.functions.invoke(
+        "create-job",
+        {
+          body: { submissionData },
+        }
+      );
 
-          // Reset colleague and location selections
-          // Re-add current user on reset
-          if (currentUserColleagueId) {
-            setSelectedColleagues([currentUserColleagueId]);
-          } else {
-            setSelectedColleagues([]);
-          }
-          setSelectedLocation("");
+      if (fetchError) {
+        const errorMessage =
+          fetchError.message ||
+          "There was a problem on the server!  Please try again later.";
+        console.error("Form Submission: Failed", fetchError);
+        Alert.alert(
+          "Error",
+          "There was a problem on the server! Please try again later.",
+          [
+            {
+              text: "OK",
+            },
+          ]
+        );
+        return;
+      }
 
-          // Navigate back to home
-          router.push("./");
-        },
-      },
-    ]);
+      if (data?.error) {
+        console.error("Form submission: Server error", data.error);
+        Alert.alert("Error", data.error, [
+          {
+            text: "OK",
+          },
+        ]);
+        return;
+      }
+
+      if (data?.success) {
+        // For now, just show success and navigate back
+        Alert.alert("Success", "Entry submitted successfully!", [
+          {
+            text: "OK",
+            onPress: () => {
+              // Reset form values
+              resetForm();
+
+              // Reset colleague and location selections
+              // Re-add current user on reset
+              if (currentUserColleagueId) {
+                setSelectedColleagues([currentUserColleagueId]);
+              } else {
+                setSelectedColleagues([]);
+              }
+              setSelectedLocation("");
+
+              // Navigate back to home
+              router.push("./");
+            },
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error("Form Submission: Failed.", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      Alert.alert(
+        "Error",
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred. Please try again.",
+        [{ text: "OK" }]
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAddColleague = (colleagueId: string) => {
@@ -138,22 +199,23 @@ export default function NewEntryScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={["bottom"]}>
+    <SafeAreaView className="flex-1 bg-background px-4 py-4" edges={["bottom"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
         keyboardVerticalOffset={100}
       >
         <ScrollView
-          className="p-4"
+          className="flex-1"
           keyboardShouldPersistTaps="handled"
           nestedScrollEnabled={true}
+          contentContainerClassName=""
         >
           {/* Colleague Select - only show if at least one colleague exists */}
           {filteredColleagues.length > 0 && (
             <View className="mb-4">
               <Text className="text-base font-semibold mb-2 text-foreground">
-                Colleagues
+                Who did you work with?!
               </Text>
               <Select
                 value=""
@@ -182,7 +244,8 @@ export default function NewEntryScreen() {
                       </Text>
                       <Pressable
                         onPress={() => handleRemoveColleague(colleagueId)}
-                        className="ml-1"
+                        className=""
+                        disabled={isSubmitting}
                       >
                         <Ionicons name="close-circle" size={16} color="#fff" />
                       </Pressable>
@@ -194,7 +257,7 @@ export default function NewEntryScreen() {
           )}
 
           {/* Location Select - only show if at least one location exists */}
-          {locations.length > 0 && (
+          {locations.length > 0 && settings?.use_predefined_locations && (
             <View className="mb-4">
               <Text className="text-base font-semibold mb-2 text-foreground ">
                 Location

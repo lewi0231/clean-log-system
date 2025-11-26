@@ -123,3 +123,51 @@ export const organizationSettingsSchema = z.object({
 export type OrganizationSettingsFormData = z.infer<
   typeof organizationSettingsSchema
 >;
+
+// Auth schemas
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const signUpSchema = z.object({
+  organisation: z.string().min(1, "Organisation name is required"),
+  email: z.string().email("Invalid email format"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(20, "Password cannot be more than 20 characters")
+    .refine(
+      (password) => /[A-Z]/.test(password),
+      "Password must contain at least one uppercase letter"
+    )
+    .refine(
+      (password) => /[a-z]/.test(password),
+      "Password must contain at least one lowercase letter"
+    )
+    .refine(
+      (password) => /[0-9]/.test(password),
+      "Password must contain at least one number"
+    ),
+});
+
+export type LoginFormData = z.infer<typeof loginSchema>;
+export type SignUpFormData = z.infer<typeof signUpSchema>;
+
+/**
+ * Convert Zod validation errors to a field errors object
+ */
+export function formatZodErrors<T extends Record<string, unknown>>(
+  error: z.ZodError
+): Partial<Record<keyof T, string>> {
+  const fieldErrors: Partial<Record<keyof T, string>> = {};
+
+  error.issues.forEach((issue) => {
+    const path = issue.path[0] as keyof T;
+    if (path) {
+      fieldErrors[path] = issue.message;
+    }
+  });
+
+  return fieldErrors;
+}

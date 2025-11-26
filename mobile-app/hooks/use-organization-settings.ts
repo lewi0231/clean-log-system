@@ -1,0 +1,54 @@
+import { supabase } from "@/lib/supabase";
+import { OrganizationSettings } from "@/shared/types/organization-settings";
+import { useEffect, useState } from "react";
+
+export function useOrganizationSettings(organizationId: string | null) {
+  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<OrganizationSettings | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!organizationId) return;
+
+    const fetchSettings = async () => {
+      console.log("Organization Settings: Fetching...", { organizationId });
+
+      try {
+        const { data, error: fetchError } = await supabase.functions.invoke(
+          "get-organization-settings",
+          {
+            body: { organization_id: organizationId },
+          }
+        );
+
+        if (fetchError) {
+          console.error("🏢 Organization Settings: Error fetching", fetchError);
+          throw fetchError;
+        }
+
+        if (data?.settings) {
+          console.info("Organization Settings: Success!", data.settings);
+          setSettings(data.settings);
+        } else {
+          console.warn("🏢 Organization Settings: None found");
+          setError("No organization settings found");
+        }
+      } catch (err) {
+        console.error("🏢 Organization Settings: Failed to fetch", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Organization Settings: Failed to fetch"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, [organizationId]);
+
+  return { settings, loading, error };
+}

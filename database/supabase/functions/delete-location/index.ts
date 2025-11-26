@@ -1,5 +1,5 @@
-import { serve } from "server";
 import { createClient } from "@supabase/supabase-js";
+import { serve } from "server";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +31,7 @@ serve(async (req) => {
     );
 
     const { error: deleteError } = await supabase
-      .from("car_yard")
+      .from("location")
       .delete()
       .eq("id", id);
 
@@ -61,4 +61,3 @@ serve(async (req) => {
     );
   }
 });
-

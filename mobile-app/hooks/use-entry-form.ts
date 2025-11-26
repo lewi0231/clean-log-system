@@ -1,6 +1,8 @@
 import { GroupedBreakdownItem } from "@/components/group-breakdown-field";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import z from "zod";
 import { FieldErrors, useFieldConfigs } from "./use-field-configs";
+import { useOrganizationSettings } from "./use-organization-settings";
 
 interface UseEntryFormProps {
   organizationId: string | null;
@@ -15,6 +17,26 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
     FieldConfigSchema,
   } = useFieldConfigs(organizationId);
   const [errors, setErrors] = useState<FieldErrors>({});
+
+  //   Fetch org settings
+  const { settings } = useOrganizationSettings(organizationId || "");
+
+  // Create extended schema that includes conditional validation based on settings
+  const extendedSchema = useMemo(() => {
+    if (!settings) return FieldConfigSchema;
+
+    const baseShape = FieldConfigSchema.shape;
+
+    if (settings.use_predefined_locations) {
+      return FieldConfigSchema.extend({
+        location_id: z.string().min(1, "Location is required"),
+      });
+    }
+
+    return FieldConfigSchema.extend({
+      location_id: z.string().optional(),
+    });
+  }, [FieldConfigSchema, settings]);
 
   const buildSubmissionData = () => {
     const submissionData: Record<string, any> = {};
@@ -43,7 +65,7 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
   };
 
   const validateInputs = (submissionData: Record<string, any>) => {
-    const validation = FieldConfigSchema.safeParse(submissionData);
+    const validation = extendedSchema.safeParse(submissionData);
 
     if (!validation.success) {
       const fieldErrors: FieldErrors = {};

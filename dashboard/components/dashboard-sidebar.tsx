@@ -1,7 +1,15 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Building2, Settings, Smartphone, Users } from "lucide-react";
+import {
+  Building2,
+  ChartBar,
+  Clipboard,
+  FileText,
+  Settings,
+  Smartphone,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -22,9 +30,24 @@ const navigation = [
     icon: Smartphone,
   },
   {
+    name: "Completed Jobs",
+    href: "/dashboard/completed-jobs",
+    icon: Clipboard,
+  },
+  {
+    name: "Invoicing",
+    href: "/dashboard/invoicing",
+    icon: FileText,
+  },
+  {
     name: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
+  },
+  {
+    name: "Visualizations",
+    href: "/dashboard/visualizations",
+    icon: ChartBar,
   },
 ];
 

@@ -13,31 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { formatZodErrors, signUpSchema } from "@/lib/validations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { z } from "zod";
-
-const SignUpSchema = z.object({
-  organisation: z.string().min(1, "Organisation name is required"),
-  email: z.string().email("Invalid email format"),
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters")
-    .max(20, "Password cannot be more than 20 characters")
-    .refine(
-      (password) => /[A-Z]/.test(password),
-      "Password must contain at least one uppercase letter"
-    )
-    .refine(
-      (password) => /[a-z]/.test(password),
-      "Password must contain at least one lowercase letter"
-    )
-    .refine(
-      (password) => /[0-9]/.test(password),
-      "Password must contain at least one number"
-    ),
-});
 
 export default function SignUp() {
   const router = useRouter();
@@ -56,30 +35,18 @@ export default function SignUp() {
   const validateInput = () => {
     log.debug("SignUp: Validating form input");
 
-    const result = SignUpSchema.safeParse({
+    const result = signUpSchema.safeParse({
       email,
       organisation,
       password,
     });
 
     if (!result.success) {
-      const fieldErrors: {
-        organisation?: string;
-        email?: string;
-        password?: string;
-      } = {};
-
-      result.error.issues.forEach((issue) => {
-        const path = issue.path[0] as string;
-        if (
-          path === "organisation" ||
-          path === "email" ||
-          path === "password"
-        ) {
-          fieldErrors[path] = issue.message;
-        }
-      });
-
+      const fieldErrors = formatZodErrors<{
+        organisation: string;
+        email: string;
+        password: string;
+      }>(result.error);
       log.warn("SignUp: Form validation failed", { errors: fieldErrors });
       setErrors(fieldErrors);
       throw new Error("Validation failed");

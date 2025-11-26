@@ -10,7 +10,7 @@ supabase start
 supabase stop
 
 <!-- This updates the local server with the migration -->
-supabase up
+supabase migration up
 
 <!-- Logs you into remote supabase -->
 supabase link

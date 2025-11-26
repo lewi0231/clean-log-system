@@ -78,10 +78,10 @@ export function GroupedBreakdownField({
   const canAddMore = value.length < maxItems && availableBrands.length > 0;
 
   return (
-    <View className="space-y-3">
+    <View className="space-y-3 gap-4">
       {/* Display added items */}
       {value.length > 0 && (
-        <View className="space-y-2">
+        <View className="space-y-2 ">
           {value.map((item) => (
             <View
               key={item.brand}

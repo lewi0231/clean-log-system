@@ -6,6 +6,7 @@ import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Select, SelectItem } from "@/components/ui/select";
 import { FieldConfig } from "@/shared/types/field-config";
 import { Switch, Text, TextInput, View } from "react-native";
+import { TimePicker } from "./ui/time-picker";
 
 interface FieldRendererProps {
   config: FieldConfig;
@@ -244,8 +245,7 @@ export function FieldRenderer({
 
       return (
         <View>
-          <DateTimePicker
-            mode="time"
+          <TimePicker
             value={timeValue}
             onValueChange={(selectedTime) => {
               if (selectedTime instanceof Date) {

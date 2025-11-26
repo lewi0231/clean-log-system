@@ -1,5 +1,5 @@
-import { serve } from "server";
 import { createClient } from "@supabase/supabase-js";
+import { serve } from "server";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { id, name, email, address, contact_person, phone } = await req.json();
+    const { id, name, email, address, contact_person, phone } =
+      await req.json();
 
     if (!id || !name || !email || !address || !contact_person) {
       return new Response(
@@ -31,7 +32,7 @@ serve(async (req) => {
     );
 
     const { data: location, error: locationError } = await supabase
-      .from("car_yard")
+      .from("location")
       .update({
         name,
         email,
@@ -70,4 +71,3 @@ serve(async (req) => {
     );
   }
 });
-

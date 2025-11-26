@@ -13,15 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { formatZodErrors, loginSchema } from "@/lib/validations";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { z } from "zod";
-
-const LoginSchema = z.object({
-  email: z.string().email("Invalid email format"),
-  password: z.string().min(1, "Password is required"),
-});
 
 export default function Login() {
   const router = useRouter();
@@ -39,21 +34,12 @@ export default function Login() {
       setIsLoading(true);
       setErrors({});
 
-      // TODO - duplicate code - make this reusuable
-      const validation = LoginSchema.safeParse({ email, password });
+      const validation = loginSchema.safeParse({ email, password });
       if (!validation.success) {
-        const fieldErrors: {
-          email?: string;
-          password?: string;
-        } = {};
-
-        validation.error.issues.forEach((issue) => {
-          const path = issue.path[0] as string;
-          if (path === "email" || path === "password") {
-            fieldErrors[path] = issue.message;
-          }
-        });
-
+        const fieldErrors = formatZodErrors<{
+          email: string;
+          password: string;
+        }>(validation.error);
         log.warn("Login: Form validation failed", { errors: fieldErrors });
         setErrors(fieldErrors);
         return;

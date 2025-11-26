@@ -3,33 +3,12 @@
 import LocationForm from "@/components/locations/location-form";
 import LocationList from "@/components/locations/location-list";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingState } from "@/components/ui/loading-state";
+import { useLocations } from "@/hooks/use-locations";
 import useOrganization from "@/hooks/useOrganization";
-import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
-import { Location } from "@/lib/types";
 import { Plus } from "lucide-react";
-import { useEffect, useOptimistic, useState, useTransition } from "react";
-
-type OptimisticAction<T> =
-  | { type: "add"; item: T }
-  | { type: "update"; item: T }
-  | { type: "delete"; id: string };
-
-function locationsReducer(
-  state: Location[],
-  action: OptimisticAction<Location>
-): Location[] {
-  switch (action.type) {
-    case "add":
-      return [action.item, ...state];
-    case "update":
-      return state.map((l) => (l.id === action.item.id ? action.item : l));
-    case "delete":
-      return state.filter((l) => l.id !== action.id);
-    default:
-      return state;
-  }
-}
+import { useState } from "react";
 
 export default function LocationsPage() {
   const {
@@ -37,55 +16,15 @@ export default function LocationsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
-  const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
-
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
-
-  // Optimistic state for locations
-  const [optimisticLocations, updateOptimisticLocations] = useOptimistic(
+  const {
     locations,
-    locationsReducer
-  );
-
-  const fetchLocations = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      log.debug("LocationsPage: Fetching locations");
-
-      const { data, error: fetchError } = await supabase.functions.invoke(
-        "list-workers-and-locations",
-        {
-          body: { organization_id: organizationId },
-        }
-      );
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      if (data?.locations) {
-        log.info("LocationsPage: Locations fetched successfully", {
-          locationsCount: data.locations.length,
-        });
-        setLocations(data.locations);
-      } else {
-        setLocations([]);
-      }
-    } catch (err) {
-      log.error("LocationsPage: Failed to fetch locations", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch locations"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    loading,
+    error,
+    createLocation,
+    updateLocation,
+    deleteLocation,
+  } = useLocations();
+  const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
 
   const handleAddLocation = async (locationData: {
     name: string;
@@ -94,43 +33,11 @@ export default function LocationsPage() {
     contact_person: string;
     phone?: string;
   }) => {
-    // Optimistically add location
-    const optimisticLocation: Location = {
-      id: `temp-${Date.now()}`,
+    if (!organizationId) return;
+    await createLocation({
+      organization_id: organizationId,
       ...locationData,
-      phone: locationData.phone || null,
-      active: true,
-      created_at: new Date().toISOString(),
-    };
-
-    startTransition(() => {
-      updateOptimisticLocations({ type: "add", item: optimisticLocation });
     });
-
-    try {
-      const { error: createError } = await supabase.functions.invoke(
-        "create-location",
-        {
-          body: {
-            ...locationData,
-            organization_id: organizationId,
-          },
-        }
-      );
-
-      if (createError) {
-        throw createError;
-      }
-
-      await fetchLocations();
-      log.info("LocationsPage: Location created successfully");
-    } catch (err) {
-      log.error("LocationsPage: Failed to create location", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      await fetchLocations();
-      throw err;
-    }
   };
 
   const handleUpdateLocation = async (
@@ -143,100 +50,26 @@ export default function LocationsPage() {
       phone?: string;
     }
   ) => {
-    const existingLocation = locations.find((l) => l.id === locationId);
-    if (!existingLocation) return;
-
-    // Optimistically update location
-    const optimisticLocation: Location = {
-      ...existingLocation,
+    await updateLocation({
+      id: locationId,
       ...locationData,
-    };
-
-    startTransition(() => {
-      updateOptimisticLocations({ type: "update", item: optimisticLocation });
     });
-
-    try {
-      const { error: updateError } = await supabase.functions.invoke(
-        "update-location",
-        {
-          body: {
-            id: locationId,
-            ...locationData,
-          },
-        }
-      );
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      await fetchLocations();
-      log.info("LocationsPage: Location updated successfully");
-    } catch (err) {
-      log.error("LocationsPage: Failed to update location", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      await fetchLocations();
-      throw err;
-    }
   };
 
   const handleDeleteLocation = async (locationId: string) => {
-    // Optimistically delete location
-    startTransition(() => {
-      updateOptimisticLocations({ type: "delete", id: locationId });
-    });
-
-    try {
-      const { error: deleteError } = await supabase.functions.invoke(
-        "delete-location",
-        {
-          body: { id: locationId },
-        }
-      );
-
-      if (deleteError) {
-        throw deleteError;
-      }
-
-      await fetchLocations();
-      log.info("LocationsPage: Location deleted successfully");
-    } catch (err) {
-      log.error("LocationsPage: Failed to delete location", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      await fetchLocations();
-      throw err;
-    }
+    await deleteLocation({ id: locationId });
   };
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchLocations();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
-
   if (orgLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading locations...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState message="Loading locations..." fullScreen />;
   }
 
   if (orgError || !organizationId) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-destructive">
-            {orgError || "Failed to load organization"}
-          </p>
-        </div>
-      </div>
+      <ErrorState
+        message={orgError || "Failed to load organization"}
+        fullScreen
+      />
     );
   }
 
@@ -274,7 +107,7 @@ export default function LocationsPage() {
 
       <div className="space-y-4">
         <LocationList
-          locations={optimisticLocations}
+          locations={locations}
           loading={loading}
           error={error}
           onDeleteLocation={handleDeleteLocation}

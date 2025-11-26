@@ -22,8 +22,8 @@ CREATE TABLE organization_user (
   UNIQUE(organization_id, email)
 );
 
--- Car Yard (Now scoped to organization)
-CREATE TABLE car_yard (
+-- Location (Now scoped to organization)
+CREATE TABLE location (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organization(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
@@ -54,10 +54,9 @@ CREATE TABLE worker (
 CREATE TABLE job (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organization(id) ON DELETE CASCADE NOT NULL,
-  car_yard_id UUID REFERENCES car_yard(id) NOT NULL,
-  car_count INTEGER NOT NULL,
+  location_id UUID REFERENCES location(id),
+  submission_data JSONB,
   completed_at TIMESTAMPTZ DEFAULT NOW(),
-  notes TEXT,
   feedback_token TEXT UNIQUE,
   email_sent BOOLEAN DEFAULT false,
   email_sent_at TIMESTAMPTZ,
@@ -82,14 +81,13 @@ CREATE TABLE feedback (
 );
 
 -- Indexes for multi-tenant queries
-CREATE INDEX idx_car_yard_org ON car_yard(organization_id);
+CREATE INDEX idx_location_org ON location(organization_id);
 CREATE INDEX idx_worker_org ON worker(organization_id);
 CREATE INDEX idx_job_org ON job(organization_id);
-CREATE INDEX idx_job_car_yard ON job(car_yard_id);
+CREATE INDEX idx_job_location ON job(location_id);
 CREATE INDEX idx_job_completed ON job(completed_at);
 CREATE INDEX idx_feedback_job ON feedback(job_id);
 CREATE INDEX idx_job_token ON job(feedback_token);
-CREATE INDEX idx_worker_org_pin ON worker(organization_id, pin_code);
 
 -- Indexes for job_worker junction table
 CREATE INDEX idx_job_worker_job ON job_worker(job_id);
@@ -98,7 +96,7 @@ CREATE INDEX idx_job_worker_worker ON job_worker(worker_id);
 -- Row Level Security (RLS) Policies
 ALTER TABLE organization ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_user ENABLE ROW LEVEL SECURITY;
-ALTER TABLE car_yard ENABLE ROW LEVEL SECURITY;
+ALTER TABLE location ENABLE ROW LEVEL SECURITY;
 ALTER TABLE worker ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_worker ENABLE ROW LEVEL SECURITY;
@@ -114,9 +112,9 @@ CREATE POLICY "Service role can manage organization_user"
 ON organization_user FOR ALL
 USING (auth.jwt() ->> 'role' = 'service_role');
 
--- Car Yard: Only accessible by same organization
-CREATE POLICY "Service role can manage car yard"
-ON car_yard FOR ALL
+-- Location: Only accessible by same organization
+CREATE POLICY "Service role can manage location"
+ON location FOR ALL
 USING (auth.jwt() ->> 'role' = 'service_role');
 
 -- worker: Only accessible by same organization
@@ -159,8 +157,7 @@ SELECT
   o.name as organization_name,
   w.name as worker_name,
   w.id as worker_id,
-  cy.name as car_yard_name,
-  cj.car_count,
+  l.name as location_name,
   cj.completed_at,
   f.rating,
   f.comment
@@ -168,6 +165,6 @@ FROM job cj
 JOIN organization o ON cj.organization_id = o.id
 JOIN job_worker jw ON cj.id = jw.job_id
 JOIN worker w ON jw.worker_id = w.id
-JOIN car_yard cy ON cj.car_yard_id = cy.id
+LEFT JOIN location l ON cj.location_id = l.id
 LEFT JOIN feedback f ON cj.id = f.job_id
 ORDER BY cj.completed_at DESC;

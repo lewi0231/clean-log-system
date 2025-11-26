@@ -1,5 +1,5 @@
-import { serve } from "server";
 import { createClient } from "@supabase/supabase-js";
+import { serve } from "server";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,7 +31,7 @@ serve(async (req) => {
     );
 
     const { data: locations, error: locationsError } = await supabase
-      .from("car_yard")
+      .from("location")
       .select("*")
       .eq("organization_id", organization_id)
       .order("created_at", { ascending: false });
@@ -63,4 +63,3 @@ serve(async (req) => {
     );
   }
 });
-

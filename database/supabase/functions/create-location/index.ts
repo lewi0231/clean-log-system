@@ -31,9 +31,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Create location (car_yard)
+    // Create location
     const { data: location, error: locationError } = await supabase
-      .from("car_yard")
+      .from("location")
       .insert({
         organization_id,
         name,

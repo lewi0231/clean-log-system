@@ -38,7 +38,7 @@ serve(async (req) => {
         .order("created_at", { ascending: false }),
 
       supabase
-        .from("car_yard")
+        .from("location")
         .select("*")
         .eq("organization_id", organization_id)
         .order("created_at", { ascending: false }),

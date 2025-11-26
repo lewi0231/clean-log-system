@@ -426,6 +426,12 @@ verify_jwt = false
 import_map = "./functions/list-workers-and-locations/deno.json"
 entrypoint = "./functions/list-workers-and-locations/index.ts"
 
+[functions.create-job]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-job/deno.json"
+entrypoint = "./functions/create-job/index.ts"
+
 [functions.update-organization-settings]
 enabled = true
 verify_jwt = false
