@@ -1,16 +1,22 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import type { FieldPricing } from "@/lib/types";
+import type { FieldPricing, PricingType, WorkerPaymentType } from "@/lib/types";
 
 export interface ListFieldPricingRequest {
   organization_id: string;
+  location_id?: string | null; // Optional filter by location
 }
 
 export interface UpsertFieldPricingRequest {
   organization_id: string;
   field_config_id: string;
-  unit_price: number;
+  customer_price: number;
   currency?: string;
+  location_id?: string | null;
+  pricing_type?: PricingType;
+  applies_to_field_type?: string;
+  worker_payment_type?: WorkerPaymentType | null;
+  worker_payment_value?: number | null;
 }
 
 export interface DeleteFieldPricingRequest {

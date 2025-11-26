@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { organization_id } = await req.json();
+    const { organization_id, location_id } = await req.json();
 
     if (!organization_id) {
       return new Response(
@@ -30,13 +30,13 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get field pricing with field config details and location info
-    const { data: fieldPricing, error: pricingError } = await supabase
-      .from("field_pricing")
+    // Build query
+    let query = supabase
+      .from("base_pricing")
       .select(
         `
         *,
-        field_config:field_config_id (
+        field_config:job_type_field_config_id (
           id,
           name,
           label,
@@ -48,15 +48,27 @@ serve(async (req) => {
         )
       `
       )
-      .eq("organization_id", organization_id)
-      .order("location_id", { ascending: true, nullsFirst: true });
+      .eq("organization_id", organization_id);
+
+    if (location_id !== undefined) {
+      if (location_id === null) {
+        query = query.is("location_id", null);
+      } else {
+        query = query.eq("location_id", location_id);
+      }
+    }
+
+    const { data: basePricing, error: pricingError } = await query.order(
+      "created_at",
+      { ascending: true }
+    );
 
     if (pricingError) throw pricingError;
 
     return new Response(
       JSON.stringify({
         success: true,
-        field_pricing: fieldPricing || [],
+        base_pricing: basePricing || [],
       }),
       {
         status: 200,
@@ -64,9 +76,9 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("List field pricing error:", error);
+    console.error("List base pricing error:", error);
     const errorMessage =
-      error instanceof Error ? error.message : "Failed to list field pricing";
+      error instanceof Error ? error.message : "Failed to list base pricing";
     return new Response(
       JSON.stringify({
         error: errorMessage,

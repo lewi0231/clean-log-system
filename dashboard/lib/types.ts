@@ -71,11 +71,17 @@ export interface Job {
   }>;
 }
 
-export interface FieldPricing {
+export type PricingType = "unit" | "fixed";
+export type WorkerPaymentType = "same_structure" | "percentage" | "fixed_rate";
+
+export interface OptionPricing {
   id: string;
   organization_id: string;
   field_config_id: string;
-  unit_price: number;
+  option_value: string;
+  customer_price: number;
+  worker_payment_rate: number | null;
+  location_id: string | null;
   currency: string;
   created_at: string;
   updated_at: string;
@@ -85,4 +91,117 @@ export interface FieldPricing {
     label: string;
     field_type: string;
   };
+  location?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface BasePricing {
+  id: string;
+  organization_id: string;
+  job_type_field_config_id: string | null;
+  job_type_value: string | null;
+  standalone_base_price: number | null;
+  customer_base_price: number;
+  worker_base_payment: number | null;
+  location_id: string | null;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+  field_config?: {
+    id: string;
+    name: string;
+    label: string;
+    field_type: string;
+  } | null;
+  location?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export type PricingRuleType = "discount" | "surcharge" | "override";
+export type ConditionOperator =
+  | "equals"
+  | "greater_than"
+  | "less_than"
+  | "contains"
+  | "not_equals";
+export type ActionType = "multiply" | "add" | "set";
+
+export interface PricingRule {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  rule_type: PricingRuleType;
+  condition_field_config_id: string;
+  condition_operator: ConditionOperator;
+  condition_value: string;
+  action_type: ActionType;
+  action_value: number;
+  priority: number;
+  enabled: boolean;
+  location_id: string | null;
+  created_at: string;
+  updated_at: string;
+  field_config?: {
+    id: string;
+    name: string;
+    label: string;
+    field_type: string;
+  };
+  location?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface InvoiceCalculation {
+  job_id: string;
+  base_price: number;
+  line_items: Array<{
+    field_config_id: string;
+    field_name: string;
+    field_label: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+  }>;
+  pricing_rules_applied: Array<{
+    rule_id: string;
+    rule_name: string;
+    adjustment: number;
+  }>;
+  subtotal: number;
+  total_adjustments: number;
+  total: number;
+  worker_payment_total: number;
+  margin: number;
+}
+
+export interface FieldPricing {
+  id: string;
+  organization_id: string;
+  field_config_id: string;
+  customer_price: number;
+  currency: string;
+  location_id: string | null;
+  pricing_type: PricingType;
+  applies_to_field_type: string;
+  worker_payment_type: WorkerPaymentType | null;
+  worker_payment_value: number | null;
+  created_at: string;
+  updated_at: string;
+  field_config?: {
+    id: string;
+    name: string;
+    label: string;
+    field_type: string;
+  };
+  location?: {
+    id: string;
+    name: string;
+  } | null;
 }

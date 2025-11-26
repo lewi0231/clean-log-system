@@ -16,20 +16,23 @@ serve(async (req) => {
     const {
       organization_id,
       field_config_id,
+      option_value,
       customer_price,
-      currency,
+      worker_payment_rate,
       location_id,
-      pricing_type,
-      applies_to_field_type,
-      worker_payment_type,
-      worker_payment_value,
+      currency,
     } = await req.json();
 
-    if (!organization_id || !field_config_id || customer_price === undefined) {
+    if (
+      !organization_id ||
+      !field_config_id ||
+      !option_value ||
+      customer_price === undefined
+    ) {
       return new Response(
         JSON.stringify({
           error:
-            "Organization ID, field config ID, and customer price are required",
+            "Organization ID, field config ID, option value, and customer price are required",
         }),
         {
           status: 400,
@@ -48,39 +51,16 @@ serve(async (req) => {
       );
     }
 
-    // Validate worker payment value if provided
-    if (
-      worker_payment_type === "percentage" &&
-      worker_payment_value !== undefined
-    ) {
-      if (worker_payment_value < 0 || worker_payment_value > 100) {
-        return new Response(
-          JSON.stringify({
-            error: "Worker payment percentage must be between 0 and 100",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
-    }
-
-    if (
-      worker_payment_type === "fixed_rate" &&
-      worker_payment_value !== undefined
-    ) {
-      if (worker_payment_value < 0) {
-        return new Response(
-          JSON.stringify({
-            error: "Worker payment fixed rate must be non-negative",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
+    if (worker_payment_rate !== undefined && worker_payment_rate < 0) {
+      return new Response(
+        JSON.stringify({
+          error: "Worker payment rate must be non-negative",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const supabase = createClient(
@@ -88,10 +68,10 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify field config exists
+    // Verify field config exists and is select or grouped_breakdown
     const { data: fieldConfig, error: fieldConfigError } = await supabase
       .from("organization_field_configs")
-      .select("id, field_type, organization_id")
+      .select("id, field_type, organization_id, options")
       .eq("id", field_config_id)
       .eq("organization_id", organization_id)
       .single();
@@ -101,6 +81,36 @@ serve(async (req) => {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (
+      fieldConfig.field_type !== "select" &&
+      fieldConfig.field_type !== "grouped_breakdown"
+    ) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Option pricing can only be set for select or grouped_breakdown fields",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Verify option_value exists in field config options
+    const options = fieldConfig.options as string[] | null;
+    if (!options || !options.includes(option_value)) {
+      return new Response(
+        JSON.stringify({
+          error: `Option "${option_value}" not found in field config options`,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Validate location_id if provided
@@ -120,38 +130,13 @@ serve(async (req) => {
       }
     }
 
-    // Set applies_to_field_type from field config if not provided
-    const finalAppliesToFieldType =
-      applies_to_field_type || fieldConfig.field_type;
-
-    // Build upsert data
-    const upsertData: Record<string, unknown> = {
-      organization_id,
-      field_config_id,
-      customer_price: parseFloat(customer_price),
-      currency: currency || "USD",
-      pricing_type: pricing_type || "unit",
-      applies_to_field_type: finalAppliesToFieldType,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (location_id) {
-      upsertData.location_id = location_id;
-    }
-
-    if (worker_payment_type) {
-      upsertData.worker_payment_type = worker_payment_type;
-      if (worker_payment_value !== undefined) {
-        upsertData.worker_payment_value = parseFloat(worker_payment_value);
-      }
-    }
-
     // Check if pricing exists for this combination
     const { data: existingPricing, error: checkError } = await supabase
-      .from("field_pricing")
+      .from("option_pricing")
       .select("id")
       .eq("organization_id", organization_id)
       .eq("field_config_id", field_config_id)
+      .eq("option_value", option_value)
       .eq("location_id", location_id || null)
       .maybeSingle();
 
@@ -159,34 +144,49 @@ serve(async (req) => {
       throw checkError;
     }
 
-    let fieldPricing;
+    const upsertData: Record<string, unknown> = {
+      organization_id,
+      field_config_id,
+      option_value,
+      customer_price: parseFloat(customer_price),
+      currency: currency || "USD",
+      updated_at: new Date().toISOString(),
+    };
+
+    if (location_id) {
+      upsertData.location_id = location_id;
+    }
+
+    if (worker_payment_rate !== undefined) {
+      upsertData.worker_payment_rate = parseFloat(worker_payment_rate);
+    }
+
+    let optionPricing;
     if (existingPricing) {
       // Update existing
       const { data: updated, error: updateError } = await supabase
-        .from("field_pricing")
+        .from("option_pricing")
         .update(upsertData)
         .eq("id", existingPricing.id)
         .select()
         .single();
       if (updateError) throw updateError;
-      fieldPricing = updated;
+      optionPricing = updated;
     } else {
       // Insert new
       const { data: inserted, error: insertError } = await supabase
-        .from("field_pricing")
+        .from("option_pricing")
         .insert(upsertData)
         .select()
         .single();
       if (insertError) throw insertError;
-      fieldPricing = inserted;
+      optionPricing = inserted;
     }
-
-    // if (upsertError) throw upsertError;
 
     return new Response(
       JSON.stringify({
         success: true,
-        field_pricing: fieldPricing,
+        option_pricing: optionPricing,
       }),
       {
         status: 200,
@@ -194,9 +194,11 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Upsert field pricing error:", error);
+    console.error("Upsert option pricing error:", error);
     const errorMessage =
-      error instanceof Error ? error.message : "Failed to upsert field pricing";
+      error instanceof Error
+        ? error.message
+        : "Failed to upsert option pricing";
     return new Response(
       JSON.stringify({
         error: errorMessage,

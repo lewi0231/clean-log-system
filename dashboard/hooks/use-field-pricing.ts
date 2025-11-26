@@ -1,7 +1,7 @@
 "use client";
 
 import { FieldPricingService } from "@/lib/services";
-import type { FieldPricing } from "@/lib/types";
+import type { FieldPricing, PricingType, WorkerPaymentType } from "@/lib/types";
 import { useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
 
@@ -12,8 +12,15 @@ interface UseFieldPricingResult {
   refetch: () => Promise<void>;
   upsertPricing: (
     fieldConfigId: string,
-    unitPrice: number,
-    currency?: string
+    customerPrice: number,
+    options?: {
+      currency?: string;
+      locationId?: string | null;
+      pricingType?: PricingType;
+      appliesToFieldType?: string;
+      workerPaymentType?: WorkerPaymentType | null;
+      workerPaymentValue?: number | null;
+    }
   ) => Promise<FieldPricing>;
   deletePricing: (id: string) => Promise<void>;
 }
@@ -51,8 +58,15 @@ export function useFieldPricing(): UseFieldPricingResult {
 
   const upsertPricing = async (
     fieldConfigId: string,
-    unitPrice: number,
-    currency = "USD"
+    customerPrice: number,
+    options?: {
+      currency?: string;
+      locationId?: string | null;
+      pricingType?: PricingType;
+      appliesToFieldType?: string;
+      workerPaymentType?: WorkerPaymentType | null;
+      workerPaymentValue?: number | null;
+    }
   ): Promise<FieldPricing> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
@@ -61,8 +75,13 @@ export function useFieldPricing(): UseFieldPricingResult {
     const pricing = await FieldPricingService.upsert({
       organization_id: organizationId,
       field_config_id: fieldConfigId,
-      unit_price: unitPrice,
-      currency,
+      customer_price: customerPrice,
+      currency: options?.currency || "USD",
+      location_id: options?.locationId,
+      pricing_type: options?.pricingType,
+      applies_to_field_type: options?.appliesToFieldType,
+      worker_payment_type: options?.workerPaymentType,
+      worker_payment_value: options?.workerPaymentValue,
     });
 
     await fetchFieldPricing();

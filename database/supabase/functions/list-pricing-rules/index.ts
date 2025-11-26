@@ -30,13 +30,12 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Get field pricing with field config details and location info
-    const { data: fieldPricing, error: pricingError } = await supabase
-      .from("field_pricing")
+    const { data: pricingRules, error: rulesError } = await supabase
+      .from("pricing_rules")
       .select(
         `
         *,
-        field_config:field_config_id (
+        field_config:condition_field_config_id (
           id,
           name,
           label,
@@ -49,14 +48,15 @@ serve(async (req) => {
       `
       )
       .eq("organization_id", organization_id)
-      .order("location_id", { ascending: true, nullsFirst: true });
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: true });
 
-    if (pricingError) throw pricingError;
+    if (rulesError) throw rulesError;
 
     return new Response(
       JSON.stringify({
         success: true,
-        field_pricing: fieldPricing || [],
+        pricing_rules: pricingRules || [],
       }),
       {
         status: 200,
@@ -64,9 +64,9 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("List field pricing error:", error);
+    console.error("List pricing rules error:", error);
     const errorMessage =
-      error instanceof Error ? error.message : "Failed to list field pricing";
+      error instanceof Error ? error.message : "Failed to list pricing rules";
     return new Response(
       JSON.stringify({
         error: errorMessage,
