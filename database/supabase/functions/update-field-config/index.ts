@@ -34,7 +34,13 @@ serve(async (req) => {
     const supabase = createServiceRoleClient();
 
     // Validate group/cluster consistency
-    if (group_cluster !== undefined && !mutually_exclusive_group) {
+    // Only validate if group_cluster is being set to a non-null value
+    // Allow both to be null when clearing them
+    if (
+      group_cluster !== undefined &&
+      group_cluster !== null &&
+      (!mutually_exclusive_group || mutually_exclusive_group === null)
+    ) {
       return errorResponse(
         "Group cluster requires a mutually exclusive group to be set",
         400

@@ -137,4 +137,46 @@ describe("VisualFormBuilder", () => {
     const formFieldsHeader = screen.getByText("Form Fields");
     expect(formFieldsHeader).toBeInTheDocument();
   });
+
+  it("highlights mutually exclusive groups with divider and badges", () => {
+    const fields = [
+      createMockFieldConfig({
+        id: "field-1",
+        label: "Yard Toggle",
+        field_type: "boolean",
+        mutually_exclusive_group: "yard_tracking_method",
+        group_cluster: "simple_servicing",
+      }),
+      createMockFieldConfig({
+        id: "field-2",
+        label: "Cars Wiped",
+        field_type: "grouped_breakdown",
+        mutually_exclusive_group: "yard_tracking_method",
+        group_cluster: "detailed_tracking",
+      }),
+    ];
+
+    render(
+      <VisualFormBuilder
+        fields={fields}
+        sections={[]}
+        onAddField={mockOnAddField}
+        onUpdateField={mockOnUpdateField}
+        onDeleteField={mockOnDeleteField}
+        onReorderFields={mockOnReorderFields}
+        onAddSection={mockOnAddSection}
+        onUpdateSection={mockOnUpdateSection}
+        onDeleteSection={mockOnDeleteSection}
+        onReorderSections={mockOnReorderSections}
+      />
+    );
+
+    expect(
+      screen.getByText("Choose one: Yard Tracking Method")
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Exclusive: yard_tracking_method")[0]
+    ).toBeInTheDocument();
+    expect(screen.getByText("Cluster: simple_servicing")).toBeInTheDocument();
+  });
 });

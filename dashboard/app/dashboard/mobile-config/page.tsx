@@ -8,6 +8,7 @@ import { Package, RotateCcw, Sparkles } from "lucide-react";
 
 // 3. Internal components
 import { VisualFormBuilder } from "@/components/form-builder";
+import { MutuallyExclusiveGroupManager } from "@/components/form-builder/mutually-exclusive-group-manager";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -17,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +27,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // 4. Hooks
 import { useMobileConfig } from "@/hooks/use-mobile-config";
@@ -36,6 +43,9 @@ import useOrganization from "@/hooks/useOrganization";
 import { getTemplateDescription, getTemplateFields } from "@/lib/templates";
 
 export default function MobileConfigPage() {
+  const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
+  const [createdClusters, setCreatedClusters] = useState<string[]>([]);
+
   const {
     organizationId,
     loading: orgLoading,
@@ -226,8 +236,44 @@ export default function MobileConfigPage() {
             onUpdateSection={handleUpdateSection}
             onDeleteSection={handleDeleteSection}
             onReorderSections={handleReorderSections}
+            createdClusters={createdClusters}
           />
         )}
+
+        {/* Advanced Form Configuration */}
+        <Collapsible
+          open={advancedSectionOpen}
+          onOpenChange={setAdvancedSectionOpen}
+        >
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Advanced Form Configuration</CardTitle>
+                    <CardDescription className="mt-1">
+                      Configure mutually exclusive groups and clusters for
+                      advanced form behavior
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {advancedSectionOpen ? "Expanded" : "Collapsed"}
+                  </Badge>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <MutuallyExclusiveGroupManager
+                  fields={optimisticFieldConfigs}
+                  onUpdateField={handleUpdateFieldConfig}
+                  createdClusters={createdClusters}
+                  onCreatedClustersChange={setCreatedClusters}
+                />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       </div>
 
       {/* Reset Template Dialog */}

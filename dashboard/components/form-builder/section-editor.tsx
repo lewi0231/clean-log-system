@@ -210,7 +210,10 @@ export function SectionEditor({
         <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
           <FolderPlus className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No sections yet</p>
-          <p className="text-xs">Add sections to organize your form fields</p>
+          <p className="text-xs">
+            Add sections to organize your form fields. Fields only appear in the
+            mobile preview when they are inside a section.
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -284,38 +287,63 @@ export function SectionEditor({
                     <p>{section.description || "No description"}</p>
                     {sectionFields.length > 0 && (
                       <div className="space-y-2">
-                        {sectionFields.map((field) => (
-                          <div
-                            key={field.id}
-                            className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-foreground group"
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-sm font-medium">
-                                {field.label}
-                              </span>
-                              <span className="text-[11px] text-muted-foreground">
-                                {field.name}
-                              </span>
+                        {sectionFields.map((field) => {
+                          const groupId = field.mutually_exclusive_group;
+                          const clusterId = field.group_cluster;
+                          return (
+                            <div
+                              key={field.id}
+                              className={`flex items-center justify-between rounded-md border bg-background px-3 py-2 text-foreground group ${
+                                groupId ? "border-primary/50 bg-primary/5" : ""
+                              }`}
+                            >
+                              <div className="flex flex-col gap-1">
+                                <span className="text-sm font-medium">
+                                  {field.label}
+                                </span>
+                                <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                                  <span>{field.name}</span>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[11px]"
+                                  >
+                                    {field.field_type}
+                                  </Badge>
+                                  {groupId && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[11px] border-primary/40 text-primary"
+                                    >
+                                      Exclusive: {groupId}
+                                    </Badge>
+                                  )}
+                                  {clusterId && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[11px] border-dashed border-primary/40 text-primary"
+                                    >
+                                      Cluster: {clusterId}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {onRemoveFieldFromSection && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                    onClick={() =>
+                                      onRemoveFieldFromSection(field.id)
+                                    }
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[11px]">
-                                {field.field_type}
-                              </Badge>
-                              {onRemoveFieldFromSection && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                                  onClick={() =>
-                                    onRemoveFieldFromSection(field.id)
-                                  }
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                     <div
@@ -351,7 +379,7 @@ export function SectionEditor({
             <DialogDescription>
               {editingSection
                 ? "Update the section details below"
-                : "Create a new section to organize your form fields"}
+                : "Create a new section to group related fields. Only fields inside sections will appear in the mobile preview."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

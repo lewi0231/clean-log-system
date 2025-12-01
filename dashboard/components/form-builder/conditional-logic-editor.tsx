@@ -17,7 +17,7 @@ import {
   ConditionalRule,
   FieldConfig,
 } from "@clean-log/shared";
-import { Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 
 interface ConditionalLogicEditorProps {
   field: FieldConfig;
@@ -50,6 +50,16 @@ export function ConditionalLogicEditor({
 
   // Filter out the current field from options
   const availableFields = allFields.filter((f) => f.id !== field.id);
+  const referencedGroupIds =
+    logic?.conditions
+      .map(
+        (condition) =>
+          allFields.find((f) => f.id === condition.field_id)
+            ?.mutually_exclusive_group || null
+      )
+      .filter((groupId): groupId is string => Boolean(groupId)) || [];
+  const uniqueReferencedGroups = new Set(referencedGroupIds);
+  const showExclusiveWarning = uniqueReferencedGroups.size > 1;
 
   const handleToggle = (enabled: boolean) => {
     if (enabled) {
@@ -235,6 +245,18 @@ export function ConditionalLogicEditor({
               </div>
             ))}
           </div>
+
+          {showExclusiveWarning && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-400/70 bg-amber-50/80 px-3 py-2 text-[11px] text-amber-900">
+              <AlertTriangle className="h-3.5 w-3.5 mt-[2px]" />
+              <p>
+                Conditions reference multiple mutually exclusive groups (
+                {Array.from(uniqueReferencedGroups).join(", ")}). Only one group
+                can be active at a time, so combined logic may never evaluate as
+                expected.
+              </p>
+            </div>
+          )}
 
           {availableFields.length > 0 && (
             <Button

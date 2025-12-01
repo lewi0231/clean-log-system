@@ -173,4 +173,34 @@ describe("SectionEditor", () => {
 
     expect(screen.getByText("No sections yet")).toBeInTheDocument();
   });
+
+  it("shows mutually exclusive metadata for section fields", () => {
+    const sections = [
+      createMockSection({ id: "section-1", field_ids: ["field-1"] }),
+    ];
+    const fields = [
+      createMockFieldConfig({
+        id: "field-1",
+        label: "Cars Soaped",
+        mutually_exclusive_group: "yard_tracking_method",
+        group_cluster: "detailed_tracking",
+      }),
+    ];
+
+    render(
+      <SectionEditor
+        sections={sections}
+        fields={fields}
+        onAddSection={mockOnAddSection}
+        onUpdateSection={mockOnUpdateSection}
+        onDeleteSection={mockOnDeleteSection}
+        onReorderSections={mockOnReorderSections}
+      />
+    );
+
+    expect(
+      screen.getByText("Exclusive: yard_tracking_method")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Cluster: detailed_tracking")).toBeInTheDocument();
+  });
 });

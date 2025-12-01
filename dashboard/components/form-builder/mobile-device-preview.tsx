@@ -243,11 +243,11 @@ export function MobileDevicePreview({
     );
   };
 
-  const unsectionedFields = organizedContent.get(null) || [];
-  const visibleFieldCount = fields.filter(isFieldVisible).length;
+  const fieldsInSections = fields.filter((field) => field.section_id !== null);
+  const visibleFieldCount = fieldsInSections.filter(isFieldVisible).length;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full ">
       <div className="flex items-center gap-2 mb-4">
         <Smartphone className="w-5 h-5 text-muted-foreground" />
         <h3 className="text-sm font-semibold text-foreground">
@@ -325,22 +325,12 @@ export function MobileDevicePreview({
                 );
               })}
 
-              {/* Render unsectioned fields */}
-              {unsectionedFields.filter(isFieldVisible).length > 0 && (
-                <div className="space-y-3">
-                  {sections.length > 0 && (
-                    <p className="text-xs text-gray-400 uppercase tracking-wide">
-                      Other Fields
-                    </p>
-                  )}
-                  {unsectionedFields.map(renderField)}
-                </div>
-              )}
-
               {/* Empty state */}
-              {fields.length === 0 && (
+              {(sections.length === 0 || visibleFieldCount === 0) && (
                 <div className="text-center py-12 text-gray-400">
-                  <p className="text-sm">Add fields to see preview</p>
+                  <p className="text-sm">
+                    Add sections and assign fields to see a preview
+                  </p>
                 </div>
               )}
 
