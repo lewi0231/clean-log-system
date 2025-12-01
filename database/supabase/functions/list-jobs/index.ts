@@ -1,35 +1,24 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 import type { JobWorker, JobWorkerQueryResult, Worker } from "../types.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
-
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { organization_id } = await req.json();
+    const body = await req.json();
+    const validation = validateRequiredFields(body, ["organization_id"]);
 
-    if (!organization_id) {
-      return new Response(
-        JSON.stringify({ error: "Organization ID is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (!validation.valid) {
+      return errorResponse("Organization ID is required", 400);
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const { organization_id } = body;
+
+    const supabase = createServiceRoleClient();
 
     // Fetch jobs with location info
     const { data: jobs, error: jobsError } = await supabase
@@ -106,28 +95,14 @@ serve(async (req) => {
       workers: workersByJobId.get(job.id) || [],
     }));
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        jobs: jobsWithWorkers || [],
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      jobs: jobsWithWorkers || [],
+    });
   } catch (error) {
     console.error("List jobs error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to list jobs";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to list jobs"
     );
   }
 });

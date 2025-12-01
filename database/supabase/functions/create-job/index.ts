@@ -1,11 +1,7 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
   console.log("📥 Create Job: Request received", {
@@ -14,15 +10,12 @@ serve(async (req) => {
     hasAuthHeader: !!req.headers.get("authorization"),
   });
 
-  if (req.method === "OPTIONS") {
-    console.log("📥 Create Job: OPTIONS request, returning OK");
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
     // Get auth token from headers
-    const authHeader = req.headers.get("authorization");
-    const token = authHeader?.replace("Bearer ", "");
+    const token = extractAuthToken(req);
 
     console.log("🔐 Create Job: Authentication check", {
       hasToken: !!token,
@@ -31,76 +24,24 @@ serve(async (req) => {
 
     if (!token) {
       console.error("❌ Create Job: No authentication token provided");
-      return new Response(
-        JSON.stringify({ error: "Authentication required" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse("Authentication required", 401);
     }
 
-    // Create clients
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabaseAdmin = createServiceRoleClient();
 
     // Verify token and get user
-    let authUserId: string | null = null;
-    try {
-      const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-      console.log("🔐 Create Job: Verifying token", {
-        hasAnonKey: !!anonKey,
-      });
-      if (anonKey) {
-        const supabaseAnon = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          anonKey
-        );
-        const {
-          data: { user },
-          error: userError,
-        } = await supabaseAnon.auth.getUser(token);
+    const authUser = await getAuthUser(token);
 
-        if (userError) {
-          console.error("❌ Create Job: Token verification error", {
-            error: userError.message,
-            code: userError.status,
-          });
-        } else if (user) {
-          authUserId = user.id;
-          console.log("✅ Create Job: Token verified", {
-            userId: authUserId,
-            email: user.email,
-          });
-        } else {
-          console.warn("⚠️ Create Job: Token verified but no user returned");
-        }
-      } else {
-        console.warn("⚠️ Create Job: SUPABASE_ANON_KEY not available");
-      }
-    } catch (err) {
-      console.error("❌ Create Job: Error verifying auth token", {
-        error: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-      });
-      return new Response(
-        JSON.stringify({ error: "Invalid authentication token" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (!authUserId) {
+    if (!authUser) {
       console.error("❌ Create Job: User not found after token verification");
-      return new Response(JSON.stringify({ error: "User not found" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("User not found", 401);
     }
+
+    const authUserId = authUser.id;
+    console.log("✅ Create Job: Token verified", {
+      userId: authUserId,
+      email: authUser.email,
+    });
 
     // Get organization_id from worker table
     console.log("👷 Create Job: Fetching worker by auth_user_id", {
@@ -125,15 +66,37 @@ serve(async (req) => {
       console.error("❌ Create Job: Worker not found", {
         authUserId,
       });
-      return new Response(JSON.stringify({ error: "Worker not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Worker not found", 404);
     }
 
     const organizationId = worker.organization_id;
     console.log("✅ Create Job: Worker found", {
       organizationId,
+    });
+
+    // Fetch organization settings to check if predefined locations are required
+    console.log("🏢 Create Job: Fetching organization settings", {
+      organizationId,
+    });
+    const { data: organization, error: orgError } = await supabaseAdmin
+      .from("organization")
+      .select("use_predefined_locations")
+      .eq("id", organizationId)
+      .single();
+
+    if (orgError) {
+      console.error("❌ Create Job: Error fetching organization settings", {
+        error: orgError.message,
+        code: orgError.code,
+        details: orgError.details,
+      });
+      throw orgError;
+    }
+
+    const usePredefinedLocations =
+      organization?.use_predefined_locations ?? true;
+    console.log("✅ Create Job: Organization settings fetched", {
+      usePredefinedLocations,
     });
 
     // Parse request body
@@ -157,10 +120,7 @@ serve(async (req) => {
         error:
           parseError instanceof Error ? parseError.message : String(parseError),
       });
-      return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Invalid request body", 400);
     }
 
     const { submissionData } = body;
@@ -170,13 +130,7 @@ serve(async (req) => {
         hasSubmissionData: !!submissionData,
         type: typeof submissionData,
       });
-      return new Response(
-        JSON.stringify({ error: "submissionData is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse("submissionData is required", 400);
     }
 
     // Extract colleague_ids and location_id from submissionData
@@ -214,9 +168,22 @@ serve(async (req) => {
     console.log("📍 Create Job: Location normalization", {
       originalLocationId: locationId,
       normalizedLocationId,
+      usePredefinedLocations,
     });
 
-    // Validate location_id if provided
+    // Check if location_id is required based on organization settings
+    if (usePredefinedLocations && !normalizedLocationId) {
+      console.error("❌ Create Job: Location ID is required", {
+        usePredefinedLocations,
+        hasLocationId: !!normalizedLocationId,
+      });
+      return errorResponse(
+        "Location ID is required when predefined locations are enabled",
+        400
+      );
+    }
+
+    // Validate location_id if provided (or required)
     if (normalizedLocationId) {
       console.log("📍 Create Job: Validating location", {
         locationId: normalizedLocationId,
@@ -243,14 +210,9 @@ serve(async (req) => {
           locationId: normalizedLocationId,
           organizationId,
         });
-        return new Response(
-          JSON.stringify({
-            error: "Location not found or does not belong to your organization",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+        return errorResponse(
+          "Location not found or does not belong to your organization",
+          400
         );
       }
       console.log("✅ Create Job: Location validated", {
@@ -291,15 +253,9 @@ serve(async (req) => {
           requestedIds: colleagueIds,
           foundIds: colleagues?.map((c) => c.id) || [],
         });
-        return new Response(
-          JSON.stringify({
-            error:
-              "One or more colleagues not found or do not belong to your organization",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+        return errorResponse(
+          "One or more colleagues not found or do not belong to your organization",
+          400
         );
       }
       console.log("✅ Create Job: All colleagues validated", {
@@ -380,8 +336,8 @@ serve(async (req) => {
       status: 201,
     });
 
-    return new Response(
-      JSON.stringify({
+    return jsonResponse(
+      {
         success: true,
         job: {
           id: job.id,
@@ -390,11 +346,8 @@ serve(async (req) => {
           completed_at: job.completed_at,
           created_at: job.created_at,
         },
-      }),
-      {
-        status: 201,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
+      201
     );
   } catch (error) {
     const errorLog: Record<string, unknown> = {
@@ -441,14 +394,6 @@ serve(async (req) => {
       errorMessage,
     });
 
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: statusCode,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return errorResponse(errorMessage, statusCode);
   }
 });

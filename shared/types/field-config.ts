@@ -12,6 +12,8 @@ export interface FieldConfig {
   order_position: number;
   validation_rules: ValidationRules | null;
   options: string[] | null; // For select fields
+  mutually_exclusive_group: string | null;
+  group_cluster: string | null;
   version: number;
   active: boolean;
   archived_at: string | null;

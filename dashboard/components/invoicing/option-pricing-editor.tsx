@@ -137,8 +137,8 @@ export default function OptionPricingEditor({
         <CardHeader>
           <CardTitle className="text-sm">No Options</CardTitle>
           <CardDescription>
-            This field has no options configured. Add options in Mobile Config
-            first.
+            This field has no options configured. Add options in Mobile
+            Application first.
           </CardDescription>
         </CardHeader>
       </Card>

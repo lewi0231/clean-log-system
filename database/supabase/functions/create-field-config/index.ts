@@ -1,18 +1,25 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    const body = await req.json();
+    const validation = validateRequiredFields(body, [
+      "organization_id",
+      "name",
+      "label",
+      "field_type",
+    ]);
+
+    if (!validation.valid) {
+      return errorResponse("Missing required fields", 400);
+    }
+
     const {
       organization_id,
       name,
@@ -23,22 +30,19 @@ serve(async (req) => {
       order_position,
       validation_rules,
       options,
-    } = await req.json();
+      mutually_exclusive_group,
+      group_cluster,
+    } = body;
 
-    if (!organization_id || !name || !label || !field_type) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+    const supabase = createServiceRoleClient();
+
+    // Validate group/cluster consistency
+    if (group_cluster && !mutually_exclusive_group) {
+      return errorResponse(
+        "Group cluster requires a mutually exclusive group to be set",
+        400
       );
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     // If order_position not provided, get the max and add 1
     let finalOrderPosition = order_position;
@@ -69,6 +73,8 @@ serve(async (req) => {
         order_position: finalOrderPosition,
         validation_rules: validation_rules || null,
         options: options || null,
+        mutually_exclusive_group: mutually_exclusive_group || null,
+        group_cluster: group_cluster || null,
         active: true,
       })
       .select()
@@ -76,28 +82,14 @@ serve(async (req) => {
 
     if (createError) throw createError;
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        field_config: fieldConfig,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      field_config: fieldConfig,
+    });
   } catch (error) {
     console.error("Create field config error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to create field config";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to create field config"
     );
   }
 });

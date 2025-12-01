@@ -42,6 +42,15 @@ export default function TabLayout() {
           href: null, // Hide from tab bar - only accessible via navigation
         }}
       />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="gearshape.fill" color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

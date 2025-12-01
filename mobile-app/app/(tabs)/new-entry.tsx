@@ -3,6 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectItem } from "@/components/ui/select";
 import { useColleagues } from "@/hooks/use-colleagues";
 import { useEntryForm } from "@/hooks/use-entry-form";
+import {
+  groupFieldsByMutualExclusivity,
+  isFieldDisabled,
+} from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useAuth } from "@/hooks/useAuth";
@@ -282,30 +286,77 @@ export default function NewEntryScreen() {
               <Text className="text-muted-foreground">Loading fields...</Text>
             </View>
           ) : (
-            fieldConfigs.map((config) => (
-              <View key={config.id} className="mb-4">
-                {config.field_type !== "boolean" && (
-                  <Text className="text-base font-semibold mb-2 text-foreground">
-                    {config.label}
-                    {config.required && (
-                      <Text className="text-red-500"> *</Text>
-                    )}
-                  </Text>
-                )}
-                {config.description && (
-                  <Text className="text-sm text-muted-foreground mb-2 italic">
-                    {config.description}
-                  </Text>
-                )}
-                <FieldRenderer
-                  config={config}
-                  value={fieldValues[config.id]}
-                  error={errors[config.name]}
-                  onChange={(value) => updateFieldValue(config.id, value)}
-                  onErrorClear={() => clearFieldError(config.name)}
-                />
-              </View>
-            ))
+            (() => {
+              const groupedFields =
+                groupFieldsByMutualExclusivity(fieldConfigs);
+              const fieldElements: JSX.Element[] = [];
+
+              // Render grouped fields
+              Array.from(groupedFields.entries()).forEach(
+                ([groupId, configs]) => {
+                  if (groupId) {
+                    // Add group separator
+                    fieldElements.push(
+                      <View key={`group-${groupId}`} className="mb-2 mt-4">
+                        <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Choose One: {groupId}
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  // Render fields in this group
+                  configs.forEach((config) => {
+                    const disabled = isFieldDisabled(
+                      config,
+                      fieldConfigs,
+                      fieldValues
+                    );
+
+                    fieldElements.push(
+                      <View key={config.id} className="mb-4">
+                        {config.field_type !== "boolean" && (
+                          <Text
+                            className={`text-base font-semibold mb-2 ${
+                              disabled
+                                ? "text-muted-foreground"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {config.label}
+                            {config.required && (
+                              <Text className="text-red-500"> *</Text>
+                            )}
+                            {disabled && (
+                              <Text className="text-xs text-muted-foreground ml-2">
+                                (locked - another method selected)
+                              </Text>
+                            )}
+                          </Text>
+                        )}
+                        {config.description && (
+                          <Text className="text-sm text-muted-foreground mb-2 italic">
+                            {config.description}
+                          </Text>
+                        )}
+                        <FieldRenderer
+                          config={config}
+                          value={fieldValues[config.id]}
+                          error={errors[config.name]}
+                          onChange={(value) =>
+                            updateFieldValue(config.id, value)
+                          }
+                          onErrorClear={() => clearFieldError(config.name)}
+                          disabled={disabled}
+                        />
+                      </View>
+                    );
+                  });
+                }
+              );
+
+              return fieldElements;
+            })()
           )}
 
           {/* Submit button */}

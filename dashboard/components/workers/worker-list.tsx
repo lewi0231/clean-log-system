@@ -19,8 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { log } from "@/lib/logger";
 import { Worker } from "@/lib/types";
-import { Pencil, Trash2 } from "lucide-react";
+import { Mail, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import WorkerForm from "./worker-form";
 
@@ -33,6 +34,8 @@ interface WorkerListProps {
     workerId: string,
     workerData: { name: string; email: string; phone: string; active?: boolean }
   ) => Promise<void>;
+  onResendInvitation?: (workerId: string) => Promise<void>;
+  organizationId?: string | null;
 }
 
 export default function WorkerList({
@@ -41,10 +44,14 @@ export default function WorkerList({
   error,
   onDeleteWorker,
   onUpdateWorker,
+  onResendInvitation,
+  organizationId,
 }: WorkerListProps) {
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingWorker, setDeletingWorker] = useState<Worker | null>(null);
+  const [resendingWorker, setResendingWorker] = useState<Worker | null>(null);
+  const [isResending, setIsResending] = useState(false);
 
   const handleEdit = (worker: Worker) => {
     setEditingWorker(worker);
@@ -55,6 +62,31 @@ export default function WorkerList({
     if (!deletingWorker) return;
     await onDeleteWorker(deletingWorker.id);
     setDeletingWorker(null);
+  };
+
+  const handleResendInvitation = async () => {
+    if (!resendingWorker || !onResendInvitation || !organizationId) return;
+
+    try {
+      setIsResending(true);
+      await onResendInvitation(resendingWorker.id);
+      log.info("WorkerList: Invitation resent successfully", {
+        workerId: resendingWorker.id,
+      });
+      setResendingWorker(null);
+      alert(`Invitation email has been sent to ${resendingWorker.email}`);
+    } catch (err) {
+      log.error("WorkerList: Failed to resend invitation", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      alert(
+        `Failed to resend invitation: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const handleFormSuccess = async (
@@ -126,6 +158,18 @@ export default function WorkerList({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {!worker.active &&
+                        !worker.auth_user_id &&
+                        onResendInvitation && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setResendingWorker(worker)}
+                            title="Resend invitation email"
+                          >
+                            <Mail className="h-4 w-4 cursor-pointer" />
+                          </Button>
+                        )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -184,6 +228,35 @@ export default function WorkerList({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!resendingWorker}
+        onOpenChange={(open) => {
+          if (!open && !isResending) {
+            setResendingWorker(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Resend Invitation Email</AlertDialogTitle>
+            <AlertDialogDescription>
+              Send a new invitation email to &quot;{resendingWorker?.name}&quot;
+              ({resendingWorker?.email})? They will receive a link to set up
+              their account.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResendInvitation}
+              disabled={isResending}
+            >
+              {isResending ? "Sending..." : "Resend Email"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

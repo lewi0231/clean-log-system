@@ -1,7 +1,13 @@
 import { GroupedBreakdownItem } from "@/components/group-breakdown-field";
 import { useMemo, useState } from "react";
 import z from "zod";
-import { FieldErrors, useFieldConfigs } from "./use-field-configs";
+import {
+  FieldErrors,
+  getFieldCluster,
+  groupFieldsByMutualExclusivity,
+  hasValue,
+  useFieldConfigs,
+} from "./use-field-configs";
 import { useOrganizationSettings } from "./use-organization-settings";
 
 interface UseEntryFormProps {
@@ -22,8 +28,11 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
   const { settings } = useOrganizationSettings(organizationId || "");
 
   // Create extended schema that includes conditional validation based on settings
+  // TODO - investigate later as this seems to be rendering way too often.
   const extendedSchema = useMemo(() => {
     if (!settings) return FieldConfigSchema;
+
+    console.debug("Entry: Settings:", settings);
 
     const baseShape = FieldConfigSchema.shape;
 
@@ -64,7 +73,81 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
     return submissionData;
   };
 
+  const validateMutuallyExclusiveGroups = (
+    submissionData: Record<string, any>
+  ): FieldErrors => {
+    const groups = groupFieldsByMutualExclusivity(fieldConfigs);
+    const errors: FieldErrors = {};
+
+    // Check each mutually exclusive group
+    groups.forEach((configs, groupId) => {
+      if (!groupId) return; // Skip ungrouped fields
+
+      // Group fields by cluster
+      const clusters = new Map<string | null, typeof configs>();
+      configs.forEach((config) => {
+        const cluster = getFieldCluster(config);
+        if (!clusters.has(cluster)) {
+          clusters.set(cluster, []);
+        }
+        clusters.get(cluster)!.push(config);
+      });
+
+      // Check which clusters have values
+      const activeClusters: Array<{
+        cluster: string | null;
+        fields: typeof configs;
+      }> = [];
+
+      clusters.forEach((fields, cluster) => {
+        const fieldsWithValues = fields.filter((fc) =>
+          hasValue(submissionData[fc.name], fc.field_type)
+        );
+
+        if (fieldsWithValues.length > 0) {
+          activeClusters.push({ cluster, fields: fieldsWithValues });
+        }
+      });
+
+      // Multiple clusters active = error
+      if (activeClusters.length > 1) {
+        activeClusters.forEach(({ fields }) => {
+          fields.forEach((config) => {
+            errors[config.name] =
+              "Multiple tracking methods selected. Please use only one method.";
+          });
+        });
+      }
+
+      // Check required fields within active cluster
+      if (activeClusters.length === 1) {
+        const { fields: activeFields } = activeClusters[0];
+        activeFields.forEach((config) => {
+          if (
+            config.required &&
+            !hasValue(submissionData[config.name], config.field_type)
+          ) {
+            errors[config.name] = `${config.label} is required`;
+          }
+        });
+      } else if (activeClusters.length === 0) {
+        // Check if any field in group is required
+        const requiredInGroup = configs.find((c) => c.required);
+        if (requiredInGroup) {
+          errors[
+            requiredInGroup.name
+          ] = `Please select one tracking method: ${configs
+            .map((c) => c.label)
+            .join(", ")}`;
+        }
+      }
+    });
+
+    return errors;
+  };
+
   const validateInputs = (submissionData: Record<string, any>) => {
+    // First validate schema
     const validation = extendedSchema.safeParse(submissionData);
 
     if (!validation.success) {
@@ -79,6 +162,15 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
       setErrors(fieldErrors);
       return false;
     }
+
+    // Then validate mutually exclusive groups
+    const groupErrors = validateMutuallyExclusiveGroups(submissionData);
+    if (Object.keys(groupErrors).length > 0) {
+      console.warn("Entry: group validation failed", { errors: groupErrors });
+      setErrors(groupErrors);
+      return false;
+    }
+
     console.warn("Entry: form validation success", validation.data);
     setErrors({}); // Clear errors on success
     return true;

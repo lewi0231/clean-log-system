@@ -1,70 +1,54 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { organization_id } = await req.json();
+    const body = await req.json();
+    const validation = validateRequiredFields(body, ["organization_id"]);
 
-    if (!organization_id) {
-      return new Response(
-        JSON.stringify({ error: "Organization ID is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (!validation.valid) {
+      return errorResponse("Organization ID is required", 400);
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const { organization_id } = body;
+
+    const supabase = createServiceRoleClient();
 
     const { data: organization, error: orgError } = await supabase
       .from("organization")
-      .select("use_predefined_locations")
+      .select(
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider"
+      )
       .eq("id", organization_id)
       .single();
 
     if (orgError) throw orgError;
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        settings: {
-          use_predefined_locations:
-            organization?.use_predefined_locations ?? true,
-        },
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      settings: {
+        name: organization?.name ?? "",
+        use_predefined_locations:
+          organization?.use_predefined_locations ?? true,
+        business_mode: organization?.business_mode ?? "service_based",
+        abn: organization?.abn ?? null,
+        logo_url: organization?.logo_url ?? null,
+        primary_contact_email: organization?.primary_contact_email ?? null,
+        invoice_send_immediately:
+          organization?.invoice_send_immediately ?? false,
+        stripe_account_id: organization?.stripe_account_id ?? null,
+        payment_provider: organization?.payment_provider ?? null,
+      },
+    });
   } catch (error) {
     console.error("Get organization settings error:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to get organization settings";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to get organization settings"
     );
   }
 });

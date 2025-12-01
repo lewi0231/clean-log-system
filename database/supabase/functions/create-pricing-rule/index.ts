@@ -1,18 +1,31 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    const body = await req.json();
+    const validation = validateRequiredFields(body, [
+      "organization_id",
+      "name",
+      "rule_type",
+      "condition_field_config_id",
+      "condition_operator",
+      "action_type",
+    ]);
+
+    if (
+      !validation.valid ||
+      body.condition_value === undefined ||
+      body.action_value === undefined
+    ) {
+      return errorResponse("Missing required fields", 400);
+    }
+
     const {
       organization_id,
       name,
@@ -26,33 +39,9 @@ serve(async (req) => {
       priority,
       enabled,
       location_id,
-    } = await req.json();
+    } = body;
 
-    if (
-      !organization_id ||
-      !name ||
-      !rule_type ||
-      !condition_field_config_id ||
-      !condition_operator ||
-      condition_value === undefined ||
-      !action_type ||
-      action_value === undefined
-    ) {
-      return new Response(
-        JSON.stringify({
-          error: "Missing required fields",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceRoleClient();
 
     // Verify field config exists
     const { data: fieldConfig, error: fieldConfigError } = await supabase
@@ -63,10 +52,7 @@ serve(async (req) => {
       .single();
 
     if (fieldConfigError || !fieldConfig) {
-      return new Response(JSON.stringify({ error: "Field config not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Field config not found", 404);
     }
 
     // Validate location_id if provided
@@ -79,10 +65,7 @@ serve(async (req) => {
         .single();
 
       if (locationError || !location) {
-        return new Response(JSON.stringify({ error: "Location not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Location not found", 404);
       }
     }
 
@@ -107,28 +90,14 @@ serve(async (req) => {
 
     if (createError) throw createError;
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        pricing_rule: pricingRule,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      pricing_rule: pricingRule,
+    });
   } catch (error) {
     console.error("Create pricing rule error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to create pricing rule";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to create pricing rule"
     );
   }
 });

@@ -33,6 +33,14 @@ export interface Worker {
   created_at: string;
 }
 
+export interface OrganizationUser {
+  id: string;
+  organization_id: string;
+  email: string;
+  role: "admin" | "viewer";
+  created_at: string;
+}
+
 export interface Location {
   id: string;
   name: string;
@@ -44,8 +52,18 @@ export interface Location {
   created_at: string;
 }
 
+export type BusinessMode = "service_based" | "resource_tracking";
+
 export interface OrganizationSettings {
+  name: string;
   use_predefined_locations: boolean;
+  business_mode: BusinessMode;
+  abn: string | null;
+  logo_url: string | null;
+  primary_contact_email: string | null;
+  invoice_send_immediately: boolean;
+  stripe_account_id: string | null;
+  payment_provider: string | null;
 }
 
 export interface Job {
@@ -105,6 +123,7 @@ export interface BasePricing {
   standalone_base_price: number | null;
   customer_base_price: number;
   worker_base_payment: number | null;
+  adjustment_type: "add" | "multiply";
   location_id: string | null;
   currency: string;
   created_at: string;
@@ -204,4 +223,71 @@ export interface FieldPricing {
     id: string;
     name: string;
   } | null;
+}
+
+export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
+
+export interface Invoice {
+  id: string;
+  organization_id: string;
+  invoice_number: string;
+  status: InvoiceStatus;
+  subtotal: number;
+  total: number;
+  currency: string;
+  due_date: string;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceWithJobs extends Invoice {
+  invoice_job: Array<{
+    job: {
+      id: string;
+      completed_at: string;
+      created_at: string;
+      submission_data?: Record<string, unknown> | null;
+      location: {
+        id: string;
+        name: string;
+        email: string;
+        address: string | null;
+        contact_person: string | null;
+        phone: string | null;
+      } | null;
+    };
+  }>;
+}
+
+export interface CreateInvoiceRequest {
+  organization_id: string;
+  job_ids: string[];
+  due_date: string;
+  notes?: string | null;
+}
+
+export interface ListInvoicesRequest {
+  organization_id: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface LineItemDisplayConfig {
+  include_option_value: boolean;
+  description_format: string;
+  show_base_price_separately: boolean;
+}
+
+export interface InvoiceTemplateConfig {
+  id: string;
+  organization_id: string;
+  invoice_title: string;
+  show_logo: boolean;
+  show_abn: boolean;
+  bill_to_fields: string[]; // Array of field_config names to display in Bill To section
+  line_item_display: LineItemDisplayConfig;
+  created_at: string;
+  updated_at: string;
 }

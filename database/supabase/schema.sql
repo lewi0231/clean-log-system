@@ -8,6 +8,8 @@ CREATE TABLE organization (
   plan TEXT DEFAULT 'basic', -- basic, pro, enterprise
   active BOOLEAN DEFAULT true,
   trial_ends_at TIMESTAMPTZ,
+  use_predefined_locations BOOLEAN DEFAULT true,
+  business_mode TEXT DEFAULT 'service_based' CHECK (business_mode IN ('service_based', 'resource_tracking')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

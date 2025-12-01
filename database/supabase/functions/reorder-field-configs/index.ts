@@ -1,36 +1,23 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { organization_id, field_config_ids } = await req.json();
+    const body = await req.json();
+    const { organization_id, field_config_ids } = body;
 
     if (!organization_id || !Array.isArray(field_config_ids)) {
-      return new Response(
-        JSON.stringify({
-          error: "Organization ID and field_config_ids array are required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      return errorResponse(
+        "Organization ID and field_config_ids array are required",
+        400
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceRoleClient();
 
     // Update order_position for each field config based on array index
     const updates = field_config_ids.map((id: string, index: number) =>
@@ -53,29 +40,11 @@ serve(async (req) => {
       );
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({ success: true });
   } catch (error) {
     console.error("Reorder field configs error:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to reorder field configs";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to reorder field configs"
     );
   }
 });

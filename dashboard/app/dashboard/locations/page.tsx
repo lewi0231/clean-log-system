@@ -78,22 +78,24 @@ export default function LocationsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Locations</h1>
         <p className="text-muted-foreground mt-2">
-          Manage your organization&apos;s locations
+          Manage your organization&apos;s locations. These are locations that
+          you regularly service.
         </p>
       </div>
 
       <div className="mb-6 p-4 bg-muted rounded-lg">
         <p className="text-sm text-muted-foreground">
-          These locations will appear as select options in the mobile app when
-          the &quot;Use Predefined Locations&quot; setting is enabled. You can
-          also configure custom location fields in{" "}
+          These locations will appear as selectable options in the mobile app
+          when the &quot;Use Predefined Locations&quot; setting is enabled. You
+          can also configure custom location fields in{" "}
           <a
             href="/dashboard/mobile-config"
             className="text-primary hover:underline font-medium"
           >
-            Mobile Config
+            Mobile Application
           </a>
-          .
+          . You would do this if your business does not service known locations
+          (e.g., Mobile Car Detailer vs Car Yard Service)
         </p>
       </div>
 

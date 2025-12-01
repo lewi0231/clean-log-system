@@ -79,7 +79,7 @@ function Nav() {
   return (
     <nav
       className={cn(
-        "fixed h-20 flex justify-between px-20 py-10 items-center min-w-full bg-secondary -translate-y-20 transition-all duration-300",
+        "fixed h-20 flex justify-between px-20 py-10 items-center min-w-full bg-secondary -translate-y-20 transition-all duration-300 z-50",
         isTop ? "translate-y-0 opacity-100" : "opacity-0"
       )}
     >

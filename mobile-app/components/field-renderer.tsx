@@ -14,6 +14,7 @@ interface FieldRendererProps {
   error?: string;
   onChange: (value: string | number | boolean | GroupedBreakdownItem[]) => void;
   onErrorClear?: () => void;
+  disabled?: boolean;
 }
 
 export function FieldRenderer({
@@ -22,6 +23,7 @@ export function FieldRenderer({
   error,
   onChange,
   onErrorClear,
+  disabled = false,
 }: FieldRendererProps) {
   const placeholder = config.required
     ? `${config.label} *`
@@ -30,6 +32,7 @@ export function FieldRenderer({
   const handleFieldChange = (
     newValue: string | number | boolean | GroupedBreakdownItem[]
   ) => {
+    if (disabled) return;
     onChange(newValue);
     // Clear error when user starts typing/selecting
     if (error && onErrorClear) {
@@ -44,11 +47,14 @@ export function FieldRenderer({
       return (
         <View>
           <TextInput
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground"
+            className={`bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground ${
+              disabled ? "opacity-50" : ""
+            }`}
             placeholder={placeholder}
             placeholderTextColor="#999"
             value={String(value || "")}
             onChangeText={(text) => handleFieldChange(text)}
+            editable={!disabled}
             keyboardType={
               config.field_type === "email"
                 ? "email-address"
@@ -77,7 +83,9 @@ export function FieldRenderer({
       return (
         <View>
           <TextInput
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground"
+            className={`bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground ${
+              disabled ? "opacity-50" : ""
+            }`}
             placeholder={placeholder}
             placeholderTextColor="#999"
             value={String(value || "0")}
@@ -86,6 +94,7 @@ export function FieldRenderer({
               handleFieldChange(numValue);
             }}
             keyboardType="number-pad"
+            editable={!disabled}
           />
           {error && (
             <Text className="text-sm text-destructive mt-1">{error}</Text>
@@ -97,7 +106,9 @@ export function FieldRenderer({
       return (
         <View>
           <TextInput
-            className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 pt-3.5 text-base text-foreground min-h-[100px]"
+            className={`bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 pt-3.5 text-base text-foreground min-h-[100px] ${
+              disabled ? "opacity-50" : ""
+            }`}
             placeholder={placeholder}
             placeholderTextColor="#999"
             value={String(value || "")}
@@ -105,6 +116,7 @@ export function FieldRenderer({
             multiline
             numberOfLines={4}
             textAlignVertical="top"
+            editable={!disabled}
           />
           {error && (
             <Text className="text-sm text-destructive mt-1">{error}</Text>
@@ -132,6 +144,7 @@ export function FieldRenderer({
             onValueChange={(selectedValue) => handleFieldChange(selectedValue)}
             placeholder={placeholder}
             size="medium"
+            disabled={disabled}
           >
             {config.options.map((option) => (
               <SelectItem key={option} value={option}>
@@ -152,6 +165,7 @@ export function FieldRenderer({
             config={config}
             value={(value as GroupedBreakdownItem[]) || []}
             onChange={(items) => handleFieldChange(items)}
+            disabled={disabled}
           />
           {error && (
             <Text className="text-sm text-destructive mt-1">{error}</Text>
@@ -170,6 +184,7 @@ export function FieldRenderer({
             onValueChange={(newValue) => handleFieldChange(newValue)}
             trackColor={{ false: "#767577", true: "#007AFF" }}
             thumbColor="#fff"
+            disabled={disabled}
           />
         </View>
       );
@@ -204,7 +219,7 @@ export function FieldRenderer({
               }
             }}
             placeholder={placeholder}
-            disabled={false}
+            disabled={disabled}
             className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5"
             size="md"
             variant="outline"
@@ -262,7 +277,7 @@ export function FieldRenderer({
               }
             }}
             placeholder={placeholder || "Select time"}
-            disabled={false}
+            disabled={disabled}
             className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5"
             size="lg"
             variant="outline"

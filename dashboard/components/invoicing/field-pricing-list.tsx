@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
+import { useModeAwareLabels } from "@/hooks/use-mode-aware-labels";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import type { FieldConfig, FieldType } from "@/shared/types";
 import { ChevronDown, ChevronUp, DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -34,6 +36,9 @@ export default function FieldPricingList() {
     upsertPricing,
     deletePricing,
   } = useFieldPricing();
+  const labels = useModeAwareLabels();
+  const { settings } = useOrganizationSettings();
+  const isServiceBased = settings?.business_mode === "service_based";
 
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
     {}
@@ -137,28 +142,38 @@ export default function FieldPricingList() {
   const getFieldTypeLabel = (fieldType: FieldType): string => {
     switch (fieldType) {
       case "number":
-        return "Unit Price";
+        return isServiceBased ? "Service Price" : "Unit Cost";
       case "select":
-        return "Option Price";
+        return isServiceBased ? "Service Price" : "Option Cost";
       case "grouped_breakdown":
-        return "Group/Brand Price";
+        return isServiceBased ? "Service Price" : "Group/Brand Cost";
       case "boolean":
-        return "Fixed Price (when true)";
+        return isServiceBased
+          ? "Fixed Price (when true)"
+          : "Fixed Cost (when true)";
       default:
-        return "Price";
+        return labels.pricingLabel;
     }
   };
 
   const getFieldTypeDescription = (fieldConfig: FieldConfig): string => {
     switch (fieldConfig.field_type) {
       case "number":
-        return "Price per unit (multiplied by quantity)";
+        return isServiceBased
+          ? "Price per unit (multiplied by quantity)"
+          : "Cost per unit (multiplied by quantity)";
       case "select":
-        return "Price for each selected option. Configure option-specific pricing in the Option Pricing section.";
+        return isServiceBased
+          ? "Price for each selected option. Configure option-specific pricing in the Option Pricing section."
+          : "Cost for each selected option. Configure option-specific pricing in the Option Pricing section.";
       case "grouped_breakdown":
-        return "Price for each group/brand. Configure group-specific pricing in the Option Pricing section.";
+        return isServiceBased
+          ? "Price for each group/brand. Configure group-specific pricing in the Option Pricing section."
+          : "Cost for each group/brand. Configure group-specific pricing in the Option Pricing section.";
       case "boolean":
-        return "Fixed price charged when this field is true";
+        return isServiceBased
+          ? "Fixed price charged when this field is true"
+          : "Fixed cost charged when this field is true";
       default:
         return "";
     }
@@ -185,8 +200,8 @@ export default function FieldPricingList() {
           <CardTitle>No Fields Available for Pricing</CardTitle>
           <CardDescription>
             You need to create field configurations (number, select, grouped
-            breakdown, or boolean types) in Mobile Config before you can set
-            pricing for invoicing.
+            breakdown, or boolean types) in Mobile Application before you can
+            set pricing for invoicing.
           </CardDescription>
         </CardHeader>
       </Card>

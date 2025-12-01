@@ -1,13 +1,8 @@
-// supabase/functions/register-organization/index.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 
 function generateOrgCode(businessName: string): string {
   // Take first 4 letters, uppercase
@@ -47,39 +42,30 @@ async function ensureUniqueOrgCode(
 }
 
 serve(async (req) => {
-  // Handle CORS
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const {
-      organisation: business_name,
-      email: admin_email,
-      password,
-    } = await req.json();
+    const body = await req.json();
+    const { organisation: business_name, email: admin_email, password } = body;
 
-    // Validate input
-    if (!business_name || !admin_email || !password) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    const validation = validateRequiredFields(body, [
+      "organisation",
+      "email",
+      "password",
+    ]);
+
+    if (!validation.valid) {
+      return errorResponse("Missing required fields", 400);
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceRoleClient();
 
     // Generate unique org code
     const baseCode = generateOrgCode(business_name);
     const orgCode = await ensureUniqueOrgCode(supabase, baseCode);
 
-    // Calculate trial end date (14 days from now)
+    // Calculate trial end date (30 days from now)
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
@@ -90,6 +76,7 @@ serve(async (req) => {
         name: business_name,
         org_code: orgCode,
         trial_ends_at: trialEndsAt.toISOString(),
+        primary_contact_email: admin_email,
       })
       .select()
       .single();
@@ -118,36 +105,22 @@ serve(async (req) => {
     if (linkError) throw linkError;
 
     // 4. Return success with org code
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Organization created successfully",
-        organization: {
-          id: org.id,
-          name: org.name,
-          org_code: orgCode,
-        },
-        admin_email: admin_email,
-        // Show org_code prominently - employees will need this
-        instructions: `Your organization code is: ${orgCode}. Give this to your employees for mobile app login.`,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      message: "Organization created successfully",
+      organization: {
+        id: org.id,
+        name: org.name,
+        org_code: orgCode,
+      },
+      admin_email: admin_email,
+      // Show org_code prominently - employees will need this
+      instructions: `Your organization code is: ${orgCode}. Give this to your employees for mobile app login.`,
+    });
   } catch (error) {
     console.error("Registration error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Registration failed";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Registration failed"
     );
   }
 });

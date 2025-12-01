@@ -1,38 +1,30 @@
-// supabase/functions/accept-worker-invitation/index.ts
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   if (req.method === "POST") {
     try {
-      const { invitation_token, password } = await req.json();
+      const body = await req.json();
+      const validation = validateRequiredFields(body, [
+        "invitation_token",
+        "password",
+      ]);
 
-      if (!invitation_token || !password) {
-        return new Response(
-          JSON.stringify({
-            error: "Missing required fields: invitation_token and password",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+      if (!validation.valid) {
+        return errorResponse(
+          "Missing required fields: invitation_token and password",
+          400
         );
       }
 
-      const supabase = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
+      const { invitation_token, password } = body;
+
+      const supabase = createServiceRoleClient();
 
       // Step 1: Verify invitation exists and not expired
       const { data: invitation, error: inviteError } = await supabase
@@ -42,27 +34,15 @@ serve(async (req) => {
         .single();
 
       if (inviteError || !invitation) {
-        return new Response(JSON.stringify({ error: "Invitation not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Invitation not found", 404);
       }
 
       if (new Date(invitation.expires_at) < new Date()) {
-        return new Response(JSON.stringify({ error: "Invitation expired" }), {
-          status: 410,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Invitation expired", 410);
       }
 
       if (invitation.accepted_at) {
-        return new Response(
-          JSON.stringify({ error: "Invitation already used" }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return errorResponse("Invitation already used", 400);
       }
 
       // Step 2: Create Supabase Auth user
@@ -79,13 +59,7 @@ serve(async (req) => {
         });
 
       if (authError) {
-        return new Response(
-          JSON.stringify({ error: `Auth error: ${authError.message}` }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return errorResponse(`Auth error: ${authError.message}`, 400);
       }
 
       // Step 3: Update worker with auth_user_id and set active to true
@@ -100,13 +74,7 @@ serve(async (req) => {
 
       if (updateError) {
         console.error("Update worker error:", updateError);
-        return new Response(
-          JSON.stringify({ error: "Failed to update worker" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return errorResponse("Failed to update worker", 500);
       }
 
       // Step 4: Mark invitation as accepted
@@ -120,42 +88,24 @@ serve(async (req) => {
 
       if (acceptError) {
         console.error("Accept invitation error:", acceptError);
-        return new Response(
-          JSON.stringify({ error: "Failed to mark invitation as accepted" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return errorResponse("Failed to mark invitation as accepted", 500);
       }
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Account created successfully",
-          user: {
-            id: authData.user.id,
-            email: authData.user.email,
-          },
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse({
+        success: true,
+        message: "Account created successfully",
+        user: {
+          id: authData.user.id,
+          email: authData.user.email,
+        },
+      });
     } catch (error) {
       console.error("Accept invitation error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to accept invitation";
-      return new Response(JSON.stringify({ error: errorMessage }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse(
+        error instanceof Error ? error : "Failed to accept invitation"
+      );
     }
   }
 
-  return new Response(JSON.stringify({ error: "Method not allowed" }), {
-    status: 405,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return errorResponse("Method not allowed", 405);
 });

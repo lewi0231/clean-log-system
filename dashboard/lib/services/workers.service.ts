@@ -6,6 +6,7 @@ import type {
   DeleteWorkerRequest,
   ListWorkersAndLocationsRequest,
   ListWorkersAndLocationsResponse,
+  ResendWorkerInvitationRequest,
   UpdateWorkerRequest,
 } from "@/lib/types/api";
 
@@ -135,6 +136,44 @@ export class WorkersService {
       });
     } catch (err) {
       log.error("WorkersService: Failed to delete worker", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Resend invitation email to a worker
+   */
+  static async resendInvitation(
+    request: ResendWorkerInvitationRequest
+  ): Promise<void> {
+    try {
+      log.debug("WorkersService: Resending invitation", {
+        workerId: request.worker_id,
+        organizationId: request.organization_id,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "resend-worker-invitation",
+        {
+          body: request,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || !data.success) {
+        throw new Error("Failed to resend invitation");
+      }
+
+      log.info("WorkersService: Invitation resent successfully", {
+        workerId: request.worker_id,
+      });
+    } catch (err) {
+      log.error("WorkersService: Failed to resend invitation", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       throw err;

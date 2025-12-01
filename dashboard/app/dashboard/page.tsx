@@ -65,7 +65,7 @@ export default function Dashboard() {
               {stats.activeWorkers} active
             </p>
             <Button asChild variant="outline" className="mt-4 w-full">
-              <Link href="/dashboard/workers">Manage Workers</Link>
+              <Link href="/dashboard/users">Manage Users</Link>
             </Button>
           </CardContent>
         </Card>

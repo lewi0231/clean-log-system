@@ -1,18 +1,30 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import {
+  validateNonNegativeNumber,
+  validateRequiredFields,
+} from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    const body = await req.json();
+    const validation = validateRequiredFields(body, ["organization_id"]);
+
+    if (!validation.valid) {
+      return errorResponse("Organization ID is required", 400);
+    }
+
+    if (body.customer_base_price === undefined) {
+      return errorResponse(
+        "Organization ID and customer base price are required",
+        400
+      );
+    }
+
     const {
       organization_id,
       job_type_field_config_id,
@@ -20,69 +32,58 @@ serve(async (req) => {
       standalone_base_price,
       customer_base_price,
       worker_base_payment,
+      adjustment_type,
       location_id,
       currency,
-    } = await req.json();
-
-    if (!organization_id || customer_base_price === undefined) {
-      return new Response(
-        JSON.stringify({
-          error: "Organization ID and customer base price are required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    } = body;
 
     // Validate that only one pricing type is specified
     if (
       (job_type_field_config_id && standalone_base_price !== undefined) ||
       (!job_type_field_config_id && standalone_base_price === undefined)
     ) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Must specify either job_type_field_config_id (field-based) or standalone_base_price (standalone), but not both",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      return errorResponse(
+        "Must specify either job_type_field_config_id (field-based) or standalone_base_price (standalone), but not both",
+        400
       );
     }
 
-    if (customer_base_price < 0) {
-      return new Response(
-        JSON.stringify({ error: "Customer base price must be non-negative" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+    // Validate adjustment_type
+    const validAdjustmentType = adjustment_type || "add";
+    if (validAdjustmentType !== "add" && validAdjustmentType !== "multiply") {
+      return errorResponse(
+        "adjustment_type must be either 'add' or 'multiply'",
+        400
       );
+    }
+
+    // Validate customer_base_price based on adjustment_type
+    if (validAdjustmentType === "add") {
+      if (!validateNonNegativeNumber(customer_base_price)) {
+        return errorResponse("Customer base price must be non-negative", 400);
+      }
+    } else {
+      // For multiply, value must be > 0 (e.g., 1.2 for 20% increase, 0.9 for 10% decrease)
+      if (
+        !validateNonNegativeNumber(customer_base_price) ||
+        customer_base_price <= 0
+      ) {
+        return errorResponse(
+          "Customer base price (multiplier) must be greater than 0",
+          400
+        );
+      }
     }
 
     if (
       worker_base_payment !== undefined &&
       worker_base_payment !== null &&
-      worker_base_payment < 0
+      !validateNonNegativeNumber(worker_base_payment)
     ) {
-      return new Response(
-        JSON.stringify({
-          error: "Worker base payment must be non-negative",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return errorResponse("Worker base payment must be non-negative", 400);
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceRoleClient();
 
     // Verify field config exists if field-based
     if (job_type_field_config_id) {
@@ -94,38 +95,22 @@ serve(async (req) => {
         .single();
 
       if (fieldConfigError || !fieldConfig) {
-        return new Response(
-          JSON.stringify({ error: "Field config not found" }),
-          {
-            status: 404,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return errorResponse("Field config not found", 404);
       }
 
       if (fieldConfig.field_type !== "select") {
-        return new Response(
-          JSON.stringify({
-            error: "Field-based base pricing can only use select fields",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+        return errorResponse(
+          "Field-based base pricing can only use select fields",
+          400
         );
       }
 
       // Verify job_type_value exists in field config options
       const options = fieldConfig.options as string[] | null;
       if (!options || !options.includes(job_type_value)) {
-        return new Response(
-          JSON.stringify({
-            error: `Job type value "${job_type_value}" not found in field config options`,
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+        return errorResponse(
+          `Job type value "${job_type_value}" not found in field config options`,
+          400
         );
       }
     }
@@ -140,10 +125,7 @@ serve(async (req) => {
         .single();
 
       if (locationError || !location) {
-        return new Response(JSON.stringify({ error: "Location not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Location not found", 404);
       }
     }
 
@@ -163,7 +145,8 @@ serve(async (req) => {
 
     const upsertData: Record<string, unknown> = {
       organization_id,
-      customer_base_price: parseFloat(customer_base_price),
+      customer_base_price: customer_base_price,
+      adjustment_type: validAdjustmentType,
       currency: currency || "USD",
       updated_at: new Date().toISOString(),
     };
@@ -208,28 +191,14 @@ serve(async (req) => {
       basePricing = inserted;
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        base_pricing: basePricing,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      base_pricing: basePricing,
+    });
   } catch (error) {
     console.error("Upsert base pricing error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to upsert base pricing";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to upsert base pricing"
     );
   }
 });

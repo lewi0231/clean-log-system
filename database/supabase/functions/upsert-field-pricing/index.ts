@@ -1,18 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import {
+  validateNonNegativeNumber,
+  validateRequiredFields,
+} from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    const body = await req.json();
+    const validation = validateRequiredFields(body, [
+      "organization_id",
+      "field_config_id",
+    ]);
+
+    if (!validation.valid || body.customer_price === undefined) {
+      return errorResponse(
+        "Organization ID, field config ID, and customer price are required",
+        400
+      );
+    }
+
     const {
       organization_id,
       field_config_id,
@@ -23,29 +34,10 @@ serve(async (req) => {
       applies_to_field_type,
       worker_payment_type,
       worker_payment_value,
-    } = await req.json();
+    } = body;
 
-    if (!organization_id || !field_config_id || customer_price === undefined) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Organization ID, field config ID, and customer price are required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (customer_price < 0) {
-      return new Response(
-        JSON.stringify({ error: "Customer price must be non-negative" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (!validateNonNegativeNumber(customer_price)) {
+      return errorResponse("Customer price must be non-negative", 400);
     }
 
     // Validate worker payment value if provided
@@ -53,40 +45,29 @@ serve(async (req) => {
       worker_payment_type === "percentage" &&
       worker_payment_value !== undefined
     ) {
-      if (worker_payment_value < 0 || worker_payment_value > 100) {
-        return new Response(
-          JSON.stringify({
-            error: "Worker payment percentage must be between 0 and 100",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
+      if (
+        !validateNonNegativeNumber(worker_payment_value) ||
+        worker_payment_value > 100
+      ) {
+        return errorResponse(
+          "Worker payment percentage must be between 0 and 100",
+          400
         );
       }
     }
 
     if (
       worker_payment_type === "fixed_rate" &&
-      worker_payment_value !== undefined
+      worker_payment_value !== undefined &&
+      !validateNonNegativeNumber(worker_payment_value)
     ) {
-      if (worker_payment_value < 0) {
-        return new Response(
-          JSON.stringify({
-            error: "Worker payment fixed rate must be non-negative",
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
+      return errorResponse(
+        "Worker payment fixed rate must be non-negative",
+        400
+      );
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceRoleClient();
 
     // Verify field config exists
     const { data: fieldConfig, error: fieldConfigError } = await supabase
@@ -97,10 +78,7 @@ serve(async (req) => {
       .single();
 
     if (fieldConfigError || !fieldConfig) {
-      return new Response(JSON.stringify({ error: "Field config not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Field config not found", 404);
     }
 
     // Validate location_id if provided
@@ -113,10 +91,7 @@ serve(async (req) => {
         .single();
 
       if (locationError || !location) {
-        return new Response(JSON.stringify({ error: "Location not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Location not found", 404);
       }
     }
 
@@ -128,7 +103,7 @@ serve(async (req) => {
     const upsertData: Record<string, unknown> = {
       organization_id,
       field_config_id,
-      customer_price: parseFloat(customer_price),
+      customer_price: customer_price,
       currency: currency || "USD",
       pricing_type: pricing_type || "unit",
       applies_to_field_type: finalAppliesToFieldType,
@@ -181,30 +156,14 @@ serve(async (req) => {
       fieldPricing = inserted;
     }
 
-    // if (upsertError) throw upsertError;
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        field_pricing: fieldPricing,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      field_pricing: fieldPricing,
+    });
   } catch (error) {
     console.error("Upsert field pricing error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to upsert field pricing";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to upsert field pricing"
     );
   }
 });

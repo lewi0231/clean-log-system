@@ -1,5 +1,4 @@
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { supabase } from "@/lib/supabase";
 import { useState } from "react";
 import {
@@ -9,9 +8,11 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
+  Text,
   TextInput,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -49,140 +50,82 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ThemedView style={styles.content}>
-          <ThemedText type="title" style={styles.title}>
-            Clean Log
-          </ThemedText>
-          <ThemedText type="subtitle" style={styles.subtitle}>
-            Sign in to continue
-          </ThemedText>
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "center",
+            padding: 20,
+          }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View className="w-full max-w-sm self-center gap-5">
+            <View className="items-center mb-2">
+              <ThemedText
+                type="title"
+                className="text-3xl font-bold text-center mb-2"
+              >
+                Clean Log
+              </ThemedText>
+              <ThemedText
+                type="subtitle"
+                className="text-base text-center mb-8 text-muted-foreground"
+              >
+                Sign in to continue
+              </ThemedText>
+            </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            editable={!isLoading}
-          />
+            <TextInput
+              className="bg-white border-[1.5px] border-gray-300 rounded-xl px-4 py-3.5 text-base shadow-sm"
+              placeholder="Email"
+              placeholderTextColor="#999"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+              editable={!isLoading}
+            />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#999"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            editable={!isLoading}
-          />
+            <TextInput
+              className="bg-white border-[1.5px] border-gray-300 rounded-xl px-4 py-3.5 text-base shadow-sm"
+              placeholder="Password"
+              placeholderTextColor="#999"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoComplete="password"
+              editable={!isLoading}
+            />
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              (isLoading || pressed) && styles.buttonPressed,
-            ]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <ThemedText style={styles.buttonText}>Sign In</ThemedText>
-            )}
-          </Pressable>
-        </ThemedView>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            <Pressable
+              onPress={handleLogin}
+              disabled={isLoading}
+              className={`bg-blue-500 rounded-xl py-4 px-8 items-center justify-center mt-2 min-h-[52px] shadow-lg ${
+                isLoading
+                  ? "opacity-70"
+                  : "active:bg-blue-600 active:scale-[0.98]"
+              }`}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-white text-lg font-semibold">
+                  Sign In
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    // alignItems: "flex-start",
-    padding: 20,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-  content: {
-    width: "100%",
-    maxWidth: 400,
-    alignSelf: "center",
-    gap: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: 32,
-    color: "#666",
-  },
-  input: {
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderRadius: 12,
-    borderColor: "#e0e0e0",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 8,
-    shadowColor: "#007AFF",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    minHeight: 52,
-  },
-  buttonPressed: {
-    backgroundColor: "#0051D5",
-    shadowOpacity: 0.2,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-});

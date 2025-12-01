@@ -14,12 +14,14 @@ interface GroupedBreakdownFieldProps {
   config: FieldConfig;
   value: GroupedBreakdownItem[];
   onChange: (items: GroupedBreakdownItem[]) => void;
+  disabled?: boolean;
 }
 
 export function GroupedBreakdownField({
   config,
   value = [],
   onChange,
+  disabled = false,
 }: GroupedBreakdownFieldProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState("");
@@ -94,18 +96,22 @@ export function GroupedBreakdownField({
                 <View className="flex-row items-center gap-3">
                   {/* Quantity input */}
                   <TextInput
-                    className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-center text-base text-foreground min-w-[60px]"
+                    className={`bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-center text-base text-foreground min-w-[60px] ${
+                      disabled ? "opacity-50" : ""
+                    }`}
                     value={String(item.quantity)}
                     onChangeText={(text) => {
                       const num = text === "" ? 0 : parseInt(text, 10) || 0;
                       handleUpdateQuantity(item.brand, num);
                     }}
                     keyboardType="number-pad"
+                    editable={!disabled}
                   />
                   {/* Remove button */}
                   <Pressable
                     onPress={() => handleRemoveItem(item.brand)}
                     className="ml-2 p-1"
+                    disabled={disabled}
                   >
                     <Ionicons name="close-circle" size={24} color="#ef4444" />
                   </Pressable>
@@ -117,7 +123,7 @@ export function GroupedBreakdownField({
       )}
 
       {/* Add Brand button */}
-      {canAddMore && (
+      {canAddMore && !disabled && (
         <Pressable
           onPress={() => setDrawerOpen(true)}
           className="flex-row items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-[#e0e0e0] rounded-xl active:bg-gray-50"

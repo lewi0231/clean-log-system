@@ -96,6 +96,8 @@ export const fieldConfigSchema = z
     order_position: z.number().int().min(0).optional(),
     validation_rules: validationRulesSchema.nullable(),
     options: z.array(z.string().min(1)).nullable(),
+    mutually_exclusive_group: z.string().min(1).nullable().optional(),
+    group_cluster: z.string().min(1).nullable().optional(),
   })
   .refine(
     (data) => {
@@ -112,12 +114,28 @@ export const fieldConfigSchema = z
         "Options are required for select and grouped_breakdown field types",
       path: ["options"],
     }
+  )
+  .refine(
+    (data) => {
+      // If group_cluster is set, mutually_exclusive_group must also be set
+      if (data.group_cluster && !data.mutually_exclusive_group) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Group cluster requires a mutually exclusive group to be set",
+      path: ["group_cluster"],
+    }
   );
 
 export type FieldConfigFormData = z.infer<typeof fieldConfigSchema>;
 
 export const organizationSettingsSchema = z.object({
   use_predefined_locations: z.boolean().default(true),
+  business_mode: z
+    .enum(["service_based", "resource_tracking"])
+    .default("service_based"),
 });
 
 export type OrganizationSettingsFormData = z.infer<

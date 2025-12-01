@@ -18,6 +18,7 @@ interface UseWorkersResult {
   createWorker: (request: CreateWorkerRequest) => Promise<Worker>;
   updateWorker: (request: UpdateWorkerRequest) => Promise<Worker>;
   deleteWorker: (request: DeleteWorkerRequest) => Promise<void>;
+  resendInvitation: (workerId: string, organizationId: string) => Promise<void>;
 }
 
 export function useWorkers(): UseWorkersResult {
@@ -70,6 +71,20 @@ export function useWorkers(): UseWorkersResult {
     await fetchWorkers();
   };
 
+  const resendInvitation = async (
+    workerId: string,
+    orgId: string
+  ): Promise<void> => {
+    if (!orgId) {
+      throw new Error("Organization ID is required");
+    }
+    await WorkersService.resendInvitation({
+      worker_id: workerId,
+      organization_id: orgId,
+    });
+    // Don't refetch workers as nothing changes in the list
+  };
+
   useEffect(() => {
     fetchWorkers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,5 +98,6 @@ export function useWorkers(): UseWorkersResult {
     createWorker,
     updateWorker,
     deleteWorker,
+    resendInvitation,
   };
 }

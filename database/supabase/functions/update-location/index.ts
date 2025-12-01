@@ -1,35 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
-    const { id, name, email, address, contact_person, phone } =
-      await req.json();
+    const body = await req.json();
+    const validation = validateRequiredFields(body, [
+      "id",
+      "name",
+      "email",
+      "address",
+      "contact_person",
+    ]);
 
-    if (!id || !name || !email || !address || !contact_person) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (!validation.valid) {
+      return errorResponse("Missing required fields", 400);
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const { id, name, email, address, contact_person, phone } = body;
+
+    const supabase = createServiceRoleClient();
 
     const { data: location, error: locationError } = await supabase
       .from("location")
@@ -46,28 +40,11 @@ serve(async (req) => {
 
     if (locationError) throw locationError;
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        location,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({ success: true, location });
   } catch (error) {
     console.error("Update location error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to update location";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to update location"
     );
   }
 });

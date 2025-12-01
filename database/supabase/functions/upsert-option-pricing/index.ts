@@ -1,72 +1,83 @@
-import { createClient } from "@supabase/supabase-js";
 import { serve } from "server";
+import { z } from "zod";
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createServiceRoleClient } from "../_utils/supabase.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-} as const;
+// Zod schema for request validation
+const upsertOptionPricingSchema = z.object({
+  organization_id: z.string().uuid("Organization ID must be a valid UUID"),
+  field_config_id: z.string().uuid("Field config ID must be a valid UUID"),
+  option_value: z.string().min(1, "Option value is required"),
+  customer_price: z
+    .number()
+    .nonnegative("Customer price must be non-negative")
+    .finite("Customer price must be a finite number"),
+  worker_payment_rate: z
+    .number()
+    .nonnegative("Worker payment rate must be non-negative")
+    .finite("Worker payment rate must be a finite number")
+    .optional()
+    .nullable(),
+  // location_id can be a valid UUID string, null, undefined, or the string "null"
+  // We normalize it before UUID validation
+  location_id: z.preprocess((val) => {
+    // Normalize: convert string "null", empty string, undefined to null
+    if (val === null || val === undefined || val === "null" || val === "") {
+      return null;
+    }
+    return val;
+  }, z.union([z.string().uuid("Location ID must be a valid UUID"), z.null()]).optional()),
+  currency: z.string().default("USD").optional(),
+});
+
+/**
+ * Normalize location_id - convert string "null", undefined, empty string to null
+ */
+function normalizeLocationId(
+  locationId: string | null | undefined
+): string | null {
+  if (
+    locationId === null ||
+    locationId === undefined ||
+    locationId === "null" ||
+    locationId === ""
+  ) {
+    return null;
+  }
+  return locationId;
+}
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  const corsResponse = handleCors(req);
+  if (corsResponse) return corsResponse;
 
   try {
+    const body = await req.json();
+
+    // Validate with Zod
+    const validationResult = upsertOptionPricingSchema.safeParse(body);
+
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors
+        .map((e) => `${e.path.join(".")}: ${e.message}`)
+        .join(", ");
+      return errorResponse(`Validation error: ${errors}`, 400);
+    }
+
     const {
       organization_id,
       field_config_id,
       option_value,
       customer_price,
       worker_payment_rate,
-      location_id,
+      location_id: rawLocationId,
       currency,
-    } = await req.json();
+    } = validationResult.data;
 
-    if (
-      !organization_id ||
-      !field_config_id ||
-      !option_value ||
-      customer_price === undefined
-    ) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Organization ID, field config ID, option value, and customer price are required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    // Normalize location_id early (Zod already normalized it, but double-check)
+    const location_id = normalizeLocationId(rawLocationId ?? null);
 
-    if (customer_price < 0) {
-      return new Response(
-        JSON.stringify({ error: "Customer price must be non-negative" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (worker_payment_rate !== undefined && worker_payment_rate < 0) {
-      return new Response(
-        JSON.stringify({
-          error: "Worker payment rate must be non-negative",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createServiceRoleClient();
 
     // Verify field config exists and is select or grouped_breakdown
     const { data: fieldConfig, error: fieldConfigError } = await supabase
@@ -77,39 +88,25 @@ serve(async (req) => {
       .single();
 
     if (fieldConfigError || !fieldConfig) {
-      return new Response(JSON.stringify({ error: "Field config not found" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return errorResponse("Field config not found", 404);
     }
 
     if (
       fieldConfig.field_type !== "select" &&
       fieldConfig.field_type !== "grouped_breakdown"
     ) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Option pricing can only be set for select or grouped_breakdown fields",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      return errorResponse(
+        "Option pricing can only be set for select or grouped_breakdown fields",
+        400
       );
     }
 
     // Verify option_value exists in field config options
     const options = fieldConfig.options as string[] | null;
     if (!options || !options.includes(option_value)) {
-      return new Response(
-        JSON.stringify({
-          error: `Option "${option_value}" not found in field config options`,
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+      return errorResponse(
+        `Option "${option_value}" not found in field config options`,
+        400
       );
     }
 
@@ -123,22 +120,27 @@ serve(async (req) => {
         .single();
 
       if (locationError || !location) {
-        return new Response(JSON.stringify({ error: "Location not found" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return errorResponse("Location not found", 404);
       }
     }
 
     // Check if pricing exists for this combination
-    const { data: existingPricing, error: checkError } = await supabase
+    let checkQuery = supabase
       .from("option_pricing")
       .select("id")
       .eq("organization_id", organization_id)
       .eq("field_config_id", field_config_id)
-      .eq("option_value", option_value)
-      .eq("location_id", location_id || null)
-      .maybeSingle();
+      .eq("option_value", option_value);
+
+    // Use .is() for null checks, .eq() for values (same pattern as list-option-pricing)
+    if (location_id === null || location_id === undefined) {
+      checkQuery = checkQuery.is("location_id", null);
+    } else {
+      checkQuery = checkQuery.eq("location_id", location_id);
+    }
+
+    const { data: existingPricing, error: checkError } =
+      await checkQuery.maybeSingle();
 
     if (checkError && checkError.code !== "PGRST116") {
       throw checkError;
@@ -148,7 +150,7 @@ serve(async (req) => {
       organization_id,
       field_config_id,
       option_value,
-      customer_price: parseFloat(customer_price),
+      customer_price: customer_price,
       currency: currency || "USD",
       updated_at: new Date().toISOString(),
     };
@@ -157,8 +159,8 @@ serve(async (req) => {
       upsertData.location_id = location_id;
     }
 
-    if (worker_payment_rate !== undefined) {
-      upsertData.worker_payment_rate = parseFloat(worker_payment_rate);
+    if (worker_payment_rate !== undefined && worker_payment_rate !== null) {
+      upsertData.worker_payment_rate = worker_payment_rate;
     }
 
     let optionPricing;
@@ -183,30 +185,14 @@ serve(async (req) => {
       optionPricing = inserted;
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        option_pricing: optionPricing,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse({
+      success: true,
+      option_pricing: optionPricing,
+    });
   } catch (error) {
     console.error("Upsert option pricing error:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to upsert option pricing";
-    return new Response(
-      JSON.stringify({
-        error: errorMessage,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+    return errorResponse(
+      error instanceof Error ? error : "Failed to upsert option pricing"
     );
   }
 });

@@ -75,10 +75,32 @@ export class OptionPricingService {
         optionValue: request.option_value,
       });
 
+      // Build request body, excluding null/undefined location_id
+      const body: Record<string, unknown> = {
+        organization_id: request.organization_id,
+        field_config_id: request.field_config_id,
+        option_value: request.option_value,
+        customer_price: request.customer_price,
+        currency: request.currency || "USD",
+      };
+
+      // Only include location_id if it's a valid string
+      if (request.location_id !== null && request.location_id !== undefined) {
+        body.location_id = request.location_id;
+      }
+
+      // Only include worker_payment_rate if it's defined
+      if (
+        request.worker_payment_rate !== null &&
+        request.worker_payment_rate !== undefined
+      ) {
+        body.worker_payment_rate = request.worker_payment_rate;
+      }
+
       const { data, error } = await supabase.functions.invoke(
         "upsert-option-pricing",
         {
-          body: request,
+          body,
         }
       );
 

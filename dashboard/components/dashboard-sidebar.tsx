@@ -5,6 +5,7 @@ import {
   Building2,
   ChartBar,
   Clipboard,
+  DollarSign,
   FileText,
   Settings,
   Smartphone,
@@ -15,8 +16,8 @@ import { usePathname } from "next/navigation";
 
 const navigation = [
   {
-    name: "Workers",
-    href: "/dashboard/workers",
+    name: "Users",
+    href: "/dashboard/users",
     icon: Users,
   },
   {
@@ -25,7 +26,7 @@ const navigation = [
     icon: Building2,
   },
   {
-    name: "Mobile Config",
+    name: "Mobile Application",
     href: "/dashboard/mobile-config",
     icon: Smartphone,
   },
@@ -33,6 +34,11 @@ const navigation = [
     name: "Completed Jobs",
     href: "/dashboard/completed-jobs",
     icon: Clipboard,
+  },
+  {
+    name: "Pricing",
+    href: "/dashboard/pricing",
+    icon: DollarSign,
   },
   {
     name: "Invoicing",

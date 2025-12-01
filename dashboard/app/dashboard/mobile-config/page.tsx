@@ -2,6 +2,15 @@
 
 import FieldConfigForm from "@/components/settings/field-config-form";
 import FieldConfigList from "@/components/settings/field-config-list";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,11 +19,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useModeAwareLabels } from "@/hooks/use-mode-aware-labels";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { getTemplateDescription, getTemplateFields } from "@/lib/templates";
 import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
-import { Plus } from "lucide-react";
+import { Package, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useOptimistic, useState, useTransition } from "react";
 
 type OptimisticAction<T> =
@@ -47,11 +59,14 @@ export default function MobileConfigPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const { settings, loading: settingsLoading } = useOrganizationSettings();
+  const labels = useModeAwareLabels();
 
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [, startTransition] = useTransition();
 
   const [optimisticFieldConfigs, updateOptimisticFieldConfigs] = useOptimistic(
@@ -106,6 +121,8 @@ export default function MobileConfigPage() {
     required: boolean;
     validation_rules: ValidationRules | null;
     options: string[] | null;
+    mutually_exclusive_group: string | null;
+    group_cluster: string | null;
   }) => {
     if (!organizationId) return;
 
@@ -114,6 +131,9 @@ export default function MobileConfigPage() {
       id: `temp-${Date.now()}`,
       organization_id: organizationId,
       ...fieldConfigData,
+      mutually_exclusive_group:
+        fieldConfigData.mutually_exclusive_group || null,
+      group_cluster: fieldConfigData.group_cluster || null,
       order_position: fieldConfigs.length,
       version: 1,
       active: true,
@@ -166,6 +186,8 @@ export default function MobileConfigPage() {
       required: boolean;
       validation_rules: ValidationRules | null;
       options: string[] | null;
+      mutually_exclusive_group: string | null;
+      group_cluster: string | null;
     }
   ) => {
     const existingFieldConfig = fieldConfigs.find(
@@ -177,6 +199,11 @@ export default function MobileConfigPage() {
     const optimisticFieldConfig: FieldConfig = {
       ...existingFieldConfig,
       ...fieldConfigData,
+      mutually_exclusive_group:
+        fieldConfigData.mutually_exclusive_group ??
+        existingFieldConfig.mutually_exclusive_group,
+      group_cluster:
+        fieldConfigData.group_cluster ?? existingFieldConfig.group_cluster,
       updated_at: new Date().toISOString(),
     };
 
@@ -283,6 +310,56 @@ export default function MobileConfigPage() {
     }
   };
 
+  const [resetTemplateMode, setResetTemplateMode] = useState<
+    "service_based" | "resource_tracking" | null
+  >(null);
+
+  const handleApplyTemplate = async (
+    businessMode: "service_based" | "resource_tracking",
+    resetExisting = false
+  ) => {
+    if (!organizationId) return;
+
+    try {
+      setApplyingTemplate(true);
+      log.info("MobileConfig: Applying template", {
+        businessMode,
+        resetExisting,
+      });
+
+      const { data, error: templateError } = await supabase.functions.invoke(
+        "apply-field-config-template",
+        {
+          body: {
+            organization_id: organizationId,
+            business_mode: businessMode,
+            reset_existing: resetExisting,
+          },
+        }
+      );
+
+      if (templateError) {
+        throw templateError;
+      }
+
+      if (data?.success) {
+        await fetchFieldConfigs();
+        setResetTemplateMode(null);
+        log.info("MobileConfig: Template applied successfully", {
+          count: data.count,
+          resetExisting,
+        });
+      }
+    } catch (err) {
+      log.error("MobileConfig: Failed to apply template", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setError(err instanceof Error ? err.message : "Failed to apply template");
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
+
   useEffect(() => {
     if (organizationId) {
       fetchFieldConfigs();
@@ -290,11 +367,13 @@ export default function MobileConfigPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId]);
 
-  if (orgLoading) {
+  if (orgLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-muted-foreground">Loading mobile config...</p>
+          <p className="text-muted-foreground">
+            Loading mobile application configuration...
+          </p>
         </div>
       </div>
     );
@@ -314,45 +393,242 @@ export default function MobileConfigPage() {
 
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Mobile Config</h1>
+      <div className="mb-8 w-3/4">
+        <h1 className="text-3xl font-bold tracking-tight">
+          Mobile Application
+        </h1>
         <p className="text-muted-foreground mt-2">
-          Configure custom fields for the mobile app
+          {labels.mobileConfigDescription}
         </p>
       </div>
 
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Field Configurations</CardTitle>
-                <CardDescription>
-                  Configure custom fields that will appear in the mobile app.
-                  These fields can be used alongside predefined locations or as
-                  standalone custom fields.
-                </CardDescription>
+        {/* Show template options when no field configs exist */}
+        {fieldConfigs.length === 0 && !loading && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Get Started with a Template</CardTitle>
+              <CardDescription>
+                Start with a pre-configured set of fields tailored to your
+                business mode, or build from scratch.
+                {settings?.business_mode && (
+                  <span className="block mt-2 text-sm font-medium">
+                    Recommended:{" "}
+                    {settings.business_mode === "service_based"
+                      ? "Service-Based Template"
+                      : "Resource Tracking Template"}
+                  </span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="relative">
+                  <button
+                    onClick={() => handleApplyTemplate("service_based")}
+                    disabled={applyingTemplate}
+                    className={`w-full flex flex-col rounded-lg border-2 p-6 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
+                      settings?.business_mode === "service_based"
+                        ? "border-primary bg-primary/5"
+                        : "border-muted bg-card"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <div className="font-semibold">
+                          Service-Based Template
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Car Detailer
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {getTemplateDescription("service_based")}
+                    </p>
+                    <div className="text-xs text-muted-foreground">
+                      <div className="font-medium mb-1">Includes:</div>
+                      <ul className="list-disc list-inside space-y-1">
+                        {getTemplateFields("service_based").map((field) => (
+                          <li key={field.name}>{field.label}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </button>
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => handleApplyTemplate("resource_tracking")}
+                    disabled={applyingTemplate}
+                    className={`w-full flex flex-col rounded-lg border-2 p-6 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
+                      settings?.business_mode === "resource_tracking"
+                        ? "border-primary bg-primary/5"
+                        : "border-muted bg-card"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <Package className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <div className="font-semibold">
+                          Resource Tracking Template
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Car Yard Business
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {getTemplateDescription("resource_tracking")}
+                    </p>
+                    <div className="text-xs text-muted-foreground">
+                      <div className="font-medium mb-1">Includes:</div>
+                      <ul className="list-disc list-inside space-y-1">
+                        {getTemplateFields("resource_tracking").map((field) => (
+                          <li key={field.name}>{field.label}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </button>
+                </div>
               </div>
-              <Button
-                onClick={() => setIsFormOpen(true)}
-                className="cursor-pointer"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Field
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <FieldConfigList
-              fieldConfigs={optimisticFieldConfigs}
-              loading={loading}
-              error={error}
-              onDeleteFieldConfig={handleDeleteFieldConfig}
-              onUpdateFieldConfig={handleUpdateFieldConfig}
-              onReorderFieldConfigs={handleReorderFieldConfigs}
-            />
-          </CardContent>
-        </Card>
+              <div className="mt-6 pt-6 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsFormOpen(true)}
+                  className="w-full"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Build from Scratch
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show field configurations when they exist */}
+        {fieldConfigs.length > 0 && (
+          <>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Field Configurations</CardTitle>
+                    <CardDescription className="w-3/4 pt-2">
+                      Configure custom fields that will appear in the mobile
+                      app. These fields can be used alongside predefined
+                      locations or as standalone custom fields.
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsFormOpen(true)}
+                      className="cursor-pointer"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Field
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (settings?.business_mode) {
+                          setResetTemplateMode(settings.business_mode);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reset to Template
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <FieldConfigList
+                  fieldConfigs={optimisticFieldConfigs}
+                  loading={loading}
+                  error={error}
+                  onDeleteFieldConfig={handleDeleteFieldConfig}
+                  onUpdateFieldConfig={handleUpdateFieldConfig}
+                  onReorderFieldConfigs={handleReorderFieldConfigs}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Reset Template Dialog */}
+            <AlertDialog
+              open={resetTemplateMode !== null}
+              onOpenChange={(open) => {
+                if (!open) setResetTemplateMode(null);
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset to Template?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will replace all your current field configurations with
+                    the template fields. This action cannot be undone. Your
+                    existing fields will be archived.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <button
+                      onClick={() => {
+                        if (resetTemplateMode) {
+                          handleApplyTemplate("service_based", true);
+                        }
+                      }}
+                      disabled={applyingTemplate}
+                      className={`flex flex-col rounded-lg border-2 p-4 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
+                        resetTemplateMode === "service_based"
+                          ? "border-primary bg-primary/5"
+                          : "border-muted bg-card"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <div className="font-semibold text-sm">
+                          Service-Based Template
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {getTemplateDescription("service_based")}
+                      </p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (resetTemplateMode) {
+                          handleApplyTemplate("resource_tracking", true);
+                        }
+                      }}
+                      disabled={applyingTemplate}
+                      className={`flex flex-col rounded-lg border-2 p-4 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
+                        resetTemplateMode === "resource_tracking"
+                          ? "border-primary bg-primary/5"
+                          : "border-muted bg-card"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <Package className="h-4 w-4 text-primary" />
+                        <div className="font-semibold text-sm">
+                          Resource Tracking Template
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {getTemplateDescription("resource_tracking")}
+                      </p>
+                    </button>
+                  </div>
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
       </div>
 
       <FieldConfigForm

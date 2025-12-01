@@ -38,6 +38,8 @@ interface FieldConfigFormProps {
       required: boolean;
       validation_rules: ValidationRules | null;
       options: string[] | null;
+      mutually_exclusive_group: string | null;
+      group_cluster: string | null;
     },
     fieldConfigId?: string
   ) => void | Promise<void>;
@@ -59,12 +61,16 @@ export default function FieldConfigForm({
     useState<ValidationRules | null>(null);
   const [options, setOptions] = useState<string[]>([]);
   const [optionsInput, setOptionsInput] = useState("");
+  const [mutuallyExclusiveGroup, setMutuallyExclusiveGroup] = useState("");
+  const [groupCluster, setGroupCluster] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
     label?: string;
     field_type?: string;
     options?: string;
+    mutually_exclusive_group?: string;
+    group_cluster?: string;
   }>({});
 
   const isEditMode = !!fieldConfig;
@@ -83,6 +89,8 @@ export default function FieldConfigForm({
         setValidationRules(fieldConfig.validation_rules);
         setOptions(fieldConfig.options || []);
         setOptionsInput((fieldConfig.options || []).join(", "));
+        setMutuallyExclusiveGroup(fieldConfig.mutually_exclusive_group || "");
+        setGroupCluster(fieldConfig.group_cluster || "");
       } else {
         setName("");
         setLabel("");
@@ -92,6 +100,8 @@ export default function FieldConfigForm({
         setValidationRules(null);
         setOptions([]);
         setOptionsInput("");
+        setMutuallyExclusiveGroup("");
+        setGroupCluster("");
       }
       setErrors({});
     }
@@ -108,6 +118,8 @@ export default function FieldConfigForm({
       required,
       validation_rules: validationRules,
       options: requiresOptions ? options : null,
+      mutually_exclusive_group: mutuallyExclusiveGroup.trim() || null,
+      group_cluster: groupCluster.trim() || null,
     });
 
     if (!result.success) {
@@ -116,6 +128,8 @@ export default function FieldConfigForm({
         label?: string;
         field_type?: string;
         options?: string;
+        mutually_exclusive_group?: string;
+        group_cluster?: string;
       } = {};
 
       result.error.issues.forEach((issue) => {
@@ -124,7 +138,9 @@ export default function FieldConfigForm({
           path === "name" ||
           path === "label" ||
           path === "field_type" ||
-          path === "options"
+          path === "options" ||
+          path === "mutually_exclusive_group" ||
+          path === "group_cluster"
         ) {
           fieldErrors[path] = issue.message;
         }
@@ -162,6 +178,8 @@ export default function FieldConfigForm({
       setValidationRules(null);
       setOptions([]);
       setOptionsInput("");
+      setMutuallyExclusiveGroup("");
+      setGroupCluster("");
       setErrors({});
       onOpenChange(false);
       await onSuccess(validatedData, fieldConfig?.id);
@@ -344,6 +362,74 @@ export default function FieldConfigForm({
             validationRules={validationRules}
             onChange={setValidationRules}
           />
+
+          <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-2">
+              <Label htmlFor="mutually_exclusive_group">
+                Mutually Exclusive Group (Optional)
+              </Label>
+              <Input
+                id="mutually_exclusive_group"
+                name="mutually_exclusive_group"
+                type="text"
+                value={mutuallyExclusiveGroup}
+                onChange={(e) => {
+                  setMutuallyExclusiveGroup(e.target.value);
+                  if (!e.target.value.trim()) {
+                    setGroupCluster("");
+                  }
+                  if (errors.mutually_exclusive_group) {
+                    setErrors((prev) => ({
+                      ...prev,
+                      mutually_exclusive_group: undefined,
+                    }));
+                  }
+                }}
+                placeholder="yard_tracking_method"
+                aria-invalid={!!errors.mutually_exclusive_group}
+              />
+              {errors.mutually_exclusive_group && (
+                <p className="text-sm text-destructive">
+                  {errors.mutually_exclusive_group}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Fields with the same group are mutually exclusive. Only one
+                cluster or field in a group can have values at a time.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="group_cluster">Group Cluster (Optional)</Label>
+              <Input
+                id="group_cluster"
+                name="group_cluster"
+                type="text"
+                value={groupCluster}
+                onChange={(e) => {
+                  setGroupCluster(e.target.value);
+                  if (errors.group_cluster) {
+                    setErrors((prev) => ({
+                      ...prev,
+                      group_cluster: undefined,
+                    }));
+                  }
+                }}
+                placeholder="soap_and_wipe_pair"
+                disabled={!mutuallyExclusiveGroup.trim()}
+                aria-invalid={!!errors.group_cluster}
+              />
+              {errors.group_cluster && (
+                <p className="text-sm text-destructive">
+                  {errors.group_cluster}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Fields with the same cluster work together within a group. Only
+                enabled if a mutually exclusive group is set.
+              </p>
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button

@@ -30,6 +30,36 @@ export interface DeleteWorkerRequest {
   id: string;
 }
 
+export interface ResendWorkerInvitationRequest {
+  worker_id: string;
+  organization_id: string;
+}
+
+// Organization Users API
+export interface ListOrganizationUsersRequest {
+  organization_id: string;
+}
+
+export interface ListOrganizationUsersResponse {
+  success: boolean;
+  organization_users: OrganizationUser[];
+}
+
+export interface CreateOrganizationUserRequest {
+  organization_id: string;
+  email: string;
+  role: "admin" | "viewer";
+}
+
+export interface UpdateOrganizationUserRequest {
+  id: string;
+  role?: "admin" | "viewer";
+}
+
+export interface DeleteOrganizationUserRequest {
+  id: string;
+}
+
 // Locations API
 export interface CreateLocationRequest {
   organization_id: string;
@@ -85,7 +115,8 @@ export interface GetOrganizationSettingsResponse {
 
 export interface UpdateOrganizationSettingsRequest {
   organization_id: string;
-  use_predefined_locations: boolean;
+  use_predefined_locations?: boolean;
+  business_mode?: BusinessMode;
 }
 
 // Field Pricing API
@@ -121,10 +152,12 @@ export interface DeleteFieldPricingResponse {
 // Common types (re-exported from lib/types.ts for convenience)
 import type { FieldConfig } from "@/shared/types/field-config";
 import type {
+  BusinessMode,
   FieldPricing,
   Job,
   Location,
   OrganizationSettings,
+  OrganizationUser,
   Worker,
 } from "../types";
 

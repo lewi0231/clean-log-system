@@ -14,6 +14,7 @@ export interface UpsertBasePricingRequest {
   standalone_base_price?: number | null;
   customer_base_price: number;
   worker_base_payment?: number | null;
+  adjustment_type?: "add" | "multiply";
   location_id?: string | null;
   currency?: string;
 }
