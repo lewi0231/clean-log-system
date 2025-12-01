@@ -1,7 +1,13 @@
 "use client";
 
-import FieldConfigForm from "@/components/settings/field-config-form";
-import FieldConfigList from "@/components/settings/field-config-list";
+// 1. React
+import { useEffect, useOptimistic, useState, useTransition } from "react";
+
+// 2. Third-party
+import { Package, RotateCcw, Sparkles } from "lucide-react";
+
+// 3. Internal components
+import { VisualFormBuilder } from "@/components/form-builder";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -19,15 +25,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+// 4. Hooks
 import { useModeAwareLabels } from "@/hooks/use-mode-aware-labels";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
+
+// 5. Services/Utils
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { getTemplateDescription, getTemplateFields } from "@/lib/templates";
-import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
-import { Package, Plus, RotateCcw, Sparkles } from "lucide-react";
-import { useEffect, useOptimistic, useState, useTransition } from "react";
+
+// 6. Shared types
+import {
+  ConditionalLogic,
+  FieldConfig,
+  FieldType,
+  FormSectionWithFields,
+  ValidationRules,
+} from "@clean-log/shared";
 
 type OptimisticAction<T> =
   | { type: "add"; item: T }
@@ -63,9 +79,9 @@ export default function MobileConfigPage() {
   const labels = useModeAwareLabels();
 
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
+  const [sections, setSections] = useState<FormSectionWithFields[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [, setError] = useState<string | null>(null);
   const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [, startTransition] = useTransition();
 
@@ -80,26 +96,62 @@ export default function MobileConfigPage() {
     try {
       setLoading(true);
       setError(null);
-      log.debug("MobileConfig: Fetching field configs");
+      log.debug("MobileConfig: Fetching field configs and sections");
 
-      const { data, error: fetchError } = await supabase.functions.invoke(
-        "list-field-configs",
-        {
+      // Fetch both field configs and sections in parallel
+      const [fieldConfigsResponse, sectionsResponse] = await Promise.all([
+        supabase.functions.invoke("list-field-configs", {
           body: { organization_id: organizationId },
-        }
-      );
+        }),
+        supabase.functions.invoke("list-form-sections", {
+          body: { organization_id: organizationId },
+        }),
+      ]);
 
-      if (fetchError) {
-        throw fetchError;
+      if (fieldConfigsResponse.error) {
+        throw fieldConfigsResponse.error;
       }
 
-      if (data?.field_configs) {
+      if (sectionsResponse.error) {
+        throw sectionsResponse.error;
+      }
+
+      // Process field configs
+      if (fieldConfigsResponse.data?.field_configs) {
         log.info("MobileConfig: Field configs fetched successfully", {
-          count: data.field_configs.length,
+          count: fieldConfigsResponse.data.field_configs.length,
         });
-        setFieldConfigs(data.field_configs);
+        const configsWithDefaults = fieldConfigsResponse.data.field_configs.map(
+          (fc: FieldConfig) => ({
+            ...fc,
+            section_id: fc.section_id ?? null,
+            conditional_logic: fc.conditional_logic ?? null,
+          })
+        );
+        setFieldConfigs(configsWithDefaults);
       } else {
         setFieldConfigs([]);
+      }
+
+      // Process sections
+      if (sectionsResponse.data?.sections) {
+        log.info("MobileConfig: Sections fetched successfully", {
+          count: sectionsResponse.data.sections.length,
+        });
+        // Convert to FormSectionWithFields by adding field_ids
+        const sectionsWithFields: FormSectionWithFields[] =
+          sectionsResponse.data.sections.map(
+            (section: FormSectionWithFields) => ({
+              ...section,
+              field_ids:
+                fieldConfigsResponse.data?.field_configs
+                  ?.filter((fc: FieldConfig) => fc.section_id === section.id)
+                  .map((fc: FieldConfig) => fc.id) || [],
+            })
+          );
+        setSections(sectionsWithFields);
+      } else {
+        setSections([]);
       }
     } catch (err) {
       log.error("MobileConfig: Failed to fetch field configs", {
@@ -123,6 +175,9 @@ export default function MobileConfigPage() {
     options: string[] | null;
     mutually_exclusive_group: string | null;
     group_cluster: string | null;
+    section_id: string | null;
+    conditional_logic: ConditionalLogic | null;
+    order_position: number;
   }) => {
     if (!organizationId) return;
 
@@ -131,10 +186,6 @@ export default function MobileConfigPage() {
       id: `temp-${Date.now()}`,
       organization_id: organizationId,
       ...fieldConfigData,
-      mutually_exclusive_group:
-        fieldConfigData.mutually_exclusive_group || null,
-      group_cluster: fieldConfigData.group_cluster || null,
-      order_position: fieldConfigs.length,
       version: 1,
       active: true,
       archived_at: null,
@@ -150,8 +201,7 @@ export default function MobileConfigPage() {
     });
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { data, error: createError } = await supabase.functions.invoke(
+      const { error: createError } = await supabase.functions.invoke(
         "create-field-config",
         {
           body: {
@@ -178,19 +228,9 @@ export default function MobileConfigPage() {
 
   const handleUpdateFieldConfig = async (
     fieldConfigId: string,
-    fieldConfigData: {
-      name: string;
-      label: string;
-      field_type: FieldType;
-      description: string | null;
-      required: boolean;
-      validation_rules: ValidationRules | null;
-      options: string[] | null;
-      mutually_exclusive_group: string | null;
-      group_cluster: string | null;
-    }
+    fieldConfigData: Partial<FieldConfig>
   ) => {
-    const existingFieldConfig = fieldConfigs.find(
+    const existingFieldConfig = optimisticFieldConfigs.find(
       (fc) => fc.id === fieldConfigId
     );
     if (!existingFieldConfig) return;
@@ -199,11 +239,6 @@ export default function MobileConfigPage() {
     const optimisticFieldConfig: FieldConfig = {
       ...existingFieldConfig,
       ...fieldConfigData,
-      mutually_exclusive_group:
-        fieldConfigData.mutually_exclusive_group ??
-        existingFieldConfig.mutually_exclusive_group,
-      group_cluster:
-        fieldConfigData.group_cluster ?? existingFieldConfig.group_cluster,
       updated_at: new Date().toISOString(),
     };
 
@@ -212,6 +247,9 @@ export default function MobileConfigPage() {
         type: "update",
         item: optimisticFieldConfig,
       });
+      setFieldConfigs((prev) =>
+        prev.map((fc) => (fc.id === fieldConfigId ? optimisticFieldConfig : fc))
+      );
     });
 
     try {
@@ -229,12 +267,12 @@ export default function MobileConfigPage() {
         throw updateError;
       }
 
-      await fetchFieldConfigs();
       log.info("MobileConfig: Field config updated successfully");
     } catch (err) {
       log.error("MobileConfig: Failed to update field config", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
+      // Rollback to server state on error
       await fetchFieldConfigs();
       throw err;
     }
@@ -274,7 +312,7 @@ export default function MobileConfigPage() {
 
     // Optimistically reorder
     const reorderedConfigs = fieldConfigIds
-      .map((id) => fieldConfigs.find((fc) => fc.id === id))
+      .map((id) => optimisticFieldConfigs.find((fc) => fc.id === id))
       .filter((fc): fc is FieldConfig => fc !== undefined);
 
     startTransition(() => {
@@ -282,6 +320,7 @@ export default function MobileConfigPage() {
         type: "reorder",
         items: reorderedConfigs,
       });
+      setFieldConfigs(reorderedConfigs);
     });
 
     try {
@@ -299,14 +338,157 @@ export default function MobileConfigPage() {
         throw reorderError;
       }
 
-      await fetchFieldConfigs();
       log.info("MobileConfig: Field configs reordered successfully");
     } catch (err) {
       log.error("MobileConfig: Failed to reorder field configs", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
+      // Rollback to server state on error
       await fetchFieldConfigs();
       throw err;
+    }
+  };
+
+  // Section handlers - persist to database
+  const handleAddSection = async (
+    section: Omit<
+      FormSectionWithFields,
+      "id" | "organization_id" | "created_at" | "updated_at"
+    >
+  ) => {
+    if (!organizationId) return;
+
+    // Optimistically add section
+    const optimisticSection: FormSectionWithFields = {
+      ...section,
+      id: `temp-section-${Date.now()}`,
+      organization_id: organizationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setSections((prev) => [...prev, optimisticSection]);
+
+    try {
+      const { error: createError } = await supabase.functions.invoke(
+        "create-form-section",
+        {
+          body: {
+            organization_id: organizationId,
+            title: section.title,
+            description: section.description,
+            order_position: section.order_position,
+            collapsed_by_default: section.collapsed_by_default,
+          },
+        }
+      );
+
+      if (createError) {
+        throw createError;
+      }
+
+      await fetchFieldConfigs();
+      log.info("MobileConfig: Section created successfully");
+    } catch (err) {
+      log.error("MobileConfig: Failed to create section", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      await fetchFieldConfigs();
+      throw err;
+    }
+  };
+
+  const handleUpdateSection = async (
+    sectionId: string,
+    updates: Partial<FormSectionWithFields>
+  ) => {
+    // Optimistically update section
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? { ...s, ...updates, updated_at: new Date().toISOString() }
+          : s
+      )
+    );
+
+    try {
+      const { error: updateError } = await supabase.functions.invoke(
+        "update-form-section",
+        {
+          body: {
+            id: sectionId,
+            ...updates,
+          },
+        }
+      );
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await fetchFieldConfigs();
+      log.info("MobileConfig: Section updated successfully");
+    } catch (err) {
+      log.error("MobileConfig: Failed to update section", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      await fetchFieldConfigs();
+      throw err;
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string) => {
+    // Optimistically delete section
+    setSections((prev) => prev.filter((s) => s.id !== sectionId));
+
+    try {
+      const { error: deleteError } = await supabase.functions.invoke(
+        "delete-form-section",
+        {
+          body: { id: sectionId },
+        }
+      );
+
+      if (deleteError) {
+        throw deleteError;
+      }
+
+      await fetchFieldConfigs();
+      log.info("MobileConfig: Section deleted successfully");
+    } catch (err) {
+      log.error("MobileConfig: Failed to delete section", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      await fetchFieldConfigs();
+      throw err;
+    }
+  };
+
+  const handleReorderSections = async (sectionIds: string[]) => {
+    // Optimistically reorder
+    const reordered = sectionIds
+      .map((id) => sections.find((s) => s.id === id))
+      .filter((s): s is FormSectionWithFields => s !== undefined)
+      .map((s, index) => ({ ...s, order_position: index }));
+    setSections(reordered);
+
+    // Update each section's order_position in the database
+    try {
+      await Promise.all(
+        reordered.map((section, index) =>
+          supabase.functions.invoke("update-form-section", {
+            body: {
+              id: section.id,
+              order_position: index,
+            },
+          })
+        )
+      );
+      log.info("MobileConfig: Sections reordered successfully");
+    } catch (err) {
+      log.error("MobileConfig: Failed to reorder sections", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      await fetchFieldConfigs();
     }
   };
 
@@ -367,6 +549,20 @@ export default function MobileConfigPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId]);
 
+  // Update section field_ids when field configs change
+  useEffect(() => {
+    if (sections.length > 0 && fieldConfigs.length > 0) {
+      setSections((prevSections) =>
+        prevSections.map((section) => ({
+          ...section,
+          field_ids: fieldConfigs
+            .filter((fc) => fc.section_id === section.id)
+            .map((fc) => fc.id),
+        }))
+      );
+    }
+  }, [fieldConfigs, sections.length]);
+
   if (orgLoading || settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -393,13 +589,31 @@ export default function MobileConfigPage() {
 
   return (
     <>
-      <div className="mb-8 w-3/4">
-        <h1 className="text-3xl font-bold tracking-tight">
-          Mobile Application
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          {labels.mobileConfigDescription}
-        </p>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div className="w-3/4">
+            <h1 className="text-3xl font-bold tracking-tight">
+              Mobile Application
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {labels.mobileConfigDescription}
+            </p>
+          </div>
+          {fieldConfigs.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (settings?.business_mode) {
+                  setResetTemplateMode(settings.business_mode);
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset to Template
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -410,7 +624,8 @@ export default function MobileConfigPage() {
               <CardTitle>Get Started with a Template</CardTitle>
               <CardDescription>
                 Start with a pre-configured set of fields tailored to your
-                business mode, or build from scratch.
+                business mode, or build from scratch with the visual form
+                builder.
                 {settings?.business_mode && (
                   <span className="block mt-2 text-sm font-medium">
                     Recommended:{" "}
@@ -492,153 +707,98 @@ export default function MobileConfigPage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-6 pt-6 border-t">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsFormOpen(true)}
-                  className="w-full"
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Build from Scratch
-                </Button>
-              </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Show field configurations when they exist */}
-        {fieldConfigs.length > 0 && (
-          <>
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Field Configurations</CardTitle>
-                    <CardDescription className="w-3/4 pt-2">
-                      Configure custom fields that will appear in the mobile
-                      app. These fields can be used alongside predefined
-                      locations or as standalone custom fields.
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsFormOpen(true)}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Field
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (settings?.business_mode) {
-                          setResetTemplateMode(settings.business_mode);
-                        }
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Reset to Template
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <FieldConfigList
-                  fieldConfigs={optimisticFieldConfigs}
-                  loading={loading}
-                  error={error}
-                  onDeleteFieldConfig={handleDeleteFieldConfig}
-                  onUpdateFieldConfig={handleUpdateFieldConfig}
-                  onReorderFieldConfigs={handleReorderFieldConfigs}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Reset Template Dialog */}
-            <AlertDialog
-              open={resetTemplateMode !== null}
-              onOpenChange={(open) => {
-                if (!open) setResetTemplateMode(null);
-              }}
-            >
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Reset to Template?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will replace all your current field configurations with
-                    the template fields. This action cannot be undone. Your
-                    existing fields will be archived.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <button
-                      onClick={() => {
-                        if (resetTemplateMode) {
-                          handleApplyTemplate("service_based", true);
-                        }
-                      }}
-                      disabled={applyingTemplate}
-                      className={`flex flex-col rounded-lg border-2 p-4 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
-                        resetTemplateMode === "service_based"
-                          ? "border-primary bg-primary/5"
-                          : "border-muted bg-card"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        <div className="font-semibold text-sm">
-                          Service-Based Template
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {getTemplateDescription("service_based")}
-                      </p>
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (resetTemplateMode) {
-                          handleApplyTemplate("resource_tracking", true);
-                        }
-                      }}
-                      disabled={applyingTemplate}
-                      className={`flex flex-col rounded-lg border-2 p-4 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
-                        resetTemplateMode === "resource_tracking"
-                          ? "border-primary bg-primary/5"
-                          : "border-muted bg-card"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <Package className="h-4 w-4 text-primary" />
-                        <div className="font-semibold text-sm">
-                          Resource Tracking Template
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {getTemplateDescription("resource_tracking")}
-                      </p>
-                    </button>
-                  </div>
-                </div>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </>
+        {/* Show Visual Form Builder when fields exist */}
+        {(fieldConfigs.length > 0 || loading) && (
+          <VisualFormBuilder
+            fields={optimisticFieldConfigs}
+            sections={sections}
+            onAddField={handleAddFieldConfig}
+            onUpdateField={handleUpdateFieldConfig}
+            onDeleteField={handleDeleteFieldConfig}
+            onReorderFields={handleReorderFieldConfigs}
+            onAddSection={handleAddSection}
+            onUpdateSection={handleUpdateSection}
+            onDeleteSection={handleDeleteSection}
+            onReorderSections={handleReorderSections}
+          />
         )}
       </div>
 
-      <FieldConfigForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        onSuccess={async (fieldConfigData) => {
-          setIsFormOpen(false);
-          await handleAddFieldConfig(fieldConfigData);
+      {/* Reset Template Dialog */}
+      <AlertDialog
+        open={resetTemplateMode !== null}
+        onOpenChange={(open) => {
+          if (!open) setResetTemplateMode(null);
         }}
-      />
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset to Template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace all your current field configurations with the
+              template fields. This action cannot be undone. Your existing
+              fields will be archived.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <button
+                onClick={() => {
+                  if (resetTemplateMode) {
+                    handleApplyTemplate("service_based", true);
+                  }
+                }}
+                disabled={applyingTemplate}
+                className={`flex flex-col rounded-lg border-2 p-4 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
+                  resetTemplateMode === "service_based"
+                    ? "border-primary bg-primary/5"
+                    : "border-muted bg-card"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <div className="font-semibold text-sm">
+                    Service-Based Template
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {getTemplateDescription("service_based")}
+                </p>
+              </button>
+              <button
+                onClick={() => {
+                  if (resetTemplateMode) {
+                    handleApplyTemplate("resource_tracking", true);
+                  }
+                }}
+                disabled={applyingTemplate}
+                className={`flex flex-col rounded-lg border-2 p-4 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
+                  resetTemplateMode === "resource_tracking"
+                    ? "border-primary bg-primary/5"
+                    : "border-muted bg-card"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Package className="h-4 w-4 text-primary" />
+                  <div className="font-semibold text-sm">
+                    Resource Tracking Template
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {getTemplateDescription("resource_tracking")}
+                </p>
+              </button>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

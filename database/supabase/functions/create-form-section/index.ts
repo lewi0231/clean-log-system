@@ -11,9 +11,7 @@ serve(async (req) => {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
       "organization_id",
-      "name",
-      "label",
-      "field_type",
+      "title",
     ]);
 
     if (!validation.valid) {
@@ -22,64 +20,38 @@ serve(async (req) => {
 
     const {
       organization_id,
-      name,
-      label,
-      field_type,
+      title,
       description,
-      required,
       order_position,
-      validation_rules,
-      options,
-      mutually_exclusive_group,
-      group_cluster,
-      section_id,
-      conditional_logic,
+      collapsed_by_default,
     } = body;
 
     const supabase = createServiceRoleClient();
 
-    // Validate group/cluster consistency
-    if (group_cluster && !mutually_exclusive_group) {
-      return errorResponse(
-        "Group cluster requires a mutually exclusive group to be set",
-        400
-      );
-    }
-
     // If order_position not provided, get the max and add 1
     let finalOrderPosition = order_position;
     if (finalOrderPosition === undefined || finalOrderPosition === null) {
-      const { data: existingConfigs } = await supabase
-        .from("organization_field_configs")
+      const { data: existingSections } = await supabase
+        .from("form_section")
         .select("order_position")
         .eq("organization_id", organization_id)
-        .eq("active", true)
         .order("order_position", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      finalOrderPosition = existingConfigs?.order_position
-        ? existingConfigs.order_position + 1
+      finalOrderPosition = existingSections?.order_position
+        ? existingSections.order_position + 1
         : 0;
     }
 
-    const { data: fieldConfig, error: createError } = await supabase
-      .from("organization_field_configs")
+    const { data: section, error: createError } = await supabase
+      .from("form_section")
       .insert({
         organization_id,
-        name,
-        label,
-        field_type,
+        title,
         description: description || null,
-        required: required || false,
         order_position: finalOrderPosition,
-        validation_rules: validation_rules || null,
-        options: options || null,
-        mutually_exclusive_group: mutually_exclusive_group || null,
-        group_cluster: group_cluster || null,
-        section_id: section_id || null,
-        conditional_logic: conditional_logic || null,
-        active: true,
+        collapsed_by_default: collapsed_by_default || false,
       })
       .select()
       .single();
@@ -88,12 +60,12 @@ serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      field_config: fieldConfig,
+      section,
     });
   } catch (error) {
-    console.error("Create field config error:", error);
+    console.error("Create form section error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to create field config"
+      error instanceof Error ? error : "Failed to create form section"
     );
   }
 });

@@ -27,6 +27,8 @@ serve(async (req) => {
       options,
       mutually_exclusive_group,
       group_cluster,
+      section_id,
+      conditional_logic,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -57,6 +59,9 @@ serve(async (req) => {
       updateData.mutually_exclusive_group = mutually_exclusive_group || null;
     if (group_cluster !== undefined)
       updateData.group_cluster = group_cluster || null;
+    if (section_id !== undefined) updateData.section_id = section_id || null;
+    if (conditional_logic !== undefined)
+      updateData.conditional_logic = conditional_logic || null;
 
     const { data: fieldConfig, error: updateError } = await supabase
       .from("organization_field_configs")

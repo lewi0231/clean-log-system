@@ -1,3 +1,4 @@
+import { ConditionalLogic } from "./conditional-logic";
 import { FieldType } from "./field-type";
 import { ValidationRules } from "./validation-rule";
 
@@ -14,6 +15,10 @@ export interface FieldConfig {
   options: string[] | null; // For select fields
   mutually_exclusive_group: string | null;
   group_cluster: string | null;
+  // New: Section grouping
+  section_id: string | null;
+  // New: Conditional visibility
+  conditional_logic: ConditionalLogic | null;
   version: number;
   active: boolean;
   archived_at: string | null;
