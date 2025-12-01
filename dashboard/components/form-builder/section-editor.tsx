@@ -42,6 +42,7 @@ interface SectionEditorProps {
   onReorderSections: (sectionIds: string[]) => void;
   draggedFieldId?: string | null;
   onDropFieldToSection?: (sectionId: string, fieldId: string) => void;
+  onRemoveFieldFromSection?: (fieldId: string) => void;
 }
 
 interface SectionFormData {
@@ -59,6 +60,7 @@ export function SectionEditor({
   onReorderSections,
   draggedFieldId,
   onDropFieldToSection,
+  onRemoveFieldFromSection,
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSection, setEditingSection] =
@@ -261,7 +263,7 @@ export function SectionEditor({
                         {sectionFields.map((field) => (
                           <div
                             key={field.id}
-                            className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-foreground"
+                            className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-foreground group"
                           >
                             <div className="flex flex-col">
                               <span className="text-sm font-medium">
@@ -271,9 +273,23 @@ export function SectionEditor({
                                 {field.name}
                               </span>
                             </div>
-                            <Badge variant="outline" className="text-[11px]">
-                              {field.field_type}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[11px]">
+                                {field.field_type}
+                              </Badge>
+                              {onRemoveFieldFromSection && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                  onClick={() =>
+                                    onRemoveFieldFromSection(field.id)
+                                  }
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

@@ -313,6 +313,9 @@ export function VisualFormBuilder({
                   onUpdateField(fieldId, { section_id: sectionId });
                   setDraggedField(null);
                 }}
+                onRemoveFieldFromSection={(fieldId) => {
+                  onUpdateField(fieldId, { section_id: null });
+                }}
               />
             </CardContent>
           </Card>
