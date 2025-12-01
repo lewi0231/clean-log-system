@@ -23,7 +23,7 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface SectionEditorProps {
   sections: FormSectionWithFields[];
@@ -74,9 +74,29 @@ export function SectionEditor({
     new Set(sections.map((s) => s.id))
   );
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() =>
+    sections.map((s) => s.id)
+  );
   const fieldMap = useMemo(
     () => new Map(fields.map((field) => [field.id, field])),
     [fields]
+  );
+
+  // Keep local order in sync when sections change externally (but not during drag)
+  useEffect(() => {
+    if (!draggedSection) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSectionOrder(sections.map((s) => s.id));
+    }
+  }, [sections, draggedSection]);
+
+  // Get ordered sections based on local state
+  const orderedSections = useMemo(
+    () =>
+      sectionOrder
+        .map((id) => sections.find((s) => s.id === id))
+        .filter((s): s is FormSectionWithFields => s !== undefined),
+    [sectionOrder, sections]
   );
 
   const handleOpenDialog = (section?: FormSectionWithFields) => {
@@ -142,18 +162,19 @@ export function SectionEditor({
 
     e.preventDefault();
 
-    const draggedIndex = sections.findIndex((s) => s.id === draggedSection);
-    const targetIndex = sections.findIndex((s) => s.id === targetId);
+    setSectionOrder((prev) => {
+      const draggedIndex = prev.indexOf(draggedSection);
+      const targetIndex = prev.indexOf(targetId);
 
-    if (draggedIndex === -1 || targetIndex === -1) {
-      return;
-    }
+      if (draggedIndex === -1 || targetIndex === -1) {
+        return prev;
+      }
 
-    const newOrder = [...sections];
-    const [removed] = newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, removed);
-
-    onReorderSections(newOrder.map((s) => s.id));
+      const next = [...prev];
+      const [removed] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, removed);
+      return next;
+    });
   };
 
   const handleFieldDrop = (e: React.DragEvent, sectionId: string) => {
@@ -164,6 +185,9 @@ export function SectionEditor({
   };
 
   const handleDragEnd = () => {
+    if (sectionOrder.length > 0) {
+      onReorderSections(sectionOrder);
+    }
     setDraggedSection(null);
   };
 
@@ -190,7 +214,7 @@ export function SectionEditor({
         </div>
       ) : (
         <div className="space-y-2">
-          {sections.map((section) => {
+          {orderedSections.map((section) => {
             const isExpanded = expandedSections.has(section.id);
             const sectionFields = (section.field_ids || [])
               .map((fieldId) => fieldMap.get(fieldId))

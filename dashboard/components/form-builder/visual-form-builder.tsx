@@ -133,13 +133,15 @@ export function VisualFormBuilder({
   );
 
   // Helper to generate unique field name
-  const generateFieldName = (label: string): string => {
+  const generateFieldName = (
+    label: string,
+    existingNames: string[] = fields.map((f) => f.name)
+  ): string => {
     const baseName = label
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_|_$/g, "");
 
-    const existingNames = fields.map((f) => f.name);
     let name = baseName;
     let counter = 1;
 
@@ -186,15 +188,25 @@ export function VisualFormBuilder({
   const handleApplyTemplate = async (template: FieldTemplate) => {
     setIsAddingField(true);
     try {
+      // Capture initial state
+      let currentOrderPosition = fields.length;
+      const existingNames = new Set(fields.map((f) => f.name));
+
       for (const templateField of template.fields) {
-        const name = generateFieldName(templateField.label);
+        // Generate unique name checking against both existing fields and previously added template fields
+        const name = generateFieldName(
+          templateField.label,
+          Array.from(existingNames)
+        );
+        existingNames.add(name); // Track this name to avoid duplicates within the template
+
         await onAddField({
           name,
           label: templateField.label,
           field_type: templateField.field_type,
           description: templateField.description || null,
           required: templateField.required,
-          order_position: fields.length,
+          order_position: currentOrderPosition++,
           validation_rules: templateField.validation_rules || null,
           options: templateField.options || null,
           mutually_exclusive_group: null,

@@ -53,10 +53,14 @@ export function ConditionalLogicEditor({
 
   const handleToggle = (enabled: boolean) => {
     if (enabled) {
+      // Don't create invalid conditions when there are no available fields
+      if (availableFields.length === 0) {
+        return;
+      }
       onChange({
         conditions: [
           {
-            field_id: availableFields[0]?.id || "",
+            field_id: availableFields[0].id,
             operator: "is_not_empty",
           },
         ],
@@ -68,13 +72,13 @@ export function ConditionalLogicEditor({
   };
 
   const addCondition = () => {
-    if (!logic) return;
+    if (!logic || availableFields.length === 0) return;
     onChange({
       ...logic,
       conditions: [
         ...logic.conditions,
         {
-          field_id: availableFields[0]?.id || "",
+          field_id: availableFields[0].id,
           operator: "is_not_empty",
         },
       ],
@@ -120,8 +124,17 @@ export function ConditionalLogicEditor({
     <div className="space-y-3 pt-4 border-t">
       <div className="flex items-center justify-between">
         <Label className="text-xs font-medium">Conditional Visibility</Label>
-        <Switch checked={isEnabled} onCheckedChange={handleToggle} />
+        <Switch
+          checked={isEnabled}
+          onCheckedChange={handleToggle}
+          disabled={availableFields.length === 0}
+        />
       </div>
+      {availableFields.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Add more fields to enable conditional visibility
+        </p>
+      )}
 
       {isEnabled && logic && (
         <div className="space-y-3 pl-1">
