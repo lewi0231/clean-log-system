@@ -12,9 +12,10 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
+import { ConditionalLogic, FieldConfig } from "@/shared/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { JSX, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -24,7 +25,128 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// Helper to evaluate conditional logic
+function evaluateCondition(
+  logic: ConditionalLogic | null,
+  fieldValues: Record<string, string | number | boolean | unknown>,
+  fieldConfigs: FieldConfig[]
+): boolean {
+  if (!logic || !logic.conditions || logic.conditions.length === 0) {
+    return true; // No conditions = always visible
+  }
+
+  const { conditions, match_type = "all" } = logic;
+
+  const results = conditions.map((condition) => {
+    // Find the source field
+    const sourceField = fieldConfigs.find((f) => f.id === condition.field_id);
+    if (!sourceField) return true; // If field not found, show by default
+
+    const sourceValue = fieldValues[sourceField.id];
+
+    switch (condition.operator) {
+      case "equals":
+        return sourceValue === condition.value;
+      case "not_equals":
+        return sourceValue !== condition.value;
+      case "is_empty":
+        return (
+          sourceValue === undefined ||
+          sourceValue === null ||
+          sourceValue === "" ||
+          sourceValue === 0
+        );
+      case "is_not_empty":
+        return (
+          sourceValue !== undefined &&
+          sourceValue !== null &&
+          sourceValue !== "" &&
+          sourceValue !== 0
+        );
+      case "contains":
+        return String(sourceValue || "").includes(String(condition.value));
+      case "greater_than":
+        return Number(sourceValue) > Number(condition.value);
+      case "less_than":
+        return Number(sourceValue) < Number(condition.value);
+      default:
+        return true;
+    }
+  });
+
+  return match_type === "all" ? results.every(Boolean) : results.some(Boolean);
+}
+
+// Collapsible Section Component
+interface CollapsibleSectionProps {
+  title: string;
+  description?: string | null;
+  children: React.ReactNode;
+  defaultCollapsed?: boolean;
+  fieldCount: number;
+}
+
+function CollapsibleSection({
+  title,
+  description,
+  children,
+  defaultCollapsed = false,
+  fieldCount,
+}: CollapsibleSectionProps) {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const animatedHeight = useSharedValue(defaultCollapsed ? 0 : 1);
+
+  const toggleCollapse = useCallback(() => {
+    setIsCollapsed((prev) => !prev);
+    animatedHeight.value = withTiming(isCollapsed ? 1 : 0, { duration: 200 });
+  }, [isCollapsed, animatedHeight]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: animatedHeight.value,
+    maxHeight: animatedHeight.value === 0 ? 0 : undefined,
+    overflow: "hidden",
+  }));
+
+  return (
+    <View className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-4">
+      <Pressable
+        onPress={toggleCollapse}
+        className="flex-row items-center justify-between p-4 bg-gray-50 active:bg-gray-100"
+      >
+        <View className="flex-1">
+          <Text className="text-base font-semibold text-foreground">
+            {title}
+          </Text>
+          {description && (
+            <Text className="text-xs text-muted-foreground mt-0.5">
+              {description}
+            </Text>
+          )}
+        </View>
+        <View className="flex-row items-center gap-2">
+          <View className="bg-gray-200 px-2 py-0.5 rounded-full">
+            <Text className="text-xs text-gray-600">{fieldCount}</Text>
+          </View>
+          <Ionicons
+            name={isCollapsed ? "chevron-forward" : "chevron-down"}
+            size={18}
+            color="#6b7280"
+          />
+        </View>
+      </Pressable>
+      <Animated.View style={animatedStyle}>
+        <View className="p-4 space-y-4">{children}</View>
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function NewEntryScreen() {
   const router = useRouter();
@@ -77,6 +199,34 @@ export default function NewEntryScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserColleagueId]);
+
+  // Group fields by section
+  const organizedFields = useMemo(() => {
+    const sectionMap = new Map<string | null, FieldConfig[]>();
+    sectionMap.set(null, []); // Unsectioned fields
+
+    fieldConfigs.forEach((config) => {
+      const sectionId = config.section_id;
+      if (!sectionMap.has(sectionId)) {
+        sectionMap.set(sectionId, []);
+      }
+      sectionMap.get(sectionId)!.push(config);
+    });
+
+    return sectionMap;
+  }, [fieldConfigs]);
+
+  // Check if a field should be visible based on conditional logic
+  const isFieldVisible = useCallback(
+    (field: FieldConfig): boolean => {
+      return evaluateCondition(
+        field.conditional_logic,
+        fieldValues,
+        fieldConfigs
+      );
+    },
+    [fieldValues, fieldConfigs]
+  );
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -202,6 +352,68 @@ export default function NewEntryScreen() {
     );
   };
 
+  // Render a single field
+  const renderField = (config: FieldConfig) => {
+    // Check conditional visibility
+    if (!isFieldVisible(config)) {
+      return null;
+    }
+
+    const disabled = isFieldDisabled(config, fieldConfigs, fieldValues);
+
+    return (
+      <View key={config.id} className="mb-4">
+        {config.field_type !== "boolean" && (
+          <Text
+            className={`text-base font-semibold mb-2 ${
+              disabled ? "text-muted-foreground" : "text-foreground"
+            }`}
+          >
+            {config.label}
+            {config.required && <Text className="text-red-500"> *</Text>}
+            {disabled && (
+              <Text className="text-xs text-muted-foreground ml-2">
+                (locked - another method selected)
+              </Text>
+            )}
+          </Text>
+        )}
+        {config.description && (
+          <Text className="text-sm text-muted-foreground mb-2 italic">
+            {config.description}
+          </Text>
+        )}
+        <FieldRenderer
+          config={config}
+          value={fieldValues[config.id]}
+          error={errors[config.name]}
+          onChange={(value) => updateFieldValue(config.id, value)}
+          onErrorClear={() => clearFieldError(config.name)}
+          disabled={disabled}
+        />
+      </View>
+    );
+  };
+
+  // Get visible field count for a section
+  const getVisibleFieldCount = (fields: FieldConfig[]): number => {
+    return fields.filter(isFieldVisible).length;
+  };
+
+  // Get unsectioned fields
+  const unsectionedFields = organizedFields.get(null) || [];
+
+  // Get unique sections from field configs
+  const sections = useMemo(() => {
+    const sectionIds = new Set<string>();
+    fieldConfigs.forEach((config) => {
+      if (config.section_id) {
+        sectionIds.add(config.section_id);
+      }
+    });
+    return Array.from(sectionIds);
+  }, [fieldConfigs]);
+
   return (
     <SafeAreaView className="flex-1 bg-background px-4 py-4" edges={["bottom"]}>
       <KeyboardAvoidingView
@@ -219,7 +431,7 @@ export default function NewEntryScreen() {
           {filteredColleagues.length > 0 && (
             <View className="mb-4">
               <Text className="text-base font-semibold mb-2 text-foreground">
-                Who did you work with?!
+                Who did you work with?
               </Text>
               <Select
                 value=""
@@ -286,85 +498,90 @@ export default function NewEntryScreen() {
               <Text className="text-muted-foreground">Loading fields...</Text>
             </View>
           ) : (
-            (() => {
-              const groupedFields =
-                groupFieldsByMutualExclusivity(fieldConfigs);
-              const fieldElements: JSX.Element[] = [];
+            <>
+              {/* Render sectioned fields */}
+              {sections.map((sectionId) => {
+                const sectionFields = organizedFields.get(sectionId) || [];
+                const visibleCount = getVisibleFieldCount(sectionFields);
 
-              // Render grouped fields
-              Array.from(groupedFields.entries()).forEach(
-                ([groupId, configs]) => {
-                  if (groupId) {
-                    // Add group separator
-                    fieldElements.push(
-                      <View key={`group-${groupId}`} className="mb-2 mt-4">
-                        <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                          Choose One: {groupId}
-                        </Text>
-                      </View>
-                    );
-                  }
+                if (visibleCount === 0) return null;
 
-                  // Render fields in this group
-                  configs.forEach((config) => {
-                    const disabled = isFieldDisabled(
-                      config,
-                      fieldConfigs,
-                      fieldValues
-                    );
+                // For now, use section ID as title (will be enhanced with section metadata later)
+                const sectionTitle =
+                  sectionId
+                    .replace(/-/g, " ")
+                    .replace(/section/i, "")
+                    .trim() || "Section";
 
-                    fieldElements.push(
-                      <View key={config.id} className="mb-4">
-                        {config.field_type !== "boolean" && (
-                          <Text
-                            className={`text-base font-semibold mb-2 ${
-                              disabled
-                                ? "text-muted-foreground"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {config.label}
-                            {config.required && (
-                              <Text className="text-red-500"> *</Text>
-                            )}
-                            {disabled && (
-                              <Text className="text-xs text-muted-foreground ml-2">
-                                (locked - another method selected)
+                return (
+                  <CollapsibleSection
+                    key={sectionId}
+                    title={sectionTitle}
+                    fieldCount={visibleCount}
+                    defaultCollapsed={false}
+                  >
+                    {sectionFields.map(renderField)}
+                  </CollapsibleSection>
+                );
+              })}
+
+              {/* Render unsectioned fields with mutual exclusivity grouping */}
+              {unsectionedFields.length > 0 && (
+                <>
+                  {(() => {
+                    const groupedFields =
+                      groupFieldsByMutualExclusivity(unsectionedFields);
+                    const fieldElements: JSX.Element[] = [];
+
+                    // Render grouped fields
+                    Array.from(groupedFields.entries()).forEach(
+                      ([groupId, configs]) => {
+                        // Filter out invisible fields
+                        const visibleConfigs = configs.filter(isFieldVisible);
+                        if (visibleConfigs.length === 0) return;
+
+                        if (groupId) {
+                          // Add group separator
+                          fieldElements.push(
+                            <View
+                              key={`group-${groupId}`}
+                              className="mb-2 mt-4"
+                            >
+                              <Text className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                Choose One: {groupId}
                               </Text>
-                            )}
-                          </Text>
-                        )}
-                        {config.description && (
-                          <Text className="text-sm text-muted-foreground mb-2 italic">
-                            {config.description}
-                          </Text>
-                        )}
-                        <FieldRenderer
-                          config={config}
-                          value={fieldValues[config.id]}
-                          error={errors[config.name]}
-                          onChange={(value) =>
-                            updateFieldValue(config.id, value)
-                          }
-                          onErrorClear={() => clearFieldError(config.name)}
-                          disabled={disabled}
-                        />
-                      </View>
-                    );
-                  });
-                }
-              );
+                            </View>
+                          );
+                        }
 
-              return fieldElements;
-            })()
+                        // Render fields in this group
+                        visibleConfigs.forEach((config) => {
+                          const element = renderField(config);
+                          if (element) {
+                            fieldElements.push(element);
+                          }
+                        });
+                      }
+                    );
+
+                    return fieldElements;
+                  })()}
+                </>
+              )}
+            </>
           )}
 
           {/* Submit button */}
           <Pressable
             onPress={handleSubmit}
-            className="bg-blue-500 rounded-xl py-4 px-8 items-center justify-center mt-6 active:bg-blue-600 active:scale-[0.98]"
+            disabled={isSubmitting}
+            className={`bg-blue-500 rounded-xl py-4 px-8 items-center justify-center mt-6 active:bg-blue-600 active:scale-[0.98] ${
+              isSubmitting ? "opacity-50" : ""
+            }`}
           >
-            <Text className="text-white text-lg font-semibold">Submit</Text>
+            <Text className="text-white text-lg font-semibold">
+              {isSubmitting ? "Submitting..." : "Submit"}
+            </Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

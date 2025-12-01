@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -22,9 +23,71 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { log } from "@/lib/logger";
 import { fieldConfigSchema } from "@/lib/validations";
-import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
+import { FieldConfig, FieldType, ValidationRules } from "@clean-log/shared";
 import { useEffect, useState } from "react";
 import ValidationRulesEditor from "./validation-rules-editor";
+
+const YARD_GROUP_ID = "yard_tracking_method";
+
+type YardPresetId =
+  | "yard_boolean"
+  | "yard_wiped"
+  | "yard_soaped"
+  | "yard_number";
+
+const YARD_PRESETS: Array<{
+  id: YardPresetId;
+  label: string;
+  description: string;
+  name: string;
+  fieldLabel: string;
+  fieldType: FieldType;
+  groupCluster: string;
+  options?: string[];
+  validationRules?: ValidationRules | null;
+}> = [
+  {
+    id: "yard_boolean",
+    label: "Yard serviced toggle",
+    description: "Fast yes/no confirmation for simple yards.",
+    name: "yard_serviced_toggle",
+    fieldLabel: "Yard Serviced Today?",
+    fieldType: "boolean",
+    groupCluster: "simple_servicing",
+  },
+  {
+    id: "yard_wiped",
+    label: "Cars wiped breakdown",
+    description: "Log how many sedans/SUVs/trucks were wiped.",
+    name: "cars_wiped_breakdown",
+    fieldLabel: "Cars Wiped (breakdown)",
+    fieldType: "grouped_breakdown",
+    groupCluster: "detailed_tracking",
+    options: ["Sedan", "SUV", "Truck"],
+  },
+  {
+    id: "yard_soaped",
+    label: "Cars soaped breakdown",
+    description: "Track soap counts per vehicle type.",
+    name: "cars_soaped_breakdown",
+    fieldLabel: "Cars Soaped (breakdown)",
+    fieldType: "grouped_breakdown",
+    groupCluster: "detailed_tracking",
+    options: ["Sedan", "SUV", "Truck"],
+  },
+  {
+    id: "yard_number",
+    label: "Specific yard number",
+    description: "Capture the lot or yard identifier that was serviced.",
+    name: "yard_number_reference",
+    fieldLabel: "Specific Yard Number",
+    fieldType: "number",
+    groupCluster: "yard_number",
+    validationRules: {
+      min: 0,
+    },
+  },
+];
 
 interface FieldConfigFormProps {
   open: boolean;
@@ -72,6 +135,9 @@ export default function FieldConfigForm({
     mutually_exclusive_group?: string;
     group_cluster?: string;
   }>({});
+  const [selectedPreset, setSelectedPreset] = useState<YardPresetId | "custom">(
+    "custom"
+  );
 
   const isEditMode = !!fieldConfig;
   const isSelectField = fieldType === "select";
@@ -91,6 +157,16 @@ export default function FieldConfigForm({
         setOptionsInput((fieldConfig.options || []).join(", "));
         setMutuallyExclusiveGroup(fieldConfig.mutually_exclusive_group || "");
         setGroupCluster(fieldConfig.group_cluster || "");
+        if (fieldConfig.mutually_exclusive_group === YARD_GROUP_ID) {
+          const presetMatch = YARD_PRESETS.find(
+            (preset) =>
+              preset.fieldType === fieldConfig.field_type &&
+              preset.groupCluster === (fieldConfig.group_cluster || "")
+          );
+          setSelectedPreset(presetMatch?.id || "custom");
+        } else {
+          setSelectedPreset("custom");
+        }
       } else {
         setName("");
         setLabel("");
@@ -102,6 +178,7 @@ export default function FieldConfigForm({
         setOptionsInput("");
         setMutuallyExclusiveGroup("");
         setGroupCluster("");
+        setSelectedPreset("custom");
       }
       setErrors({});
     }
@@ -169,6 +246,14 @@ export default function FieldConfigForm({
 
       const validatedData = validateInput();
 
+      // Normalize validated data to ensure undefined becomes null for optional fields
+      const normalizedData = {
+        ...validatedData,
+        mutually_exclusive_group:
+          validatedData.mutually_exclusive_group ?? null,
+        group_cluster: validatedData.group_cluster ?? null,
+      };
+
       // Reset form
       setName("");
       setLabel("");
@@ -182,7 +267,7 @@ export default function FieldConfigForm({
       setGroupCluster("");
       setErrors({});
       onOpenChange(false);
-      await onSuccess(validatedData, fieldConfig?.id);
+      await onSuccess(normalizedData, fieldConfig?.id);
     } catch (error) {
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("FieldConfigForm: Submission failed", {
@@ -205,6 +290,34 @@ export default function FieldConfigForm({
       .map((opt) => opt.trim())
       .filter((opt) => opt.length > 0);
     setOptions(newOptions);
+  };
+
+  const applyPreset = (presetId: YardPresetId | "custom") => {
+    setSelectedPreset(presetId);
+
+    if (presetId === "custom") {
+      setMutuallyExclusiveGroup("");
+      setGroupCluster("");
+      return;
+    }
+
+    const preset = YARD_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+
+    setName(preset.name);
+    setLabel(preset.fieldLabel);
+    setDescription(preset.description);
+    setFieldType(preset.fieldType);
+    setMutuallyExclusiveGroup(YARD_GROUP_ID);
+    setGroupCluster(preset.groupCluster);
+    setOptions(preset.options || []);
+    setOptionsInput(preset.options ? preset.options.join(", ") : "");
+    setValidationRules(
+      typeof preset.validationRules !== "undefined"
+        ? preset.validationRules
+        : null
+    );
+    setRequired(false);
   };
 
   return (
@@ -303,6 +416,74 @@ export default function FieldConfigForm({
             </Select>
           </div>
 
+          <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+            <div className="flex flex-col gap-1">
+              <Label className="text-sm">
+                Yard Tracking Presets (Optional)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Quickly wire the boolean / grouped breakdown / number trio into{" "}
+                <code>{YARD_GROUP_ID}</code>. Presets follow{" "}
+                <a
+                  href="https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/radio-button"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-4"
+                >
+                  Microsoft&apos;s mutually exclusive recommendations
+                </a>{" "}
+                so crews choose one yard tracking method per entry.
+              </p>
+            </div>
+            <RadioGroup
+              value={selectedPreset}
+              onValueChange={(value) =>
+                applyPreset(value as YardPresetId | "custom")
+              }
+              className="grid gap-2 md:grid-cols-2"
+            >
+              <div className="rounded-md border bg-background px-3 py-2">
+                <div className="flex items-start gap-2">
+                  <RadioGroupItem value="custom" id="yard-preset-custom" />
+                  <div className="space-y-1">
+                    <Label htmlFor="yard-preset-custom" className="text-sm">
+                      Custom configuration
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Start from scratch. Set mutually exclusive values manually
+                      if needed.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {YARD_PRESETS.map((preset) => {
+                const inputId = `yard-preset-${preset.id}`;
+                return (
+                  <div
+                    key={preset.id}
+                    className="rounded-md border bg-background px-3 py-2"
+                  >
+                    <div className="flex items-start gap-2">
+                      <RadioGroupItem value={preset.id} id={inputId} />
+                      <div className="space-y-1">
+                        <Label htmlFor={inputId} className="text-sm">
+                          {preset.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          {preset.description}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Sets {preset.fieldLabel} in{" "}
+                          <code>{YARD_GROUP_ID}</code> ({preset.groupCluster})
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </RadioGroup>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="description">Description (Optional)</Label>
             <Textarea
@@ -395,7 +576,16 @@ export default function FieldConfigForm({
               )}
               <p className="text-xs text-muted-foreground">
                 Fields with the same group are mutually exclusive. Only one
-                cluster or field in a group can have values at a time.
+                cluster or field in a group can have values at a time—mirroring{" "}
+                <a
+                  href="https://learn.microsoft.com/en-us/windows/apps/develop/ui/controls/radio-button"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-4"
+                >
+                  Microsoft&apos;s radio-button guidance
+                </a>{" "}
+                so choices stay crystal clear.
               </p>
             </div>
 
@@ -425,8 +615,9 @@ export default function FieldConfigForm({
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Fields with the same cluster work together within a group. Only
-                enabled if a mutually exclusive group is set.
+                Fields with the same cluster work together as a single option
+                inside the mutually exclusive group. Think “cars wiped” + “cars
+                soaped” acting as one choice when crews log a yard.
               </p>
             </div>
           </div>
