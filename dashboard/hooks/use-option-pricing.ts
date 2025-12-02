@@ -1,9 +1,15 @@
 "use client";
 
-import { OptionPricingService } from "@/lib/services";
-import type { OptionPricing } from "@/lib/types";
+import { PricingService } from "@/lib/services";
+import type { OptionPricing, PricingRule } from "@/lib/types";
 import { useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
+
+interface UseOptionPricingOptions {
+  locationId?: string | null;
+  locationHierarchyId?: string | null;
+  effectiveAt?: string | null;
+}
 
 interface UseOptionPricingResult {
   optionPricing: OptionPricing[];
@@ -17,6 +23,7 @@ interface UseOptionPricingResult {
     options?: {
       workerPaymentRate?: number | null;
       locationId?: string | null;
+      locationHierarchyId?: string | null;
       currency?: string;
     }
   ) => Promise<OptionPricing>;
@@ -25,7 +32,7 @@ interface UseOptionPricingResult {
 
 export function useOptionPricing(
   fieldConfigId?: string,
-  locationId?: string | null
+  filters?: UseOptionPricingOptions
 ): UseOptionPricingResult {
   const { organizationId } = useOrganization();
   const [optionPricing, setOptionPricing] = useState<OptionPricing[]>([]);
@@ -42,13 +49,16 @@ export function useOptionPricing(
       setLoading(true);
       setError(null);
 
-      const pricing = await OptionPricingService.list({
+      const pricing = await PricingService.listRules({
         organization_id: organizationId,
+        scopes: ["option"],
         field_config_id: fieldConfigId,
-        location_id: locationId,
+        location_hierarchy_id: filters?.locationHierarchyId ?? null,
+        location_id: filters?.locationId ?? null,
+        effective_at: filters?.effectiveAt ?? undefined,
       });
 
-      setOptionPricing(pricing);
+      setOptionPricing(pricing.map(transformOptionRule));
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to fetch option pricing"
@@ -66,6 +76,7 @@ export function useOptionPricing(
     options?: {
       workerPaymentRate?: number | null;
       locationId?: string | null;
+      locationHierarchyId?: string | null;
       currency?: string;
     }
   ): Promise<OptionPricing> => {
@@ -73,29 +84,54 @@ export function useOptionPricing(
       throw new Error("Organization ID is required");
     }
 
-    const pricing = await OptionPricingService.upsert({
+    const targetLocationHierarchyId =
+      options?.locationHierarchyId ?? filters?.locationHierarchyId ?? null;
+    const targetLocationId = options?.locationId ?? filters?.locationId ?? null;
+
+    const existingPricing = optionPricing.find(
+      (pricing) =>
+        pricing.field_config_id === fieldConfigId &&
+        pricing.option_value === optionValue &&
+        (pricing.location_hierarchy_id || null) === targetLocationHierarchyId &&
+        (pricing.location_id || null) === targetLocationId
+    );
+
+    const pricing = await PricingService.upsertRule({
+      id: existingPricing?.id,
       organization_id: organizationId,
+      scope: "option",
+      pricing_type: "fixed",
       field_config_id: fieldConfigId,
       option_value: optionValue,
-      customer_price: customerPrice,
-      worker_payment_rate: options?.workerPaymentRate,
-      location_id: options?.locationId,
+      base_price: customerPrice,
       currency: options?.currency || "USD",
+      location_hierarchy_id: targetLocationHierarchyId,
+      location_id: targetLocationId,
+      worker_payment_type: options?.workerPaymentRate
+        ? "fixed_rate"
+        : existingPricing?.worker_payment_type || null,
+      worker_payment_value: options?.workerPaymentRate ?? null,
     });
 
     await fetchOptionPricing();
-    return pricing;
+    return transformOptionRule(pricing);
   };
 
   const deletePricing = async (id: string): Promise<void> => {
-    await OptionPricingService.delete({ id });
+    await PricingService.deleteRule(id);
     await fetchOptionPricing();
   };
 
   useEffect(() => {
     fetchOptionPricing();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, fieldConfigId, locationId]);
+  }, [
+    organizationId,
+    fieldConfigId,
+    filters?.locationHierarchyId,
+    filters?.locationId,
+    filters?.effectiveAt,
+  ]);
 
   return {
     optionPricing,
@@ -106,3 +142,20 @@ export function useOptionPricing(
     deletePricing,
   };
 }
+
+const transformOptionRule = (rule: PricingRule): OptionPricing => ({
+  id: rule.id,
+  organization_id: rule.organization_id,
+  field_config_id: rule.field_config_id || "",
+  option_value: rule.option_value || "",
+  customer_price: rule.base_price ?? 0,
+  worker_payment_rate: rule.worker_payment_value ?? null,
+  worker_payment_type: rule.worker_payment_type ?? null,
+  location_id: rule.location_id,
+  location_hierarchy_id: rule.location_hierarchy_id,
+  currency: rule.currency,
+  source_rule: rule,
+  field_config: rule.field_config,
+  location: rule.location,
+  location_node: rule.location_node,
+});

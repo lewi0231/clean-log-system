@@ -31,10 +31,19 @@ export interface CalculateInvoiceResponse {
         unit_price: number;
         total: number;
       }>;
-      pricing_rules_applied: Array<{
-        rule_id: string;
-        rule_name: string;
-        adjustment: number;
+      applied_rules: Array<{
+        pricing_rule_id: string;
+        scope: string;
+        pricing_type: string;
+        field_config_id: string | null;
+        option_value: string | null;
+        location_hierarchy_id: string | null;
+        location_id: string | null;
+        amount: number;
+        worker_payment: number;
+        metadata: Record<string, unknown>;
+        snapshot_data?: Record<string, unknown>;
+        line_item_key?: string;
       }>;
       subtotal: number;
       total_adjustments: number;
@@ -210,7 +219,7 @@ export class InvoiceService {
         template_config: data.template_config,
       } as InvoiceWithJobs & {
         calculation: CalculateInvoiceResponse["calculation"];
-        template_config: any; // Will be properly typed later
+        template_config: Record<string, unknown> | null; // Will be properly typed later
       };
     } catch (err) {
       log.error("InvoiceService: Failed to get invoice details", {

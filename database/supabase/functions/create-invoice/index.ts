@@ -148,6 +148,27 @@ serve(async (req) => {
 
     if (invoiceJobError) throw invoiceJobError;
 
+    const snapshotRecords =
+      calculation.job_calculations?.flatMap((jobCalc: any) =>
+        (jobCalc.applied_rules || []).map((rule: any) => ({
+          organization_id,
+          invoice_id: invoice.id,
+          job_id: jobCalc.job_id,
+          pricing_rule_id: rule.pricing_rule_id,
+          field_config_id: rule.field_config_id,
+          line_item_key: rule.line_item_key || null,
+          snapshot_data: rule.snapshot_data || {},
+        }))
+      ) || [];
+
+    if (snapshotRecords.length > 0) {
+      const { error: snapshotError } = await supabase
+        .from("pricing_snapshot")
+        .insert(snapshotRecords);
+
+      if (snapshotError) throw snapshotError;
+    }
+
     // Fetch invoice with related jobs and location info
     const { data: invoiceWithJobs, error: fetchError } = await supabase
       .from("invoice")

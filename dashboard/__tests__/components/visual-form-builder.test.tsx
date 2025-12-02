@@ -1,8 +1,22 @@
+import React from "react";
+
 import { createMockFieldConfig } from "@/__tests__/lib/fixtures";
 import { VisualFormBuilder } from "@/components/form-builder/visual-form-builder";
 import type { FormSectionWithFields } from "@clean-log/shared";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/components/ui/popover", () => ({
+  Popover: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="mock-popover">{children}</div>
+  ),
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="mock-popover-trigger">{children}</div>
+  ),
+  PopoverContent: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="mock-popover-content">{children}</div>
+  ),
+}));
 
 const createMockSection = (
   overrides?: Partial<FormSectionWithFields>
@@ -178,5 +192,33 @@ describe("VisualFormBuilder", () => {
       screen.getAllByText("Exclusive: yard_tracking_method")[0]
     ).toBeInTheDocument();
     expect(screen.getByText("Cluster: simple_servicing")).toBeInTheDocument();
+  });
+
+  it("exposes advanced options including conditional logic controls", () => {
+    const fields = [
+      createMockFieldConfig({ id: "field-1", label: "Primary Field" }),
+      createMockFieldConfig({ id: "field-2", label: "Secondary Field" }),
+    ];
+
+    render(
+      <VisualFormBuilder
+        fields={fields}
+        sections={[]}
+        onAddField={mockOnAddField}
+        onUpdateField={mockOnUpdateField}
+        onDeleteField={mockOnDeleteField}
+        onReorderFields={mockOnReorderFields}
+        onAddSection={mockOnAddSection}
+        onUpdateSection={mockOnUpdateSection}
+        onDeleteSection={mockOnDeleteSection}
+        onReorderSections={mockOnReorderSections}
+      />
+    );
+
+    const advancedButtons = screen.getAllByText("Advanced Options");
+    fireEvent.click(advancedButtons[0]);
+
+    expect(screen.getByText("Mutually Exclusive Cluster")).toBeInTheDocument();
+    expect(screen.getByText("Conditional Visibility")).toBeInTheDocument();
   });
 });

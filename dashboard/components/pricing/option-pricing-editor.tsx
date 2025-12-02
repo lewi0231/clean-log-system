@@ -11,21 +11,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
-import type { FieldConfig } from "@/shared/types";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 interface OptionPricingEditorProps {
   fieldConfig: FieldConfig;
-  locationId?: string | null;
+  locationHierarchyId?: string | null;
+  effectiveAt?: string | null;
 }
 
 export default function OptionPricingEditor({
   fieldConfig,
-  locationId,
+  locationHierarchyId = null,
+  effectiveAt = null,
 }: OptionPricingEditorProps) {
   const { optionPricing, loading, error, upsertPricing, deletePricing } =
-    useOptionPricing(fieldConfig.id, locationId);
+    useOptionPricing(fieldConfig.id, {
+      locationHierarchyId,
+      effectiveAt,
+    });
 
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
     {}
@@ -68,7 +73,8 @@ export default function OptionPricingEditor({
     setSaving((prev) => ({ ...prev, [optionValue]: true }));
     try {
       await upsertPricing(fieldConfig.id, optionValue, customerPrice, {
-        locationId,
+        locationId: null,
+        locationHierarchyId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };

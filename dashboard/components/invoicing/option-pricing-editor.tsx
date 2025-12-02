@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
-import type { FieldConfig } from "@/shared/types";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -26,7 +26,9 @@ export default function OptionPricingEditor({
   locationId,
 }: OptionPricingEditorProps) {
   const { optionPricing, loading, error, upsertPricing, deletePricing } =
-    useOptionPricing(fieldConfig.id, locationId);
+    useOptionPricing(fieldConfig.id, {
+      locationId,
+    });
 
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer: string; worker: string }>

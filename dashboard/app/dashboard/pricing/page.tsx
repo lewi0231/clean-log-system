@@ -2,6 +2,7 @@
 
 import BasePricingEditor from "@/components/pricing/base-pricing-editor";
 import FieldPricingList from "@/components/pricing/field-pricing-list";
+import LocationScopeSelector from "@/components/pricing/location-scope-selector";
 import OptionPricingEditor from "@/components/pricing/option-pricing-editor";
 import {
   Card,
@@ -24,10 +25,11 @@ export default function PricingPage() {
     error: orgError,
   } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(
-    null
-  );
+
+  const [selectedLocationNodeId, setSelectedLocationNodeId] = useState<
+    string | null
+  >(null);
+  const [effectiveDate, setEffectiveDate] = useState<string | null>(null);
 
   // Filter fields that support option pricing
   const optionPricingFields = useMemo(() => {
@@ -60,6 +62,13 @@ export default function PricingPage() {
         </p>
       </div>
 
+      <LocationScopeSelector
+        selectedNodeId={selectedLocationNodeId}
+        onNodeChange={setSelectedLocationNodeId}
+        effectiveDate={effectiveDate}
+        onEffectiveDateChange={setEffectiveDate}
+      />
+
       <Tabs defaultValue="field-pricing" className="space-y-6">
         <TabsList>
           <TabsTrigger value="field-pricing">Field Pricing</TabsTrigger>
@@ -79,7 +88,10 @@ export default function PricingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <FieldPricingList />
+              <FieldPricingList
+                locationHierarchyId={selectedLocationNodeId}
+                effectiveAt={effectiveDate}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -100,7 +112,8 @@ export default function PricingPage() {
                   <CardContent>
                     <OptionPricingEditor
                       fieldConfig={fieldConfig}
-                      locationId={selectedLocationId}
+                      locationHierarchyId={selectedLocationNodeId}
+                      effectiveAt={effectiveDate}
                     />
                   </CardContent>
                 </Card>
@@ -130,7 +143,10 @@ export default function PricingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <BasePricingEditor locationId={selectedLocationId} />
+              <BasePricingEditor
+                locationHierarchyId={selectedLocationNodeId}
+                effectiveAt={effectiveDate}
+              />
             </CardContent>
           </Card>
         </TabsContent>

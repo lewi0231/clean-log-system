@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
-import type { FieldConfig, FieldType } from "@/shared/types";
+import type { FieldConfig, FieldType } from "@clean-log/shared";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -32,7 +32,15 @@ const getEquationPreview = (fieldType: FieldType): string => {
   }
 };
 
-export default function FieldPricingList() {
+interface FieldPricingListProps {
+  locationHierarchyId?: string | null;
+  effectiveAt?: string | null;
+}
+
+export default function FieldPricingList({
+  locationHierarchyId = null,
+  effectiveAt = null,
+}: FieldPricingListProps) {
   const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
   const {
     fieldPricing,
@@ -40,7 +48,10 @@ export default function FieldPricingList() {
     error: pricingError,
     upsertPricing,
     deletePricing,
-  } = useFieldPricing();
+  } = useFieldPricing({
+    locationHierarchyId,
+    effectiveAt,
+  });
 
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
     {}
@@ -96,6 +107,7 @@ export default function FieldPricingList() {
       await upsertPricing(fieldConfig.id, customerPrice, {
         appliesToFieldType: fieldConfig.field_type,
         pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+        locationHierarchyId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };

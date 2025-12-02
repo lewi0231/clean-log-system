@@ -25,15 +25,20 @@ import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 interface BasePricingEditorProps {
-  locationId?: string | null;
+  locationHierarchyId?: string | null;
+  effectiveAt?: string | null;
 }
 
 export default function BasePricingEditor({
-  locationId,
+  locationHierarchyId = null,
+  effectiveAt = null,
 }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
   const { basePricing, loading, error, upsertPricing, deletePricing } =
-    useBasePricing(locationId);
+    useBasePricing({
+      locationHierarchyId,
+      effectiveAt,
+    });
 
   const [isFieldBased, setIsFieldBased] = useState(true);
   const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
@@ -128,7 +133,6 @@ export default function BasePricingEditor({
         standalone_base_price: adjustmentType === "add" ? customerPrice : 0,
         customer_base_price: customerPrice,
         adjustment_type: adjustmentType,
-        location_id: locationId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };
@@ -186,7 +190,6 @@ export default function BasePricingEditor({
         job_type_value: optionValue,
         customer_base_price: customerPrice,
         adjustment_type: adjustmentType,
-        location_id: locationId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };

@@ -33,7 +33,7 @@ export default function BasePricingEditor({
 }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
   const { basePricing, loading, error, upsertPricing, deletePricing } =
-    useBasePricing(locationId);
+    useBasePricing({ locationId });
 
   const [isFieldBased, setIsFieldBased] = useState(true);
   const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
@@ -116,7 +116,6 @@ export default function BasePricingEditor({
         standalone_base_price: customerPrice,
         customer_base_price: customerPrice,
         worker_base_payment: workerPrice,
-        location_id: locationId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };
@@ -163,7 +162,6 @@ export default function BasePricingEditor({
         job_type_value: optionValue,
         customer_base_price: customerPrice,
         worker_base_payment: workerPrice,
-        location_id: locationId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };
@@ -199,6 +197,10 @@ export default function BasePricingEditor({
   const selectedFieldConfig = useMemo(() => {
     return selectFieldConfigs.find((fc) => fc.id === selectedFieldConfigId);
   }, [selectFieldConfigs, selectedFieldConfigId]);
+
+  const selectedFieldOptions = useMemo(() => {
+    return selectedFieldConfig?.options ?? null;
+  }, [selectedFieldConfig]);
 
   if (loading) {
     return <LoadingState message="Loading base pricing..." />;
@@ -378,9 +380,9 @@ export default function BasePricingEditor({
               </Select>
             </div>
 
-            {selectedFieldConfig && selectedFieldConfig.options && (
+            {selectedFieldConfig && selectedFieldOptions && (
               <div className="space-y-3">
-                {selectedFieldConfig.options.map((optionValue) => {
+                {selectedFieldOptions.map((optionValue: string) => {
                   const existingPricing = fieldBasedPricingMap[optionValue];
                   const editing = editingPrices[optionValue];
                   const currentCustomerPrice =

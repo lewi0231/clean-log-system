@@ -1,7 +1,7 @@
 "use client";
 
 import { FieldConfigsService } from "@/lib/services";
-import type { FieldConfig } from "@/shared/types/field-config";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
 
