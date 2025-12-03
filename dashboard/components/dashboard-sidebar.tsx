@@ -67,11 +67,20 @@ export default function DashboardSidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-background">
-      <div className="flex h-16 items-center border-b px-6">
-        <h2 className="text-lg font-semibold">Dashboard</h2>
+    <aside className="w-64 bg-gradient-to-b from-sidebar/95 to-sidebar/90 backdrop-blur-xl border-r border-sidebar-border/50 flex flex-col p-6 gap-8 fixed h-screen overflow-y-auto">
+      {/* Logo/Branding Section */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+          <ChartBar className="w-6 h-6 text-white" strokeWidth={3} />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold gradient-text">Clean Log</h1>
+          <p className="text-xs text-muted-foreground">Dashboard</p>
+        </div>
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-2">
         {navigation.map((item) => {
           const isActive =
             pathname === item.href || pathname.startsWith(item.href + "/");
@@ -80,18 +89,21 @@ export default function DashboardSidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300",
                 isActive
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  ? "bg-sidebar-primary/20 text-sidebar-primary border border-sidebar-primary/50"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground"
               )}
             >
-              <item.icon className="h-4 w-4" />
-              {item.name}
+              <item.icon className="w-5 h-5" />
+              <span className="font-medium text-sm">{item.name}</span>
+              {isActive && (
+                <div className="ml-auto w-2 h-2 bg-sidebar-primary rounded-full" />
+              )}
             </Link>
           );
         })}
       </nav>
-    </div>
+    </aside>
   );
 }

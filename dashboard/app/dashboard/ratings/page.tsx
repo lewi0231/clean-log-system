@@ -42,7 +42,3 @@ export default function RatingsPage() {
     </>
   );
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> 22f2347 (- added basic ratings setup.)
