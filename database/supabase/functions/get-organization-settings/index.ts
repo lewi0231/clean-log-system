@@ -22,7 +22,7 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider"
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider, currency, locale",
       )
       .eq("id", organization_id)
       .single();
@@ -33,22 +33,24 @@ serve(async (req) => {
       success: true,
       settings: {
         name: organization?.name ?? "",
-        use_predefined_locations:
-          organization?.use_predefined_locations ?? true,
+        use_predefined_locations: organization?.use_predefined_locations ??
+          true,
         business_mode: organization?.business_mode ?? "service_based",
         abn: organization?.abn ?? null,
         logo_url: organization?.logo_url ?? null,
         primary_contact_email: organization?.primary_contact_email ?? null,
-        invoice_send_immediately:
-          organization?.invoice_send_immediately ?? false,
+        invoice_send_immediately: organization?.invoice_send_immediately ??
+          false,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
+        currency: organization?.currency ?? "AUD",
+        locale: organization?.locale ?? "en-AU",
       },
     });
   } catch (error) {
     console.error("Get organization settings error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to get organization settings"
+      error instanceof Error ? error : "Failed to get organization settings",
     );
   }
 });

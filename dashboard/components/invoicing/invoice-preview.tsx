@@ -369,18 +369,17 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                   })}
 
                   {/* Pricing Rules Applied */}
-                  {calculation.pricing_rules_applied.length > 0 &&
-                    calculation.pricing_rules_applied.map((rule, ruleIndex) => (
+                  {calculation.applied_rules.length > 0 &&
+                    calculation.applied_rules.map((rule, ruleIndex) => (
                       <TableRow key={`${job.id}-rule-${ruleIndex}`}>
                         <TableCell
                           colSpan={3}
                           className="text-sm text-muted-foreground"
                         >
-                          {rule.rule_name}
+                          {rule.scope} — {rule.pricing_type}
                         </TableCell>
                         <TableCell className="text-right text-sm">
-                          {rule.adjustment >= 0 ? "+" : ""}$
-                          {rule.adjustment.toFixed(2)}
+                          {rule.amount >= 0 ? "+" : ""}${rule.amount.toFixed(2)}
                         </TableCell>
                       </TableRow>
                     ))}

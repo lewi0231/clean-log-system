@@ -50,9 +50,17 @@ export interface Location {
   phone: string | null;
   active: boolean;
   created_at: string;
+  hierarchy_parent_id: string | null;
+  hierarchy_parent?: {
+    id: string;
+    name: string;
+    type: "company" | "region";
+  } | null;
 }
 
 export type BusinessMode = "service_based" | "resource_tracking";
+
+export type SupportedCurrency = "AUD" | "USD" | "GBP" | "EUR" | "CAD" | "NZD";
 
 export interface OrganizationSettings {
   name: string;
@@ -64,6 +72,8 @@ export interface OrganizationSettings {
   invoice_send_immediately: boolean;
   stripe_account_id: string | null;
   payment_provider: string | null;
+  currency: SupportedCurrency;
+  locale: string;
 }
 
 export interface Job {
@@ -89,8 +99,103 @@ export interface Job {
   }>;
 }
 
-export type PricingType = "unit" | "fixed";
+export type PricingType =
+  | "unit"
+  | "fixed"
+  | "tiered"
+  | "percentage"
+  | "conditional";
 export type WorkerPaymentType = "same_structure" | "percentage" | "fixed_rate";
+export type PricingScope = "field" | "option" | "base" | "global";
+
+export interface PricingTier {
+  min: number;
+  max: number | null;
+  price: number;
+}
+
+export interface PricingCondition {
+  id: string;
+  pricing_rule_id: string;
+  condition_field_config_id: string;
+  operator:
+    | "equals"
+    | "not_equals"
+    | "greater_than"
+    | "greater_than_or_equal"
+    | "less_than"
+    | "less_than_or_equal"
+    | "contains";
+  condition_value: string;
+  action_type: "add" | "subtract" | "multiply" | "divide" | "set";
+  action_value: number;
+  metadata: Record<string, unknown> | null;
+  priority: number;
+}
+
+export interface PricingRule {
+  id: string;
+  organization_id: string;
+  scope: PricingScope;
+  pricing_type: PricingType;
+  field_config_id: string | null;
+  option_value: string | null;
+  applies_to_field_type: string | null;
+  location_hierarchy_id: string | null;
+  location_id: string | null;
+  currency: string;
+  base_price: number | null;
+  percentage_rate: number | null;
+  minimum_quantity: number | null;
+  maximum_quantity: number | null;
+  tier_definition: PricingTier[] | null;
+  metadata: Record<string, unknown>;
+  worker_payment_type: WorkerPaymentType | null;
+  worker_payment_value: number | null;
+  priority: number;
+  active: boolean;
+  effective_at: string;
+  expires_at: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+  field_config?: {
+    id: string;
+    name: string;
+    label: string;
+    field_type: string;
+  } | null;
+  location?: {
+    id: string;
+    name: string;
+  } | null;
+  location_node?: {
+    id: string;
+    name: string;
+    type: "company" | "region";
+    parent_id: string | null;
+  } | null;
+  conditions?: PricingCondition[];
+}
+
+export interface FieldPricing {
+  id: string;
+  organization_id: string;
+  field_config_id: string;
+  location_id: string | null;
+  location_hierarchy_id: string | null;
+  pricing_type: PricingType;
+  customer_price: number;
+  currency: string;
+  applies_to_field_type: string | null;
+  worker_payment_type: WorkerPaymentType | null;
+  worker_payment_value: number | null;
+  source_rule: PricingRule;
+  field_config?: PricingRule["field_config"];
+  location?: PricingRule["location"];
+  location_node?: PricingRule["location_node"];
+}
 
 export interface OptionPricing {
   id: string;
@@ -99,20 +204,14 @@ export interface OptionPricing {
   option_value: string;
   customer_price: number;
   worker_payment_rate: number | null;
+  worker_payment_type: WorkerPaymentType | null;
   location_id: string | null;
+  location_hierarchy_id: string | null;
   currency: string;
-  created_at: string;
-  updated_at: string;
-  field_config?: {
-    id: string;
-    name: string;
-    label: string;
-    field_type: string;
-  };
-  location?: {
-    id: string;
-    name: string;
-  } | null;
+  source_rule: PricingRule;
+  field_config?: PricingRule["field_config"];
+  location?: PricingRule["location"];
+  location_node?: PricingRule["location_node"];
 }
 
 export interface BasePricing {
@@ -120,61 +219,17 @@ export interface BasePricing {
   organization_id: string;
   job_type_field_config_id: string | null;
   job_type_value: string | null;
-  standalone_base_price: number | null;
+  adjustment_type: "add" | "multiply";
   customer_base_price: number;
   worker_base_payment: number | null;
-  adjustment_type: "add" | "multiply";
+  worker_payment_type: WorkerPaymentType | null;
   location_id: string | null;
+  location_hierarchy_id: string | null;
   currency: string;
-  created_at: string;
-  updated_at: string;
-  field_config?: {
-    id: string;
-    name: string;
-    label: string;
-    field_type: string;
-  } | null;
-  location?: {
-    id: string;
-    name: string;
-  } | null;
-}
-
-export type PricingRuleType = "discount" | "surcharge" | "override";
-export type ConditionOperator =
-  | "equals"
-  | "greater_than"
-  | "less_than"
-  | "contains"
-  | "not_equals";
-export type ActionType = "multiply" | "add" | "set";
-
-export interface PricingRule {
-  id: string;
-  organization_id: string;
-  name: string;
-  description: string | null;
-  rule_type: PricingRuleType;
-  condition_field_config_id: string;
-  condition_operator: ConditionOperator;
-  condition_value: string;
-  action_type: ActionType;
-  action_value: number;
-  priority: number;
-  enabled: boolean;
-  location_id: string | null;
-  created_at: string;
-  updated_at: string;
-  field_config?: {
-    id: string;
-    name: string;
-    label: string;
-    field_type: string;
-  };
-  location?: {
-    id: string;
-    name: string;
-  } | null;
+  source_rule: PricingRule;
+  field_config?: PricingRule["field_config"];
+  location?: PricingRule["location"];
+  location_node?: PricingRule["location_node"];
 }
 
 export interface InvoiceCalculation {
@@ -184,14 +239,22 @@ export interface InvoiceCalculation {
     field_config_id: string;
     field_name: string;
     field_label: string;
+    option_value?: string;
     quantity: number;
     unit_price: number;
     total: number;
   }>;
-  pricing_rules_applied: Array<{
-    rule_id: string;
-    rule_name: string;
-    adjustment: number;
+  applied_rules: Array<{
+    pricing_rule_id: string;
+    scope: PricingScope;
+    pricing_type: PricingType;
+    field_config_id: string | null;
+    option_value: string | null;
+    location_hierarchy_id: string | null;
+    location_id: string | null;
+    amount: number;
+    worker_payment?: number;
+    metadata?: Record<string, unknown>;
   }>;
   subtotal: number;
   total_adjustments: number;
@@ -200,28 +263,34 @@ export interface InvoiceCalculation {
   margin: number;
 }
 
-export interface FieldPricing {
+export interface PricingSnapshot {
   id: string;
   organization_id: string;
-  field_config_id: string;
-  customer_price: number;
-  currency: string;
-  location_id: string | null;
-  pricing_type: PricingType;
-  applies_to_field_type: string;
-  worker_payment_type: WorkerPaymentType | null;
-  worker_payment_value: number | null;
+  invoice_id: string;
+  job_id: string | null;
+  pricing_rule_id: string | null;
+  field_config_id: string | null;
+  line_item_key: string | null;
+  snapshot_data: Record<string, unknown>;
+  captured_at: string;
+}
+
+export interface LocationHierarchyNode {
+  id: string;
+  organization_id: string;
+  parent_id: string | null;
+  name: string;
+  code: string | null;
+  type: "company" | "region";
+  sort_order: number;
+  metadata: Record<string, unknown> | null;
+  active: boolean;
   created_at: string;
   updated_at: string;
-  field_config?: {
+  parent?: {
     id: string;
     name: string;
-    label: string;
-    field_type: string;
-  };
-  location?: {
-    id: string;
-    name: string;
+    type: "company" | "region";
   } | null;
 }
 

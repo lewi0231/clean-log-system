@@ -11,9 +11,18 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
 import { log } from "@/lib/logger";
+import type { LocationHierarchyNode } from "@/lib/types";
 import { locationSchema } from "@/lib/validations";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface LocationFormProps {
   open: boolean;
@@ -25,6 +34,7 @@ interface LocationFormProps {
       address: string;
       contact_person: string;
       phone?: string;
+      hierarchy_parent_id?: string | null;
     },
     locationId?: string
   ) => void | Promise<void>;
@@ -35,6 +45,7 @@ interface LocationFormProps {
     address: string | null;
     contact_person: string | null;
     phone: string | null;
+    hierarchy_parent_id?: string | null;
   } | null;
 }
 
@@ -44,6 +55,7 @@ export default function LocationForm({
   onSuccess,
   location,
 }: LocationFormProps) {
+  const { nodes: hierarchyNodes } = useLocationHierarchy();
   const [name, setName] = useState(location?.name || "");
   const [email, setEmail] = useState(location?.email || "");
   const [address, setAddress] = useState(location?.address || "");
@@ -51,6 +63,9 @@ export default function LocationForm({
     location?.contact_person || ""
   );
   const [phone, setPhone] = useState(location?.phone || "");
+  const [hierarchyParentId, setHierarchyParentId] = useState<string | null>(
+    location?.hierarchy_parent_id || null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
@@ -59,6 +74,26 @@ export default function LocationForm({
     contact_person?: string;
     phone?: string;
   }>({});
+
+  // Build a flat list with indentation for display
+  const hierarchyOptions = useMemo(() => {
+    const options: Array<{ node: LocationHierarchyNode; indent: number }> = [];
+
+    const addNode = (node: LocationHierarchyNode, indent: number) => {
+      options.push({ node, indent });
+      // Find children
+      hierarchyNodes
+        .filter((n) => n.parent_id === node.id)
+        .forEach((child) => addNode(child, indent + 1));
+    };
+
+    // Start with root nodes (no parent)
+    hierarchyNodes
+      .filter((n) => !n.parent_id)
+      .forEach((root) => addNode(root, 0));
+
+    return options;
+  }, [hierarchyNodes]);
 
   const isEditMode = !!location;
 
@@ -129,9 +164,13 @@ export default function LocationForm({
       setAddress("");
       setContactPerson("");
       setPhone("");
+      setHierarchyParentId(null);
       setErrors({});
       onOpenChange(false);
-      await onSuccess(validatedData, location?.id);
+      await onSuccess(
+        { ...validatedData, hierarchy_parent_id: hierarchyParentId },
+        location?.id
+      );
     } catch (error) {
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("LocationForm: Submission failed", { error: error.message });
@@ -159,6 +198,7 @@ export default function LocationForm({
       setAddress(location?.address || "");
       setContactPerson(location?.contact_person || "");
       setPhone(location?.phone || "");
+      setHierarchyParentId(location?.hierarchy_parent_id || null);
       setErrors({});
     }
   }, [open, location]);
@@ -281,6 +321,47 @@ export default function LocationForm({
             />
             {errors.phone && (
               <p className="text-sm text-destructive">{errors.phone}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="hierarchy_parent">
+              Region / Company (Optional)
+            </Label>
+            {hierarchyOptions.length > 0 ? (
+              <>
+                <Select
+                  value={hierarchyParentId || "none"}
+                  onValueChange={(value) =>
+                    setHierarchyParentId(value === "none" ? null : value)
+                  }
+                >
+                  <SelectTrigger id="hierarchy_parent">
+                    <SelectValue placeholder="Select region for pricing..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">
+                      No region (org default)
+                    </SelectItem>
+                    {hierarchyOptions.map(({ node, indent }) => (
+                      <SelectItem key={node.id} value={node.id}>
+                        {"  ".repeat(indent)}
+                        {node.name} ({node.type})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Assign this location to a region or company for regional
+                  pricing rules.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground p-2 bg-muted rounded">
+                No regions or companies defined yet. Create them in the{" "}
+                <strong>Location Hierarchy</strong> tab to enable regional
+                pricing for this location.
+              </p>
             )}
           </div>
         </div>

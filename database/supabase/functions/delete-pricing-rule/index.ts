@@ -20,7 +20,7 @@ serve(async (req) => {
     const supabase = createServiceRoleClient();
 
     const { error: deleteError } = await supabase
-      .from("pricing_rules")
+      .from("pricing_rule")
       .delete()
       .eq("id", id);
 

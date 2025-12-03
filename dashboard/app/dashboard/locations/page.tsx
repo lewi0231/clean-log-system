@@ -1,10 +1,12 @@
 "use client";
 
 import LocationForm from "@/components/locations/location-form";
+import LocationHierarchyManager from "@/components/locations/location-hierarchy-manager";
 import LocationList from "@/components/locations/location-list";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocations } from "@/hooks/use-locations";
 import useOrganization from "@/hooks/useOrganization";
 import { Plus } from "lucide-react";
@@ -32,6 +34,7 @@ export default function LocationsPage() {
     address: string;
     contact_person: string;
     phone?: string;
+    hierarchy_parent_id?: string | null;
   }) => {
     if (!organizationId) return;
     await createLocation({
@@ -48,6 +51,7 @@ export default function LocationsPage() {
       address: string;
       contact_person: string;
       phone?: string;
+      hierarchy_parent_id?: string | null;
     }
   ) => {
     await updateLocation({
@@ -78,44 +82,54 @@ export default function LocationsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Locations</h1>
         <p className="text-muted-foreground mt-2">
-          Manage your organization&apos;s locations. These are locations that
-          you regularly service.
+          Manage your organization&apos;s locations and location hierarchy for
+          regional pricing.
         </p>
       </div>
 
-      <div className="mb-6 p-4 bg-muted rounded-lg">
-        <p className="text-sm text-muted-foreground">
-          These locations will appear as selectable options in the mobile app
-          when the &quot;Use Predefined Locations&quot; setting is enabled. You
-          can also configure custom location fields in{" "}
-          <a
-            href="/dashboard/mobile-config"
-            className="text-primary hover:underline font-medium"
-          >
-            Mobile Application
-          </a>
-          . You would do this if your business does not service known locations
-          (e.g., Mobile Car Detailer vs Car Yard Service)
-        </p>
-      </div>
+      <Tabs defaultValue="locations" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="locations">Customer Locations</TabsTrigger>
+          <TabsTrigger value="hierarchy">Location Hierarchy</TabsTrigger>
+        </TabsList>
 
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1" />
-        <Button onClick={() => setIsLocationFormOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Location
-        </Button>
-      </div>
+        <TabsContent value="locations" className="space-y-6">
+          <div className="p-4 bg-muted rounded-lg space-y-2">
+            <p className="text-sm text-muted-foreground">
+              <strong>Customer Locations</strong> are the sites where your
+              workers complete jobs. They appear in the mobile app when
+              &quot;Use Predefined Locations&quot; is enabled.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <strong>Tip:</strong> Assign locations to a region (from the
+              Location Hierarchy tab) to apply regional pricing rules
+              automatically.
+            </p>
+          </div>
 
-      <div className="space-y-4">
-        <LocationList
-          locations={locations}
-          loading={loading}
-          error={error}
-          onDeleteLocation={handleDeleteLocation}
-          onUpdateLocation={handleUpdateLocation}
-        />
-      </div>
+          <div className="flex items-center justify-between">
+            <div className="flex-1" />
+            <Button onClick={() => setIsLocationFormOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Location
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <LocationList
+              locations={locations}
+              loading={loading}
+              error={error}
+              onDeleteLocation={handleDeleteLocation}
+              onUpdateLocation={handleUpdateLocation}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="hierarchy">
+          <LocationHierarchyManager />
+        </TabsContent>
+      </Tabs>
 
       <LocationForm
         open={isLocationFormOpen}

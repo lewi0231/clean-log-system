@@ -29,6 +29,8 @@ serve(async (req) => {
       invoice_send_immediately,
       stripe_account_id,
       payment_provider,
+      currency,
+      locale,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -44,7 +46,7 @@ serve(async (req) => {
       if (!validateBusinessMode(business_mode)) {
         return errorResponse(
           "Invalid business_mode. Must be 'service_based' or 'resource_tracking'",
-          400
+          400,
         );
       }
       updateData.business_mode = business_mode;
@@ -86,8 +88,9 @@ serve(async (req) => {
     }
 
     if (stripe_account_id !== undefined) {
-      updateData.stripe_account_id =
-        stripe_account_id === "" ? null : stripe_account_id;
+      updateData.stripe_account_id = stripe_account_id === ""
+        ? null
+        : stripe_account_id;
     }
 
     if (payment_provider !== undefined) {
@@ -96,10 +99,12 @@ serve(async (req) => {
         const validProviders = ["stripe"]; // TODO: Add more providers as they're implemented
         if (!validProviders.includes(payment_provider.trim().toLowerCase())) {
           return errorResponse(
-            `Invalid payment provider. Must be one of: ${validProviders.join(
-              ", "
-            )}`,
-            400
+            `Invalid payment provider. Must be one of: ${
+              validProviders.join(
+                ", ",
+              )
+            }`,
+            400,
           );
         }
         updateData.payment_provider = payment_provider.trim().toLowerCase();
@@ -108,12 +113,27 @@ serve(async (req) => {
       }
     }
 
+    if (currency !== undefined) {
+      const validCurrencies = ["AUD", "USD", "GBP", "EUR", "CAD", "NZD"];
+      if (!validCurrencies.includes(currency)) {
+        return errorResponse(
+          `Invalid currency. Must be one of: ${validCurrencies.join(", ")}`,
+          400,
+        );
+      }
+      updateData.currency = currency;
+    }
+
+    if (locale !== undefined) {
+      updateData.locale = locale;
+    }
+
     const { data: organization, error: updateError } = await supabase
       .from("organization")
       .update(updateData)
       .eq("id", organization_id)
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider"
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider, currency, locale",
       )
       .single();
 
@@ -123,22 +143,24 @@ serve(async (req) => {
       success: true,
       settings: {
         name: organization?.name ?? "",
-        use_predefined_locations:
-          organization?.use_predefined_locations ?? true,
+        use_predefined_locations: organization?.use_predefined_locations ??
+          true,
         business_mode: organization?.business_mode ?? "service_based",
         abn: organization?.abn ?? null,
         logo_url: organization?.logo_url ?? null,
         primary_contact_email: organization?.primary_contact_email ?? null,
-        invoice_send_immediately:
-          organization?.invoice_send_immediately ?? false,
+        invoice_send_immediately: organization?.invoice_send_immediately ??
+          false,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
+        currency: organization?.currency ?? "AUD",
+        locale: organization?.locale ?? "en-AU",
       },
     });
   } catch (error) {
     console.error("Update organization settings error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to update organization settings"
+      error instanceof Error ? error : "Failed to update organization settings",
     );
   }
 });

@@ -3,59 +3,110 @@ import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
+interface PricingConditionInput {
+  condition_field_config_id: string;
+  operator: string;
+  condition_value: string | number;
+  action_type: string;
+  action_value: number;
+  metadata?: Record<string, unknown>;
+  priority?: number;
+}
+
+interface CreatePricingRuleRequest {
+  organization_id: string;
+  scope: "field" | "option" | "base" | "global";
+  pricing_type: "unit" | "fixed" | "tiered" | "percentage" | "conditional";
+  field_config_id?: string | null;
+  option_value?: string | null;
+  applies_to_field_type?: string | null;
+  location_hierarchy_id?: string | null;
+  location_id?: string | null;
+  currency?: string;
+  base_price?: number | null;
+  percentage_rate?: number | null;
+  minimum_quantity?: number | null;
+  maximum_quantity?: number | null;
+  tier_definition?: unknown;
+  metadata?: Record<string, unknown>;
+  worker_payment_type?: "same_structure" | "percentage" | "fixed_rate" | null;
+  worker_payment_value?: number | null;
+  priority?: number;
+  active?: boolean;
+  effective_at?: string;
+  expires_at?: string | null;
+  created_by?: string | null;
+  conditions?: PricingConditionInput[];
+}
+
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
+    const body = (await req.json()) as CreatePricingRuleRequest;
     const validation = validateRequiredFields(body, [
       "organization_id",
-      "name",
-      "rule_type",
-      "condition_field_config_id",
-      "condition_operator",
-      "action_type",
+      "scope",
+      "pricing_type",
     ]);
 
-    if (
-      !validation.valid ||
-      body.condition_value === undefined ||
-      body.action_value === undefined
-    ) {
+    if (!validation.valid) {
       return errorResponse("Missing required fields", 400);
     }
 
     const {
       organization_id,
-      name,
-      description,
-      rule_type,
-      condition_field_config_id,
-      condition_operator,
-      condition_value,
-      action_type,
-      action_value,
-      priority,
-      enabled,
+      scope,
+      pricing_type,
+      field_config_id,
+      option_value,
+      applies_to_field_type,
+      location_hierarchy_id,
       location_id,
+      currency,
+      base_price,
+      percentage_rate,
+      minimum_quantity,
+      maximum_quantity,
+      tier_definition,
+      metadata,
+      worker_payment_type,
+      worker_payment_value,
+      priority,
+      active,
+      effective_at,
+      expires_at,
+      created_by,
+      conditions,
     } = body;
+
+    if (scope === "field" && !field_config_id) {
+      return errorResponse("field_config_id is required for field scope", 400);
+    }
+
+    if (scope === "option" && (!field_config_id || !option_value)) {
+      return errorResponse(
+        "field_config_id and option_value are required for option scope",
+        400
+      );
+    }
 
     const supabase = createServiceRoleClient();
 
-    // Verify field config exists
-    const { data: fieldConfig, error: fieldConfigError } = await supabase
-      .from("organization_field_configs")
-      .select("id, organization_id")
-      .eq("id", condition_field_config_id)
-      .eq("organization_id", organization_id)
-      .single();
+    if (field_config_id) {
+      const { data: fieldConfig, error: fieldConfigError } = await supabase
+        .from("organization_field_configs")
+        .select("id, organization_id")
+        .eq("id", field_config_id)
+        .eq("organization_id", organization_id)
+        .single();
 
-    if (fieldConfigError || !fieldConfig) {
-      return errorResponse("Field config not found", 404);
+      if (fieldConfigError || !fieldConfig) {
+        return errorResponse("Field config not found", 404);
+      }
     }
 
-    // Validate location_id if provided
     if (location_id) {
       const { data: location, error: locationError } = await supabase
         .from("location")
@@ -69,26 +120,95 @@ serve(async (req) => {
       }
     }
 
+    if (location_hierarchy_id) {
+      const { data: node, error: nodeError } = await supabase
+        .from("location_hierarchy")
+        .select("id, organization_id")
+        .eq("id", location_hierarchy_id)
+        .eq("organization_id", organization_id)
+        .single();
+
+      if (nodeError || !node) {
+        return errorResponse("Location hierarchy node not found", 404);
+      }
+    }
+
+    const insertPayload = {
+      organization_id,
+      scope,
+      pricing_type,
+      field_config_id: field_config_id || null,
+      option_value: option_value || null,
+      applies_to_field_type: applies_to_field_type || null,
+      location_hierarchy_id: location_hierarchy_id || null,
+      location_id: location_id || null,
+      currency: currency || "USD",
+      base_price: base_price ?? null,
+      percentage_rate: percentage_rate ?? null,
+      minimum_quantity: minimum_quantity ?? null,
+      maximum_quantity: maximum_quantity ?? null,
+      tier_definition: tier_definition || null,
+      metadata: metadata || {},
+      worker_payment_type: worker_payment_type || null,
+      worker_payment_value: worker_payment_value ?? null,
+      priority: priority || 0,
+      active: active !== undefined ? active : true,
+      effective_at: effective_at || new Date().toISOString(),
+      expires_at: expires_at || null,
+      created_by: created_by || null,
+      updated_by: created_by || null,
+    };
+
     const { data: pricingRule, error: createError } = await supabase
-      .from("pricing_rules")
-      .insert({
-        organization_id,
-        name,
-        description: description || null,
-        rule_type,
-        condition_field_config_id,
-        condition_operator,
-        condition_value: String(condition_value),
-        action_type,
-        action_value: parseFloat(action_value),
-        priority: priority || 0,
-        enabled: enabled !== undefined ? enabled : true,
-        location_id: location_id || null,
-      })
-      .select()
+      .from("pricing_rule")
+      .insert(insertPayload)
+      .select(
+        `
+        *,
+        field_config:field_config_id (
+          id,
+          name,
+          label,
+          field_type
+        ),
+        location:location_id (
+          id,
+          name
+        ),
+        location_node:location_hierarchy_id (
+          id,
+          name,
+          type,
+          parent_id
+        )
+      `
+      )
       .single();
 
     if (createError) throw createError;
+
+    if (conditions && conditions.length > 0) {
+      const conditionPayload = conditions.map((condition) => ({
+        pricing_rule_id: pricingRule.id,
+        condition_field_config_id: condition.condition_field_config_id,
+        operator: condition.operator,
+        condition_value: String(condition.condition_value),
+        action_type: condition.action_type,
+        action_value: condition.action_value,
+        metadata: condition.metadata || {},
+        priority: condition.priority || 0,
+      }));
+
+      const { error: conditionError } = await supabase
+        .from("pricing_condition")
+        .insert(conditionPayload);
+
+      if (conditionError) {
+        // Clean up inserted rule to keep data consistent
+        await supabase.from("pricing_rule").delete().eq("id", pricingRule.id);
+        throw conditionError;
+      }
+    }
 
     return jsonResponse({
       success: true,

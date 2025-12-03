@@ -37,6 +37,7 @@ interface LocationListProps {
       address: string;
       contact_person: string;
       phone?: string;
+      hierarchy_parent_id?: string | null;
     }
   ) => Promise<void>;
 }
@@ -72,6 +73,7 @@ export default function LocationList({
       address: string;
       contact_person: string;
       phone?: string;
+      hierarchy_parent_id?: string | null;
     },
     locationId?: string
   ) => {
@@ -99,12 +101,12 @@ export default function LocationList({
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Region</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Address</TableHead>
               <TableHead>Contact Person</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -119,6 +121,17 @@ export default function LocationList({
               locations.map((location) => (
                 <TableRow key={location.id}>
                   <TableCell className="font-medium">{location.name}</TableCell>
+                  <TableCell>
+                    {location.hierarchy_parent ? (
+                      <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {location.hierarchy_parent.name}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground text-xs">
+                        Org default
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{location.email}</TableCell>
                   <TableCell>{location.address || "-"}</TableCell>
                   <TableCell>{location.contact_person || "-"}</TableCell>
@@ -133,9 +146,6 @@ export default function LocationList({
                     >
                       {location.active ? "Active" : "Inactive"}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(location.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

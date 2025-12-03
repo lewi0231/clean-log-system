@@ -21,7 +21,14 @@ serve(async (req) => {
 
     const { data: locations, error: locationsError } = await supabase
       .from("location")
-      .select("*")
+      .select(`
+        *,
+        hierarchy_parent:hierarchy_parent_id (
+          id,
+          name,
+          type
+        )
+      `)
       .eq("organization_id", organization_id)
       .order("created_at", { ascending: false });
 
@@ -34,7 +41,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("List locations error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to list locations"
+      error instanceof Error ? error : "Failed to list locations",
     );
   }
 });

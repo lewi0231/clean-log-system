@@ -8,4 +8,5 @@ export interface Location {
   phone: string | null;
   active: boolean;
   created_at: string;
+  hierarchy_parent_id: string | null;
 }
