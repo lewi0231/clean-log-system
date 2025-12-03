@@ -434,11 +434,13 @@ export function SectionEditor({
                                           </Label>
                                           <Input
                                             value={field.label}
-                                            onChange={(e) =>
-                                              onUpdateField(field.id, {
-                                                label: e.target.value,
-                                              })
-                                            }
+                                            onChange={async (e) => {
+                                              if (onUpdateField) {
+                                                await onUpdateField(field.id, {
+                                                  label: e.target.value,
+                                                });
+                                              }
+                                            }}
                                           />
                                         </div>
 
@@ -449,12 +451,14 @@ export function SectionEditor({
                                           </Label>
                                           <Textarea
                                             value={field.description || ""}
-                                            onChange={(e) =>
-                                              onUpdateField(field.id, {
-                                                description:
-                                                  e.target.value || null,
-                                              })
-                                            }
+                                            onChange={async (e) => {
+                                              if (onUpdateField) {
+                                                await onUpdateField(field.id, {
+                                                  description:
+                                                    e.target.value || null,
+                                                });
+                                              }
+                                            }}
                                             rows={2}
                                           />
                                         </div>
@@ -466,11 +470,15 @@ export function SectionEditor({
                                           </Label>
                                           <Select
                                             value={field.field_type}
-                                            onValueChange={(v: string) =>
-                                              onUpdateField(field.id, {
-                                                field_type: v as FieldType,
-                                              })
-                                            }
+                                            onValueChange={async (
+                                              v: string
+                                            ) => {
+                                              if (onUpdateField) {
+                                                await onUpdateField(field.id, {
+                                                  field_type: v as FieldType,
+                                                });
+                                              }
+                                            }}
                                           >
                                             <SelectTrigger>
                                               <SelectValue />
@@ -521,12 +529,19 @@ export function SectionEditor({
                                             </Label>
                                             <Select
                                               value={field.section_id || "none"}
-                                              onValueChange={(v: string) =>
-                                                onUpdateField(field.id, {
-                                                  section_id:
-                                                    v === "none" ? null : v,
-                                                })
-                                              }
+                                              onValueChange={async (
+                                                v: string
+                                              ) => {
+                                                if (onUpdateField) {
+                                                  await onUpdateField(
+                                                    field.id,
+                                                    {
+                                                      section_id:
+                                                        v === "none" ? null : v,
+                                                    }
+                                                  );
+                                                }
+                                              }}
                                             >
                                               <SelectTrigger>
                                                 <SelectValue placeholder="No section" />
@@ -555,13 +570,15 @@ export function SectionEditor({
                                           </Label>
                                           <Switch
                                             checked={field.required}
-                                            onCheckedChange={(
+                                            onCheckedChange={async (
                                               checked: boolean
-                                            ) =>
-                                              onUpdateField(field.id, {
-                                                required: checked,
-                                              })
-                                            }
+                                            ) => {
+                                              if (onUpdateField) {
+                                                await onUpdateField(field.id, {
+                                                  required: checked,
+                                                });
+                                              }
+                                            }}
                                           />
                                         </div>
 
@@ -657,11 +674,13 @@ export function SectionEditor({
                                                         field.group_cluster ||
                                                         "none"
                                                       }
-                                                      onValueChange={(
+                                                      onValueChange={async (
                                                         value: string
                                                       ) => {
+                                                        if (!onUpdateField)
+                                                          return;
                                                         if (value === "none") {
-                                                          onUpdateField(
+                                                          await onUpdateField(
                                                             field.id,
                                                             {
                                                               mutually_exclusive_group:
@@ -671,7 +690,7 @@ export function SectionEditor({
                                                             }
                                                           );
                                                         } else {
-                                                          onUpdateField(
+                                                          await onUpdateField(
                                                             field.id,
                                                             {
                                                               mutually_exclusive_group:
@@ -712,21 +731,33 @@ export function SectionEditor({
                                                             )
                                                           : ""
                                                       }
-                                                      onChange={(e) => {
+                                                      onChange={async (e) => {
                                                         // Allow typing freely; apply on blur
-                                                        if (!e.target.value) {
-                                                          onUpdateField(
-                                                            field.id,
-                                                            {
-                                                              mutually_exclusive_group:
-                                                                null,
-                                                              group_cluster:
-                                                                null,
-                                                            }
-                                                          );
+                                                        if (
+                                                          !e.target.value &&
+                                                          onUpdateField
+                                                        ) {
+                                                          const result =
+                                                            onUpdateField(
+                                                              field.id,
+                                                              {
+                                                                mutually_exclusive_group:
+                                                                  null,
+                                                                group_cluster:
+                                                                  null,
+                                                              }
+                                                            );
+                                                          if (
+                                                            result instanceof
+                                                            Promise
+                                                          ) {
+                                                            await result;
+                                                          }
                                                         }
                                                       }}
-                                                      onBlur={(e) => {
+                                                      onBlur={async (e) => {
+                                                        if (!onUpdateField)
+                                                          return;
                                                         const clusterName =
                                                           e.target.value.trim();
                                                         if (clusterName) {
@@ -742,7 +773,7 @@ export function SectionEditor({
                                                                 ""
                                                               );
 
-                                                          onUpdateField(
+                                                          await onUpdateField(
                                                             field.id,
                                                             {
                                                               mutually_exclusive_group:
@@ -768,11 +799,16 @@ export function SectionEditor({
                                             <ConditionalLogicEditor
                                               field={field}
                                               allFields={fields}
-                                              onChange={(logic) =>
-                                                onUpdateField(field.id, {
-                                                  conditional_logic: logic,
-                                                })
-                                              }
+                                              onChange={async (logic) => {
+                                                if (onUpdateField) {
+                                                  await onUpdateField(
+                                                    field.id,
+                                                    {
+                                                      conditional_logic: logic,
+                                                    }
+                                                  );
+                                                }
+                                              }}
                                             />
                                           </CollapsibleContent>
                                         </Collapsible>

@@ -278,12 +278,15 @@ export function VisualFormBuilder({
   };
 
   // Handle options update for select fields
-  const handleOptionsChange = (fieldId: string, optionsString: string) => {
+  const handleOptionsChange = async (
+    fieldId: string,
+    optionsString: string
+  ) => {
     const options = optionsString
       .split(",")
       .map((o) => o.trim())
       .filter((o) => o.length > 0);
-    handleUpdateField(fieldId, {
+    await handleUpdateField(fieldId, {
       options: options.length > 0 ? options : null,
     });
   };
@@ -349,12 +352,12 @@ export function VisualFormBuilder({
                 onDeleteSection={onDeleteSection}
                 onReorderSections={onReorderSections}
                 draggedFieldId={draggedField}
-                onDropFieldToSection={(sectionId, fieldId) => {
-                  onUpdateField(fieldId, { section_id: sectionId });
+                onDropFieldToSection={async (sectionId, fieldId) => {
+                  await onUpdateField(fieldId, { section_id: sectionId });
                   setDraggedField(null);
                 }}
-                onRemoveFieldFromSection={(fieldId) => {
-                  onUpdateField(fieldId, { section_id: null });
+                onRemoveFieldFromSection={async (fieldId) => {
+                  await onUpdateField(fieldId, { section_id: null });
                 }}
                 onUpdateField={onUpdateField}
                 createdClusters={createdClusters}

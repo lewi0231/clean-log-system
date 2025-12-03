@@ -25,7 +25,7 @@ import {
   FieldType,
   FormSectionWithFields,
 } from "@clean-log/shared";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface FieldConfigDialogProps {
   open: boolean;
@@ -75,32 +75,35 @@ export function FieldConfigDialog({
   const [sectionId, setSectionId] = useState<string>("none");
   const [options, setOptions] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const nameManuallyEditedRef = useRef(false);
 
-  // Generate field name from label
-  const generateFieldName = (labelText: string): string => {
-    const baseName = labelText
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_|_$/g, "");
-
-    let generatedName = baseName;
-    let counter = 1;
-
-    while (existingFieldNames.includes(generatedName)) {
-      generatedName = `${baseName}_${counter}`;
-      counter++;
-    }
-
-    return generatedName;
-  };
-
-  // Update name when label changes
+  // Update name when label changes (only if not manually edited)
   useEffect(() => {
-    if (label) {
+    if (label && !nameManuallyEditedRef.current) {
+      // Generate field name from label
+      const generateFieldName = (labelText: string): string => {
+        const baseName = labelText
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "_")
+          .replace(/^_|_$/g, "");
+
+        let generatedName = baseName;
+        let counter = 1;
+
+        // Use current existingFieldNames via closure
+        while (existingFieldNames.includes(generatedName)) {
+          generatedName = `${baseName}_${counter}`;
+          counter++;
+        }
+
+        return generatedName;
+      };
+
       const generatedName = generateFieldName(label);
       setName(generatedName);
     }
-  }, [label, existingFieldNames]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [label]);
 
   // Reset form when dialog opens/closes or field type changes
   useEffect(() => {
@@ -115,6 +118,8 @@ export function FieldConfigDialog({
           ? "Option 1, Option 2"
           : ""
       );
+      // Reset manual edit flag when dialog opens
+      nameManuallyEditedRef.current = false;
     }
   }, [open, fieldType]);
 
@@ -183,7 +188,11 @@ export function FieldConfigDialog({
             <Input
               id="field-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                // Mark as manually edited when user types
+                nameManuallyEditedRef.current = true;
+              }}
               placeholder="field_name"
               className="font-mono"
             />
