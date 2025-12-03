@@ -29,6 +29,8 @@ serve(async (req) => {
       invoice_send_immediately,
       stripe_account_id,
       payment_provider,
+      currency,
+      locale,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -108,12 +110,27 @@ serve(async (req) => {
       }
     }
 
+    if (currency !== undefined) {
+      const validCurrencies = ["AUD", "USD", "GBP", "EUR", "CAD", "NZD"];
+      if (!validCurrencies.includes(currency)) {
+        return errorResponse(
+          `Invalid currency. Must be one of: ${validCurrencies.join(", ")}`,
+          400
+        );
+      }
+      updateData.currency = currency;
+    }
+
+    if (locale !== undefined) {
+      updateData.locale = locale;
+    }
+
     const { data: organization, error: updateError } = await supabase
       .from("organization")
       .update(updateData)
       .eq("id", organization_id)
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider"
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider, currency, locale"
       )
       .single();
 
@@ -133,6 +150,8 @@ serve(async (req) => {
           organization?.invoice_send_immediately ?? false,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
+        currency: organization?.currency ?? "AUD",
+        locale: organization?.locale ?? "en-AU",
       },
     });
   } catch (error) {

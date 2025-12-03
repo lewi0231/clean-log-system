@@ -53,6 +53,7 @@ type JobRecord = {
   organization_id: string;
   location_id: string | null;
   submission_data: Record<string, unknown> | null;
+  hierarchy_parent_id?: string | null; // Denormalized from location for pricing lookup
 };
 
 type PricingConditionRow = {
@@ -94,11 +95,6 @@ type LocationHierarchyNode = {
   parent_id: string | null;
 };
 
-type LocationHierarchyAssignment = {
-  location_id: string;
-  hierarchy_id: string;
-};
-
 type LocationContext = {
   locationId: string | null;
   ancestors: Set<string>;
@@ -128,16 +124,39 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
-    const { data: jobs, error: jobsError } = await supabase
+    const { data: jobsRaw, error: jobsError } = await supabase
       .from("job")
-      .select("id, organization_id, location_id, submission_data")
+      .select(`
+        id,
+        organization_id,
+        location_id,
+        submission_data,
+        location:location_id (
+          hierarchy_parent_id
+        )
+      `)
       .eq("organization_id", organization_id)
       .in("id", job_ids);
 
     if (jobsError) throw jobsError;
-    if (!jobs || jobs.length === 0) {
+    if (!jobsRaw || jobsRaw.length === 0) {
       return errorResponse("No jobs found", 404);
     }
+
+    // Flatten the location join to get hierarchy_parent_id directly on job
+    // Note: Supabase returns the joined location as an object (single relation via FK)
+    const jobs = jobsRaw.map((job) => {
+      const locationData = job.location as unknown as
+        | { hierarchy_parent_id: string | null }
+        | null;
+      return {
+        id: job.id,
+        organization_id: job.organization_id,
+        location_id: job.location_id,
+        submission_data: job.submission_data,
+        hierarchy_parent_id: locationData?.hierarchy_parent_id || null,
+      };
+    });
 
     const { data: fieldConfigs, error: configsError } = await supabase
       .from("organization_field_configs")
@@ -155,13 +174,6 @@ serve(async (req) => {
 
     if (hierarchyError) throw hierarchyError;
 
-    const { data: hierarchyAssignments, error: assignmentError } =
-      await supabase
-        .from("location_hierarchy_assignment")
-        .select("location_id, hierarchy_id");
-
-    if (assignmentError) throw assignmentError;
-
     const nowIso = new Date().toISOString();
     const { data: pricingRules, error: pricingRulesError } = await supabase
       .from("pricing_rule")
@@ -178,7 +190,7 @@ serve(async (req) => {
           metadata,
           priority
         )
-      `
+      `,
       )
       .eq("organization_id", organization_id)
       .eq("active", true)
@@ -190,7 +202,7 @@ serve(async (req) => {
     if (pricingRulesError) throw pricingRulesError;
 
     const fieldConfigMap = new Map<string, FieldConfig>(
-      (fieldConfigs || []).map((config) => [config.id, config as FieldConfig])
+      (fieldConfigs || []).map((config) => [config.id, config as FieldConfig]),
     );
 
     const calculations: InvoiceCalculation[] = [];
@@ -201,8 +213,6 @@ serve(async (req) => {
         fieldConfigMap,
         pricingRules: (pricingRules || []) as PricingRuleRow[],
         hierarchyNodes: (hierarchyNodes || []) as LocationHierarchyNode[],
-        hierarchyAssignments: (hierarchyAssignments ||
-          []) as LocationHierarchyAssignment[],
       });
       calculations.push(calculation);
     }
@@ -210,16 +220,16 @@ serve(async (req) => {
     const aggregated = {
       total_subtotal: calculations.reduce(
         (sum, calc) => sum + calc.subtotal,
-        0
+        0,
       ),
       total_adjustments: calculations.reduce(
         (sum, calc) => sum + calc.total_adjustments,
-        0
+        0,
       ),
       total: calculations.reduce((sum, calc) => sum + calc.total, 0),
       total_worker_payment: calculations.reduce(
         (sum, calc) => sum + calc.worker_payment_total,
-        0
+        0,
       ),
       total_margin: calculations.reduce((sum, calc) => sum + calc.margin, 0),
       job_calculations: calculations,
@@ -232,7 +242,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Calculate invoice error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to calculate invoice"
+      error instanceof Error ? error : "Failed to calculate invoice",
     );
   }
 });
@@ -242,27 +252,19 @@ function calculateJobPricing({
   fieldConfigMap,
   pricingRules,
   hierarchyNodes,
-  hierarchyAssignments,
 }: {
   job: JobRecord;
   fieldConfigMap: Map<string, FieldConfig>;
   pricingRules: PricingRuleRow[];
   hierarchyNodes: LocationHierarchyNode[];
-  hierarchyAssignments: LocationHierarchyAssignment[];
 }): InvoiceCalculation {
   const submissionData = (job.submission_data as Record<string, unknown>) || {};
   const nodeParentMap = new Map(hierarchyNodes.map((node) => [node.id, node]));
-  const assignmentMap = new Map(
-    hierarchyAssignments.map((assignment) => [
-      assignment.location_id,
-      assignment.hierarchy_id,
-    ])
-  );
 
   const locationContext = buildLocationContext(
     job.location_id,
-    assignmentMap,
-    nodeParentMap
+    job.hierarchy_parent_id || null,
+    nodeParentMap,
   );
 
   const applicableRules = pricingRules.filter((rule) =>
@@ -275,7 +277,7 @@ function calculateJobPricing({
 
   const fieldRuleGroups = groupRules(
     applicableRules.filter((rule) => rule.scope === "field"),
-    (rule) => rule.field_config_id || "default"
+    (rule) => rule.field_config_id || "default",
   );
 
   for (const [fieldId, rules] of fieldRuleGroups.entries()) {
@@ -289,7 +291,7 @@ function calculateJobPricing({
     const result = evaluateFieldRule(
       bestRule,
       fieldConfig,
-      submissionData[fieldConfig.name]
+      submissionData[fieldConfig.name],
     );
 
     if (result) {
@@ -301,7 +303,7 @@ function calculateJobPricing({
 
   const optionRuleGroups = groupRules(
     applicableRules.filter((rule) => rule.scope === "option"),
-    (rule) => `${rule.field_config_id || "default"}:${rule.option_value || ""}`
+    (rule) => `${rule.field_config_id || "default"}:${rule.option_value || ""}`,
   );
 
   for (const [key, rules] of optionRuleGroups.entries()) {
@@ -315,7 +317,7 @@ function calculateJobPricing({
     const result = evaluateOptionRule(
       bestRule,
       fieldConfig,
-      submissionData[fieldConfig.name]
+      submissionData[fieldConfig.name],
     );
 
     if (result) {
@@ -340,7 +342,7 @@ function calculateJobPricing({
   appliedRules.push(...baseEvaluation.appliedRules);
 
   const conditionalRules = applicableRules.filter(
-    (rule) => rule.pricing_type === "conditional" || rule.scope === "global"
+    (rule) => rule.pricing_type === "conditional" || rule.scope === "global",
   );
   const conditionalEvaluation = applyConditionalRules({
     rules: conditionalRules,
@@ -355,7 +357,7 @@ function calculateJobPricing({
 
   const workerPaymentTotal = appliedRules.reduce(
     (sum, rule) => sum + (rule.worker_payment || 0),
-    0
+    0,
   );
 
   return {
@@ -373,7 +375,7 @@ function calculateJobPricing({
 
 function groupRules(
   rules: PricingRuleRow[],
-  keyFn: (rule: PricingRuleRow) => string
+  keyFn: (rule: PricingRuleRow) => string,
 ): Map<string, PricingRuleRow[]> {
   const map = new Map<string, PricingRuleRow[]>();
   for (const rule of rules) {
@@ -388,14 +390,14 @@ function groupRules(
 
 function buildLocationContext(
   locationId: string | null,
-  assignmentMap: Map<string, string>,
-  nodeMap: Map<string, LocationHierarchyNode>
+  hierarchyParentId: string | null,
+  nodeMap: Map<string, LocationHierarchyNode>,
 ): LocationContext {
   const ancestors = new Set<string>();
   const depthMap = new Map<string, number>();
 
-  let currentNodeId: string | null =
-    (locationId && assignmentMap.get(locationId)) || null;
+  // Start from the location's hierarchy parent (if any)
+  let currentNodeId: string | null = hierarchyParentId;
 
   while (currentNodeId) {
     ancestors.add(currentNodeId);
@@ -415,7 +417,7 @@ function buildLocationContext(
 function getNodeDepth(
   nodeId: string,
   nodeMap: Map<string, LocationHierarchyNode>,
-  cache: Map<string, number>
+  cache: Map<string, number>,
 ): number {
   if (cache.has(nodeId)) {
     return cache.get(nodeId)!;
@@ -432,7 +434,7 @@ function getNodeDepth(
 
 function ruleMatchesLocation(
   rule: PricingRuleRow,
-  context: LocationContext
+  context: LocationContext,
 ): boolean {
   if (rule.location_id && rule.location_id !== context.locationId) {
     return false;
@@ -448,7 +450,7 @@ function ruleMatchesLocation(
 
 function getRuleSpecificity(
   rule: PricingRuleRow,
-  context: LocationContext
+  context: LocationContext,
 ): number {
   let score = 0;
   if (rule.location_id && rule.location_id === context.locationId) {
@@ -469,7 +471,7 @@ function getRuleSpecificity(
 
 function selectBestRule(
   rules: PricingRuleRow[],
-  context: LocationContext
+  context: LocationContext,
 ): PricingRuleRow | null {
   let bestRule: PricingRuleRow | null = null;
   let bestScore = -Infinity;
@@ -486,7 +488,7 @@ function selectBestRule(
 function evaluateFieldRule(
   rule: PricingRuleRow,
   fieldConfig: FieldConfig,
-  fieldValue: unknown
+  fieldValue: unknown,
 ): { lineItem: LineItem; appliedRule: AppliedRule } | null {
   const quantity = getFieldQuantity(fieldConfig.field_type, fieldValue);
   if (quantity <= 0) return null;
@@ -550,7 +552,7 @@ function evaluateFieldRule(
 function evaluateOptionRule(
   rule: PricingRuleRow,
   fieldConfig: FieldConfig,
-  fieldValue: unknown
+  fieldValue: unknown,
 ): { lineItem: LineItem; appliedRule: AppliedRule } | null {
   if (!rule.option_value) return null;
   const quantity = getOptionQuantity(fieldValue, rule.option_value);
@@ -582,7 +584,7 @@ function evaluateOptionRule(
       location_hierarchy_id: rule.location_hierarchy_id,
       location_id: rule.location_id,
       amount: total,
-      worker_payment,
+      worker_payment: workerPayment,
       metadata: { quantity, unit_price: unitPrice },
       line_item_key: lineItemKey,
       snapshot_data: {
@@ -623,8 +625,7 @@ function getOptionQuantity(value: unknown, optionValue: string): number {
         entry !== null &&
         "quantity" in entry
       ) {
-        const label =
-          (entry.brand as string) ||
+        const label = (entry.brand as string) ||
           (entry.option as string) ||
           (entry.name as string);
         if (label === optionValue) {
@@ -647,11 +648,10 @@ function calculateTieredTotal(quantity: number, definition: unknown): number {
   const tiers = definition
     .map((tier) => ({
       min: Number((tier as Record<string, unknown>).min) || 0,
-      max:
-        (tier as Record<string, unknown>).max === null ||
-        (tier as Record<string, unknown>).max === undefined
-          ? Infinity
-          : Number((tier as Record<string, unknown>).max),
+      max: (tier as Record<string, unknown>).max === null ||
+          (tier as Record<string, unknown>).max === undefined
+        ? Infinity
+        : Number((tier as Record<string, unknown>).max),
       price: Number((tier as Record<string, unknown>).price) || 0,
     }))
     .sort((a, b) => a.min - b.min);
@@ -663,8 +663,9 @@ function calculateTieredTotal(quantity: number, definition: unknown): number {
     if (remaining <= 0) break;
     if (quantity <= tier.min) continue;
     const upperBound = Math.min(remaining + tier.min, tier.max);
-    const tierQuantity =
-      tier.max === Infinity ? remaining : Math.max(0, upperBound - tier.min);
+    const tierQuantity = tier.max === Infinity
+      ? remaining
+      : Math.max(0, upperBound - tier.min);
     total += tierQuantity * tier.price;
     remaining -= tierQuantity;
   }
@@ -717,7 +718,7 @@ function applyBaseRules({
 
   const fieldGroups = groupRules(
     fieldBasedRules,
-    (rule) => `${rule.field_config_id}:${rule.option_value || ""}`
+    (rule) => `${rule.field_config_id}:${rule.option_value || ""}`,
   );
 
   let selectedRule: PricingRuleRow | null = null;
@@ -807,7 +808,7 @@ function applyConditionalRules({
 
     for (const condition of rule.conditions) {
       const fieldConfig = fieldConfigMap.get(
-        condition.condition_field_config_id
+        condition.condition_field_config_id,
       );
       if (!fieldConfig) continue;
 
@@ -816,7 +817,7 @@ function applyConditionalRules({
         !evaluateCondition(
           condition.operator,
           fieldValue,
-          condition.condition_value
+          condition.condition_value,
         )
       ) {
         continue;
@@ -865,7 +866,7 @@ function applyConditionalRules({
         location_hierarchy_id: rule.location_hierarchy_id,
         location_id: rule.location_id,
         amount: adjustment,
-        worker_payment,
+        worker_payment: workerPayment,
         metadata: {
           condition_id: condition.id,
           operator: condition.operator,
@@ -889,7 +890,7 @@ function applyConditionalRules({
 function evaluateCondition(
   operator: string,
   value: unknown,
-  target: string
+  target: string,
 ): boolean {
   switch (operator) {
     case "equals":

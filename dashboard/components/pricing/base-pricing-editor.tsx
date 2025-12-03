@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  ConditionalRuleBuilder,
+  type ConditionalRuleDraft,
+} from "@/components/pricing/conditional-rule-builder";
+import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
+import { serializeCondition } from "@/components/pricing/pricing-condition-helpers";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,24 +27,29 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
+import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
 interface BasePricingEditorProps {
   locationHierarchyId?: string | null;
+  locationId?: string | null;
   effectiveAt?: string | null;
 }
 
 export default function BasePricingEditor({
   locationHierarchyId = null,
+  locationId = null,
   effectiveAt = null,
 }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
   const { basePricing, loading, error, upsertPricing, deletePricing } =
     useBasePricing({
       locationHierarchyId,
+      locationId,
       effectiveAt,
     });
+  useOrganizationCurrency(); // Hook used for currency context
 
   const [isFieldBased, setIsFieldBased] = useState(true);
   const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
@@ -52,16 +63,28 @@ export default function BasePricingEditor({
   >({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+  const [ruleSaving, setRuleSaving] = useState(false);
+  const [ruleError, setRuleError] = useState<string | null>(null);
 
   // Filter to select-type fields for field-based pricing
   const selectFieldConfigs = useMemo(() => {
     return fieldConfigs.filter((fc) => fc.field_type === "select");
   }, [fieldConfigs]);
 
+  const fieldLabelLookup = useMemo(() => {
+    const lookup: Record<string, string> = {};
+    fieldConfigs.forEach((fc) => {
+      lookup[fc.id] = fc.label;
+    });
+    return lookup;
+  }, [fieldConfigs]);
+
   // Create maps for quick lookup
   const standalonePricing = useMemo(() => {
     return basePricing.find((p) => !p.job_type_field_config_id);
   }, [basePricing]);
+
+  const standaloneConditions = standalonePricing?.source_rule?.conditions ?? [];
 
   const fieldBasedPricingMap = useMemo(() => {
     const map: Record<
@@ -91,6 +114,55 @@ export default function BasePricingEditor({
       ...prev,
       [key]: value,
     }));
+  };
+
+  const handleStandaloneRuleSubmit = async (
+    draft: ConditionalRuleDraft
+  ): Promise<void> => {
+    if (!standalonePricing) {
+      setRuleError("Save a standalone base price before adding rules.");
+      return;
+    }
+
+    setRuleSaving(true);
+    setRuleError(null);
+    try {
+      const existingConditions =
+        standalonePricing.source_rule.conditions?.map(serializeCondition) ?? [];
+      const nextConditions = [
+        ...existingConditions,
+        {
+          condition_field_config_id: draft.condition_field_config_id,
+          operator: draft.operator,
+          condition_value: draft.condition_value,
+          action_type: draft.action_type,
+          action_value: draft.action_value,
+          metadata: { created_in_dashboard: true },
+          priority: existingConditions.length + 1,
+        },
+      ];
+
+      const request = {
+        standalone_base_price:
+          (editingAdjustmentTypes["standalone"] ||
+            standalonePricing.adjustment_type) === "add"
+            ? standalonePricing.customer_base_price
+            : 0,
+        customer_base_price: standalonePricing.customer_base_price,
+        adjustment_type:
+          editingAdjustmentTypes["standalone"] ||
+          standalonePricing.adjustment_type,
+        conditions: nextConditions,
+      } as Parameters<typeof upsertPricing>[0];
+      await upsertPricing(request);
+    } catch (error) {
+      console.error("Failed to add conditional rule", error);
+      setRuleError(
+        error instanceof Error ? error.message : "Failed to add rule."
+      );
+    } finally {
+      setRuleSaving(false);
+    }
   };
 
   const handleAdjustmentTypeChange = (
@@ -129,11 +201,16 @@ export default function BasePricingEditor({
 
     setSaving((prev) => ({ ...prev, standalone: true }));
     try {
-      await upsertPricing({
+      const existingConditions =
+        standalonePricing?.source_rule?.conditions?.map(serializeCondition) ??
+        undefined;
+      const request = {
         standalone_base_price: adjustmentType === "add" ? customerPrice : 0,
         customer_base_price: customerPrice,
         adjustment_type: adjustmentType,
-      });
+        conditions: existingConditions,
+      } as Parameters<typeof upsertPricing>[0];
+      await upsertPricing(request);
       setEditingPrices((prev) => {
         const next = { ...prev };
         delete next.standalone;
@@ -420,6 +497,31 @@ export default function BasePricingEditor({
                 )}
               </Button>
             </div>
+
+            {standalonePricing && (
+              <div className="space-y-3 border-t pt-4">
+                <div>
+                  <Label className="text-sm font-semibold">
+                    Conditional rules
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Trigger additional adjustments when other fields meet
+                    certain criteria.
+                  </p>
+                </div>
+                <ConditionalRuleChips
+                  conditions={standaloneConditions}
+                  fieldLabels={fieldLabelLookup}
+                  emptyMessage="No conditional adjustments for the base price yet."
+                />
+                <ConditionalRuleBuilder
+                  fieldOptions={fieldConfigs}
+                  saving={ruleSaving}
+                  error={ruleError}
+                  onSubmit={handleStandaloneRuleSubmit}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

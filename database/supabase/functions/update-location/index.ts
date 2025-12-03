@@ -21,9 +21,48 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    const { id, name, email, address, contact_person, phone } = body;
+    const {
+      id,
+      name,
+      email,
+      address,
+      contact_person,
+      phone,
+      hierarchy_parent_id,
+    } = body;
 
     const supabase = createServiceRoleClient();
+
+    // Validate hierarchy_parent_id if provided
+    if (hierarchy_parent_id) {
+      // First get the location to check organization_id
+      const { data: existingLocation, error: existingError } = await supabase
+        .from("location")
+        .select("organization_id")
+        .eq("id", id)
+        .single();
+
+      if (existingError || !existingLocation) {
+        return errorResponse("Location not found", 404);
+      }
+
+      const { data: parentNode, error: parentError } = await supabase
+        .from("location_hierarchy")
+        .select("id, organization_id")
+        .eq("id", hierarchy_parent_id)
+        .single();
+
+      if (parentError || !parentNode) {
+        return errorResponse("Invalid hierarchy parent", 400);
+      }
+
+      if (parentNode.organization_id !== existingLocation.organization_id) {
+        return errorResponse(
+          "Hierarchy parent belongs to a different organization",
+          400,
+        );
+      }
+    }
 
     const { data: location, error: locationError } = await supabase
       .from("location")
@@ -33,9 +72,17 @@ serve(async (req) => {
         address,
         contact_person,
         phone: phone || null,
+        hierarchy_parent_id: hierarchy_parent_id ?? null,
       })
       .eq("id", id)
-      .select()
+      .select(`
+        *,
+        hierarchy_parent:hierarchy_parent_id (
+          id,
+          name,
+          type
+        )
+      `)
       .single();
 
     if (locationError) throw locationError;
@@ -44,7 +91,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Update location error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to update location"
+      error instanceof Error ? error : "Failed to update location",
     );
   }
 });

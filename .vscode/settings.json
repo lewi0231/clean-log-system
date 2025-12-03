@@ -1,5 +1,10 @@
 {
-  "git.ignoreLimitWarning": true
-  // it seems that subfolders arent able to override the below
-  // "deno.enable": false
+  "git.ignoreLimitWarning": true,
+  "deno.enable": false,
+  "deno.enablePaths": ["database/supabase/functions"],
+  "typescript.enableProjectDiagnostics": false,
+  "files.exclude": {},
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  }
 }

@@ -25,14 +25,15 @@ interface UseOptionPricingResult {
       locationId?: string | null;
       locationHierarchyId?: string | null;
       currency?: string;
-    }
+      expirationDate?: string | null;
+    },
   ) => Promise<OptionPricing>;
   deletePricing: (id: string) => Promise<void>;
 }
 
 export function useOptionPricing(
   fieldConfigId?: string,
-  filters?: UseOptionPricingOptions
+  filters?: UseOptionPricingOptions,
 ): UseOptionPricingResult {
   const { organizationId } = useOrganization();
   const [optionPricing, setOptionPricing] = useState<OptionPricing[]>([]);
@@ -49,19 +50,22 @@ export function useOptionPricing(
       setLoading(true);
       setError(null);
 
+      // Fetch ALL pricing for this field config to show all overrides
+      // We'll filter by scope in the component for the main price display
       const pricing = await PricingService.listRules({
         organization_id: organizationId,
         scopes: ["option"],
         field_config_id: fieldConfigId,
-        location_hierarchy_id: filters?.locationHierarchyId ?? null,
-        location_id: filters?.locationId ?? null,
+        // Don't filter by location - fetch all to show all overrides
+        location_hierarchy_id: null,
+        location_id: null,
         effective_at: filters?.effectiveAt ?? undefined,
       });
 
       setOptionPricing(pricing.map(transformOptionRule));
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch option pricing"
+        err instanceof Error ? err.message : "Failed to fetch option pricing",
       );
       setOptionPricing([]);
     } finally {
@@ -78,14 +82,15 @@ export function useOptionPricing(
       locationId?: string | null;
       locationHierarchyId?: string | null;
       currency?: string;
-    }
+      expirationDate?: string | null;
+    },
   ): Promise<OptionPricing> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
     }
 
-    const targetLocationHierarchyId =
-      options?.locationHierarchyId ?? filters?.locationHierarchyId ?? null;
+    const targetLocationHierarchyId = options?.locationHierarchyId ??
+      filters?.locationHierarchyId ?? null;
     const targetLocationId = options?.locationId ?? filters?.locationId ?? null;
 
     const existingPricing = optionPricing.find(
@@ -93,7 +98,7 @@ export function useOptionPricing(
         pricing.field_config_id === fieldConfigId &&
         pricing.option_value === optionValue &&
         (pricing.location_hierarchy_id || null) === targetLocationHierarchyId &&
-        (pricing.location_id || null) === targetLocationId
+        (pricing.location_id || null) === targetLocationId,
     );
 
     const pricing = await PricingService.upsertRule({
@@ -111,6 +116,7 @@ export function useOptionPricing(
         ? "fixed_rate"
         : existingPricing?.worker_payment_type || null,
       worker_payment_value: options?.workerPaymentRate ?? null,
+      expires_at: options?.expirationDate || null,
     });
 
     await fetchOptionPricing();

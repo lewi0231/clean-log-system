@@ -105,10 +105,11 @@ serve(async (req) => {
 
     if (effective_at) {
       const effectiveDate = new Date(effective_at).toISOString();
-      query = query.lte("effective_at", effectiveDate);
-      query = query.or(`expires_at.is.null,expires_at.gt.${effectiveDate}`, {
-        referencedTable: "pricing_rule",
-      });
+      // Filter for rules that are effective at or before the specified date
+      // and either haven't expired or expire after the effective date
+      query = query
+        .lte("effective_at", effectiveDate)
+        .or(`expires_at.is.null,expires_at.gt.${effectiveDate}`);
     }
 
     const { data: pricingRules, error: rulesError } = await query;

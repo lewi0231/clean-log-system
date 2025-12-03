@@ -461,3 +461,237 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/get-organization-settings/deno.json"
 entrypoint = "./functions/get-organization-settings/index.ts"
+
+[functions.accept-worker-invitation]
+enabled = true
+verify_jwt = false
+import_map = "./functions/accept-worker-invitation/deno.json"
+entrypoint = "./functions/accept-worker-invitation/index.ts"
+
+[functions.apply-field-config-template]
+enabled = true
+verify_jwt = false
+import_map = "./functions/apply-field-config-template/deno.json"
+entrypoint = "./functions/apply-field-config-template/index.ts"
+
+[functions.calculate-invoice]
+enabled = true
+verify_jwt = false
+import_map = "./functions/calculate-invoice/deno.json"
+entrypoint = "./functions/calculate-invoice/index.ts"
+
+[functions.create-field-config]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-field-config/deno.json"
+entrypoint = "./functions/create-field-config/index.ts"
+
+[functions.create-form-section]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-form-section/deno.json"
+entrypoint = "./functions/create-form-section/index.ts"
+
+[functions.create-invoice]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-invoice/deno.json"
+entrypoint = "./functions/create-invoice/index.ts"
+
+[functions.create-location-hierarchy]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-location-hierarchy/deno.json"
+entrypoint = "./functions/create-location-hierarchy/index.ts"
+
+[functions.create-organization-user]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-organization-user/deno.json"
+entrypoint = "./functions/create-organization-user/index.ts"
+
+[functions.create-pricing-rule]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-pricing-rule/deno.json"
+entrypoint = "./functions/create-pricing-rule/index.ts"
+
+[functions.delete-base-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-base-pricing/deno.json"
+entrypoint = "./functions/delete-base-pricing/index.ts"
+
+[functions.delete-field-config]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-field-config/deno.json"
+entrypoint = "./functions/delete-field-config/index.ts"
+
+[functions.delete-field-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-field-pricing/deno.json"
+entrypoint = "./functions/delete-field-pricing/index.ts"
+
+[functions.delete-form-section]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-form-section/deno.json"
+entrypoint = "./functions/delete-form-section/index.ts"
+
+[functions.delete-location-hierarchy]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-location-hierarchy/deno.json"
+entrypoint = "./functions/delete-location-hierarchy/index.ts"
+
+[functions.delete-option-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-option-pricing/deno.json"
+entrypoint = "./functions/delete-option-pricing/index.ts"
+
+[functions.delete-organization-user]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-organization-user/deno.json"
+entrypoint = "./functions/delete-organization-user/index.ts"
+
+[functions.delete-pricing-rule]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-pricing-rule/deno.json"
+entrypoint = "./functions/delete-pricing-rule/index.ts"
+
+[functions.get-invoice-details]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-invoice-details/deno.json"
+entrypoint = "./functions/get-invoice-details/index.ts"
+
+[functions.get-invoice-template-config]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-invoice-template-config/deno.json"
+entrypoint = "./functions/get-invoice-template-config/index.ts"
+
+[functions.get-worker]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-worker/deno.json"
+entrypoint = "./functions/get-worker/index.ts"
+
+[functions.list-base-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-base-pricing/deno.json"
+entrypoint = "./functions/list-base-pricing/index.ts"
+
+[functions.list-field-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-field-pricing/deno.json"
+entrypoint = "./functions/list-field-pricing/index.ts"
+
+[functions.list-form-sections]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-form-sections/deno.json"
+entrypoint = "./functions/list-form-sections/index.ts"
+
+[functions.list-invoices]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-invoices/deno.json"
+entrypoint = "./functions/list-invoices/index.ts"
+
+[functions.list-jobs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-jobs/deno.json"
+entrypoint = "./functions/list-jobs/index.ts"
+
+[functions.list-location-hierarchy]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-location-hierarchy/deno.json"
+entrypoint = "./functions/list-location-hierarchy/index.ts"
+
+[functions.list-option-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-option-pricing/deno.json"
+entrypoint = "./functions/list-option-pricing/index.ts"
+
+[functions.list-organization-users]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-organization-users/deno.json"
+entrypoint = "./functions/list-organization-users/index.ts"
+
+[functions.list-pricing-rules]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-pricing-rules/deno.json"
+entrypoint = "./functions/list-pricing-rules/index.ts"
+
+[functions.resend-worker-invitation]
+enabled = true
+verify_jwt = false
+import_map = "./functions/resend-worker-invitation/deno.json"
+entrypoint = "./functions/resend-worker-invitation/index.ts"
+
+[functions.update-form-section]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-form-section/deno.json"
+entrypoint = "./functions/update-form-section/index.ts"
+
+[functions.update-invoice-template-config]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-invoice-template-config/deno.json"
+entrypoint = "./functions/update-invoice-template-config/index.ts"
+
+[functions.update-location-hierarchy]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-location-hierarchy/deno.json"
+entrypoint = "./functions/update-location-hierarchy/index.ts"
+
+[functions.update-organization-user]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-organization-user/deno.json"
+entrypoint = "./functions/update-organization-user/index.ts"
+
+[functions.update-pricing-rule]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-pricing-rule/deno.json"
+entrypoint = "./functions/update-pricing-rule/index.ts"
+
+[functions.upload-organization-logo]
+enabled = true
+verify_jwt = false
+import_map = "./functions/upload-organization-logo/deno.json"
+entrypoint = "./functions/upload-organization-logo/index.ts"
+
+[functions.upsert-base-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/upsert-base-pricing/deno.json"
+entrypoint = "./functions/upsert-base-pricing/index.ts"
+
+[functions.upsert-field-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/upsert-field-pricing/deno.json"
+entrypoint = "./functions/upsert-field-pricing/index.ts"
+
+[functions.upsert-option-pricing]
+enabled = true
+verify_jwt = false
+import_map = "./functions/upsert-option-pricing/deno.json"
+entrypoint = "./functions/upsert-option-pricing/index.ts"

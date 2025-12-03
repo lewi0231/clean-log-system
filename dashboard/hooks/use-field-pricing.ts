@@ -1,6 +1,7 @@
 "use client";
 
 import { PricingService } from "@/lib/services";
+import type { UpsertPricingRuleRequest } from "@/lib/services/pricing.service";
 import type {
   FieldPricing,
   PricingRule,
@@ -14,6 +15,7 @@ interface UseFieldPricingOptions {
   locationId?: string | null;
   locationHierarchyId?: string | null;
   effectiveAt?: string | null;
+  refreshToken?: number;
 }
 
 interface UseFieldPricingResult {
@@ -32,13 +34,15 @@ interface UseFieldPricingResult {
       appliesToFieldType?: string;
       workerPaymentType?: WorkerPaymentType | null;
       workerPaymentValue?: number | null;
-    }
+      conditions?: UpsertPricingRuleRequest["conditions"];
+      expirationDate?: string | null;
+    },
   ) => Promise<FieldPricing>;
   deletePricing: (id: string) => Promise<void>;
 }
 
 export function useFieldPricing(
-  options?: UseFieldPricingOptions
+  options?: UseFieldPricingOptions,
 ): UseFieldPricingResult {
   const { organizationId } = useOrganization();
   const [fieldPricing, setFieldPricing] = useState<FieldPricing[]>([]);
@@ -66,7 +70,7 @@ export function useFieldPricing(
       setFieldPricing(pricing.map(transformFieldPricing));
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch field pricing"
+        err instanceof Error ? err.message : "Failed to fetch field pricing",
       );
       setFieldPricing([]);
     } finally {
@@ -85,7 +89,9 @@ export function useFieldPricing(
       appliesToFieldType?: string;
       workerPaymentType?: WorkerPaymentType | null;
       workerPaymentValue?: number | null;
-    }
+      conditions?: UpsertPricingRuleRequest["conditions"];
+      expirationDate?: string | null;
+    },
   ): Promise<FieldPricing> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
@@ -98,7 +104,7 @@ export function useFieldPricing(
       (rule) =>
         rule.field_config_id === fieldConfigId &&
         (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
-        (rule.location_id || null) === targetLocationId
+        (rule.location_id || null) === targetLocationId,
     );
 
     const pricing = await PricingService.upsertRule({
@@ -114,6 +120,8 @@ export function useFieldPricing(
       location_id: targetLocationId,
       worker_payment_type: options?.workerPaymentType || null,
       worker_payment_value: options?.workerPaymentValue ?? null,
+      conditions: options?.conditions,
+      expires_at: options?.expirationDate || null,
     });
 
     await fetchFieldPricing();
@@ -133,6 +141,7 @@ export function useFieldPricing(
     options?.locationHierarchyId,
     options?.locationId,
     options?.effectiveAt,
+    options?.refreshToken,
   ]);
 
   return {
@@ -152,10 +161,9 @@ const transformFieldPricing = (rule: PricingRule): FieldPricing => ({
   location_id: rule.location_id,
   location_hierarchy_id: rule.location_hierarchy_id,
   pricing_type: rule.pricing_type,
-  customer_price:
-    rule.pricing_type === "percentage"
-      ? rule.percentage_rate ?? 0
-      : rule.base_price ?? 0,
+  customer_price: rule.pricing_type === "percentage"
+    ? rule.percentage_rate ?? 0
+    : rule.base_price ?? 0,
   currency: rule.currency,
   applies_to_field_type: rule.applies_to_field_type || null,
   worker_payment_type: rule.worker_payment_type,

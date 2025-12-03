@@ -1,6 +1,7 @@
 "use client";
 
 import { PricingService } from "@/lib/services";
+import type { UpsertPricingRuleRequest } from "@/lib/services/pricing.service";
 import type { BasePricing, PricingRule } from "@/lib/types";
 import { useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
@@ -75,6 +76,7 @@ export function useBasePricing(
     adjustment_type?: "add" | "multiply";
     location_id?: string | null;
     currency?: string;
+    conditions?: UpsertPricingRuleRequest["conditions"];
   }): Promise<BasePricing> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
@@ -126,6 +128,7 @@ export function useBasePricing(
         : existing?.worker_payment_type || null,
       worker_payment_value: request.worker_base_payment ?? null,
       currency: request.currency || "USD",
+      conditions: request.conditions,
     });
 
     await fetchBasePricing();

@@ -1,0 +1,34 @@
+---
+alwaysApply: true
+---
+
+MCP Server Reference Map
+Research & External Data:
+
+Tavily: Web search for best practices, technical solutions, design patterns
+Brave Search: Alternative web search for documentation and examples
+Firecrawl: Scrape full content from documentation sites, competitor UIs, design systems
+
+Codebase Analysis:
+
+Filesystem: Navigate and read files across dashboard/mobile-app/shared packages
+GitHub: Review commits, PRs, issues, and code history
+Supabase: Query database schema, tables, RLS policies, edge functions directly
+Extension NX: Monorepo structure analysis and workspace management
+
+Design & UI:
+
+Figma: Access design files and components (connect designs to implementation)
+V0: Generate UI components from descriptions (Vercel's component generator)
+Next Devtools: Inspect Next.js app structure, routes, and performance
+
+Problem Solving:
+
+Sequential Thinking: Break down complex problems into logical steps before implementing
+
+Recommended Workflow:
+
+Research: Use Tavily/Brave/Firecrawl to find solutions and patterns
+Analyze: Use Filesystem/GitHub/Supabase to understand current implementation
+Design: Use Figma/V0 for UI, Sequential Thinking for complex logic
+Implement: Apply findings with full context from analysis phase

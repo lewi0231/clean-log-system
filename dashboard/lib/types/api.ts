@@ -68,6 +68,7 @@ export interface CreateLocationRequest {
   address: string;
   contact_person: string;
   phone?: string;
+  hierarchy_parent_id?: string | null;
 }
 
 export interface UpdateLocationRequest {
@@ -77,6 +78,7 @@ export interface UpdateLocationRequest {
   address?: string;
   contact_person?: string;
   phone?: string;
+  hierarchy_parent_id?: string | null;
 }
 
 export interface DeleteLocationRequest {

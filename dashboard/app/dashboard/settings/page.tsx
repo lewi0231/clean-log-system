@@ -13,14 +13,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { BusinessMode, OrganizationSettings } from "@/lib/types";
-import { Package, Sparkles, Upload, X } from "lucide-react";
+import {
+  BusinessMode,
+  OrganizationSettings,
+  SupportedCurrency,
+} from "@/lib/types";
+import { DollarSign, Package, Sparkles, Upload, X } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 
@@ -41,6 +52,8 @@ export default function SettingsPage() {
     invoice_send_immediately: false,
     stripe_account_id: null,
     payment_provider: null,
+    currency: "AUD",
+    locale: "en-AU",
   });
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -77,6 +90,8 @@ export default function SettingsPage() {
             data.settings.invoice_send_immediately ?? false,
           stripe_account_id: data.settings.stripe_account_id ?? null,
           payment_provider: data.settings.payment_provider ?? null,
+          currency: data.settings.currency ?? "AUD",
+          locale: data.settings.locale ?? "en-AU",
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
       }
@@ -479,6 +494,56 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCurrencyChange = async (currency: SupportedCurrency) => {
+    if (!organizationId) return;
+
+    // Map currency to appropriate locale
+    const currencyLocaleMap: Record<SupportedCurrency, string> = {
+      AUD: "en-AU",
+      USD: "en-US",
+      GBP: "en-GB",
+      EUR: "de-DE",
+      CAD: "en-CA",
+      NZD: "en-NZ",
+    };
+
+    const locale = currencyLocaleMap[currency];
+
+    try {
+      log.info("Settings: Updating currency", { currency, locale });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            currency,
+            locale,
+          },
+        }
+      );
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          currency: data.settings.currency,
+          locale: data.settings.locale,
+        }));
+      }
+
+      log.info("Settings: Currency updated successfully", { currency });
+    } catch (err) {
+      log.error("Settings: Failed to update currency", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      alert("Failed to update currency. Please try again.");
+    }
+  };
+
   useEffect(() => {
     if (organizationId) {
       fetchSettings();
@@ -609,6 +674,63 @@ export default function SettingsPage() {
                 placeholder="Enter primary contact email"
                 description="The primary business contact email for account communications and notifications."
               />
+
+              <div className="space-y-2">
+                <Label htmlFor="currency">Currency</Label>
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) =>
+                    handleCurrencyChange(value as SupportedCurrency)
+                  }
+                >
+                  <SelectTrigger id="currency" className="w-full max-w-xs">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select currency" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUD">
+                      <span className="font-medium">AUD</span>
+                      <span className="text-muted-foreground ml-2">
+                        Australian Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="USD">
+                      <span className="font-medium">USD</span>
+                      <span className="text-muted-foreground ml-2">
+                        US Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="GBP">
+                      <span className="font-medium">GBP</span>
+                      <span className="text-muted-foreground ml-2">
+                        British Pound
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="EUR">
+                      <span className="font-medium">EUR</span>
+                      <span className="text-muted-foreground ml-2">Euro</span>
+                    </SelectItem>
+                    <SelectItem value="CAD">
+                      <span className="font-medium">CAD</span>
+                      <span className="text-muted-foreground ml-2">
+                        Canadian Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="NZD">
+                      <span className="font-medium">NZD</span>
+                      <span className="text-muted-foreground ml-2">
+                        New Zealand Dollar
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Default currency for pricing and invoicing. This affects how
+                  prices are displayed throughout the application.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

@@ -28,7 +28,7 @@ serve(async (req) => {
           name,
           type
         )
-      `
+      `,
       )
       .eq("organization_id", organization_id)
       .order("sort_order", { ascending: true })
@@ -36,35 +36,34 @@ serve(async (req) => {
 
     if (hierarchyError) throw hierarchyError;
 
-    const { data: assignments, error: assignmentError } = await supabase
-      .from("location_hierarchy_assignment")
+    // Get locations with their hierarchy parent for reference
+    const { data: locations, error: locationsError } = await supabase
+      .from("location")
       .select(
         `
-        location_id,
-        hierarchy_id,
-        assigned_at,
-        location:location_id (
-          id,
-          name,
-          organization_id,
-          address,
-          email
-        )
-      `
+        id,
+        name,
+        organization_id,
+        address,
+        email,
+        hierarchy_parent_id
+      `,
       )
-      .eq("location.organization_id", organization_id);
+      .eq("organization_id", organization_id)
+      .not("hierarchy_parent_id", "is", null);
 
-    if (assignmentError) throw assignmentError;
+    if (locationsError) throw locationsError;
 
     return jsonResponse({
       success: true,
       nodes: nodes || [],
-      assignments: assignments || [],
+      // For backwards compatibility, return locations grouped by their hierarchy parent
+      locations_by_hierarchy: locations || [],
     });
   } catch (error) {
     console.error("List location hierarchy error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to list location hierarchy"
+      error instanceof Error ? error : "Failed to list location hierarchy",
     );
   }
 });

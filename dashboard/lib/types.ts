@@ -50,9 +50,17 @@ export interface Location {
   phone: string | null;
   active: boolean;
   created_at: string;
+  hierarchy_parent_id: string | null;
+  hierarchy_parent?: {
+    id: string;
+    name: string;
+    type: "company" | "region";
+  } | null;
 }
 
 export type BusinessMode = "service_based" | "resource_tracking";
+
+export type SupportedCurrency = "AUD" | "USD" | "GBP" | "EUR" | "CAD" | "NZD";
 
 export interface OrganizationSettings {
   name: string;
@@ -64,6 +72,8 @@ export interface OrganizationSettings {
   invoice_send_immediately: boolean;
   stripe_account_id: string | null;
   payment_provider: string | null;
+  currency: SupportedCurrency;
+  locale: string;
 }
 
 export interface Job {
@@ -163,7 +173,7 @@ export interface PricingRule {
   location_node?: {
     id: string;
     name: string;
-    type: "company" | "region" | "site";
+    type: "company" | "region";
     parent_id: string | null;
   } | null;
   conditions?: PricingCondition[];
@@ -271,7 +281,7 @@ export interface LocationHierarchyNode {
   parent_id: string | null;
   name: string;
   code: string | null;
-  type: "company" | "region" | "site";
+  type: "company" | "region";
   sort_order: number;
   metadata: Record<string, unknown> | null;
   active: boolean;
@@ -280,21 +290,8 @@ export interface LocationHierarchyNode {
   parent?: {
     id: string;
     name: string;
-    type: "company" | "region" | "site";
+    type: "company" | "region";
   } | null;
-}
-
-export interface LocationHierarchyAssignment {
-  location_id: string;
-  hierarchy_id: string;
-  assigned_at: string;
-  location: {
-    id: string;
-    name: string;
-    organization_id: string;
-    address: string | null;
-    email: string | null;
-  };
 }
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
