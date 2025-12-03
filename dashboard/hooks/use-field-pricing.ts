@@ -59,11 +59,14 @@ export function useFieldPricing(
       setLoading(true);
       setError(null);
 
+      // Fetch ALL pricing for field scope to show all overrides
+      // We'll filter by scope in the component for the main price display
       const pricing = await PricingService.listRules({
         organization_id: organizationId,
         scopes: ["field"],
-        location_hierarchy_id: options?.locationHierarchyId ?? null,
-        location_id: options?.locationId ?? null,
+        // Don't filter by location - fetch all to show all overrides
+        location_hierarchy_id: null,
+        location_id: null,
         effective_at: options?.effectiveAt ?? undefined,
       });
 
@@ -138,8 +141,6 @@ export function useFieldPricing(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     organizationId,
-    options?.locationHierarchyId,
-    options?.locationId,
     options?.effectiveAt,
     options?.refreshToken,
   ]);
