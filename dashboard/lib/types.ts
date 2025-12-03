@@ -70,6 +70,7 @@ export interface OrganizationSettings {
   logo_url: string | null;
   primary_contact_email: string | null;
   invoice_send_immediately: boolean;
+  feedback_email_send_immediately: boolean;
   stripe_account_id: string | null;
   payment_provider: string | null;
   currency: SupportedCurrency;
@@ -359,4 +360,25 @@ export interface InvoiceTemplateConfig {
   line_item_display: LineItemDisplayConfig;
   created_at: string;
   updated_at: string;
+}
+
+export interface Feedback {
+  id: string;
+  job_id: string;
+  rating: number; // 1-5
+  comment: string | null;
+  submitted_at: string;
+  job: {
+    id: string;
+    completed_at: string;
+    location: {
+      id: string;
+      name: string;
+      email: string;
+    } | null;
+    workers: Array<{
+      id: string;
+      name: string;
+    }>;
+  };
 }

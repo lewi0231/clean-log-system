@@ -95,6 +95,16 @@ export interface ListJobsResponse {
   jobs: Job[];
 }
 
+// Feedback API
+export interface ListFeedbackRequest {
+  organization_id: string;
+}
+
+export interface ListFeedbackResponse {
+  success: boolean;
+  feedback: Feedback[];
+}
+
 // Field Configs API
 export interface ListFieldConfigsRequest {
   organization_id: string;
@@ -155,6 +165,7 @@ export interface DeleteFieldPricingResponse {
 import type { FieldConfig } from "@/shared/types/field-config";
 import type {
   BusinessMode,
+  Feedback,
   FieldPricing,
   Job,
   Location,

@@ -50,6 +50,7 @@ export default function SettingsPage() {
     logo_url: null,
     primary_contact_email: null,
     invoice_send_immediately: false,
+    feedback_email_send_immediately: false,
     stripe_account_id: null,
     payment_provider: null,
     currency: "AUD",
@@ -88,6 +89,8 @@ export default function SettingsPage() {
           primary_contact_email: data.settings.primary_contact_email ?? null,
           invoice_send_immediately:
             data.settings.invoice_send_immediately ?? false,
+          feedback_email_send_immediately:
+            data.settings.feedback_email_send_immediately ?? false,
           stripe_account_id: data.settings.stripe_account_id ?? null,
           payment_provider: data.settings.payment_provider ?? null,
           currency: data.settings.currency ?? "AUD",
@@ -443,6 +446,52 @@ export default function SettingsPage() {
       log.error("Settings: Failed to update invoice send immediately setting", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
+      alert("Failed to update setting. Please try again.");
+    }
+  };
+
+  const handleFeedbackEmailSendImmediatelyChange = async (
+    checked: boolean
+  ) => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating feedback email send immediately setting", {
+        checked,
+      });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            feedback_email_send_immediately: checked,
+          },
+        }
+      );
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          feedback_email_send_immediately:
+            data.settings.feedback_email_send_immediately,
+        }));
+      }
+
+      log.info(
+        "Settings: Feedback email send immediately setting updated successfully"
+      );
+    } catch (err) {
+      log.error(
+        "Settings: Failed to update feedback email send immediately setting",
+        {
+          error: err instanceof Error ? err.message : "Unknown error",
+        }
+      );
       alert("Failed to update setting. Please try again.");
     }
   };
@@ -869,6 +918,34 @@ export default function SettingsPage() {
                   id="invoice-send-immediately"
                   checked={settings.invoice_send_immediately}
                   onCheckedChange={handleInvoiceSendImmediatelyChange}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Feedback Requests</CardTitle>
+              <CardDescription>
+                Configure how feedback request emails are sent to customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="feedback-email-send-immediately">
+                    Send Feedback Requests Immediately
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.feedback_email_send_immediately
+                      ? "Feedback request emails will be sent to customers immediately after a job is completed"
+                      : "Feedback request emails will require manual action to send"}
+                  </p>
+                </div>
+                <Switch
+                  id="feedback-email-send-immediately"
+                  checked={settings.feedback_email_send_immediately}
+                  onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
                 />
               </div>
             </CardContent>

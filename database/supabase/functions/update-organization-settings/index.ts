@@ -27,6 +27,7 @@ serve(async (req) => {
       logo_url,
       primary_contact_email,
       invoice_send_immediately,
+      feedback_email_send_immediately,
       stripe_account_id,
       payment_provider,
       currency,
@@ -87,6 +88,17 @@ serve(async (req) => {
       updateData.invoice_send_immediately = invoice_send_immediately;
     }
 
+    if (feedback_email_send_immediately !== undefined) {
+      if (typeof feedback_email_send_immediately !== "boolean") {
+        return errorResponse(
+          "feedback_email_send_immediately must be a boolean",
+          400,
+        );
+      }
+      updateData.feedback_email_send_immediately =
+        feedback_email_send_immediately;
+    }
+
     if (stripe_account_id !== undefined) {
       updateData.stripe_account_id = stripe_account_id === ""
         ? null
@@ -133,7 +145,7 @@ serve(async (req) => {
       .update(updateData)
       .eq("id", organization_id)
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, stripe_account_id, payment_provider, currency, locale",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider",
       )
       .single();
 
@@ -151,6 +163,8 @@ serve(async (req) => {
         primary_contact_email: organization?.primary_contact_email ?? null,
         invoice_send_immediately: organization?.invoice_send_immediately ??
           false,
+        feedback_email_send_immediately:
+          organization?.feedback_email_send_immediately ?? false,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",

@@ -9,6 +9,7 @@ import {
   FileText,
   Settings,
   Smartphone,
+  Star,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -34,6 +35,11 @@ const navigation = [
     name: "Completed Jobs",
     href: "/dashboard/completed-jobs",
     icon: Clipboard,
+  },
+  {
+    name: "Ratings",
+    href: "/dashboard/ratings",
+    icon: Star,
   },
   {
     name: "Pricing",
