@@ -43,12 +43,7 @@ export default function RatingsList({
       count: feedback.filter((item) => item.rating === rating).length,
       percentage:
         total > 0
-<<<<<<< HEAD
           ? (feedback.filter((item) => item.rating === rating).length / total) *
-=======
-          ? (feedback.filter((item) => item.rating === rating).length /
-              total) *
->>>>>>> 22f2347 (- added basic ratings setup.)
             100
           : 0,
     }));
@@ -96,25 +91,13 @@ export default function RatingsList({
         </Card>
         <Card>
           <CardContent className="pt-6">
-<<<<<<< HEAD
             <div className="text-2xl font-bold">{stats.average.toFixed(1)}</div>
-=======
-            <div className="text-2xl font-bold">
-              {stats.average.toFixed(1)}
-            </div>
->>>>>>> 22f2347 (- added basic ratings setup.)
             <p className="text-xs text-muted-foreground">Average Rating</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-<<<<<<< HEAD
             <div className="text-2xl font-bold">{stats.byRating[0].count}</div>
-=======
-            <div className="text-2xl font-bold">
-              {stats.byRating[0].count}
-            </div>
->>>>>>> 22f2347 (- added basic ratings setup.)
             <p className="text-xs text-muted-foreground">5-Star Reviews</p>
           </CardContent>
         </Card>
@@ -185,13 +168,7 @@ export default function RatingsList({
                   filteredFeedback.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>{renderStars(item.rating)}</TableCell>
-<<<<<<< HEAD
                       <TableCell>{item.job.location?.name || "-"}</TableCell>
-=======
-                      <TableCell>
-                        {item.job.location?.name || "-"}
-                      </TableCell>
->>>>>>> 22f2347 (- added basic ratings setup.)
                       <TableCell>
                         {item.job.workers.length > 0 ? (
                           <div className="flex flex-col gap-1">
@@ -227,7 +204,3 @@ export default function RatingsList({
     </div>
   );
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> 22f2347 (- added basic ratings setup.)

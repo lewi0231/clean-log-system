@@ -1,5 +1,4 @@
 // Barrel export for services
-export { BasePricingService } from "./base-pricing.service";
 export { FeedbackService } from "./feedback.service";
 export { FieldConfigsService } from "./field-configs.service";
 export { InvoiceService } from "./invoice.service";
