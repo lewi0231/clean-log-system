@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 interface GlassCardProps {
   title?: string;
@@ -23,11 +23,8 @@ export default function GlassCard({
         className
       )}
     >
-      {title && (
-        <h3 className="text-lg font-bold mb-4 px-6 pt-6">{title}</h3>
-      )}
+      {title && <h3 className="text-lg font-bold mb-4 px-6 pt-6">{title}</h3>}
       {children}
     </div>
   );
 }
-

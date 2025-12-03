@@ -3,6 +3,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -12,18 +17,46 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { FieldConfig, FormSectionWithFields } from "@clean-log/shared";
 import {
+  FieldConfig,
+  FieldType,
+  FormSectionWithFields,
+} from "@clean-log/shared";
+import {
+  AlignLeft,
+  Calendar,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
+  Clock,
   FolderPlus,
   GripVertical,
+  Hash,
+  Layers,
+  List,
+  Mail,
   Pencil,
+  Phone,
+  Settings,
   Trash2,
+  Type,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { ConditionalLogicEditor } from "./conditional-logic-editor";
 
 interface SectionEditorProps {
   sections: FormSectionWithFields[];
@@ -43,6 +76,11 @@ interface SectionEditorProps {
   draggedFieldId?: string | null;
   onDropFieldToSection?: (sectionId: string, fieldId: string) => void;
   onRemoveFieldFromSection?: (fieldId: string) => void;
+  onUpdateField?: (
+    fieldId: string,
+    updates: Partial<FieldConfig>
+  ) => void | Promise<void>;
+  createdClusters?: string[];
 }
 
 interface SectionFormData {
@@ -50,6 +88,27 @@ interface SectionFormData {
   description: string;
   collapsed_by_default: boolean;
 }
+
+// Field type definitions with icons
+const FIELD_TYPES: {
+  type: FieldType;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}[] = [
+  { type: "text", icon: Type, label: "Text" },
+  { type: "number", icon: Hash, label: "Number" },
+  { type: "email", icon: Mail, label: "Email" },
+  { type: "phone", icon: Phone, label: "Phone" },
+  { type: "select", icon: List, label: "Select" },
+  { type: "textarea", icon: AlignLeft, label: "Text Area" },
+  { type: "date", icon: Calendar, label: "Date" },
+  { type: "time", icon: Clock, label: "Time" },
+  { type: "boolean", icon: CheckSquare, label: "Checkbox" },
+  { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
+];
+
+// Single implicit mutually exclusive group for all clusters
+const DEFAULT_EXCLUSIVE_GROUP = "default_exclusive_group";
 
 export function SectionEditor({
   sections,
@@ -61,6 +120,8 @@ export function SectionEditor({
   draggedFieldId,
   onDropFieldToSection,
   onRemoveFieldFromSection,
+  onUpdateField,
+  createdClusters = [],
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSection, setEditingSection] =
@@ -77,10 +138,28 @@ export function SectionEditor({
   const [sectionOrder, setSectionOrder] = useState<string[]>(() =>
     sections.map((s) => s.id)
   );
+  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
+    Map<string, boolean>
+  >(new Map());
   const fieldMap = useMemo(
     () => new Map(fields.map((field) => [field.id, field])),
     [fields]
   );
+
+  // Handle options update for select fields
+  const handleOptionsChange = async (
+    fieldId: string,
+    optionsString: string
+  ) => {
+    if (!onUpdateField) return;
+    const options = optionsString
+      .split(",")
+      .map((o) => o.trim())
+      .filter((o) => o.length > 0);
+    await onUpdateField(fieldId, {
+      options: options.length > 0 ? options : null,
+    });
+  };
 
   // Keep local order in sync when sections change externally (but not during drag)
   useEffect(() => {
@@ -327,12 +406,385 @@ export function SectionEditor({
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {onUpdateField && (
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                      >
+                                        <Settings className="w-3 h-3" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="w-80 max-h-[70vh] overflow-y-auto"
+                                      align="end"
+                                    >
+                                      <div className="space-y-4">
+                                        <h4 className="font-semibold text-sm">
+                                          Field Settings
+                                        </h4>
+
+                                        {/* Label */}
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">
+                                            Label
+                                          </Label>
+                                          <Input
+                                            value={field.label}
+                                            onChange={(e) =>
+                                              onUpdateField(field.id, {
+                                                label: e.target.value,
+                                              })
+                                            }
+                                          />
+                                        </div>
+
+                                        {/* Description */}
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">
+                                            Description / Placeholder
+                                          </Label>
+                                          <Textarea
+                                            value={field.description || ""}
+                                            onChange={(e) =>
+                                              onUpdateField(field.id, {
+                                                description:
+                                                  e.target.value || null,
+                                              })
+                                            }
+                                            rows={2}
+                                          />
+                                        </div>
+
+                                        {/* Field Type */}
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">
+                                            Field Type
+                                          </Label>
+                                          <Select
+                                            value={field.field_type}
+                                            onValueChange={(v: string) =>
+                                              onUpdateField(field.id, {
+                                                field_type: v as FieldType,
+                                              })
+                                            }
+                                          >
+                                            <SelectTrigger>
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {FIELD_TYPES.map(
+                                                ({ type, label }) => (
+                                                  <SelectItem
+                                                    key={type}
+                                                    value={type}
+                                                  >
+                                                    {label}
+                                                  </SelectItem>
+                                                )
+                                              )}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+
+                                        {/* Options for select/grouped_breakdown */}
+                                        {(field.field_type === "select" ||
+                                          field.field_type ===
+                                            "grouped_breakdown") && (
+                                          <div className="space-y-1">
+                                            <Label className="text-xs">
+                                              Options (comma-separated)
+                                            </Label>
+                                            <Input
+                                              value={(field.options || []).join(
+                                                ", "
+                                              )}
+                                              onChange={(e) =>
+                                                handleOptionsChange(
+                                                  field.id,
+                                                  e.target.value
+                                                )
+                                              }
+                                              placeholder="Option 1, Option 2, Option 3"
+                                            />
+                                          </div>
+                                        )}
+
+                                        {/* Section Assignment */}
+                                        {sections.length > 0 && (
+                                          <div className="space-y-1">
+                                            <Label className="text-xs">
+                                              Section
+                                            </Label>
+                                            <Select
+                                              value={field.section_id || "none"}
+                                              onValueChange={(v: string) =>
+                                                onUpdateField(field.id, {
+                                                  section_id:
+                                                    v === "none" ? null : v,
+                                                })
+                                              }
+                                            >
+                                              <SelectTrigger>
+                                                <SelectValue placeholder="No section" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="none">
+                                                  No section
+                                                </SelectItem>
+                                                {sections.map((section) => (
+                                                  <SelectItem
+                                                    key={section.id}
+                                                    value={section.id}
+                                                  >
+                                                    {section.title}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        )}
+
+                                        {/* Required Toggle */}
+                                        <div className="flex items-center justify-between">
+                                          <Label className="text-xs">
+                                            Required Field
+                                          </Label>
+                                          <Switch
+                                            checked={field.required}
+                                            onCheckedChange={(
+                                              checked: boolean
+                                            ) =>
+                                              onUpdateField(field.id, {
+                                                required: checked,
+                                              })
+                                            }
+                                          />
+                                        </div>
+
+                                        {/* Advanced Section */}
+                                        <Collapsible
+                                          open={
+                                            advancedSectionsOpen.get(
+                                              field.id
+                                            ) || false
+                                          }
+                                          onOpenChange={(open) => {
+                                            setAdvancedSectionsOpen((prev) => {
+                                              const next = new Map(prev);
+                                              next.set(field.id, open);
+                                              return next;
+                                            });
+                                          }}
+                                        >
+                                          <CollapsibleTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="w-full justify-between"
+                                            >
+                                              <span className="text-xs">
+                                                Advanced Options
+                                              </span>
+                                              {advancedSectionsOpen.get(
+                                                field.id
+                                              ) ? (
+                                                <Layers className="w-3 h-3 rotate-180" />
+                                              ) : (
+                                                <Layers className="w-3 h-3" />
+                                              )}
+                                            </Button>
+                                          </CollapsibleTrigger>
+                                          <CollapsibleContent className="space-y-4 pt-2">
+                                            {/* Mutually Exclusive Cluster */}
+                                            <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
+                                              <Label className="text-xs">
+                                                Mutually Exclusive Cluster
+                                              </Label>
+                                              <p className="text-[11px] text-muted-foreground">
+                                                Assign this field to a cluster
+                                                where only one option can be
+                                                selected at a time. All clusters
+                                                share a single implicit group
+                                                behind the scenes.
+                                              </p>
+                                              {(() => {
+                                                // Get all clusters from all fields AND created clusters
+                                                const clustersFromFields =
+                                                  Array.from(
+                                                    new Set(
+                                                      fields
+                                                        .map(
+                                                          (f) => f.group_cluster
+                                                        )
+                                                        .filter(
+                                                          (c): c is string =>
+                                                            Boolean(c)
+                                                        )
+                                                    )
+                                                  );
+                                                // Combine with created clusters that haven't been assigned yet
+                                                const allClusters = Array.from(
+                                                  new Set([
+                                                    ...clustersFromFields,
+                                                    ...createdClusters,
+                                                  ])
+                                                ).sort();
+
+                                                // Convert cluster ID to display name
+                                                const getClusterDisplayName = (
+                                                  clusterId: string
+                                                ) => {
+                                                  return clusterId
+                                                    .split("_")
+                                                    .map(
+                                                      (word) =>
+                                                        word
+                                                          .charAt(0)
+                                                          .toUpperCase() +
+                                                        word.slice(1)
+                                                    )
+                                                    .join(" ");
+                                                };
+
+                                                return (
+                                                  <div className="space-y-2">
+                                                    <Select
+                                                      value={
+                                                        field.group_cluster ||
+                                                        "none"
+                                                      }
+                                                      onValueChange={(
+                                                        value: string
+                                                      ) => {
+                                                        if (value === "none") {
+                                                          onUpdateField(
+                                                            field.id,
+                                                            {
+                                                              mutually_exclusive_group:
+                                                                null,
+                                                              group_cluster:
+                                                                null,
+                                                            }
+                                                          );
+                                                        } else {
+                                                          onUpdateField(
+                                                            field.id,
+                                                            {
+                                                              mutually_exclusive_group:
+                                                                DEFAULT_EXCLUSIVE_GROUP,
+                                                              group_cluster:
+                                                                value,
+                                                            }
+                                                          );
+                                                        }
+                                                      }}
+                                                    >
+                                                      <SelectTrigger>
+                                                        <SelectValue placeholder="Select existing cluster" />
+                                                      </SelectTrigger>
+                                                      <SelectContent>
+                                                        <SelectItem value="none">
+                                                          No cluster
+                                                        </SelectItem>
+                                                        {allClusters.map(
+                                                          (clusterId) => (
+                                                            <SelectItem
+                                                              key={clusterId}
+                                                              value={clusterId}
+                                                            >
+                                                              {getClusterDisplayName(
+                                                                clusterId
+                                                              )}
+                                                            </SelectItem>
+                                                          )
+                                                        )}
+                                                      </SelectContent>
+                                                    </Select>
+                                                    <Input
+                                                      value={
+                                                        field.group_cluster
+                                                          ? getClusterDisplayName(
+                                                              field.group_cluster
+                                                            )
+                                                          : ""
+                                                      }
+                                                      onChange={(e) => {
+                                                        // Allow typing freely; apply on blur
+                                                        if (!e.target.value) {
+                                                          onUpdateField(
+                                                            field.id,
+                                                            {
+                                                              mutually_exclusive_group:
+                                                                null,
+                                                              group_cluster:
+                                                                null,
+                                                            }
+                                                          );
+                                                        }
+                                                      }}
+                                                      onBlur={(e) => {
+                                                        const clusterName =
+                                                          e.target.value.trim();
+                                                        if (clusterName) {
+                                                          const clusterId =
+                                                            clusterName
+                                                              .toLowerCase()
+                                                              .replace(
+                                                                /[^a-z0-9]+/g,
+                                                                "_"
+                                                              )
+                                                              .replace(
+                                                                /^_|_$/g,
+                                                                ""
+                                                              );
+
+                                                          onUpdateField(
+                                                            field.id,
+                                                            {
+                                                              mutually_exclusive_group:
+                                                                DEFAULT_EXCLUSIVE_GROUP,
+                                                              group_cluster:
+                                                                clusterId,
+                                                            }
+                                                          );
+                                                        }
+                                                      }}
+                                                      placeholder={
+                                                        allClusters.length > 0
+                                                          ? "Or type new cluster name"
+                                                          : "Type cluster name (e.g., Simple Toggle)"
+                                                      }
+                                                    />
+                                                  </div>
+                                                );
+                                              })()}
+                                            </div>
+
+                                            {/* Conditional Logic */}
+                                            <ConditionalLogicEditor
+                                              field={field}
+                                              allFields={fields}
+                                              onChange={(logic) =>
+                                                onUpdateField(field.id, {
+                                                  conditional_logic: logic,
+                                                })
+                                              }
+                                            />
+                                          </CollapsibleContent>
+                                        </Collapsible>
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
                                 {onRemoveFieldFromSection && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                    className="h-6 w-6 text-destructive hover:text-destructive"
                                     onClick={() =>
                                       onRemoveFieldFromSection(field.id)
                                     }

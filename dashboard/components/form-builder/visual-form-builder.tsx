@@ -55,6 +55,7 @@ import {
   Type,
 } from "lucide-react";
 import { ConditionalLogicEditor } from "./conditional-logic-editor";
+import { FieldConfigDialog } from "./field-config-dialog";
 import { FieldTemplatesPanel } from "./field-templates-panel";
 import { MobileDevicePreview } from "./mobile-device-preview";
 import { SectionEditor } from "./section-editor";
@@ -137,6 +138,10 @@ export function VisualFormBuilder({
   const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
     Map<string, boolean>
   >(new Map());
+  const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+  const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>(
+    null
+  );
 
   // Keep local order in sync when fields change externally
   React.useEffect(() => {
@@ -172,35 +177,29 @@ export function VisualFormBuilder({
     return name;
   };
 
-  // Add a new field
-  const handleAddField = async (type: FieldType) => {
-    const label = `New ${
-      FIELD_TYPES.find((t) => t.type === type)?.label || type
-    } Field`;
-    const name = generateFieldName(label);
+  // Open field dialog
+  const handleOpenFieldDialog = (type: FieldType) => {
+    setSelectedFieldType(type);
+    setFieldDialogOpen(true);
+  };
 
-    setIsAddingField(true);
-    try {
-      await onAddField({
-        name,
-        label,
-        field_type: type,
-        description: null,
-        required: false,
-        order_position: fields.length,
-        validation_rules: null,
-        options:
-          type === "select" || type === "grouped_breakdown"
-            ? ["Option 1", "Option 2"]
-            : null,
-        mutually_exclusive_group: null,
-        group_cluster: null,
-        section_id: null,
-        conditional_logic: null,
-      });
-    } finally {
-      setIsAddingField(false);
-    }
+  // Handle field save from dialog
+  const handleSaveFieldFromDialog = async (
+    field: Omit<
+      FieldConfig,
+      | "id"
+      | "organization_id"
+      | "version"
+      | "active"
+      | "archived_at"
+      | "created_at"
+      | "updated_at"
+    >
+  ) => {
+    await onAddField({
+      ...field,
+      order_position: fields.length,
+    });
   };
 
   // Apply a template
@@ -289,8 +288,14 @@ export function VisualFormBuilder({
     });
   };
 
+  // Filter out fields that are in sections from the main Form Fields list
+  const fieldsNotInSections = React.useMemo(
+    () => orderedFields.filter((field) => field.section_id === null),
+    [orderedFields]
+  );
+
   return (
-    <div className="flex flex-col h-auto">
+    <div className="flex flex-col">
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-xl font-semibold">Form Builder</h2>
@@ -303,9 +308,9 @@ export function VisualFormBuilder({
         </p>
       </div>
 
-      <div className="flex-1 flex flex-col lg:flex-row gap-6">
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Left Panel - Field Configuration */}
-        <div className="flex-1 flex flex-col space-y-4 lg:max-w-2xl">
+        <div className="flex-1 flex flex-col space-y-4 lg:max-w-2xl w-full">
           {/* Field Type Selector */}
           <Card className="shrink-0">
             <CardHeader className="pb-3">
@@ -318,7 +323,7 @@ export function VisualFormBuilder({
                     key={type}
                     variant="outline"
                     size="sm"
-                    onClick={() => handleAddField(type)}
+                    onClick={() => handleOpenFieldDialog(type)}
                     disabled={isAddingField}
                     className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
                   >
@@ -351,6 +356,8 @@ export function VisualFormBuilder({
                 onRemoveFieldFromSection={(fieldId) => {
                   onUpdateField(fieldId, { section_id: null });
                 }}
+                onUpdateField={onUpdateField}
+                createdClusters={createdClusters}
               />
             </CardContent>
           </Card>
@@ -362,13 +369,42 @@ export function VisualFormBuilder({
                 <CardTitle className="text-sm font-semibold">
                   Form Fields
                 </CardTitle>
-                <Badge variant="secondary">{fields.length} fields</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {fieldsNotInSections.length} fields
+                  </Badge>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Plus className="w-4 h-4 mr-1" />
+                        Add Field
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="end">
+                      <div className="grid grid-cols-2 gap-2">
+                        {FIELD_TYPES.map(({ type, icon: Icon, label }) => (
+                          <Button
+                            key={type}
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenFieldDialog(type)}
+                            disabled={isAddingField}
+                            className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span className="text-[10px]">{label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
               <TooltipProvider>
                 <div className="space-y-2">
-                  {orderedFields.length === 0 ? (
+                  {fieldsNotInSections.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <Plus className="w-12 h-12 mx-auto mb-2 opacity-20" />
                       <p className="text-sm">No fields yet</p>
@@ -391,7 +427,7 @@ export function VisualFormBuilder({
                           .join(" ");
                       };
 
-                      return orderedFields.map((field) => {
+                      return fieldsNotInSections.map((field) => {
                         const FieldIcon =
                           FIELD_TYPES.find((t) => t.type === field.field_type)
                             ?.icon || Type;
@@ -887,8 +923,8 @@ export function VisualFormBuilder({
         </div>
 
         {/* Right Panel - Mobile Preview */}
-        <div className="hidden lg:flex flex-col w-80 shrink-0 sticky top-4 self-start">
-          <Card className="p-6 overflow-hidden relative">
+        <div className="hidden lg:block w-80 shrink-0">
+          <Card className="p-6 overflow-hidden sticky top-4">
             <MobileDevicePreview
               fields={fields}
               sections={sections}
@@ -898,6 +934,18 @@ export function VisualFormBuilder({
           </Card>
         </div>
       </div>
+
+      {/* Field Configuration Dialog */}
+      {selectedFieldType && (
+        <FieldConfigDialog
+          open={fieldDialogOpen}
+          onOpenChange={setFieldDialogOpen}
+          fieldType={selectedFieldType}
+          sections={sections}
+          existingFieldNames={fields.map((f) => f.name)}
+          onSave={handleSaveFieldFromDialog}
+        />
+      )}
     </div>
   );
 }
