@@ -31,7 +31,7 @@ interface UseBasePricingResult {
 }
 
 export function useBasePricing(
-  filters?: UseBasePricingOptions
+  filters?: UseBasePricingOptions,
 ): UseBasePricingResult {
   const { organizationId } = useOrganization();
   const [basePricing, setBasePricing] = useState<BasePricing[]>([]);
@@ -51,15 +51,16 @@ export function useBasePricing(
       const pricing = await PricingService.listRules({
         organization_id: organizationId,
         scopes: ["base"],
-        location_hierarchy_id: filters?.locationHierarchyId ?? null,
-        location_id: filters?.locationId ?? null,
+        // Fetch all scopes so we can display overrides and fallbacks
+        location_hierarchy_id: null,
+        location_id: null,
         effective_at: filters?.effectiveAt ?? undefined,
       });
 
       setBasePricing(pricing.map(transformBaseRule));
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch base pricing"
+        err instanceof Error ? err.message : "Failed to fetch base pricing",
       );
       setBasePricing([]);
     } finally {
@@ -83,7 +84,7 @@ export function useBasePricing(
     }
 
     const targetLocationHierarchyId = filters?.locationHierarchyId ?? null;
-    const targetLocationId = filters?.locationId ?? null;
+    const targetLocationId = request.location_id ?? filters?.locationId ?? null;
 
     const isFieldBased = Boolean(request.job_type_field_config_id);
 
@@ -116,8 +117,9 @@ export function useBasePricing(
       field_config_id: request.job_type_field_config_id || null,
       option_value: request.job_type_value || null,
       base_price: adjustmentType === "add" ? request.customer_base_price : null,
-      percentage_rate:
-        adjustmentType === "multiply" ? request.customer_base_price : null,
+      percentage_rate: adjustmentType === "multiply"
+        ? request.customer_base_price
+        : null,
       metadata: {
         adjustment_type: adjustmentType,
       },
@@ -163,17 +165,16 @@ export function useBasePricing(
 const transformBaseRule = (rule: PricingRule): BasePricing => {
   const adjustmentType =
     (typeof (rule.metadata as Record<string, unknown> | undefined)?.[
-      "adjustment_type"
-    ] === "string"
+        "adjustment_type"
+      ] === "string"
       ? ((rule.metadata as Record<string, unknown>)["adjustment_type"] as
-          | "add"
-          | "multiply")
+        | "add"
+        | "multiply")
       : undefined) || (rule.pricing_type === "percentage" ? "multiply" : "add");
 
-  const customerValue =
-    adjustmentType === "multiply"
-      ? rule.percentage_rate ?? 0
-      : rule.base_price ?? 0;
+  const customerValue = adjustmentType === "multiply"
+    ? rule.percentage_rate ?? 0
+    : rule.base_price ?? 0;
 
   return {
     id: rule.id,

@@ -9,6 +9,8 @@ import {
   PricingScopeProvider,
   usePricingScope,
 } from "@/components/pricing/pricing-scope-context";
+import { PricingScopeIndicator } from "@/components/pricing/pricing-scope-indicator";
+import { UnifiedInvoicePreview } from "@/components/pricing/unified-invoice-preview";
 import {
   Card,
   CardContent,
@@ -129,92 +131,106 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
               </CardContent>
             </Card>
           )}
-          <Tabs defaultValue="field-pricing" className="space-y-6">
-            <TabsList className="w-full justify-start">
-              <TabsTrigger value="field-pricing">Field Pricing</TabsTrigger>
-              <TabsTrigger value="option-pricing">
-                Group & Option Pricing
-              </TabsTrigger>
-              <TabsTrigger value="base-pricing">Base Pricing</TabsTrigger>
-            </TabsList>
 
-            <TabsContent value="field-pricing" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Field Pricing</CardTitle>
-                  <CardDescription>
-                    Set prices for fields that collect quantities or counts.
-                    These prices are multiplied by the field value to calculate
-                    totals.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <FieldPricingList
-                    locationHierarchyId={locationNodeId}
-                    locationId={locationId}
-                    effectiveAt={effectiveDate}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
+          <PricingScopeIndicator
+            locationNodeId={locationNodeId}
+            locationId={locationId}
+          />
 
-            <TabsContent value="option-pricing" className="space-y-6">
-              {optionPricingFields.length > 0 ? (
-                <div className="space-y-6">
-                  {optionPricingFields.map((fieldConfig) => (
-                    <Card key={fieldConfig.id}>
+          <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
+            <div className="space-y-6">
+              <Tabs defaultValue="field-pricing" className="space-y-6">
+                <TabsList className="w-full justify-start">
+                  <TabsTrigger value="field-pricing">Field Pricing</TabsTrigger>
+                  <TabsTrigger value="option-pricing">
+                    Group & Option Pricing
+                  </TabsTrigger>
+                  <TabsTrigger value="base-pricing">Base Pricing</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="field-pricing" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Field Pricing</CardTitle>
+                      <CardDescription>
+                        Set prices for fields that collect quantities or counts.
+                        These prices are multiplied by the field value to
+                        calculate totals.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <FieldPricingList
+                        locationHierarchyId={locationNodeId}
+                        locationId={locationId}
+                        effectiveAt={effectiveDate}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="option-pricing" className="space-y-6">
+                  {optionPricingFields.length > 0 ? (
+                    <div className="space-y-6">
+                      {optionPricingFields.map((fieldConfig) => (
+                        <Card key={fieldConfig.id}>
+                          <CardHeader>
+                            <CardTitle>{fieldConfig.label}</CardTitle>
+                            <CardDescription>
+                              {fieldConfig.field_type === "grouped_breakdown"
+                                ? "Set prices for each group (e.g., car makes, wipe types). Total = sum of (price_per_group × quantity_per_group) for all selected options."
+                                : "Set prices for each option. Total = sum of (price_per_option × quantity_per_option) for all selected options."}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <OptionPricingEditor
+                              fieldConfig={fieldConfig}
+                              locationHierarchyId={locationNodeId}
+                              locationId={locationId}
+                              effectiveAt={effectiveDate}
+                            />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card>
                       <CardHeader>
-                        <CardTitle>{fieldConfig.label}</CardTitle>
+                        <CardTitle>No Group or Option Fields</CardTitle>
                         <CardDescription>
-                          {fieldConfig.field_type === "grouped_breakdown"
-                            ? "Set prices for each group (e.g., car makes, wipe types). Total = sum of (price_per_group × quantity_per_group)."
-                            : "Set prices for each group. Total = sum of (price_per_group × quantity_per_group)."}
+                          Create select or grouped breakdown fields in Mobile
+                          Application to configure option pricing.
                         </CardDescription>
                       </CardHeader>
-                      <CardContent>
-                        <OptionPricingEditor
-                          fieldConfig={fieldConfig}
-                          locationHierarchyId={locationNodeId}
-                          locationId={locationId}
-                          effectiveAt={effectiveDate}
-                        />
-                      </CardContent>
                     </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>No Group or Option Fields</CardTitle>
-                    <CardDescription>
-                      Create select or grouped breakdown fields in Mobile
-                      Application to configure option pricing.
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              )}
-            </TabsContent>
+                  )}
+                </TabsContent>
 
-            <TabsContent value="base-pricing" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Base Pricing</CardTitle>
-                  <CardDescription>
-                    Add fixed amounts or multiply the entire invoice. Can be a
-                    fixed adjustment or vary by job type (e.g., scale larger
-                    vehicles by 1.2x).
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <BasePricingEditor
-                    locationHierarchyId={locationNodeId}
-                    locationId={locationId}
-                    effectiveAt={effectiveDate}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                <TabsContent value="base-pricing" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Base Pricing</CardTitle>
+                      <CardDescription>
+                        Add fixed amounts or multiply the entire invoice. Can be
+                        a fixed adjustment or vary by job type (e.g., scale
+                        larger vehicles by 1.2x).
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <BasePricingEditor
+                        locationHierarchyId={locationNodeId}
+                        locationId={locationId}
+                        effectiveAt={effectiveDate}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            <div>
+              <UnifiedInvoicePreview />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="pricing-history" className="space-y-6">

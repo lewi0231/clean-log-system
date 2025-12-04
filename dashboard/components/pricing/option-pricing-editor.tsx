@@ -23,6 +23,11 @@ import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import {
+  buildScopedPricingMap,
+  getPricingScopeSource,
+  isEntryForScope,
+} from "@/lib/pricing-scope";
 import type { OptionPricing } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { ChevronDown, ChevronRight, DollarSign, Save, Zap } from "lucide-react";
@@ -59,32 +64,19 @@ export default function OptionPricingEditor({
   const [expanded, setExpanded] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
-  // Filter pricing by current scope for main price display
-  const scopedPricing = useMemo(() => {
-    return optionPricing.filter((p) => {
-      // Match current scope (locationId or locationHierarchyId)
-      if (locationId) {
-        return p.location_id === locationId;
-      }
-      if (locationHierarchyId) {
-        return p.location_hierarchy_id === locationHierarchyId;
-      }
-      // Default scope: no location or hierarchy
-      return !p.location_id && !p.location_hierarchy_id;
-    });
-  }, [optionPricing, locationId, locationHierarchyId]);
+  const scopeParams = useMemo(
+    () => ({ locationId, locationHierarchyId }),
+    [locationId, locationHierarchyId]
+  );
+  const scopeSource = getPricingScopeSource(scopeParams);
 
-  // Create a map of option_value -> pricing for quick lookup (using scoped pricing)
   const pricingMap = useMemo(() => {
-    const map: Record<string, { id: string; customer_price: number }> = {};
-    scopedPricing.forEach((p) => {
-      map[p.option_value] = {
-        id: p.id,
-        customer_price: p.customer_price,
-      };
-    });
-    return map;
-  }, [scopedPricing]);
+    return buildScopedPricingMap(
+      optionPricing,
+      scopeParams,
+      (record) => record.option_value || null
+    );
+  }, [optionPricing, scopeParams]);
 
   const options = fieldConfig.options || [];
 
@@ -139,8 +131,9 @@ export default function OptionPricingEditor({
       const customerPrice = parseFloat(editing);
       if (isNaN(customerPrice) || customerPrice < 0) continue;
 
-      const existingPricing = pricingMap[optionValue];
-      const existingPrice = existingPricing?.customer_price.toString() || "";
+      const pricingEntry = pricingMap[optionValue];
+      const existingPrice =
+        pricingEntry?.record.customer_price.toString() || "";
 
       // Only save if there's an actual change
       if (editing !== existingPrice) {
@@ -179,7 +172,9 @@ export default function OptionPricingEditor({
     if (isNaN(price) || price < 0) return;
 
     // Add to editingPrices for unpriced options, then use save all
-    const optionsWithoutPrice = options.filter((opt) => !pricingMap[opt]);
+    const optionsWithoutPrice = options.filter(
+      (opt) => pricingMap[opt]?.source !== scopeSource
+    );
     const newEditingPrices: Record<string, string> = {};
 
     for (const optionValue of optionsWithoutPrice) {
@@ -247,8 +242,10 @@ export default function OptionPricingEditor({
     }
   };
 
-  // Count options with and without pricing (in current scope)
-  const pricedCount = options.filter((opt) => pricingMap[opt]).length;
+  // Count options with and without pricing (for the current scope)
+  const pricedCount = options.filter(
+    (opt) => pricingMap[opt]?.source === scopeSource
+  ).length;
   const unpricedCount = options.length - pricedCount;
 
   // Count pending changes
@@ -260,8 +257,9 @@ export default function OptionPricingEditor({
       const customerPrice = parseFloat(editing);
       if (isNaN(customerPrice) || customerPrice < 0) return false;
 
-      const existingPricing = pricingMap[optionValue];
-      const existingPrice = existingPricing?.customer_price.toString() || "";
+      const pricingEntry = pricingMap[optionValue];
+      const existingPrice =
+        pricingEntry?.record.customer_price.toString() || "";
       return editing !== existingPrice;
     }
   ).length;
@@ -399,18 +397,19 @@ export default function OptionPricingEditor({
         <CollapsibleContent className="pt-3">
           <div className="space-y-2">
             {options.map((optionValue) => {
-              const existingPricing = pricingMap[optionValue];
+              const pricingEntry = pricingMap[optionValue];
+              const scopedPricing = pricingEntry?.record;
               const editing = editingPrices[optionValue];
               const currentPrice =
                 editing !== undefined
                   ? editing
-                  : existingPricing
-                  ? existingPricing.customer_price.toString()
+                  : scopedPricing
+                  ? scopedPricing.customer_price.toString()
                   : "";
 
               const hasChanges =
                 editing !== undefined &&
-                editing !== (existingPricing?.customer_price.toString() || "");
+                editing !== (scopedPricing?.customer_price.toString() || "");
 
               const isSaving = saving[optionValue] || false;
               const overrides = getOptionOverrides(
@@ -420,6 +419,7 @@ export default function OptionPricingEditor({
                 locationHierarchyId
               );
               const previewValue = parseFloat(currentPrice) || 0;
+              const isScopedEntry = isEntryForScope(pricingEntry, scopeSource);
 
               return (
                 <div
@@ -464,7 +464,7 @@ export default function OptionPricingEditor({
                     >
                       {isSaving ? (
                         "Saving..."
-                      ) : existingPricing ? (
+                      ) : isScopedEntry ? (
                         "Update"
                       ) : (
                         <>

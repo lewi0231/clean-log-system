@@ -14,6 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -28,8 +33,14 @@ import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
-import { DollarSign, Save, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  buildScopedPricingMap,
+  getPricingScopeSource,
+  isEntryForScope,
+} from "@/lib/pricing-scope";
+import { isPricingRulesEnabled } from "@/lib/utils";
+import { ChevronDown, DollarSign, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 interface BasePricingEditorProps {
   locationHierarchyId?: string | null;
@@ -51,7 +62,23 @@ export default function BasePricingEditor({
     });
   useOrganizationCurrency(); // Hook used for currency context
 
-  const [isFieldBased, setIsFieldBased] = useState(true);
+  const scopeParams = useMemo(
+    () => ({ locationId, locationHierarchyId }),
+    [locationId, locationHierarchyId]
+  );
+  const scopeSource = getPricingScopeSource(scopeParams);
+
+  // Filter to select-type fields for field-based pricing
+  const selectFieldConfigs = useMemo(() => {
+    return fieldConfigs.filter((fc) => fc.field_type === "select");
+  }, [fieldConfigs]);
+
+  const hasSelectFields = selectFieldConfigs.length > 0;
+
+  // Default to field-based only if select fields exist, otherwise standalone
+  const [isFieldBased, setIsFieldBased] = useState(
+    () => fieldConfigs.filter((fc) => fc.field_type === "select").length > 0
+  );
   const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
     string | null
   >(null);
@@ -66,11 +93,6 @@ export default function BasePricingEditor({
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
 
-  // Filter to select-type fields for field-based pricing
-  const selectFieldConfigs = useMemo(() => {
-    return fieldConfigs.filter((fc) => fc.field_type === "select");
-  }, [fieldConfigs]);
-
   const fieldLabelLookup = useMemo(() => {
     const lookup: Record<string, string> = {};
     fieldConfigs.forEach((fc) => {
@@ -80,34 +102,34 @@ export default function BasePricingEditor({
   }, [fieldConfigs]);
 
   // Create maps for quick lookup
-  const standalonePricing = useMemo(() => {
-    return basePricing.find((p) => !p.job_type_field_config_id);
-  }, [basePricing]);
+  const standaloneEntry = useMemo(() => {
+    const map = buildScopedPricingMap(
+      basePricing.filter((p) => !p.job_type_field_config_id),
+      scopeParams,
+      () => "standalone"
+    );
+    return map["standalone"];
+  }, [basePricing, scopeParams]);
 
+  const standalonePricing = standaloneEntry?.record ?? null;
   const standaloneConditions = standalonePricing?.source_rule?.conditions ?? [];
+  const standaloneHasScopedValue = isEntryForScope(
+    standaloneEntry,
+    scopeSource
+  );
 
   const fieldBasedPricingMap = useMemo(() => {
-    const map: Record<
-      string,
-      {
-        id: string;
-        customer_base_price: number;
-        adjustment_type: "add" | "multiply";
-      }
-    > = {};
-    basePricing
-      .filter((p) => p.job_type_field_config_id)
-      .forEach((p) => {
-        if (p.job_type_value) {
-          map[p.job_type_value] = {
-            id: p.id,
-            customer_base_price: p.customer_base_price,
-            adjustment_type: p.adjustment_type,
-          };
-        }
-      });
-    return map;
-  }, [basePricing]);
+    if (!selectedFieldConfigId) {
+      return {};
+    }
+    return buildScopedPricingMap(
+      basePricing.filter(
+        (p) => p.job_type_field_config_id === selectedFieldConfigId
+      ),
+      scopeParams,
+      (record) => record.job_type_value || null
+    );
+  }, [basePricing, selectedFieldConfigId, scopeParams]);
 
   const handlePriceChange = (key: string, value: string) => {
     setEditingPrices((prev) => ({
@@ -209,6 +231,7 @@ export default function BasePricingEditor({
         customer_base_price: customerPrice,
         adjustment_type: adjustmentType,
         conditions: existingConditions,
+        location_id: locationId,
       } as Parameters<typeof upsertPricing>[0];
       await upsertPricing(request);
       setEditingPrices((prev) => {
@@ -238,9 +261,10 @@ export default function BasePricingEditor({
       return;
     }
 
+    const pricingEntry = fieldBasedPricingMap[optionValue];
     const adjustmentType =
       editingAdjustmentTypes[optionValue] ||
-      fieldBasedPricingMap[optionValue]?.adjustment_type ||
+      pricingEntry?.record?.adjustment_type ||
       "add";
 
     const customerPrice = parseFloat(editing);
@@ -267,6 +291,7 @@ export default function BasePricingEditor({
         job_type_value: optionValue,
         customer_base_price: customerPrice,
         adjustment_type: adjustmentType,
+        location_id: locationId,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };
@@ -308,6 +333,32 @@ export default function BasePricingEditor({
     return selectFieldConfigs.find((fc) => fc.id === selectedFieldConfigId);
   }, [selectFieldConfigs, selectedFieldConfigId]);
 
+  // Force standalone mode if no select fields are available
+  useEffect(() => {
+    if (!hasSelectFields && isFieldBased) {
+      setIsFieldBased(false);
+    }
+  }, [hasSelectFields, isFieldBased]);
+
+  // Auto-select first field when switching to field-based mode
+  useEffect(() => {
+    if (isFieldBased && hasSelectFields && !selectedFieldConfigId) {
+      setSelectedFieldConfigId(selectFieldConfigs[0]?.id || null);
+    }
+  }, [
+    isFieldBased,
+    hasSelectFields,
+    selectFieldConfigs,
+    selectedFieldConfigId,
+  ]);
+
+  // Reset selected field when switching to standalone mode
+  useEffect(() => {
+    if (!isFieldBased) {
+      setSelectedFieldConfigId(null);
+    }
+  }, [isFieldBased]);
+
   if (loading) {
     return <LoadingState message="Loading base pricing..." />;
   }
@@ -321,26 +372,33 @@ export default function BasePricingEditor({
   return (
     <div className="space-y-6">
       {/* Toggle between field-based and standalone */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Base Pricing Type</CardTitle>
-          <CardDescription>
-            Choose whether base pricing is a fixed amount or varies by job type
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Field-Based Pricing</Label>
-              <p className="text-sm text-muted-foreground">
-                Base price varies by job type (e.g., Installation vs
-                Maintenance)
-              </p>
+      {hasSelectFields && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Base Pricing Type</CardTitle>
+            <CardDescription>
+              Choose whether base pricing is a fixed amount or varies by field
+              selection
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Field-Based Pricing</Label>
+                <p className="text-sm text-muted-foreground">
+                  {selectedFieldConfig
+                    ? `Base price varies by ${selectedFieldConfig.label} options`
+                    : "Set different base prices for each option in a select field"}
+                </p>
+              </div>
+              <Switch
+                checked={isFieldBased}
+                onCheckedChange={setIsFieldBased}
+              />
             </div>
-            <Switch checked={isFieldBased} onCheckedChange={setIsFieldBased} />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Standalone Base Pricing */}
       {!isFieldBased && (
@@ -465,7 +523,7 @@ export default function BasePricingEditor({
               </p>
             </div>
             <div className="flex gap-2">
-              {standalonePricing && (
+              {standalonePricing && standaloneHasScopedValue && (
                 <Button
                   variant="outline"
                   onClick={() => handleDelete(standalonePricing.id)}
@@ -487,7 +545,7 @@ export default function BasePricingEditor({
               >
                 {saving["standalone"] ? (
                   "Saving..."
-                ) : standalonePricing ? (
+                ) : standaloneHasScopedValue ? (
                   "Update"
                 ) : (
                   <>
@@ -498,29 +556,48 @@ export default function BasePricingEditor({
               </Button>
             </div>
 
-            {standalonePricing && (
-              <div className="space-y-3 border-t pt-4">
-                <div>
-                  <Label className="text-sm font-semibold">
-                    Conditional rules
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Trigger additional adjustments when other fields meet
-                    certain criteria.
-                  </p>
+            {standalonePricing && isPricingRulesEnabled() && (
+              <Collapsible defaultOpen={standaloneConditions.length > 0}>
+                <div className="space-y-3 border-t pt-4">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity group">
+                    <div className="text-left">
+                      <Label className="text-sm font-semibold">
+                        Conditional Rules
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Add adjustments when other fields meet certain criteria
+                        (e.g., +$50 if vehicle type is &quot;Large Truck&quot;)
+                      </p>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-3 pt-2">
+                    {standaloneConditions.length === 0 ? (
+                      <div className="rounded-md border border-dashed p-4 text-center">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          No conditional rules yet
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Add rules below to trigger automatic adjustments based
+                          on field values
+                        </p>
+                      </div>
+                    ) : (
+                      <ConditionalRuleChips
+                        conditions={standaloneConditions}
+                        fieldLabels={fieldLabelLookup}
+                        emptyMessage="No conditional adjustments for the base price yet."
+                      />
+                    )}
+                    <ConditionalRuleBuilder
+                      fieldOptions={fieldConfigs}
+                      saving={ruleSaving}
+                      error={ruleError}
+                      onSubmit={handleStandaloneRuleSubmit}
+                    />
+                  </CollapsibleContent>
                 </div>
-                <ConditionalRuleChips
-                  conditions={standaloneConditions}
-                  fieldLabels={fieldLabelLookup}
-                  emptyMessage="No conditional adjustments for the base price yet."
-                />
-                <ConditionalRuleBuilder
-                  fieldOptions={fieldConfigs}
-                  saving={ruleSaving}
-                  error={ruleError}
-                  onSubmit={handleStandaloneRuleSubmit}
-                />
-              </div>
+              </Collapsible>
             )}
           </CardContent>
         </Card>
@@ -530,19 +607,28 @@ export default function BasePricingEditor({
       {isFieldBased && (
         <Card>
           <CardHeader>
-            <CardTitle>Field-Based Base Pricing</CardTitle>
+            <CardTitle>
+              {selectedFieldConfig
+                ? `Base Pricing by ${selectedFieldConfig.label}`
+                : "Field-Based Base Pricing"}
+            </CardTitle>
             <CardDescription>
-              Set base prices for each job type option
+              {selectedFieldConfig
+                ? `Set base prices for each ${selectedFieldConfig.label} option`
+                : "Select a field to set base prices for each option"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Equation Preview */}
-            <div className="bg-muted/50 rounded-md p-2 text-sm">
-              <span className="text-muted-foreground">Equation: </span>
-              <span className="font-mono font-medium">
-                Total = adjustment[job_type] applied to invoice
-              </span>
-            </div>
+            {/* Dynamic Equation Preview */}
+            {selectedFieldConfig && (
+              <div className="bg-muted/50 rounded-md p-2 text-sm">
+                <span className="text-muted-foreground">Equation: </span>
+                <span className="font-mono font-medium">
+                  Total = adjustment[{selectedFieldConfig.label}] applied to
+                  invoice
+                </span>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="field-select">Select Field</Label>
@@ -566,7 +652,8 @@ export default function BasePricingEditor({
             {selectedFieldConfig && selectedFieldConfig.options && (
               <div className="space-y-3">
                 {selectedFieldConfig.options.map((optionValue) => {
-                  const existingPricing = fieldBasedPricingMap[optionValue];
+                  const pricingEntry = fieldBasedPricingMap[optionValue];
+                  const existingPricing = pricingEntry?.record;
                   const editing = editingPrices[optionValue];
                   const currentAdjustmentType =
                     editingAdjustmentTypes[optionValue] ||
@@ -583,6 +670,10 @@ export default function BasePricingEditor({
                     editing !== undefined &&
                     editing !==
                       (existingPricing?.customer_base_price.toString() || "");
+                  const hasScopedValue = isEntryForScope(
+                    pricingEntry,
+                    scopeSource
+                  );
 
                   return (
                     <Card key={optionValue} className="p-4">
@@ -677,7 +768,7 @@ export default function BasePricingEditor({
 
                         {/* Action Buttons */}
                         <div className="flex gap-2 justify-end">
-                          {existingPricing && (
+                          {hasScopedValue && existingPricing && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -704,7 +795,7 @@ export default function BasePricingEditor({
                           >
                             {saving[optionValue] ? (
                               "Saving..."
-                            ) : existingPricing ? (
+                            ) : hasScopedValue ? (
                               "Update"
                             ) : (
                               <>

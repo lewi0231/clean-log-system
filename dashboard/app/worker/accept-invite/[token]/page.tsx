@@ -1,7 +1,19 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import log from "loglevel";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { z } from "zod";
@@ -162,70 +174,97 @@ function AcceptInvitePage() {
 
   if (fetchingInvitation) {
     return (
-      <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow text-center">
-        <p className="text-gray-600">Loading invitation...</p>
+      <div className="h-screen w-full flex justify-center items-center px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <p className="text-muted-foreground">Loading invitation...</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow text-center">
-        <div className="text-4xl mb-4">✅</div>
-        <h1 className="text-2xl font-bold mb-2 text-green-600">Welcome!</h1>
-        <p className="text-gray-600">
-          Your account has been created successfully.
-        </p>
-        <p className="text-sm text-gray-500 mt-4">
-          Redirecting to mobile application...
-        </p>
+      <div className="h-screen w-full flex justify-center items-center px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+              <CheckCircle2 className="h-12 w-12 text-primary" />
+            </div>
+            <CardTitle className="text-center">Welcome!</CardTitle>
+            <CardDescription className="text-center">
+              Your account has been created successfully.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-center text-muted-foreground">
+              Redirecting to mobile application...
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto  p-6 bg-white rounded-lg shadow">
-      <h1 className="text-2xl font-bold mb-6">Set Up Your CleanLog Account</h1>
-      {workerEmail && (
-        <p className="text-sm text-gray-600 mb-4">
-          Creating account for:{" "}
-          <span className="font-semibold">{workerEmail}</span>
-        </p>
-      )}
-
-      <form onSubmit={handleAccept} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Create a Password
-          </label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 6 characters"
-            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500"
-            required
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            You&apos;ll use this to log into CleanLog mobile app that
-            you&apos;ll install later.
-          </p>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded text-sm">
-            {error}
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 font-semibold"
-        >
-          {loading ? "Creating Account..." : "Create Account"}
-        </button>
-      </form>
+    <div className="h-screen w-full flex justify-center items-center px-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Set Up Your CleanLog Account</CardTitle>
+          <CardDescription>
+            {workerEmail
+              ? `Creating account for ${workerEmail}`
+              : "Create a password to complete your account setup"}
+          </CardDescription>
+        </CardHeader>
+        <form onSubmit={handleAccept}>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="password">Create a Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) {
+                    setError("");
+                  }
+                }}
+                placeholder="At least 6 characters"
+                aria-invalid={!!error}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                You&apos;ll use this to log into CleanLog mobile app that
+                you&apos;ll install later.
+              </p>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-4">
+            <Button
+              className="w-full cursor-pointer"
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }

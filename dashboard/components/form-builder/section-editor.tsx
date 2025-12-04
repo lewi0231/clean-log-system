@@ -80,6 +80,7 @@ interface SectionEditorProps {
     fieldId: string,
     updates: Partial<FieldConfig>
   ) => void | Promise<void>;
+  onReorderFields?: (fieldIds: string[]) => Promise<void>;
   createdClusters?: string[];
 }
 
@@ -121,6 +122,7 @@ export function SectionEditor({
   onDropFieldToSection,
   onRemoveFieldFromSection,
   onUpdateField,
+  onReorderFields,
   createdClusters = [],
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -138,6 +140,12 @@ export function SectionEditor({
   const [sectionOrder, setSectionOrder] = useState<string[]>(() =>
     sections.map((s) => s.id)
   );
+  const [draggedSectionField, setDraggedSectionField] = useState<string | null>(
+    null
+  );
+  const [sectionFieldOrders, setSectionFieldOrders] = useState<
+    Map<string, string[]>
+  >(() => new Map(sections.map((s) => [s.id, s.field_ids || []])));
   const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
     Map<string, boolean>
   >(new Map());
@@ -168,6 +176,16 @@ export function SectionEditor({
       setSectionOrder(sections.map((s) => s.id));
     }
   }, [sections, draggedSection]);
+
+  // Keep section field orders in sync when sections change externally
+  useEffect(() => {
+    if (!draggedSectionField) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSectionFieldOrders(
+        new Map(sections.map((s) => [s.id, s.field_ids || []]))
+      );
+    }
+  }, [sections, draggedSectionField]);
 
   // Get ordered sections based on local state
   const orderedSections = useMemo(
@@ -270,6 +288,88 @@ export function SectionEditor({
     setDraggedSection(null);
   };
 
+  // Section field drag handlers
+  const handleSectionFieldDragStart = (sectionId: string, fieldId: string) => {
+    setDraggedSectionField(fieldId);
+  };
+
+  const handleSectionFieldDragOver = (
+    e: React.DragEvent,
+    sectionId: string,
+    targetFieldId: string
+  ) => {
+    e.preventDefault();
+    if (!draggedSectionField || draggedSectionField === targetFieldId) return;
+
+    setSectionFieldOrders((prev) => {
+      const currentOrder = prev.get(sectionId) || [];
+      const draggedIndex = currentOrder.indexOf(draggedSectionField);
+      const targetIndex = currentOrder.indexOf(targetFieldId);
+
+      if (draggedIndex === -1 || targetIndex === -1) {
+        return prev;
+      }
+
+      const next = [...currentOrder];
+      const [removed] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, removed);
+
+      const updated = new Map(prev);
+      updated.set(sectionId, next);
+      return updated;
+    });
+  };
+
+  const handleSectionFieldDragEnd = async (sectionId: string) => {
+    const newOrder = sectionFieldOrders.get(sectionId);
+    if (!newOrder || newOrder.length === 0) {
+      setDraggedSectionField(null);
+      return;
+    }
+
+    // If we have onReorderFields, use it to update all fields' order_position
+    // This ensures the order persists after refetch
+    if (onReorderFields) {
+      // Get all fields ordered by their current order_position
+      const allFieldsOrdered = [...fields].sort(
+        (a, b) => a.order_position - b.order_position
+      );
+
+      // Split into: fields before this section, fields in this section (reordered), fields after this section
+      const sectionFieldsInNewOrder = newOrder
+        .map((id) => fieldMap.get(id))
+        .filter((f): f is FieldConfig => Boolean(f));
+
+      const fieldsBeforeSection = allFieldsOrdered.filter(
+        (f) => f.section_id !== sectionId
+      );
+
+      // Find where this section's fields start in the global order
+      const firstSectionField = allFieldsOrdered.find(
+        (f) => f.section_id === sectionId
+      );
+      const sectionStartIndex = firstSectionField
+        ? allFieldsOrdered.indexOf(firstSectionField)
+        : fieldsBeforeSection.length;
+
+      // Reconstruct the full order: fields before + reordered section fields + fields after
+      const newFullOrder = [
+        ...fieldsBeforeSection.slice(0, sectionStartIndex),
+        ...sectionFieldsInNewOrder,
+        ...fieldsBeforeSection.slice(sectionStartIndex),
+      ]
+        .map((f) => f.id)
+        .filter((id) => id !== undefined);
+
+      // Call onReorderFields with the full ordered list
+      await onReorderFields(newFullOrder);
+    } else {
+      // Fallback: just update the section's field_ids
+      onUpdateSection(sectionId, { field_ids: newOrder });
+    }
+    setDraggedSectionField(null);
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -309,13 +409,26 @@ export function SectionEditor({
                 draggable
                 onDragStart={() => handleDragStart(section.id)}
                 onDragOver={(e) => {
+                  // If dragging a field from main list into section, allow drop
                   if (draggedFieldId && onDropFieldToSection) {
                     e.preventDefault();
-                  } else {
+                  }
+                  // If dragging a field within the section, ignore section drag
+                  else if (draggedSectionField) {
+                    // Don't interfere with field reordering within section
+                    return;
+                  }
+                  // Otherwise handle section reordering
+                  else {
                     handleSectionDragOver(e, section.id);
                   }
                 }}
-                onDrop={(e) => handleFieldDrop(e, section.id)}
+                onDrop={(e) => {
+                  // Only handle drop if dragging from main fields list, not from within section
+                  if (draggedFieldId && !draggedSectionField) {
+                    handleFieldDrop(e, section.id);
+                  }
+                }}
                 onDragEnd={handleDragEnd}
                 className={`border rounded-lg overflow-hidden transition-opacity ${
                   draggedSection === section.id ? "opacity-50" : ""
@@ -364,486 +477,589 @@ export function SectionEditor({
                 {isExpanded && (
                   <div className="p-3 text-xs text-muted-foreground bg-background space-y-3">
                     <p>{section.description || "No description"}</p>
-                    {sectionFields.length > 0 && (
-                      <div className="space-y-2">
-                        {sectionFields.map((field) => {
-                          const groupId = field.mutually_exclusive_group;
-                          const clusterId = field.group_cluster;
-                          return (
-                            <div
-                              key={field.id}
-                              className={`flex items-center justify-between rounded-md border bg-background px-3 py-2 text-foreground group ${
-                                groupId ? "border-primary/50 bg-primary/5" : ""
-                              }`}
-                            >
-                              <div className="flex flex-col gap-1">
-                                <span className="text-sm font-medium">
-                                  {field.label}
-                                </span>
-                                <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
-                                  <span>{field.name}</span>
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[11px]"
-                                  >
-                                    {field.field_type}
-                                  </Badge>
-                                  {groupId && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[11px] border-primary/40 text-primary"
-                                    >
-                                      Exclusive: {groupId}
-                                    </Badge>
-                                  )}
-                                  {clusterId && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[11px] border-dashed border-primary/40 text-primary"
-                                    >
-                                      Cluster: {clusterId}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {onUpdateField && (
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
+                    {(() => {
+                      // Get ordered field IDs for this section
+                      const orderedFieldIds =
+                        sectionFieldOrders.get(section.id) ||
+                        section.field_ids ||
+                        [];
+                      // Map to ordered fields
+                      const orderedSectionFields = orderedFieldIds
+                        .map((fieldId) => fieldMap.get(fieldId))
+                        .filter((field): field is FieldConfig =>
+                          Boolean(field)
+                        );
+
+                      return (
+                        sectionFields.length > 0 && (
+                          <div className="space-y-2">
+                            {orderedSectionFields.map((field) => {
+                              const groupId = field.mutually_exclusive_group;
+                              const clusterId = field.group_cluster;
+                              return (
+                                <div
+                                  key={field.id}
+                                  draggable
+                                  onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    handleSectionFieldDragStart(
+                                      section.id,
+                                      field.id
+                                    );
+                                  }}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleSectionFieldDragOver(
+                                      e,
+                                      section.id,
+                                      field.id
+                                    );
+                                  }}
+                                  onDragEnd={(e) => {
+                                    e.stopPropagation();
+                                    handleSectionFieldDragEnd(section.id);
+                                  }}
+                                  className={`flex items-center justify-between rounded-md border bg-background px-3 py-2 text-foreground group cursor-move ${
+                                    groupId
+                                      ? "border-primary/50 bg-primary/5"
+                                      : ""
+                                  } ${
+                                    draggedSectionField === field.id
+                                      ? "opacity-50 scale-[0.98]"
+                                      : ""
+                                  }`}
+                                >
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-sm font-medium">
+                                      {field.label}
+                                    </span>
+                                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                                      <span>{field.name}</span>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[11px]"
                                       >
-                                        <Settings className="w-3 h-3" />
-                                      </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                      className="w-80 max-h-[70vh] overflow-y-auto"
-                                      align="end"
-                                    >
-                                      <div className="space-y-4">
-                                        <h4 className="font-semibold text-sm">
-                                          Field Settings
-                                        </h4>
-
-                                        {/* Label */}
-                                        <div className="space-y-1">
-                                          <Label className="text-xs">
-                                            Label
-                                          </Label>
-                                          <Input
-                                            value={field.label}
-                                            onChange={async (e) => {
-                                              if (onUpdateField) {
-                                                await onUpdateField(field.id, {
-                                                  label: e.target.value,
-                                                });
-                                              }
-                                            }}
-                                          />
-                                        </div>
-
-                                        {/* Description */}
-                                        <div className="space-y-1">
-                                          <Label className="text-xs">
-                                            Description / Placeholder
-                                          </Label>
-                                          <Textarea
-                                            value={field.description || ""}
-                                            onChange={async (e) => {
-                                              if (onUpdateField) {
-                                                await onUpdateField(field.id, {
-                                                  description:
-                                                    e.target.value || null,
-                                                });
-                                              }
-                                            }}
-                                            rows={2}
-                                          />
-                                        </div>
-
-                                        {/* Field Type */}
-                                        <div className="space-y-1">
-                                          <Label className="text-xs">
-                                            Field Type
-                                          </Label>
-                                          <Select
-                                            value={field.field_type}
-                                            onValueChange={async (
-                                              v: string
-                                            ) => {
-                                              if (onUpdateField) {
-                                                await onUpdateField(field.id, {
-                                                  field_type: v as FieldType,
-                                                });
-                                              }
-                                            }}
-                                          >
-                                            <SelectTrigger>
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {FIELD_TYPES.map(
-                                                ({ type, label }) => (
-                                                  <SelectItem
-                                                    key={type}
-                                                    value={type}
-                                                  >
-                                                    {label}
-                                                  </SelectItem>
-                                                )
-                                              )}
-                                            </SelectContent>
-                                          </Select>
-                                        </div>
-
-                                        {/* Options for select/grouped_breakdown */}
-                                        {(field.field_type === "select" ||
-                                          field.field_type ===
-                                            "grouped_breakdown") && (
-                                          <div className="space-y-1">
-                                            <Label className="text-xs">
-                                              Options (comma-separated)
-                                            </Label>
-                                            <Input
-                                              value={(field.options || []).join(
-                                                ", "
-                                              )}
-                                              onChange={(e) =>
-                                                handleOptionsChange(
-                                                  field.id,
-                                                  e.target.value
-                                                )
-                                              }
-                                              placeholder="Option 1, Option 2, Option 3"
-                                            />
-                                          </div>
-                                        )}
-
-                                        {/* Section Assignment */}
-                                        {sections.length > 0 && (
-                                          <div className="space-y-1">
-                                            <Label className="text-xs">
-                                              Section
-                                            </Label>
-                                            <Select
-                                              value={field.section_id || "none"}
-                                              onValueChange={async (
-                                                v: string
-                                              ) => {
-                                                if (onUpdateField) {
-                                                  await onUpdateField(
-                                                    field.id,
-                                                    {
-                                                      section_id:
-                                                        v === "none" ? null : v,
-                                                    }
-                                                  );
-                                                }
-                                              }}
-                                            >
-                                              <SelectTrigger>
-                                                <SelectValue placeholder="No section" />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="none">
-                                                  No section
-                                                </SelectItem>
-                                                {sections.map((section) => (
-                                                  <SelectItem
-                                                    key={section.id}
-                                                    value={section.id}
-                                                  >
-                                                    {section.title}
-                                                  </SelectItem>
-                                                ))}
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        )}
-
-                                        {/* Required Toggle */}
-                                        <div className="flex items-center justify-between">
-                                          <Label className="text-xs">
-                                            Required Field
-                                          </Label>
-                                          <Switch
-                                            checked={field.required}
-                                            onCheckedChange={async (
-                                              checked: boolean
-                                            ) => {
-                                              if (onUpdateField) {
-                                                await onUpdateField(field.id, {
-                                                  required: checked,
-                                                });
-                                              }
-                                            }}
-                                          />
-                                        </div>
-
-                                        {/* Advanced Section */}
-                                        <Collapsible
-                                          open={
-                                            advancedSectionsOpen.get(
-                                              field.id
-                                            ) || false
-                                          }
-                                          onOpenChange={(open) => {
-                                            setAdvancedSectionsOpen((prev) => {
-                                              const next = new Map(prev);
-                                              next.set(field.id, open);
-                                              return next;
-                                            });
-                                          }}
+                                        {field.field_type}
+                                      </Badge>
+                                      {groupId && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[11px] border-primary/40 text-primary"
                                         >
-                                          <CollapsibleTrigger asChild>
+                                          Exclusive: {groupId}
+                                        </Badge>
+                                      )}
+                                      {clusterId && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[11px] border-dashed border-primary/40 text-primary"
+                                        >
+                                          Cluster: {clusterId}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      {onUpdateField && (
+                                        <Popover>
+                                          <PopoverTrigger asChild>
                                             <Button
-                                              variant="outline"
-                                              size="sm"
-                                              className="w-full justify-between"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6"
                                             >
-                                              <span className="text-xs">
-                                                Advanced Options
-                                              </span>
-                                              {advancedSectionsOpen.get(
-                                                field.id
-                                              ) ? (
-                                                <Layers className="w-3 h-3 rotate-180" />
-                                              ) : (
-                                                <Layers className="w-3 h-3" />
-                                              )}
+                                              <Settings className="w-3 h-3" />
                                             </Button>
-                                          </CollapsibleTrigger>
-                                          <CollapsibleContent className="space-y-4 pt-2">
-                                            {/* Mutually Exclusive Cluster */}
-                                            <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
-                                              <Label className="text-xs">
-                                                Mutually Exclusive Cluster
-                                              </Label>
-                                              <p className="text-[11px] text-muted-foreground">
-                                                Assign this field to a cluster
-                                                where only one option can be
-                                                selected at a time. All clusters
-                                                share a single implicit group
-                                                behind the scenes.
-                                              </p>
-                                              {(() => {
-                                                // Get all clusters from all fields AND created clusters
-                                                const clustersFromFields =
-                                                  Array.from(
-                                                    new Set(
-                                                      fields
-                                                        .map(
-                                                          (f) => f.group_cluster
-                                                        )
-                                                        .filter(
-                                                          (c): c is string =>
-                                                            Boolean(c)
-                                                        )
-                                                    )
-                                                  );
-                                                // Combine with created clusters that haven't been assigned yet
-                                                const allClusters = Array.from(
-                                                  new Set([
-                                                    ...clustersFromFields,
-                                                    ...createdClusters,
-                                                  ])
-                                                ).sort();
+                                          </PopoverTrigger>
+                                          <PopoverContent
+                                            className="w-80 max-h-[70vh] overflow-y-auto"
+                                            align="end"
+                                          >
+                                            <div className="space-y-4">
+                                              <h4 className="font-semibold text-sm">
+                                                Field Settings
+                                              </h4>
 
-                                                // Convert cluster ID to display name
-                                                const getClusterDisplayName = (
-                                                  clusterId: string
-                                                ) => {
-                                                  return clusterId
-                                                    .split("_")
-                                                    .map(
-                                                      (word) =>
-                                                        word
-                                                          .charAt(0)
-                                                          .toUpperCase() +
-                                                        word.slice(1)
-                                                    )
-                                                    .join(" ");
-                                                };
-
-                                                return (
-                                                  <div className="space-y-2">
-                                                    <Select
-                                                      value={
-                                                        field.group_cluster ||
-                                                        "none"
-                                                      }
-                                                      onValueChange={async (
-                                                        value: string
-                                                      ) => {
-                                                        if (!onUpdateField)
-                                                          return;
-                                                        if (value === "none") {
-                                                          await onUpdateField(
-                                                            field.id,
-                                                            {
-                                                              mutually_exclusive_group:
-                                                                null,
-                                                              group_cluster:
-                                                                null,
-                                                            }
-                                                          );
-                                                        } else {
-                                                          await onUpdateField(
-                                                            field.id,
-                                                            {
-                                                              mutually_exclusive_group:
-                                                                DEFAULT_EXCLUSIVE_GROUP,
-                                                              group_cluster:
-                                                                value,
-                                                            }
-                                                          );
+                                              {/* Label */}
+                                              <div className="space-y-1">
+                                                <Label className="text-xs">
+                                                  Label
+                                                </Label>
+                                                <Input
+                                                  value={field.label}
+                                                  onChange={async (e) => {
+                                                    if (onUpdateField) {
+                                                      await onUpdateField(
+                                                        field.id,
+                                                        {
+                                                          label: e.target.value,
                                                         }
-                                                      }}
-                                                    >
-                                                      <SelectTrigger>
-                                                        <SelectValue placeholder="Select existing cluster" />
-                                                      </SelectTrigger>
-                                                      <SelectContent>
-                                                        <SelectItem value="none">
-                                                          No cluster
+                                                      );
+                                                    }
+                                                  }}
+                                                />
+                                              </div>
+
+                                              {/* Description */}
+                                              <div className="space-y-1">
+                                                <Label className="text-xs">
+                                                  Description / Placeholder
+                                                </Label>
+                                                <Textarea
+                                                  value={
+                                                    field.description || ""
+                                                  }
+                                                  onChange={async (e) => {
+                                                    if (onUpdateField) {
+                                                      await onUpdateField(
+                                                        field.id,
+                                                        {
+                                                          description:
+                                                            e.target.value ||
+                                                            null,
+                                                        }
+                                                      );
+                                                    }
+                                                  }}
+                                                  rows={2}
+                                                />
+                                              </div>
+
+                                              {/* Field Type */}
+                                              <div className="space-y-1">
+                                                <Label className="text-xs">
+                                                  Field Type
+                                                </Label>
+                                                <Select
+                                                  value={field.field_type}
+                                                  onValueChange={async (
+                                                    v: string
+                                                  ) => {
+                                                    if (onUpdateField) {
+                                                      await onUpdateField(
+                                                        field.id,
+                                                        {
+                                                          field_type:
+                                                            v as FieldType,
+                                                        }
+                                                      );
+                                                    }
+                                                  }}
+                                                >
+                                                  <SelectTrigger>
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {FIELD_TYPES.map(
+                                                      ({ type, label }) => (
+                                                        <SelectItem
+                                                          key={type}
+                                                          value={type}
+                                                        >
+                                                          {label}
                                                         </SelectItem>
-                                                        {allClusters.map(
-                                                          (clusterId) => (
-                                                            <SelectItem
-                                                              key={clusterId}
-                                                              value={clusterId}
-                                                            >
-                                                              {getClusterDisplayName(
-                                                                clusterId
-                                                              )}
-                                                            </SelectItem>
-                                                          )
-                                                        )}
-                                                      </SelectContent>
-                                                    </Select>
-                                                    <Input
-                                                      value={
-                                                        field.group_cluster
-                                                          ? getClusterDisplayName(
-                                                              field.group_cluster
-                                                            )
-                                                          : ""
-                                                      }
-                                                      onChange={async (e) => {
-                                                        // Allow typing freely; apply on blur
-                                                        if (
-                                                          !e.target.value &&
-                                                          onUpdateField
-                                                        ) {
-                                                          const result =
-                                                            onUpdateField(
-                                                              field.id,
-                                                              {
-                                                                mutually_exclusive_group:
-                                                                  null,
-                                                                group_cluster:
-                                                                  null,
-                                                              }
-                                                            );
-                                                          if (
-                                                            result instanceof
-                                                            Promise
-                                                          ) {
-                                                            await result;
+                                                      )
+                                                    )}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              {/* Options for select/grouped_breakdown */}
+                                              {(field.field_type === "select" ||
+                                                field.field_type ===
+                                                  "grouped_breakdown") && (
+                                                <div className="space-y-1">
+                                                  <Label className="text-xs">
+                                                    Options (comma-separated)
+                                                  </Label>
+                                                  <Input
+                                                    value={(
+                                                      field.options || []
+                                                    ).join(", ")}
+                                                    onChange={(e) =>
+                                                      handleOptionsChange(
+                                                        field.id,
+                                                        e.target.value
+                                                      )
+                                                    }
+                                                    placeholder="Option 1, Option 2, Option 3"
+                                                  />
+                                                </div>
+                                              )}
+
+                                              {/* Section Assignment */}
+                                              {sections.length > 0 && (
+                                                <div className="space-y-1">
+                                                  <Label className="text-xs">
+                                                    Section
+                                                  </Label>
+                                                  <Select
+                                                    value={
+                                                      field.section_id || "none"
+                                                    }
+                                                    onValueChange={async (
+                                                      v: string
+                                                    ) => {
+                                                      if (onUpdateField) {
+                                                        await onUpdateField(
+                                                          field.id,
+                                                          {
+                                                            section_id:
+                                                              v === "none"
+                                                                ? null
+                                                                : v,
                                                           }
-                                                        }
-                                                      }}
-                                                      onBlur={async (e) => {
-                                                        if (!onUpdateField)
-                                                          return;
-                                                        const clusterName =
-                                                          e.target.value.trim();
-                                                        if (clusterName) {
-                                                          const clusterId =
-                                                            clusterName
-                                                              .toLowerCase()
-                                                              .replace(
-                                                                /[^a-z0-9]+/g,
-                                                                "_"
-                                                              )
-                                                              .replace(
-                                                                /^_|_$/g,
-                                                                ""
-                                                              );
-
-                                                          await onUpdateField(
-                                                            field.id,
-                                                            {
-                                                              mutually_exclusive_group:
-                                                                DEFAULT_EXCLUSIVE_GROUP,
-                                                              group_cluster:
-                                                                clusterId,
-                                                            }
-                                                          );
-                                                        }
-                                                      }}
-                                                      placeholder={
-                                                        allClusters.length > 0
-                                                          ? "Or type new cluster name"
-                                                          : "Type cluster name (e.g., Simple Toggle)"
+                                                        );
                                                       }
-                                                    />
-                                                  </div>
-                                                );
-                                              })()}
-                                            </div>
+                                                    }}
+                                                  >
+                                                    <SelectTrigger>
+                                                      <SelectValue placeholder="No section" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="none">
+                                                        No section
+                                                      </SelectItem>
+                                                      {sections.map(
+                                                        (section) => (
+                                                          <SelectItem
+                                                            key={section.id}
+                                                            value={section.id}
+                                                          >
+                                                            {section.title}
+                                                          </SelectItem>
+                                                        )
+                                                      )}
+                                                    </SelectContent>
+                                                  </Select>
+                                                </div>
+                                              )}
 
-                                            {/* Conditional Logic */}
-                                            <ConditionalLogicEditor
-                                              field={field}
-                                              allFields={fields}
-                                              onChange={async (logic) => {
-                                                if (onUpdateField) {
-                                                  await onUpdateField(
-                                                    field.id,
-                                                    {
-                                                      conditional_logic: logic,
+                                              {/* Required Toggle */}
+                                              <div className="flex items-center justify-between">
+                                                <Label className="text-xs">
+                                                  Required Field
+                                                </Label>
+                                                <Switch
+                                                  checked={field.required}
+                                                  onCheckedChange={async (
+                                                    checked: boolean
+                                                  ) => {
+                                                    if (onUpdateField) {
+                                                      await onUpdateField(
+                                                        field.id,
+                                                        {
+                                                          required: checked,
+                                                        }
+                                                      );
+                                                    }
+                                                  }}
+                                                />
+                                              </div>
+
+                                              {/* Advanced Section */}
+                                              <Collapsible
+                                                open={
+                                                  advancedSectionsOpen.get(
+                                                    field.id
+                                                  ) || false
+                                                }
+                                                onOpenChange={(open) => {
+                                                  setAdvancedSectionsOpen(
+                                                    (prev) => {
+                                                      const next = new Map(
+                                                        prev
+                                                      );
+                                                      next.set(field.id, open);
+                                                      return next;
                                                     }
                                                   );
-                                                }
-                                              }}
-                                            />
-                                          </CollapsibleContent>
-                                        </Collapsible>
-                                      </div>
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
-                                {onRemoveFieldFromSection && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 text-destructive hover:text-destructive"
-                                    onClick={() =>
-                                      onRemoveFieldFromSection(field.id)
-                                    }
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                                                }}
+                                              >
+                                                <CollapsibleTrigger asChild>
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full justify-between"
+                                                  >
+                                                    <span className="text-xs">
+                                                      Advanced Options
+                                                    </span>
+                                                    {advancedSectionsOpen.get(
+                                                      field.id
+                                                    ) ? (
+                                                      <Layers className="w-3 h-3 rotate-180" />
+                                                    ) : (
+                                                      <Layers className="w-3 h-3" />
+                                                    )}
+                                                  </Button>
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent className="space-y-4 pt-2">
+                                                  {/* Mutually Exclusive Cluster */}
+                                                  <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
+                                                    <Label className="text-xs">
+                                                      Mutually Exclusive Cluster
+                                                    </Label>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                      Assign this field to a
+                                                      cluster where only one
+                                                      option can be selected at
+                                                      a time. All clusters share
+                                                      a single implicit group
+                                                      behind the scenes.
+                                                    </p>
+                                                    {(() => {
+                                                      // Get all clusters from all fields AND created clusters
+                                                      const clustersFromFields =
+                                                        Array.from(
+                                                          new Set(
+                                                            fields
+                                                              .map(
+                                                                (f) =>
+                                                                  f.group_cluster
+                                                              )
+                                                              .filter(
+                                                                (
+                                                                  c
+                                                                ): c is string =>
+                                                                  Boolean(c)
+                                                              )
+                                                          )
+                                                        );
+                                                      // Combine with created clusters that haven't been assigned yet
+                                                      const allClusters =
+                                                        Array.from(
+                                                          new Set([
+                                                            ...clustersFromFields,
+                                                            ...createdClusters,
+                                                          ])
+                                                        ).sort();
+
+                                                      // Convert cluster ID to display name
+                                                      const getClusterDisplayName =
+                                                        (clusterId: string) => {
+                                                          return clusterId
+                                                            .split("_")
+                                                            .map(
+                                                              (word) =>
+                                                                word
+                                                                  .charAt(0)
+                                                                  .toUpperCase() +
+                                                                word.slice(1)
+                                                            )
+                                                            .join(" ");
+                                                        };
+
+                                                      return (
+                                                        <div className="space-y-2">
+                                                          <Select
+                                                            value={
+                                                              field.group_cluster ||
+                                                              "none"
+                                                            }
+                                                            onValueChange={async (
+                                                              value: string
+                                                            ) => {
+                                                              if (
+                                                                !onUpdateField
+                                                              )
+                                                                return;
+                                                              if (
+                                                                value === "none"
+                                                              ) {
+                                                                await onUpdateField(
+                                                                  field.id,
+                                                                  {
+                                                                    mutually_exclusive_group:
+                                                                      null,
+                                                                    group_cluster:
+                                                                      null,
+                                                                  }
+                                                                );
+                                                              } else {
+                                                                await onUpdateField(
+                                                                  field.id,
+                                                                  {
+                                                                    mutually_exclusive_group:
+                                                                      DEFAULT_EXCLUSIVE_GROUP,
+                                                                    group_cluster:
+                                                                      value,
+                                                                  }
+                                                                );
+                                                              }
+                                                            }}
+                                                          >
+                                                            <SelectTrigger>
+                                                              <SelectValue placeholder="Select existing cluster" />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                              <SelectItem value="none">
+                                                                No cluster
+                                                              </SelectItem>
+                                                              {allClusters.map(
+                                                                (clusterId) => (
+                                                                  <SelectItem
+                                                                    key={
+                                                                      clusterId
+                                                                    }
+                                                                    value={
+                                                                      clusterId
+                                                                    }
+                                                                  >
+                                                                    {getClusterDisplayName(
+                                                                      clusterId
+                                                                    )}
+                                                                  </SelectItem>
+                                                                )
+                                                              )}
+                                                            </SelectContent>
+                                                          </Select>
+                                                          <Input
+                                                            value={
+                                                              field.group_cluster
+                                                                ? getClusterDisplayName(
+                                                                    field.group_cluster
+                                                                  )
+                                                                : ""
+                                                            }
+                                                            onChange={async (
+                                                              e
+                                                            ) => {
+                                                              // Allow typing freely; apply on blur
+                                                              if (
+                                                                !e.target
+                                                                  .value &&
+                                                                onUpdateField
+                                                              ) {
+                                                                const result =
+                                                                  onUpdateField(
+                                                                    field.id,
+                                                                    {
+                                                                      mutually_exclusive_group:
+                                                                        null,
+                                                                      group_cluster:
+                                                                        null,
+                                                                    }
+                                                                  );
+                                                                if (
+                                                                  result instanceof
+                                                                  Promise
+                                                                ) {
+                                                                  await result;
+                                                                }
+                                                              }
+                                                            }}
+                                                            onBlur={async (
+                                                              e
+                                                            ) => {
+                                                              if (
+                                                                !onUpdateField
+                                                              )
+                                                                return;
+                                                              const clusterName =
+                                                                e.target.value.trim();
+                                                              if (clusterName) {
+                                                                const clusterId =
+                                                                  clusterName
+                                                                    .toLowerCase()
+                                                                    .replace(
+                                                                      /[^a-z0-9]+/g,
+                                                                      "_"
+                                                                    )
+                                                                    .replace(
+                                                                      /^_|_$/g,
+                                                                      ""
+                                                                    );
+
+                                                                await onUpdateField(
+                                                                  field.id,
+                                                                  {
+                                                                    mutually_exclusive_group:
+                                                                      DEFAULT_EXCLUSIVE_GROUP,
+                                                                    group_cluster:
+                                                                      clusterId,
+                                                                  }
+                                                                );
+                                                              }
+                                                            }}
+                                                            placeholder={
+                                                              allClusters.length >
+                                                              0
+                                                                ? "Or type new cluster name"
+                                                                : "Type cluster name (e.g., Simple Toggle)"
+                                                            }
+                                                          />
+                                                        </div>
+                                                      );
+                                                    })()}
+                                                  </div>
+
+                                                  {/* Conditional Logic */}
+                                                  <ConditionalLogicEditor
+                                                    field={field}
+                                                    allFields={fields}
+                                                    onChange={async (logic) => {
+                                                      if (onUpdateField) {
+                                                        await onUpdateField(
+                                                          field.id,
+                                                          {
+                                                            conditional_logic:
+                                                              logic,
+                                                          }
+                                                        );
+                                                      }
+                                                    }}
+                                                  />
+                                                </CollapsibleContent>
+                                              </Collapsible>
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      )}
+                                      {onRemoveFieldFromSection && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-6 w-6 text-destructive hover:text-destructive"
+                                          onClick={() =>
+                                            onRemoveFieldFromSection(field.id)
+                                          }
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )
+                      );
+                    })()}
                     <div
                       className={`rounded-md border border-dashed px-3 py-2 text-center ${
-                        draggedFieldId ? "border-primary/60 bg-primary/5" : ""
+                        draggedFieldId && !draggedSectionField
+                          ? "border-primary/60 bg-primary/5"
+                          : ""
                       }`}
                       onDragOver={(e) => {
-                        if (draggedFieldId && onDropFieldToSection) {
+                        if (
+                          draggedFieldId &&
+                          !draggedSectionField &&
+                          onDropFieldToSection
+                        ) {
                           e.preventDefault();
                         }
                       }}
-                      onDrop={(e) => handleFieldDrop(e, section.id)}
+                      onDrop={(e) => {
+                        if (draggedFieldId && !draggedSectionField) {
+                          handleFieldDrop(e, section.id);
+                        }
+                      }}
                     >
                       {sectionFields.length === 0
                         ? "Drag fields here to add to this section"

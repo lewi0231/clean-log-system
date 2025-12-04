@@ -4,7 +4,13 @@
 import { useState } from "react";
 
 // 2. Third-party
-import { Package, RotateCcw, Sparkles } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Package,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 
 // 3. Internal components
 import { VisualFormBuilder } from "@/components/form-builder";
@@ -18,7 +24,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -256,9 +261,11 @@ export default function MobileConfigPage() {
                       advanced form behavior
                     </CardDescription>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {advancedSectionOpen ? "Expanded" : "Collapsed"}
-                  </Badge>
+                  {advancedSectionOpen ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
                 </div>
               </CardHeader>
             </CollapsibleTrigger>

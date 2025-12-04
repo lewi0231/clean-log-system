@@ -293,12 +293,12 @@ export function VisualFormBuilder({
 
   // Filter out fields that are in sections from the main Form Fields list
   const fieldsNotInSections = React.useMemo(
-    () => orderedFields.filter((field) => field.section_id === null),
+    () => orderedFields.filter((field) => !field.section_id),
     [orderedFields]
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-xl font-semibold">Form Builder</h2>
@@ -311,7 +311,7 @@ export function VisualFormBuilder({
         </p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 items-start min-h-screen">
         {/* Left Panel - Field Configuration */}
         <div className="flex-1 flex flex-col space-y-4 lg:max-w-2xl w-full">
           {/* Field Type Selector */}
@@ -360,6 +360,7 @@ export function VisualFormBuilder({
                   await onUpdateField(fieldId, { section_id: null });
                 }}
                 onUpdateField={onUpdateField}
+                onReorderFields={onReorderFields}
                 createdClusters={createdClusters}
               />
             </CardContent>
@@ -501,7 +502,7 @@ export function VisualFormBuilder({
                                   <span className="font-mono truncate">
                                     {field.name}
                                   </span>
-                                  {field.section_id === null && (
+                                  {!field.section_id && (
                                     <Badge
                                       variant="outline"
                                       className="text-[10px] px-1.5"
@@ -926,8 +927,8 @@ export function VisualFormBuilder({
         </div>
 
         {/* Right Panel - Mobile Preview */}
-        <div className="hidden lg:block w-80 shrink-0">
-          <Card className="p-6 overflow-hidden sticky top-4">
+        <div className="hidden lg:block w-80 shrink-0 self-start sticky top-0">
+          <Card className=" p-6">
             <MobileDevicePreview
               fields={fields}
               sections={sections}

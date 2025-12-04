@@ -51,7 +51,13 @@ import {
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import {
+  buildScopedPricingMap,
+  getPricingScopeSource,
+  isEntryForScope,
+} from "@/lib/pricing-scope";
 import type { FieldPricing, PricingCondition, PricingType } from "@/lib/types";
+import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig, FieldType } from "@clean-log/shared";
 import {
   ChevronDown,
@@ -134,16 +140,19 @@ export default function FieldPricingList({
     );
   }, [fieldConfigs]);
 
-  // Create a map of field_config_id -> default pricing entity
+  const scopeParams = useMemo(
+    () => ({ locationId, locationHierarchyId }),
+    [locationId, locationHierarchyId]
+  );
+  const scopeSource = getPricingScopeSource(scopeParams);
+
   const pricingMap = useMemo(() => {
-    const map: Record<string, FieldPricing> = {};
-    fieldPricing
-      .filter((p) => !p.location_id && !p.location_hierarchy_id)
-      .forEach((p) => {
-        map[p.field_config_id] = p;
-      });
-    return map;
-  }, [fieldPricing]);
+    return buildScopedPricingMap(
+      fieldPricing,
+      scopeParams,
+      (pricing) => pricing.field_config_id || null
+    );
+  }, [fieldPricing, scopeParams]);
 
   const fieldLabelLookup = useMemo(() => {
     const lookup: Record<string, string> = {};
@@ -174,12 +183,14 @@ export default function FieldPricingList({
 
     setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
     try {
+      const pricingEntry = pricingMap[fieldConfig.id];
       await upsertPricing(fieldConfig.id, customerPrice, {
         appliesToFieldType: fieldConfig.field_type,
         pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
         locationHierarchyId,
+        locationId,
         conditions:
-          pricingMap[fieldConfig.id]?.source_rule?.conditions?.map(
+          pricingEntry?.record?.source_rule?.conditions?.map(
             serializeCondition
           ),
         expirationDate,
@@ -227,7 +238,8 @@ export default function FieldPricingList({
   const handleConditionalRuleSave = async () => {
     if (!ruleModalField) return;
 
-    const existingPricing = pricingMap[ruleModalField.id];
+    const pricingEntry = pricingMap[ruleModalField.id];
+    const existingPricing = pricingEntry?.record;
     if (!existingPricing) {
       setRuleError("Save a base price before adding rules.");
       return;
@@ -262,6 +274,7 @@ export default function FieldPricingList({
         appliesToFieldType: ruleModalField.field_type,
         pricingType: existingPricing.pricing_type as PricingType,
         locationHierarchyId,
+        locationId,
         conditions: nextConditions,
       });
       closeConditionalModal();
@@ -319,18 +332,19 @@ export default function FieldPricingList({
     <>
       <div className="space-y-3">
         {pricingFieldConfigs.map((fieldConfig) => {
-          const existingPricing = pricingMap[fieldConfig.id];
-          const defaultPrice = existingPricing?.customer_price ?? 0;
+          const pricingEntry = pricingMap[fieldConfig.id];
+          const scopedPricing = pricingEntry?.record;
+          const defaultPrice = scopedPricing?.customer_price ?? 0;
           const currentPrice =
             editingPrices[fieldConfig.id] !== undefined
               ? editingPrices[fieldConfig.id]
-              : existingPricing
-              ? existingPricing.customer_price.toString()
+              : scopedPricing
+              ? scopedPricing.customer_price.toString()
               : "";
           const hasChanges =
             editingPrices[fieldConfig.id] !== undefined &&
             editingPrices[fieldConfig.id] !==
-              (existingPricing?.customer_price.toString() || "");
+              (scopedPricing?.customer_price.toString() || "");
           const isSaving = saving[fieldConfig.id] || false;
           const overrides = getLocationOverrides(
             fieldPricing,
@@ -338,8 +352,9 @@ export default function FieldPricingList({
             locationId,
             locationHierarchyId
           );
-          const conditions = existingPricing?.source_rule?.conditions ?? [];
+          const conditions = scopedPricing?.source_rule?.conditions ?? [];
           const isExpanded = expandedCards[fieldConfig.id] ?? true;
+          const hasScopedValue = isEntryForScope(pricingEntry, scopeSource);
 
           return (
             <Collapsible
@@ -352,7 +367,7 @@ export default function FieldPricingList({
                 }))
               }
             >
-              <Card className="border-l-4 border-l-primary">
+              <Card className="">
                 <CollapsibleTrigger asChild>
                   <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors py-3">
                     <div className="flex items-center justify-between">
@@ -370,12 +385,11 @@ export default function FieldPricingList({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {existingPricing && (
+                        {scopedPricing ? (
                           <span className="text-sm font-medium text-primary">
-                            {formatCurrency(existingPricing.customer_price)}
+                            {formatCurrency(scopedPricing.customer_price)}
                           </span>
-                        )}
-                        {!existingPricing && (
+                        ) : (
                           <span className="text-xs text-muted-foreground">
                             No price set
                           </span>
@@ -448,7 +462,7 @@ export default function FieldPricingList({
                       >
                         {isSaving ? (
                           "Saving..."
-                        ) : existingPricing ? (
+                        ) : hasScopedValue ? (
                           "Update"
                         ) : (
                           <>
@@ -457,30 +471,34 @@ export default function FieldPricingList({
                           </>
                         )}
                       </Button>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              disabled={!existingPricing}
-                              onClick={() => openConditionalModal(fieldConfig)}
-                              className="gap-2"
-                            >
-                              <Sparkles className="h-4 w-4" />
-                              Add rule
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p>
-                              Click to create if/then adjustments for this
-                              price. Rules appear as chips below the price
-                              input.
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      {isPricingRulesEnabled() && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={!scopedPricing}
+                                onClick={() =>
+                                  openConditionalModal(fieldConfig)
+                                }
+                                className="gap-2"
+                              >
+                                <Sparkles className="h-4 w-4" />
+                                Add rule
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p>
+                                Click to create if/then adjustments for this
+                                price. Rules appear as chips below the price
+                                input.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
 
                     {overrides.length > 0 && (
@@ -503,10 +521,12 @@ export default function FieldPricingList({
                       />
                     )}
 
-                    <ConditionalRuleChips
-                      conditions={conditions}
-                      fieldLabels={fieldLabelLookup}
-                    />
+                    {isPricingRulesEnabled() && (
+                      <ConditionalRuleChips
+                        conditions={conditions}
+                        fieldLabels={fieldLabelLookup}
+                      />
+                    )}
                   </CardContent>
                 </CollapsibleContent>
               </Card>
@@ -515,17 +535,19 @@ export default function FieldPricingList({
         })}
       </div>
 
-      <ConditionalRuleDialog
-        field={ruleModalField}
-        fieldOptions={fieldConfigs}
-        open={Boolean(ruleModalField)}
-        onClose={closeConditionalModal}
-        form={ruleForm}
-        setForm={setRuleForm}
-        onSubmit={handleConditionalRuleSave}
-        saving={ruleSaving}
-        error={ruleError}
-      />
+      {isPricingRulesEnabled() && (
+        <ConditionalRuleDialog
+          field={ruleModalField}
+          fieldOptions={fieldConfigs}
+          open={Boolean(ruleModalField)}
+          onClose={closeConditionalModal}
+          form={ruleForm}
+          setForm={setRuleForm}
+          onSubmit={handleConditionalRuleSave}
+          saving={ruleSaving}
+          error={ruleError}
+        />
+      )}
     </>
   );
 }
