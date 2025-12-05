@@ -10,6 +10,7 @@ interface UseBasePricingOptions {
   locationId?: string | null;
   locationHierarchyId?: string | null;
   effectiveAt?: string | null;
+  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
 interface UseBasePricingResult {
@@ -26,6 +27,7 @@ interface UseBasePricingResult {
     adjustment_type?: "add" | "multiply";
     location_id?: string | null;
     currency?: string;
+    pricingContext?: "customer" | "worker";
   }) => Promise<BasePricing>;
   deletePricing: (id: string) => Promise<void>;
 }
@@ -55,6 +57,7 @@ export function useBasePricing(
         location_hierarchy_id: null,
         location_id: null,
         effective_at: filters?.effectiveAt ?? undefined,
+        pricing_context: filters?.pricingContext || "customer",
       });
 
       setBasePricing(pricing.map(transformBaseRule));
@@ -78,6 +81,7 @@ export function useBasePricing(
     location_id?: string | null;
     currency?: string;
     conditions?: UpsertPricingRuleRequest["conditions"];
+    pricingContext?: "customer" | "worker";
   }): Promise<BasePricing> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
@@ -114,6 +118,8 @@ export function useBasePricing(
       organization_id: organizationId,
       scope: "base",
       pricing_type: pricingType,
+      pricing_context: request.pricingContext || filters?.pricingContext ||
+        "customer",
       field_config_id: request.job_type_field_config_id || null,
       option_value: request.job_type_value || null,
       base_price: adjustmentType === "add" ? request.customer_base_price : null,

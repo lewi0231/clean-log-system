@@ -7,4 +7,5 @@ export { LocationHierarchyService } from "./location-hierarchy.service";
 export { LocationsService } from "./locations.service";
 export { OrganizationUsersService } from "./organization-users.service";
 export { PricingService } from "./pricing.service";
+export { WorkerPaymentService } from "./worker-payment.service";
 export { WorkersService } from "./workers.service";

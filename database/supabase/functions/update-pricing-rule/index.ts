@@ -7,6 +7,7 @@ interface UpdatePricingRuleRequest {
   id: string;
   scope?: "field" | "option" | "base" | "global";
   pricing_type?: "unit" | "fixed" | "tiered" | "percentage" | "conditional";
+  pricing_context?: "customer" | "worker";
   field_config_id?: string | null;
   option_value?: string | null;
   applies_to_field_type?: string | null;
@@ -35,6 +36,7 @@ interface UpdatePricingRuleRequest {
     metadata?: Record<string, unknown>;
     priority?: number;
   }>;
+  [key: string]: unknown;
 }
 
 serve(async (req) => {
@@ -49,6 +51,32 @@ serve(async (req) => {
       return errorResponse("ID is required", 400);
     }
 
+    // Validate pricing_context if provided
+    if (body.pricing_context !== undefined) {
+      if (
+        body.pricing_context !== "customer" &&
+        body.pricing_context !== "worker"
+      ) {
+        return errorResponse(
+          "pricing_context must be either 'customer' or 'worker'",
+          400,
+        );
+      }
+
+      // Worker payment rules should not have worker_payment_type/worker_payment_value
+      if (body.pricing_context === "worker") {
+        if (
+          body.worker_payment_type !== undefined ||
+          body.worker_payment_value !== undefined
+        ) {
+          return errorResponse(
+            "Worker payment rules cannot have worker_payment_type or worker_payment_value. Use separate worker pricing rules instead.",
+            400,
+          );
+        }
+      }
+    }
+
     const supabase = createServiceRoleClient();
 
     const updateData: Record<string, unknown> = {
@@ -58,7 +86,7 @@ serve(async (req) => {
     const assignIfDefined = <T>(
       key: string,
       value: T | undefined,
-      mapper?: (value: T) => unknown
+      mapper?: (value: T) => unknown,
     ) => {
       if (value !== undefined) {
         updateData[key] = mapper ? mapper(value) : value;
@@ -67,15 +95,16 @@ serve(async (req) => {
 
     assignIfDefined("scope", body.scope);
     assignIfDefined("pricing_type", body.pricing_type);
+    assignIfDefined("pricing_context", body.pricing_context);
     assignIfDefined("field_config_id", body.field_config_id ?? null);
     assignIfDefined("option_value", body.option_value ?? null);
     assignIfDefined(
       "applies_to_field_type",
-      body.applies_to_field_type ?? null
+      body.applies_to_field_type ?? null,
     );
     assignIfDefined(
       "location_hierarchy_id",
-      body.location_hierarchy_id ?? null
+      body.location_hierarchy_id ?? null,
     );
     assignIfDefined("location_id", body.location_id ?? null);
     assignIfDefined("currency", body.currency);
@@ -135,7 +164,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Update pricing rule error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to update pricing rule"
+      error instanceof Error ? error : "Failed to update pricing rule",
     );
   }
 });

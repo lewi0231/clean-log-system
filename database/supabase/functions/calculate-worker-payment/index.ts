@@ -3,7 +3,8 @@ import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
-interface LineItem {
+// Reuse types from calculate-invoice but adapt for worker payments
+interface WorkerPaymentLineItem {
   field_config_id: string;
   field_name: string;
   field_label: string;
@@ -22,22 +23,18 @@ interface AppliedRule {
   location_hierarchy_id: string | null;
   location_id: string | null;
   amount: number;
-  worker_payment: number;
   metadata: Record<string, unknown>;
   line_item_key?: string;
   snapshot_data: Record<string, unknown>;
 }
 
-interface InvoiceCalculation {
+interface WorkerPaymentCalculation {
   job_id: string;
-  base_price: number;
-  line_items: LineItem[];
+  line_items: WorkerPaymentLineItem[];
   applied_rules: AppliedRule[];
   subtotal: number;
   total_adjustments: number;
-  total: number;
-  worker_payment_total: number;
-  margin: number;
+  total_worker_payment: number;
 }
 
 type FieldConfig = {
@@ -53,7 +50,7 @@ type JobRecord = {
   organization_id: string;
   location_id: string | null;
   submission_data: Record<string, unknown> | null;
-  hierarchy_parent_id?: string | null; // Denormalized from location for pricing lookup
+  hierarchy_parent_id?: string | null;
   location?: LocationRecord | null;
 };
 
@@ -73,7 +70,7 @@ type PricingRuleRow = {
   organization_id: string;
   scope: string;
   pricing_type: string;
-  pricing_context: string | null; // 'customer' or 'worker'
+  pricing_context: string | null;
   field_config_id: string | null;
   option_value: string | null;
   applies_to_field_type: string | null;
@@ -86,8 +83,6 @@ type PricingRuleRow = {
   maximum_quantity: number | null;
   tier_definition: unknown;
   metadata: Record<string, unknown> | null;
-  worker_payment_type: string | null;
-  worker_payment_value: number | null;
   priority: number | null;
   conditions?: PricingConditionRow[];
 };
@@ -95,7 +90,6 @@ type PricingRuleRow = {
 type LocationRecord = {
   id: string;
   pricing_mode: string | null;
-  fixed_customer_price: number | null;
   fixed_worker_payment: number | null;
   fixed_price_currency: string | null;
   hierarchy_parent_id: string | null;
@@ -158,7 +152,6 @@ serve(async (req) => {
           id,
           hierarchy_parent_id,
           pricing_mode,
-          fixed_customer_price,
           fixed_worker_payment,
           fixed_price_currency
         )
@@ -171,15 +164,12 @@ serve(async (req) => {
       return errorResponse("No jobs found", 404);
     }
 
-    // Flatten the location join to get hierarchy_parent_id and pricing info directly on job
-    // Note: Supabase returns the joined location as an object (single relation via FK)
     const jobs = jobsRaw.map((job) => {
       const locationData = job.location as unknown as
         | {
           id: string;
           hierarchy_parent_id: string | null;
           pricing_mode: string | null;
-          fixed_customer_price: number | null;
           fixed_worker_payment: number | null;
           fixed_price_currency: string | null;
         }
@@ -195,7 +185,6 @@ serve(async (req) => {
             id: locationData.id,
             hierarchy_parent_id: locationData.hierarchy_parent_id,
             pricing_mode: locationData.pricing_mode,
-            fixed_customer_price: locationData.fixed_customer_price,
             fixed_worker_payment: locationData.fixed_worker_payment,
             fixed_price_currency: locationData.fixed_price_currency,
           }
@@ -219,7 +208,6 @@ serve(async (req) => {
 
     if (hierarchyError) throw hierarchyError;
 
-    // Service-specific pricing mode overrides (per service type option per location)
     const { data: servicePricingModes, error: servicePricingError } =
       await supabase
         .from("service_pricing_mode")
@@ -229,8 +217,7 @@ serve(async (req) => {
     if (servicePricingError) throw servicePricingError;
 
     const nowIso = new Date().toISOString();
-    // Filter pricing rules to only customer pricing (for invoicing)
-    // Worker pricing rules will be used separately for worker payment calculations
+    // Filter pricing rules to only worker pricing
     const { data: pricingRules, error: pricingRulesError } = await supabase
       .from("pricing_rule")
       .select(
@@ -250,7 +237,7 @@ serve(async (req) => {
       )
       .eq("organization_id", organization_id)
       .eq("active", true)
-      .eq("pricing_context", "customer") // Only customer pricing for invoicing
+      .eq("pricing_context", "worker") // Only worker pricing
       .lte("effective_at", nowIso)
       .or(`expires_at.is.null,expires_at.gt.${nowIso}`, {
         referencedTable: "pricing_rule",
@@ -262,10 +249,10 @@ serve(async (req) => {
       (fieldConfigs || []).map((config) => [config.id, config as FieldConfig]),
     );
 
-    const calculations: InvoiceCalculation[] = [];
+    const calculations: WorkerPaymentCalculation[] = [];
 
     for (const job of jobs as JobRecord[]) {
-      const calculation = calculateJobPricing({
+      const calculation = calculateWorkerPayment({
         job,
         fieldConfigMap,
         pricingRules: (pricingRules || []) as PricingRuleRow[],
@@ -277,20 +264,10 @@ serve(async (req) => {
     }
 
     const aggregated = {
-      total_subtotal: calculations.reduce(
-        (sum, calc) => sum + calc.subtotal,
-        0,
-      ),
-      total_adjustments: calculations.reduce(
-        (sum, calc) => sum + calc.total_adjustments,
-        0,
-      ),
-      total: calculations.reduce((sum, calc) => sum + calc.total, 0),
       total_worker_payment: calculations.reduce(
-        (sum, calc) => sum + calc.worker_payment_total,
+        (sum, calc) => sum + calc.total_worker_payment,
         0,
       ),
-      total_margin: calculations.reduce((sum, calc) => sum + calc.margin, 0),
       job_calculations: calculations,
     };
 
@@ -299,14 +276,14 @@ serve(async (req) => {
       calculation: aggregated,
     });
   } catch (error) {
-    console.error("Calculate invoice error:", error);
+    console.error("Calculate worker payment error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to calculate invoice",
+      error instanceof Error ? error : "Failed to calculate worker payment",
     );
   }
 });
 
-function calculateJobPricing({
+function calculateWorkerPayment({
   job,
   fieldConfigMap,
   pricingRules,
@@ -318,8 +295,7 @@ function calculateJobPricing({
   pricingRules: PricingRuleRow[];
   hierarchyNodes: LocationHierarchyNode[];
   servicePricingModes: ServicePricingModeRow[];
-}): InvoiceCalculation {
-  // Service-specific pricing mode override (takes precedence over location-level)
+}): WorkerPaymentCalculation {
   const serviceOverride = findServicePricingOverride({
     job,
     fieldConfigMap,
@@ -327,12 +303,10 @@ function calculateJobPricing({
   });
 
   if (serviceOverride?.pricing_mode === "fixed_price") {
-    const fixedCustomerPrice = serviceOverride.fixed_customer_price || 0;
     const fixedWorkerPayment = serviceOverride.fixed_worker_payment || 0;
 
     return {
       job_id: job.id,
-      base_price: fixedCustomerPrice,
       line_items: [],
       applied_rules: [
         {
@@ -343,8 +317,7 @@ function calculateJobPricing({
           option_value: null,
           location_hierarchy_id: job.hierarchy_parent_id || null,
           location_id: job.location_id,
-          amount: fixedCustomerPrice,
-          worker_payment: fixedWorkerPayment,
+          amount: fixedWorkerPayment,
           metadata: {
             pricing_mode: "fixed_price",
             service_type_value: serviceOverride.service_type_value,
@@ -353,31 +326,25 @@ function calculateJobPricing({
           },
           snapshot_data: {
             pricing_mode: "fixed_price",
-            fixed_customer_price: fixedCustomerPrice,
             fixed_worker_payment: fixedWorkerPayment,
             service_type_value: serviceOverride.service_type_value,
             currency: serviceOverride.fixed_price_currency || "USD",
           },
         },
       ],
-      subtotal: fixedCustomerPrice,
+      subtotal: fixedWorkerPayment,
       total_adjustments: 0,
-      total: fixedCustomerPrice,
-      worker_payment_total: fixedWorkerPayment,
-      margin: fixedCustomerPrice - fixedWorkerPayment,
+      total_worker_payment: fixedWorkerPayment,
     };
   }
 
   // Early return for fixed price locations
-  // Field config data is still collected (in submission_data) but pricing is fixed
   if (job.location?.pricing_mode === "fixed_price") {
-    const fixedCustomerPrice = job.location.fixed_customer_price || 0;
     const fixedWorkerPayment = job.location.fixed_worker_payment || 0;
 
     return {
       job_id: job.id,
-      base_price: fixedCustomerPrice,
-      line_items: [], // No field-based line items for fixed pricing
+      line_items: [],
       applied_rules: [
         {
           pricing_rule_id: `fixed_location_${job.location.id}`,
@@ -387,8 +354,7 @@ function calculateJobPricing({
           option_value: null,
           location_hierarchy_id: job.hierarchy_parent_id || null,
           location_id: job.location_id,
-          amount: fixedCustomerPrice,
-          worker_payment: fixedWorkerPayment,
+          amount: fixedWorkerPayment,
           metadata: {
             pricing_mode: "fixed_price",
             location_id: job.location.id,
@@ -396,21 +362,18 @@ function calculateJobPricing({
           },
           snapshot_data: {
             pricing_mode: "fixed_price",
-            fixed_customer_price: fixedCustomerPrice,
             fixed_worker_payment: fixedWorkerPayment,
             currency: job.location.fixed_price_currency || "USD",
           },
         },
       ],
-      subtotal: fixedCustomerPrice,
+      subtotal: fixedWorkerPayment,
       total_adjustments: 0,
-      total: fixedCustomerPrice,
-      worker_payment_total: fixedWorkerPayment,
-      margin: fixedCustomerPrice - fixedWorkerPayment,
+      total_worker_payment: fixedWorkerPayment,
     };
   }
 
-  // Standard field-based pricing calculation
+  // Standard field-based worker payment calculation
   const submissionData = (job.submission_data as Record<string, unknown>) || {};
   const nodeParentMap = new Map(hierarchyNodes.map((node) => [node.id, node]));
 
@@ -424,10 +387,11 @@ function calculateJobPricing({
     ruleMatchesLocation(rule, locationContext)
   );
 
-  const lineItems: LineItem[] = [];
+  const lineItems: WorkerPaymentLineItem[] = [];
   const appliedRules: AppliedRule[] = [];
   let subtotal = 0;
 
+  // Process field rules
   const fieldRuleGroups = groupRules(
     applicableRules.filter((rule) => rule.scope === "field"),
     (rule) => rule.field_config_id || "default",
@@ -454,6 +418,7 @@ function calculateJobPricing({
     }
   }
 
+  // Process option rules
   const optionRuleGroups = groupRules(
     applicableRules.filter((rule) => rule.scope === "option"),
     (rule) => `${rule.field_config_id || "default"}:${rule.option_value || ""}`,
@@ -480,6 +445,7 @@ function calculateJobPricing({
     }
   }
 
+  // Process base rules
   const baseRules = applicableRules.filter((rule) => rule.scope === "base");
   const baseEvaluation = applyBaseRules({
     rules: baseRules,
@@ -491,9 +457,9 @@ function calculateJobPricing({
 
   let total = baseEvaluation.total;
   let totalAdjustments = baseEvaluation.adjustmentAmount;
-  const basePrice = baseEvaluation.baseAmount;
   appliedRules.push(...baseEvaluation.appliedRules);
 
+  // Process conditional rules
   const conditionalRules = applicableRules.filter(
     (rule) => rule.pricing_type === "conditional" || rule.scope === "global",
   );
@@ -508,21 +474,13 @@ function calculateJobPricing({
   totalAdjustments += conditionalEvaluation.adjustmentAmount;
   appliedRules.push(...conditionalEvaluation.appliedRules);
 
-  const workerPaymentTotal = appliedRules.reduce(
-    (sum, rule) => sum + (rule.worker_payment || 0),
-    0,
-  );
-
   return {
     job_id: job.id,
-    base_price: basePrice,
     line_items: lineItems,
     applied_rules: appliedRules,
     subtotal,
     total_adjustments: totalAdjustments,
-    total,
-    worker_payment_total: workerPaymentTotal,
-    margin: total - workerPaymentTotal,
+    total_worker_payment: total,
   };
 }
 
@@ -539,7 +497,6 @@ function findServicePricingOverride({
   const submissionData = (job.submission_data as Record<string, unknown>) || {};
 
   for (const override of servicePricingModes) {
-    // If override is scoped to a specific location, enforce it
     if (override.location_id && override.location_id !== job.location_id) {
       continue;
     }
@@ -558,6 +515,7 @@ function findServicePricingOverride({
   return null;
 }
 
+// Helper functions (reused from calculate-invoice)
 function groupRules(
   rules: PricingRuleRow[],
   keyFn: (rule: PricingRuleRow) => string,
@@ -581,7 +539,6 @@ function buildLocationContext(
   const ancestors = new Set<string>();
   const depthMap = new Map<string, number>();
 
-  // Start from the location's hierarchy parent (if any)
   let currentNodeId: string | null = hierarchyParentId;
 
   while (currentNodeId) {
@@ -674,7 +631,7 @@ function evaluateFieldRule(
   rule: PricingRuleRow,
   fieldConfig: FieldConfig,
   fieldValue: unknown,
-): { lineItem: LineItem; appliedRule: AppliedRule } | null {
+): { lineItem: WorkerPaymentLineItem; appliedRule: AppliedRule } | null {
   const quantity = getFieldQuantity(fieldConfig.field_type, fieldValue);
   if (quantity <= 0) return null;
 
@@ -700,7 +657,6 @@ function evaluateFieldRule(
 
   if (total <= 0) return null;
 
-  const workerPayment = computeWorkerPayment(rule, total);
   const lineItemKey = `${rule.field_config_id}:${rule.option_value || "field"}`;
 
   return {
@@ -721,7 +677,6 @@ function evaluateFieldRule(
       location_hierarchy_id: rule.location_hierarchy_id,
       location_id: rule.location_id,
       amount: total,
-      worker_payment: workerPayment,
       metadata: { quantity, unit_price: unitPrice },
       line_item_key: lineItemKey,
       snapshot_data: {
@@ -738,7 +693,7 @@ function evaluateOptionRule(
   rule: PricingRuleRow,
   fieldConfig: FieldConfig,
   fieldValue: unknown,
-): { lineItem: LineItem; appliedRule: AppliedRule } | null {
+): { lineItem: WorkerPaymentLineItem; appliedRule: AppliedRule } | null {
   if (!rule.option_value) return null;
   const quantity = getOptionQuantity(fieldValue, rule.option_value);
   if (quantity <= 0) return null;
@@ -747,7 +702,6 @@ function evaluateOptionRule(
   const total = quantity * unitPrice;
   if (total <= 0) return null;
 
-  const workerPayment = computeWorkerPayment(rule, total);
   const lineItemKey = `${rule.field_config_id}:${rule.option_value}`;
 
   return {
@@ -769,7 +723,6 @@ function evaluateOptionRule(
       location_hierarchy_id: rule.location_hierarchy_id,
       location_id: rule.location_id,
       amount: total,
-      worker_payment: workerPayment,
       metadata: { quantity, unit_price: unitPrice },
       line_item_key: lineItemKey,
       snapshot_data: {
@@ -858,23 +811,6 @@ function calculateTieredTotal(quantity: number, definition: unknown): number {
   return total;
 }
 
-function computeWorkerPayment(rule: PricingRuleRow, amount: number): number {
-  if (
-    !rule.worker_payment_type ||
-    rule.worker_payment_type === "same_structure"
-  ) {
-    return amount;
-  }
-  if (rule.worker_payment_type === "percentage") {
-    const percentage = (rule.worker_payment_value ?? 0) / 100;
-    return amount * percentage;
-  }
-  if (rule.worker_payment_type === "fixed_rate") {
-    return rule.worker_payment_value ?? 0;
-  }
-  return 0;
-}
-
 function applyBaseRules({
   rules,
   locationContext,
@@ -890,12 +826,10 @@ function applyBaseRules({
 }): {
   total: number;
   adjustmentAmount: number;
-  baseAmount: number;
   appliedRules: AppliedRule[];
 } {
   let total = subtotal;
   let adjustmentAmount = 0;
-  let baseAmount = 0;
   const appliedRules: AppliedRule[] = [];
 
   const fieldBasedRules = rules.filter((rule) => rule.field_config_id);
@@ -933,7 +867,7 @@ function applyBaseRules({
       (selectedRule.pricing_type === "percentage" ? "multiply" : "add");
 
     if (adjustmentType === "add") {
-      baseAmount = selectedRule.base_price ?? 0;
+      const baseAmount = selectedRule.base_price ?? 0;
       total += baseAmount;
       adjustmentAmount += baseAmount;
     } else {
@@ -941,10 +875,8 @@ function applyBaseRules({
       const newTotal = total * multiplier;
       adjustmentAmount += newTotal - total;
       total = newTotal;
-      baseAmount = multiplier;
     }
 
-    const workerPayment = computeWorkerPayment(selectedRule, adjustmentAmount);
     appliedRules.push({
       pricing_rule_id: selectedRule.id,
       scope: selectedRule.scope,
@@ -954,7 +886,6 @@ function applyBaseRules({
       location_hierarchy_id: selectedRule.location_hierarchy_id,
       location_id: selectedRule.location_id,
       amount: adjustmentAmount,
-      worker_payment: workerPayment,
       metadata: {
         adjustment_type: adjustmentType,
       },
@@ -966,7 +897,7 @@ function applyBaseRules({
     });
   }
 
-  return { total, adjustmentAmount, baseAmount, appliedRules };
+  return { total, adjustmentAmount, appliedRules };
 }
 
 function applyConditionalRules({
@@ -1041,7 +972,6 @@ function applyConditionalRules({
       total = newTotal;
       adjustmentAmount += adjustment;
 
-      const workerPayment = computeWorkerPayment(rule, adjustment);
       appliedRules.push({
         pricing_rule_id: rule.id,
         scope: rule.scope,
@@ -1051,7 +981,6 @@ function applyConditionalRules({
         location_hierarchy_id: rule.location_hierarchy_id,
         location_id: rule.location_id,
         amount: adjustment,
-        worker_payment: workerPayment,
         metadata: {
           condition_id: condition.id,
           operator: condition.operator,

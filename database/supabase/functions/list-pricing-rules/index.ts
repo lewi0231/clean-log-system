@@ -12,6 +12,8 @@ interface ListPricingRulesRequest {
   location_id?: string | null;
   field_config_id?: string;
   option_value?: string;
+  pricing_context?: "customer" | "worker"; // Filter by pricing context
+  [key: string]: unknown;
 }
 
 serve(async (req) => {
@@ -35,6 +37,7 @@ serve(async (req) => {
       location_id,
       field_config_id,
       option_value,
+      pricing_context,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -42,9 +45,9 @@ serve(async (req) => {
     const { data: hierarchyNodes, error: hierarchyError } =
       location_hierarchy_id
         ? await supabase
-            .from("location_hierarchy")
-            .select("id,parent_id")
-            .eq("organization_id", organization_id)
+          .from("location_hierarchy")
+          .select("id,parent_id")
+          .eq("organization_id", organization_id)
         : { data: null, error: null };
 
     if (hierarchyError) throw hierarchyError;
@@ -81,7 +84,7 @@ serve(async (req) => {
           metadata,
           priority
         )
-      `
+      `,
       )
       .eq("organization_id", organization_id)
       .order("priority", { ascending: true })
@@ -103,6 +106,10 @@ serve(async (req) => {
       query = query.eq("option_value", option_value);
     }
 
+    if (pricing_context) {
+      query = query.eq("pricing_context", pricing_context);
+    }
+
     if (effective_at) {
       const effectiveDate = new Date(effective_at).toISOString();
       // Filter for rules that are effective at or before the specified date
@@ -122,7 +129,7 @@ serve(async (req) => {
       if (location_hierarchy_id) {
         allowedHierarchyIds.add(location_hierarchy_id);
         const nodes = hierarchyNodes || [];
-        let currentId = location_hierarchy_id;
+        let currentId: string | null = location_hierarchy_id;
         const nodeMap = new Map(nodes.map((node) => [node.id, node]));
         while (currentId) {
           const node = nodeMap.get(currentId);
@@ -136,11 +143,10 @@ serve(async (req) => {
       }
 
       filteredRules = filteredRules.filter((rule) => {
-        const matchesLocation =
-          !location_id || !rule.location_id || rule.location_id === location_id;
+        const matchesLocation = !location_id || !rule.location_id ||
+          rule.location_id === location_id;
 
-        const matchesHierarchy =
-          !location_hierarchy_id ||
+        const matchesHierarchy = !location_hierarchy_id ||
           !rule.location_hierarchy_id ||
           allowedHierarchyIds.has(rule.location_hierarchy_id);
 
@@ -155,7 +161,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("List pricing rules error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to list pricing rules"
+      error instanceof Error ? error : "Failed to list pricing rules",
     );
   }
 });

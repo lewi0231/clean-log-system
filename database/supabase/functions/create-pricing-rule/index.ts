@@ -17,6 +17,7 @@ interface CreatePricingRuleRequest {
   organization_id: string;
   scope: "field" | "option" | "base" | "global";
   pricing_type: "unit" | "fixed" | "tiered" | "percentage" | "conditional";
+  pricing_context?: "customer" | "worker"; // Defaults to 'customer' for backward compatibility
   field_config_id?: string | null;
   option_value?: string | null;
   applies_to_field_type?: string | null;
@@ -37,6 +38,7 @@ interface CreatePricingRuleRequest {
   expires_at?: string | null;
   created_by?: string | null;
   conditions?: PricingConditionInput[];
+  [key: string]: unknown;
 }
 
 serve(async (req) => {
@@ -59,6 +61,7 @@ serve(async (req) => {
       organization_id,
       scope,
       pricing_type,
+      pricing_context,
       field_config_id,
       option_value,
       applies_to_field_type,
@@ -88,8 +91,31 @@ serve(async (req) => {
     if (scope === "option" && (!field_config_id || !option_value)) {
       return errorResponse(
         "field_config_id and option_value are required for option scope",
-        400
+        400,
       );
+    }
+
+    // Validate pricing_context
+    if (
+      pricing_context &&
+      pricing_context !== "customer" &&
+      pricing_context !== "worker"
+    ) {
+      return errorResponse(
+        "pricing_context must be either 'customer' or 'worker'",
+        400,
+      );
+    }
+
+    // Worker payment rules should not have worker_payment_type/worker_payment_value
+    // Those fields are for customer rules with embedded worker payments
+    if (pricing_context === "worker") {
+      if (worker_payment_type || worker_payment_value !== undefined) {
+        return errorResponse(
+          "Worker payment rules cannot have worker_payment_type or worker_payment_value. Use separate worker pricing rules instead.",
+          400,
+        );
+      }
     }
 
     const supabase = createServiceRoleClient();
@@ -137,6 +163,7 @@ serve(async (req) => {
       organization_id,
       scope,
       pricing_type,
+      pricing_context: pricing_context || "customer", // Default to 'customer' for backward compatibility
       field_config_id: field_config_id || null,
       option_value: option_value || null,
       applies_to_field_type: applies_to_field_type || null,
@@ -181,7 +208,7 @@ serve(async (req) => {
           type,
           parent_id
         )
-      `
+      `,
       )
       .single();
 
@@ -217,7 +244,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Create pricing rule error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to create pricing rule"
+      error instanceof Error ? error : "Failed to create pricing rule",
     );
   }
 });

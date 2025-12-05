@@ -46,12 +46,14 @@ interface BasePricingEditorProps {
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
+  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
 export default function BasePricingEditor({
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
+  pricingContext = "customer",
 }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
   const { basePricing, loading, error, upsertPricing, deletePricing } =
@@ -59,6 +61,7 @@ export default function BasePricingEditor({
       locationHierarchyId,
       locationId,
       effectiveAt,
+      pricingContext,
     });
   useOrganizationCurrency(); // Hook used for currency context
 
@@ -175,6 +178,7 @@ export default function BasePricingEditor({
           editingAdjustmentTypes["standalone"] ||
           standalonePricing.adjustment_type,
         conditions: nextConditions,
+        pricingContext,
       } as Parameters<typeof upsertPricing>[0];
       await upsertPricing(request);
     } catch (error) {
@@ -232,6 +236,7 @@ export default function BasePricingEditor({
         adjustment_type: adjustmentType,
         conditions: existingConditions,
         location_id: locationId,
+        pricingContext,
       } as Parameters<typeof upsertPricing>[0];
       await upsertPricing(request);
       setEditingPrices((prev) => {
@@ -292,6 +297,7 @@ export default function BasePricingEditor({
         customer_base_price: customerPrice,
         adjustment_type: adjustmentType,
         location_id: locationId,
+        pricingContext,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };

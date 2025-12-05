@@ -88,6 +88,7 @@ interface FieldPricingListProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   refreshToken?: number;
+  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
 export default function FieldPricingList({
@@ -95,6 +96,7 @@ export default function FieldPricingList({
   locationId = null,
   effectiveAt = null,
   refreshToken,
+  pricingContext = "customer",
 }: FieldPricingListProps) {
   const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
   const {
@@ -108,6 +110,7 @@ export default function FieldPricingList({
     locationId,
     effectiveAt,
     refreshToken,
+    pricingContext,
   });
   const { setSelectedFieldId, expirationDate } = usePricingScope();
   const { formatCurrency } = useOrganizationCurrency();
@@ -194,6 +197,7 @@ export default function FieldPricingList({
             serializeCondition
           ),
         expirationDate,
+        pricingContext,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };
@@ -276,6 +280,7 @@ export default function FieldPricingList({
         locationHierarchyId,
         locationId,
         conditions: nextConditions,
+        pricingContext,
       });
       closeConditionalModal();
     } catch (error) {

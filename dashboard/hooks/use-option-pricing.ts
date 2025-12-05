@@ -9,6 +9,7 @@ interface UseOptionPricingOptions {
   locationId?: string | null;
   locationHierarchyId?: string | null;
   effectiveAt?: string | null;
+  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
 interface UseOptionPricingResult {
@@ -26,6 +27,7 @@ interface UseOptionPricingResult {
       locationHierarchyId?: string | null;
       currency?: string;
       expirationDate?: string | null;
+      pricingContext?: "customer" | "worker";
     },
   ) => Promise<OptionPricing>;
   deletePricing: (id: string) => Promise<void>;
@@ -60,6 +62,7 @@ export function useOptionPricing(
         location_hierarchy_id: null,
         location_id: null,
         effective_at: filters?.effectiveAt ?? undefined,
+        pricing_context: filters?.pricingContext || "customer",
       });
 
       setOptionPricing(pricing.map(transformOptionRule));
@@ -83,6 +86,7 @@ export function useOptionPricing(
       locationHierarchyId?: string | null;
       currency?: string;
       expirationDate?: string | null;
+      pricingContext?: "customer" | "worker";
     },
   ): Promise<OptionPricing> => {
     if (!organizationId) {
@@ -106,6 +110,8 @@ export function useOptionPricing(
       organization_id: organizationId,
       scope: "option",
       pricing_type: "fixed",
+      pricing_context: options?.pricingContext || filters?.pricingContext ||
+        "customer",
       field_config_id: fieldConfigId,
       option_value: optionValue,
       base_price: customerPrice,

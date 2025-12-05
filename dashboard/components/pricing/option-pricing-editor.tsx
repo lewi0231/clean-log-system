@@ -38,6 +38,7 @@ interface OptionPricingEditorProps {
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
+  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
 export default function OptionPricingEditor({
@@ -45,12 +46,14 @@ export default function OptionPricingEditor({
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
+  pricingContext = "customer",
 }: OptionPricingEditorProps) {
   const { optionPricing, loading, error, upsertPricing, deletePricing } =
     useOptionPricing(fieldConfig.id, {
       locationHierarchyId,
       locationId,
       effectiveAt,
+      pricingContext,
     });
   const { expirationDate } = usePricingScope();
   const { formatCurrency } = useOrganizationCurrency();
@@ -104,6 +107,7 @@ export default function OptionPricingEditor({
         locationId,
         locationHierarchyId,
         expirationDate,
+        pricingContext,
       });
       setEditingPrices((prev) => {
         const next = { ...prev };
@@ -154,6 +158,7 @@ export default function OptionPricingEditor({
             locationId,
             locationHierarchyId,
             expirationDate,
+            pricingContext,
           })
         )
       );
@@ -193,6 +198,7 @@ export default function OptionPricingEditor({
             locationId,
             locationHierarchyId,
             expirationDate,
+            pricingContext,
           })
         )
       );
@@ -231,6 +237,7 @@ export default function OptionPricingEditor({
             locationId,
             locationHierarchyId,
             expirationDate,
+            pricingContext,
           })
         )
       );

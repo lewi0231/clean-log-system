@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -19,8 +20,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { Location } from "@/lib/types";
-import { Pencil, Trash2 } from "lucide-react";
+import { DollarSign, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import LocationForm from "./location-form";
 
@@ -38,6 +40,10 @@ interface LocationListProps {
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      pricing_mode?: "field_based" | "fixed_price";
+      fixed_customer_price?: number | null;
+      fixed_worker_payment?: number | null;
+      fixed_price_currency?: string | null;
     }
   ) => Promise<void>;
 }
@@ -49,6 +55,7 @@ export default function LocationList({
   onDeleteLocation,
   onUpdateLocation,
 }: LocationListProps) {
+  const { formatCurrency } = useOrganizationCurrency();
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(
@@ -74,6 +81,10 @@ export default function LocationList({
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      pricing_mode?: "field_based" | "fixed_price";
+      fixed_customer_price?: number | null;
+      fixed_worker_payment?: number | null;
+      fixed_price_currency?: string | null;
     },
     locationId?: string
   ) => {
@@ -102,6 +113,7 @@ export default function LocationList({
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Region</TableHead>
+              <TableHead>Pricing</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Address</TableHead>
               <TableHead>Contact Person</TableHead>
@@ -113,7 +125,7 @@ export default function LocationList({
           <TableBody>
             {locations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
+                <TableCell colSpan={9} className="text-center py-8">
                   No locations found. Add your first location to get started.
                 </TableCell>
               </TableRow>
@@ -131,6 +143,29 @@ export default function LocationList({
                         Org default
                       </span>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Badge
+                        variant={
+                          location.pricing_mode === "fixed_price"
+                            ? "default"
+                            : "outline"
+                        }
+                        className="w-fit"
+                      >
+                        {location.pricing_mode === "fixed_price"
+                          ? "Fixed Price"
+                          : "Field-Based"}
+                      </Badge>
+                      {location.pricing_mode === "fixed_price" &&
+                        location.fixed_customer_price && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <DollarSign className="h-3 w-3" />
+                            {formatCurrency(location.fixed_customer_price)}
+                          </div>
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell>{location.email}</TableCell>
                   <TableCell>{location.address || "-"}</TableCell>

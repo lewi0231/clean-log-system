@@ -112,7 +112,10 @@ export function isFieldDisabled(
   return false; // No active clusters - field is enabled
 }
 
-export function useFieldConfigs(organizationId: string | null) {
+export function useFieldConfigs(
+  organizationId: string | null,
+  locationId?: string | null,
+) {
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [sections, setSections] = useState<FormSectionWithFields[]>([]);
   const [loading, setLoading] = useState(true);
@@ -215,7 +218,10 @@ export function useFieldConfigs(organizationId: string | null) {
         // Fetch both field configs and sections in parallel
         const [fieldConfigsResponse, sectionsResponse] = await Promise.all([
           supabase.functions.invoke("list-field-configs", {
-            body: { organization_id: organizationId },
+            body: {
+              organization_id: organizationId,
+              location_id: locationId || undefined,
+            },
           }),
           supabase.functions.invoke("list-form-sections", {
             body: { organization_id: organizationId },

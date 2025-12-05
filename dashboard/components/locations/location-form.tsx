@@ -18,10 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
+import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { log } from "@/lib/logger";
 import type { LocationHierarchyNode } from "@/lib/types";
 import { locationSchema } from "@/lib/validations";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 interface LocationFormProps {
@@ -35,6 +43,10 @@ interface LocationFormProps {
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      pricing_mode?: "field_based" | "fixed_price";
+      fixed_customer_price?: number | null;
+      fixed_worker_payment?: number | null;
+      fixed_price_currency?: string | null;
     },
     locationId?: string
   ) => void | Promise<void>;
@@ -46,6 +58,10 @@ interface LocationFormProps {
     contact_person: string | null;
     phone: string | null;
     hierarchy_parent_id?: string | null;
+    pricing_mode?: "field_based" | "fixed_price";
+    fixed_customer_price?: number | null;
+    fixed_worker_payment?: number | null;
+    fixed_price_currency?: string | null;
   } | null;
 }
 
@@ -56,6 +72,7 @@ export default function LocationForm({
   location,
 }: LocationFormProps) {
   const { nodes: hierarchyNodes } = useLocationHierarchy();
+  const { currency: orgCurrency } = useOrganizationCurrency();
   const [name, setName] = useState(location?.name || "");
   const [email, setEmail] = useState(location?.email || "");
   const [address, setAddress] = useState(location?.address || "");
@@ -66,6 +83,19 @@ export default function LocationForm({
   const [hierarchyParentId, setHierarchyParentId] = useState<string | null>(
     location?.hierarchy_parent_id || null
   );
+  const [pricingMode, setPricingMode] = useState<"field_based" | "fixed_price">(
+    location?.pricing_mode || "field_based"
+  );
+  const [fixedCustomerPrice, setFixedCustomerPrice] = useState<string>(
+    location?.fixed_customer_price?.toString() || ""
+  );
+  const [fixedWorkerPayment, setFixedWorkerPayment] = useState<string>(
+    location?.fixed_worker_payment?.toString() || ""
+  );
+  const [fixedPriceCurrency, setFixedPriceCurrency] = useState<string>(
+    location?.fixed_price_currency || orgCurrency
+  );
+  const [pricingSectionOpen, setPricingSectionOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     name?: string;
@@ -73,6 +103,7 @@ export default function LocationForm({
     address?: string;
     contact_person?: string;
     phone?: string;
+    fixed_customer_price?: string;
   }>({});
 
   // Build a flat list with indentation for display
@@ -106,6 +137,17 @@ export default function LocationForm({
       address,
       contact_person: contactPerson,
       phone: phone || undefined,
+      pricing_mode: pricingMode,
+      fixed_customer_price:
+        pricingMode === "fixed_price" && fixedCustomerPrice
+          ? parseFloat(fixedCustomerPrice)
+          : undefined,
+      fixed_worker_payment:
+        pricingMode === "fixed_price" && fixedWorkerPayment
+          ? parseFloat(fixedWorkerPayment)
+          : undefined,
+      fixed_price_currency:
+        pricingMode === "fixed_price" ? fixedPriceCurrency : undefined,
     });
 
     if (!result.success) {
@@ -115,6 +157,7 @@ export default function LocationForm({
         address?: string;
         contact_person?: string;
         phone?: string;
+        fixed_customer_price?: string;
       } = {};
 
       result.error.issues.forEach((issue) => {
@@ -124,7 +167,8 @@ export default function LocationForm({
           path === "email" ||
           path === "address" ||
           path === "contact_person" ||
-          path === "phone"
+          path === "phone" ||
+          path === "fixed_customer_price"
         ) {
           fieldErrors[path] = issue.message;
         }
@@ -158,6 +202,26 @@ export default function LocationForm({
         locationId: location?.id,
       });
 
+      // Prepare pricing data
+      const pricingData: {
+        pricing_mode?: "field_based" | "fixed_price";
+        fixed_customer_price?: number | null;
+        fixed_worker_payment?: number | null;
+        fixed_price_currency?: string | null;
+      } = {
+        pricing_mode: pricingMode,
+      };
+
+      if (pricingMode === "fixed_price") {
+        pricingData.fixed_customer_price = fixedCustomerPrice
+          ? parseFloat(fixedCustomerPrice)
+          : null;
+        pricingData.fixed_worker_payment = fixedWorkerPayment
+          ? parseFloat(fixedWorkerPayment)
+          : null;
+        pricingData.fixed_price_currency = fixedPriceCurrency;
+      }
+
       // Reset form
       setName("");
       setEmail("");
@@ -165,10 +229,18 @@ export default function LocationForm({
       setContactPerson("");
       setPhone("");
       setHierarchyParentId(null);
+      setPricingMode("field_based");
+      setFixedCustomerPrice("");
+      setFixedWorkerPayment("");
+      setFixedPriceCurrency(orgCurrency);
       setErrors({});
       onOpenChange(false);
       await onSuccess(
-        { ...validatedData, hierarchy_parent_id: hierarchyParentId },
+        {
+          ...validatedData,
+          hierarchy_parent_id: hierarchyParentId,
+          ...pricingData,
+        },
         location?.id
       );
     } catch (error) {
@@ -199,9 +271,19 @@ export default function LocationForm({
       setContactPerson(location?.contact_person || "");
       setPhone(location?.phone || "");
       setHierarchyParentId(location?.hierarchy_parent_id || null);
+      setPricingMode(location?.pricing_mode || "field_based");
+      setFixedCustomerPrice(
+        location?.fixed_customer_price?.toString() || ""
+      );
+      setFixedWorkerPayment(location?.fixed_worker_payment?.toString() || "");
+      setFixedPriceCurrency(location?.fixed_price_currency || orgCurrency);
       setErrors({});
+      // Open pricing section if location has fixed pricing
+      if (location?.pricing_mode === "fixed_price") {
+        setPricingSectionOpen(true);
+      }
     }
-  }, [open, location]);
+  }, [open, location, orgCurrency]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -364,6 +446,149 @@ export default function LocationForm({
               </p>
             )}
           </div>
+
+          <Collapsible
+            open={pricingSectionOpen}
+            onOpenChange={setPricingSectionOpen}
+          >
+            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-3 text-left hover:bg-accent">
+              <div className="flex items-center gap-2">
+                {pricingSectionOpen ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <Label className="text-base font-medium cursor-pointer">
+                  Pricing Configuration
+                </Label>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <div className="space-y-3">
+                <Label>Pricing Mode</Label>
+                <RadioGroup
+                  value={pricingMode}
+                  onValueChange={(value) => {
+                    setPricingMode(value as "field_based" | "fixed_price");
+                    if (value === "field_based") {
+                      setFixedCustomerPrice("");
+                      setFixedWorkerPayment("");
+                    }
+                    setErrors((prev) => ({
+                      ...prev,
+                      fixed_customer_price: undefined,
+                    }));
+                  }}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="field_based" id="field_based" />
+                    <Label
+                      htmlFor="field_based"
+                      className="font-normal cursor-pointer"
+                    >
+                      Field-Based Pricing
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Prices calculated from field configs and pricing rules
+                  </p>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <RadioGroupItem value="fixed_price" id="fixed_price" />
+                    <Label
+                      htmlFor="fixed_price"
+                      className="font-normal cursor-pointer"
+                    >
+                      Fixed Price
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Use a fixed price regardless of field data (field data still
+                    collected)
+                  </p>
+                </RadioGroup>
+              </div>
+
+              {pricingMode === "fixed_price" && (
+                <div className="space-y-4 border-t pt-4">
+                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
+                    <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Field config data will still be collected for operational
+                      purposes, but pricing will use the fixed amounts below.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fixed_customer_price">
+                      Fixed Customer Price <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="fixed_customer_price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={fixedCustomerPrice}
+                      onChange={(e) => {
+                        setFixedCustomerPrice(e.target.value);
+                        if (errors.fixed_customer_price) {
+                          setErrors((prev) => ({
+                            ...prev,
+                            fixed_customer_price: undefined,
+                          }));
+                        }
+                      }}
+                      placeholder="0.00"
+                      aria-invalid={!!errors.fixed_customer_price}
+                      required
+                    />
+                    {errors.fixed_customer_price && (
+                      <p className="text-sm text-destructive">
+                        {errors.fixed_customer_price}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fixed_worker_payment">
+                      Fixed Worker Payment (Optional)
+                    </Label>
+                    <Input
+                      id="fixed_worker_payment"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={fixedWorkerPayment}
+                      onChange={(e) => setFixedWorkerPayment(e.target.value)}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Amount paid to workers for jobs at this location
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fixed_price_currency">Currency</Label>
+                    <Select
+                      value={fixedPriceCurrency}
+                      onValueChange={setFixedPriceCurrency}
+                    >
+                      <SelectTrigger id="fixed_price_currency">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD - US Dollar</SelectItem>
+                        <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
+                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
+                        <SelectItem value="EUR">EUR - Euro</SelectItem>
+                        <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
+                        <SelectItem value="NZD">NZD - New Zealand Dollar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         </div>
         <DialogFooter>
           <Button

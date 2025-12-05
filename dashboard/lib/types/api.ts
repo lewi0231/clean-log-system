@@ -69,6 +69,10 @@ export interface CreateLocationRequest {
   contact_person: string;
   phone?: string;
   hierarchy_parent_id?: string | null;
+  pricing_mode?: "field_based" | "fixed_price";
+  fixed_customer_price?: number | null;
+  fixed_worker_payment?: number | null;
+  fixed_price_currency?: string | null;
 }
 
 export interface UpdateLocationRequest {
@@ -79,6 +83,10 @@ export interface UpdateLocationRequest {
   contact_person?: string;
   phone?: string;
   hierarchy_parent_id?: string | null;
+  pricing_mode?: "field_based" | "fixed_price";
+  fixed_customer_price?: number | null;
+  fixed_worker_payment?: number | null;
+  fixed_price_currency?: string | null;
 }
 
 export interface DeleteLocationRequest {

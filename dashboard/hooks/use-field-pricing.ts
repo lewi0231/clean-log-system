@@ -16,6 +16,7 @@ interface UseFieldPricingOptions {
   locationHierarchyId?: string | null;
   effectiveAt?: string | null;
   refreshToken?: number;
+  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
 interface UseFieldPricingResult {
@@ -36,6 +37,7 @@ interface UseFieldPricingResult {
       workerPaymentValue?: number | null;
       conditions?: UpsertPricingRuleRequest["conditions"];
       expirationDate?: string | null;
+      pricingContext?: "customer" | "worker";
     },
   ) => Promise<FieldPricing>;
   deletePricing: (id: string) => Promise<void>;
@@ -68,6 +70,7 @@ export function useFieldPricing(
         location_hierarchy_id: null,
         location_id: null,
         effective_at: options?.effectiveAt ?? undefined,
+        pricing_context: options?.pricingContext || "customer",
       });
 
       setFieldPricing(pricing.map(transformFieldPricing));
@@ -94,6 +97,7 @@ export function useFieldPricing(
       workerPaymentValue?: number | null;
       conditions?: UpsertPricingRuleRequest["conditions"];
       expirationDate?: string | null;
+      pricingContext?: "customer" | "worker";
     },
   ): Promise<FieldPricing> => {
     if (!organizationId) {
@@ -115,6 +119,7 @@ export function useFieldPricing(
       organization_id: organizationId,
       scope: "field",
       pricing_type: options?.pricingType || "unit",
+      pricing_context: options?.pricingContext || "customer",
       field_config_id: fieldConfigId,
       applies_to_field_type: options?.appliesToFieldType,
       base_price: customerPrice,

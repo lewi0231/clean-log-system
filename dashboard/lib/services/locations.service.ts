@@ -14,7 +14,7 @@ export class LocationsService {
    * List workers and locations for an organization
    */
   static async listWorkersAndLocations(
-    request: ListWorkersAndLocationsRequest
+    request: ListWorkersAndLocationsRequest,
   ): Promise<ListWorkersAndLocationsResponse> {
     try {
       log.debug("LocationsService: Fetching workers and locations", {
@@ -25,7 +25,7 @@ export class LocationsService {
         "list-workers-and-locations",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {
@@ -56,11 +56,34 @@ export class LocationsService {
         name: request.name,
       });
 
+      // Validate pricing mode and fixed price fields
+      if (request.pricing_mode === "fixed_price") {
+        if (
+          request.fixed_customer_price === undefined ||
+          request.fixed_customer_price === null
+        ) {
+          throw new Error(
+            "Fixed customer price is required when pricing mode is fixed price",
+          );
+        }
+        if (request.fixed_customer_price < 0) {
+          throw new Error("Fixed customer price must be non-negative");
+        }
+        if (request.fixed_price_currency) {
+          const currencyRegex = /^[A-Z]{3}$/;
+          if (!currencyRegex.test(request.fixed_price_currency)) {
+            throw new Error(
+              "Fixed price currency must be a valid 3-letter ISO code",
+            );
+          }
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke(
         "create-location",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {
@@ -92,11 +115,40 @@ export class LocationsService {
         locationId: request.id,
       });
 
+      // Validate pricing mode and fixed price fields
+      if (request.pricing_mode === "fixed_price") {
+        if (
+          request.fixed_customer_price !== undefined &&
+          request.fixed_customer_price !== null &&
+          request.fixed_customer_price < 0
+        ) {
+          throw new Error("Fixed customer price must be non-negative");
+        }
+        if (request.fixed_price_currency) {
+          const currencyRegex = /^[A-Z]{3}$/;
+          if (!currencyRegex.test(request.fixed_price_currency)) {
+            throw new Error(
+              "Fixed price currency must be a valid 3-letter ISO code",
+            );
+          }
+        }
+        // If switching to fixed_price mode, require fixed_customer_price
+        if (
+          request.pricing_mode === "fixed_price" &&
+          (request.fixed_customer_price === undefined ||
+            request.fixed_customer_price === null)
+        ) {
+          throw new Error(
+            "Fixed customer price is required when pricing mode is fixed price",
+          );
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke(
         "update-location",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {

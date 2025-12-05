@@ -16,6 +16,7 @@ export interface ListPricingRulesRequest {
   location_id?: string | null;
   field_config_id?: string;
   option_value?: string;
+  pricing_context?: "customer" | "worker";
 }
 
 export interface UpsertPricingRuleRequest {
@@ -23,6 +24,7 @@ export interface UpsertPricingRuleRequest {
   organization_id: string;
   scope: PricingScope;
   pricing_type: PricingType;
+  pricing_context?: "customer" | "worker"; // Defaults to 'customer' for backward compatibility
   field_config_id?: string | null;
   option_value?: string | null;
   applies_to_field_type?: string | null;
@@ -63,7 +65,7 @@ export interface UpsertPricingRuleRequest {
 
 export class PricingService {
   static async listRules(
-    request: ListPricingRulesRequest
+    request: ListPricingRulesRequest,
   ): Promise<PricingRule[]> {
     try {
       log.debug("PricingService: listing pricing rules", {
@@ -75,7 +77,7 @@ export class PricingService {
         "list-pricing-rules",
         {
           body: request,
-        }
+        },
       );
 
       if (error) throw error;
@@ -94,7 +96,7 @@ export class PricingService {
   }
 
   static async upsertRule(
-    request: UpsertPricingRuleRequest
+    request: UpsertPricingRuleRequest,
   ): Promise<PricingRule> {
     const functionName = request.id
       ? "update-pricing-rule"
@@ -135,7 +137,7 @@ export class PricingService {
         "delete-pricing-rule",
         {
           body: { id },
-        }
+        },
       );
 
       if (error) throw error;

@@ -56,6 +56,10 @@ export interface Location {
     name: string;
     type: "company" | "region";
   } | null;
+  pricing_mode?: "field_based" | "fixed_price";
+  fixed_customer_price?: number | null;
+  fixed_worker_payment?: number | null;
+  fixed_price_currency?: string | null;
 }
 
 export type BusinessMode = "service_based" | "resource_tracking";
@@ -139,6 +143,7 @@ export interface PricingRule {
   organization_id: string;
   scope: PricingScope;
   pricing_type: PricingType;
+  pricing_context?: "customer" | "worker"; // Separates customer invoicing from worker payments
   field_config_id: string | null;
   option_value: string | null;
   applies_to_field_type: string | null;
