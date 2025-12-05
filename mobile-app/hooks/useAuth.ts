@@ -1,13 +1,17 @@
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 
 export function useAuth() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Redirect to login page after sign out
+    router.replace("/login");
   };
 
   useEffect(() => {

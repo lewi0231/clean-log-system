@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { createSchemaFromFieldConfig } from "@/lib/utils";
 import { FieldConfig } from "@/shared/types/field-config";
 import { FieldType } from "@/shared/types/field-type";
+import { FormSectionWithFields } from "@/shared/types/form-section";
 import { useEffect, useState } from "react";
 
 export type FieldErrors = Partial<Record<FieldConfig["name"], string>>;
@@ -15,7 +16,7 @@ export function getFieldCluster(fieldConfig: FieldConfig): string | null {
 // Helper: Check if two fields are in the same cluster
 export function areInSameCluster(
   field1: FieldConfig,
-  field2: FieldConfig
+  field2: FieldConfig,
 ): boolean {
   const cluster1 = getFieldCluster(field1);
   const cluster2 = getFieldCluster(field2);
@@ -24,7 +25,7 @@ export function areInSameCluster(
 
 // Helper: Group fields by mutually_exclusive_group
 export function groupFieldsByMutualExclusivity(
-  fieldConfigs: FieldConfig[]
+  fieldConfigs: FieldConfig[],
 ): Map<string | null, FieldConfig[]> {
   const groups = new Map<string | null, FieldConfig[]>();
 
@@ -70,7 +71,7 @@ export function hasValue(value: unknown, fieldType: FieldType): boolean {
 export function isFieldDisabled(
   fieldConfig: FieldConfig,
   fieldConfigs: FieldConfig[],
-  fieldValues: Record<string, unknown>
+  fieldValues: Record<string, unknown>,
 ): boolean {
   const groupId = fieldConfig.mutually_exclusive_group;
   if (!groupId) return false; // No group = never disabled
@@ -79,7 +80,7 @@ export function isFieldDisabled(
 
   // Find all fields in the same group
   const groupFields = fieldConfigs.filter(
-    (fc) => fc.mutually_exclusive_group === groupId
+    (fc) => fc.mutually_exclusive_group === groupId,
   );
 
   // Find which clusters/fields currently have values
@@ -113,20 +114,22 @@ export function isFieldDisabled(
 
 export function useFieldConfigs(organizationId: string | null) {
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
+  const [sections, setSections] = useState<FormSectionWithFields[]>([]);
+  const [loading, setLoading] = useState(true);
   // Dynamic field values: key is field config id, value is the field value
   const [fieldValues, setFieldValues] = useState<
     Record<string, string | number | boolean | GroupedBreakdownItem[]>
   >({});
 
   const resetFieldValues = (
-    values: Record<string, string | number | boolean | GroupedBreakdownItem[]>
+    values: Record<string, string | number | boolean | GroupedBreakdownItem[]>,
   ) => {
     setFieldValues(values);
   };
 
   const updateFieldValue = (
     fieldId: string,
-    value: string | number | boolean | GroupedBreakdownItem[]
+    value: string | number | boolean | GroupedBreakdownItem[],
   ) => {
     setFieldValues((prev) => {
       const currentField = fieldConfigs.find((fc) => fc.id === fieldId);
@@ -141,7 +144,7 @@ export function useFieldConfigs(organizationId: string | null) {
       // If this field now has a value and is in a group, clear conflicting values
       if (hasNonEmptyValue && groupId) {
         const groupFields = fieldConfigs.filter(
-          (fc) => fc.mutually_exclusive_group === groupId
+          (fc) => fc.mutually_exclusive_group === groupId,
         );
 
         // Find fields in OTHER clusters that have values
@@ -155,7 +158,10 @@ export function useFieldConfigs(organizationId: string | null) {
         });
 
         // Clear values from other clusters
-        const clearedValues: Record<string, unknown> = {};
+        const clearedValues: Record<
+          string,
+          string | number | boolean | GroupedBreakdownItem[]
+        > = {};
         otherClusterFields.forEach((fc) => {
           switch (fc.field_type) {
             case "boolean":
@@ -194,61 +200,106 @@ export function useFieldConfigs(organizationId: string | null) {
   };
 
   useEffect(() => {
-    if (!organizationId) return;
+    if (!organizationId) {
+      setLoading(false);
+      return;
+    }
 
     async function fetchFieldConfigs() {
       try {
+        setLoading(true);
         console.log("📋 Field Configs: Fetching for organization", {
           organizationId,
         });
 
-        const { data, error } = await supabase.functions.invoke(
-          "list-field-configs",
-          {
+        // Fetch both field configs and sections in parallel
+        const [fieldConfigsResponse, sectionsResponse] = await Promise.all([
+          supabase.functions.invoke("list-field-configs", {
             body: { organization_id: organizationId },
-          }
-        );
+          }),
+          supabase.functions.invoke("list-form-sections", {
+            body: { organization_id: organizationId },
+          }),
+        ]);
 
-        if (error) {
-          console.error("📋 Field Configs: Error", error);
+        if (fieldConfigsResponse.error) {
+          console.error("📋 Field Configs: Error", fieldConfigsResponse.error);
+          setLoading(false);
           return;
         }
 
+        if (sectionsResponse.error) {
+          console.error("📋 Sections: Error", sectionsResponse.error);
+          // Continue even if sections fail
+        }
+
         console.log("📋 Field Configs: Response received", {
-          success: data?.success,
-          fieldConfigs: data?.field_configs,
+          success: fieldConfigsResponse.data?.success,
+          fieldConfigs: fieldConfigsResponse.data?.field_configs,
         });
 
-        if (data?.field_configs) {
-          setFieldConfigs(data.field_configs);
+        // Process field configs
+        if (fieldConfigsResponse.data?.field_configs) {
+          setFieldConfigs(fieldConfigsResponse.data.field_configs);
           // Initialize field values with default values
           const initialValues: Record<
             string,
             string | number | boolean | GroupedBreakdownItem[]
           > = {};
-          data.field_configs.forEach((config: FieldConfig) => {
-            if (config.field_type === "number") {
-              initialValues[config.id] = 0;
-            } else if (config.field_type === "boolean") {
-              initialValues[config.id] = false;
-            } else if (config.field_type === "grouped_breakdown") {
-              initialValues[config.id] = [];
-            } else if (config.field_type === "time") {
-              // Initialize time fields with current time as HH:mm string
-              const now = new Date();
-              const hours = now.getHours().toString().padStart(2, "0");
-              const minutes = now.getMinutes().toString().padStart(2, "0");
-              initialValues[config.id] = `${hours}:${minutes}`;
-            } else {
-              initialValues[config.id] = "";
-            }
-          });
+          fieldConfigsResponse.data.field_configs.forEach(
+            (config: FieldConfig) => {
+              if (config.field_type === "number") {
+                initialValues[config.id] = 0;
+              } else if (config.field_type === "boolean") {
+                initialValues[config.id] = false;
+              } else if (config.field_type === "grouped_breakdown") {
+                initialValues[config.id] = [];
+              } else if (config.field_type === "time") {
+                // Initialize time fields with current time as HH:mm string
+                const now = new Date();
+                const hours = now.getHours().toString().padStart(2, "0");
+                const minutes = now.getMinutes().toString().padStart(2, "0");
+                initialValues[config.id] = `${hours}:${minutes}`;
+              } else {
+                initialValues[config.id] = "";
+              }
+            },
+          );
           setFieldValues(initialValues);
+        } else {
+          setFieldConfigs([]);
+        }
+
+        // Process sections
+        if (sectionsResponse.data?.sections) {
+          console.log("📋 Sections: Response received", {
+            success: sectionsResponse.data?.success,
+            sections: sectionsResponse.data?.sections,
+          });
+          // Convert to FormSectionWithFields by adding field_ids
+          const sectionsWithFields: FormSectionWithFields[] = sectionsResponse
+            .data.sections.map(
+              (section: FormSectionWithFields) => ({
+                ...section,
+                field_ids: fieldConfigsResponse.data?.field_configs
+                  ?.filter((fc: FieldConfig) => fc.section_id === section.id)
+                  .map((fc: FieldConfig) => fc.id) || [],
+              }),
+            );
+          // Sort by order_position
+          sectionsWithFields.sort((a, b) =>
+            a.order_position - b.order_position
+          );
+          setSections(sectionsWithFields);
+        } else {
+          setSections([]);
         }
       } catch (err) {
         console.error("📋 Field Configs: Failed to fetch", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -258,6 +309,8 @@ export function useFieldConfigs(organizationId: string | null) {
   return {
     fieldValues,
     fieldConfigs,
+    sections,
+    loading,
     resetFieldValues,
     updateFieldValue,
     FieldConfigSchema: createSchemaFromFieldConfig(fieldConfigs),

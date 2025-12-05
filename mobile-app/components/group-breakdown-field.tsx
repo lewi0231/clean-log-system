@@ -130,7 +130,7 @@ export function GroupedBreakdownField({
         >
           <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
           <Text className="text-base font-medium text-[#007AFF]">
-            Add Brand
+            Add Entry
           </Text>
         </Pressable>
       )}

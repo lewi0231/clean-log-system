@@ -87,10 +87,10 @@ const TimePicker = React.forwardRef<View, TimePickerProps>(
           onPress={openPicker}
           disabled={disabled}
           className={cn(
-            "w-full rounded-md border border-input bg-transparent flex-row items-center justify-between",
+            "w-full rounded-xl border border-gray-700 bg-gray-800 flex-row items-center justify-between",
             sizeClasses[size],
-            value ? "border-primary" : "",
-            disabled ? "opacity-50 cursor-not-allowed" : "active:bg-accent/5",
+            value ? "border-gray-600" : "",
+            disabled ? "opacity-50 cursor-not-allowed" : "active:bg-gray-750",
             className
           )}
           {...props}
@@ -99,14 +99,11 @@ const TimePicker = React.forwardRef<View, TimePickerProps>(
             <Ionicons
               name="time-outline"
               size={iconSizes[size]}
-              color={disabled ? "#999" : "#666"}
+              color={disabled ? "#6b7280" : "#9ca3af"}
             />
           </View>
           <Text
-            className={cn(
-              "flex-1",
-              value ? "text-primary" : "text-muted-foreground"
-            )}
+            className={cn("flex-1 text-gray-100", !value && "text-gray-400")}
             numberOfLines={1}
           >
             {displayValue}

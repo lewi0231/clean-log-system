@@ -14,8 +14,12 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
       <View className="flex-1 items-center justify-center px-6">
         <View className="items-center mb-8">
-          <View className="bg-blue-100 rounded-full p-6 mb-4">
-            <Ionicons name="document-text-outline" size={64} color="#007AFF" />
+          <View className="bg-card rounded-full p-6 mb-4 border border-border">
+            <Ionicons
+              name="document-text-outline"
+              size={64}
+              color="rgb(var(--color-primary))"
+            />
           </View>
           <Text className="text-3xl font-bold text-foreground mb-2 text-center">
             Clean Log
@@ -27,11 +31,15 @@ export default function HomeScreen() {
 
         <Pressable
           onPress={handleMakeNewEntry}
-          className="bg-blue-500 rounded-xl py-5 px-12 items-center justify-center w-full max-w-sm active:bg-blue-600 active:scale-[0.98] shadow-lg"
+          className="bg-primary rounded-xl py-5 px-12 items-center justify-center w-full max-w-sm active:opacity-90 active:scale-[0.98] shadow-lg"
         >
           <View className="flex-row items-center gap-3">
-            <Ionicons name="add-circle" size={24} color="#fff" />
-            <Text className="text-white text-lg font-semibold">
+            <Ionicons
+              name="add-circle"
+              size={24}
+              color="rgb(var(--color-primary-foreground))"
+            />
+            <Text className="text-primary-foreground text-lg font-semibold">
               Make New Entry
             </Text>
           </View>

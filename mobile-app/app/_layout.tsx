@@ -24,23 +24,29 @@ export default function RootLayout() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="rgb(var(--color-primary))" />
         <StatusBar style="auto" />
       </View>
     );
   }
+  // Default to dark theme to match dashboard
+  const theme = colorScheme || "dark";
+
   return (
-    <ThemeProvider defaultTheme={colorScheme || "light"}>
+    <ThemeProvider defaultTheme={theme}>
       <NavigationThemeProvider
-        value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+        value={theme === "dark" ? DarkTheme : DefaultTheme}
       >
-        <Stack>
+        <Stack screenOptions={{ headerShown: false }}>
           {user ? (
             <>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="(tabs)" />
               <Stack.Screen
                 name="modal"
-                options={{ presentation: "modal", title: "Modal" }}
+                options={{
+                  presentation: "modal",
+                  title: "Modal",
+                }}
               />
             </>
           ) : (
@@ -58,6 +64,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "rgb(var(--color-background))",
   },
 });

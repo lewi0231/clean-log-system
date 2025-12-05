@@ -18,6 +18,8 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
   const {
     fieldConfigs,
     fieldValues,
+    sections,
+    loading,
     resetFieldValues,
     updateFieldValue,
     FieldConfigSchema,
@@ -74,7 +76,7 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
   };
 
   const validateMutuallyExclusiveGroups = (
-    submissionData: Record<string, any>
+    submissionData: Record<string, any>,
   ): FieldErrors => {
     const groups = groupFieldsByMutualExclusivity(fieldConfigs);
     const errors: FieldErrors = {};
@@ -136,9 +138,11 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
         if (requiredInGroup) {
           errors[
             requiredInGroup.name
-          ] = `Please select one tracking method: ${configs
-            .map((c) => c.label)
-            .join(", ")}`;
+          ] = `Please select one tracking method: ${
+            configs
+              .map((c) => c.label)
+              .join(", ")
+          }`;
         }
       }
     });
@@ -213,6 +217,8 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
   return {
     fieldConfigs,
     fieldValues,
+    sections,
+    loading,
     errors,
     updateFieldValue,
     buildSubmissionData,

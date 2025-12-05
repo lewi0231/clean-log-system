@@ -1,8 +1,8 @@
-import * as React from "react";
-import { View, Text, Pressable, ScrollView, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { cn } from "@/lib/utils";
 import { Drawer, useDrawer } from "@/components/ui/drawer";
+import { cn } from "@/lib/utils";
+import { Ionicons } from "@expo/vector-icons";
+import * as React from "react";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
 interface SelectProps {
   value?: string;
@@ -47,7 +47,7 @@ interface SelectContextValue {
 
 const SelectContext = React.createContext<SelectContextValue>({
   selectedValue: undefined,
-  onSelect: () => { },
+  onSelect: () => {},
 });
 
 const Select = React.forwardRef<View, SelectProps>(
@@ -136,21 +136,24 @@ const Select = React.forwardRef<View, SelectProps>(
           disabled={disabled}
           onPress={() => setOpen(true)}
           className={cn(
-            "flex-row h-12 items-center justify-between rounded-md border border-input bg-transparent px-3 py-2",
+            "flex-row h-12 items-center justify-between rounded-md border border-input bg-transparent",
             "shadow-sm",
             "active:opacity-70",
             disabled && "opacity-50",
             Platform.OS === "ios"
               ? "ios:shadow-sm ios:shadow-foreground/10"
               : "android:elevation-1",
+            // Default padding if not specified in triggerClassName
+            !triggerClassName?.includes("pl-") &&
+              !triggerClassName?.includes("px-") &&
+              "pl-3 pr-3",
             triggerClassName
           )}
         >
           <Text
             className={cn(
               "text-base flex-1",
-              !selectedValue && "text-muted-foreground",
-              "text-foreground"
+              !selectedValue ? "text-[#999]" : "text-[#999]"
             )}
             numberOfLines={1}
           >
@@ -230,8 +233,8 @@ const SelectItem = React.forwardRef<typeof Pressable, SelectItemProps>(
         disabled={disabled}
         onPress={handlePress}
         className={cn(
-          "flex-row h-14 items-center justify-between px-4 py-2 active:bg-accent/50",
-          isSelected ? "bg-accent" : "",
+          "flex-row h-14 items-center justify-between px-4 py-2",
+          isSelected ? "bg-gray-700" : "active:bg-gray-700/50",
           disabled && "opacity-50",
           className
         )}
@@ -240,9 +243,7 @@ const SelectItem = React.forwardRef<typeof Pressable, SelectItemProps>(
         <Text
           className={cn(
             "text-base",
-            isSelected
-              ? "text-accent-foreground font-medium"
-              : "text-foreground"
+            isSelected ? "text-gray-100 font-medium" : "text-gray-200"
           )}
         >
           {children}

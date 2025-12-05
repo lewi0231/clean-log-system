@@ -47,7 +47,9 @@ export function FieldRenderer({
       return (
         <View>
           <TextInput
-            className={`bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground ${
+            className={`bg-white border-[1.5px] ${
+              error ? "border-red-500" : "border-[#e0e0e0]"
+            } rounded-xl px-4 py-3.5 text-base text-foreground ${
               disabled ? "opacity-50" : ""
             }`}
             placeholder={placeholder}
@@ -72,9 +74,20 @@ export function FieldRenderer({
                 ? "tel"
                 : "off"
             }
+            returnKeyType="next"
+            accessibilityLabel={config.label}
+            accessibilityHint={config.description || undefined}
+            accessibilityState={{ disabled, invalid: !!error }}
+            accessibilityLiveRegion={error ? "polite" : "none"}
           />
           {error && (
-            <Text className="text-sm text-destructive mt-1">{error}</Text>
+            <Text
+              className="text-sm text-destructive mt-1"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              {error}
+            </Text>
           )}
         </View>
       );
@@ -83,7 +96,9 @@ export function FieldRenderer({
       return (
         <View>
           <TextInput
-            className={`bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground ${
+            className={`bg-white border-[1.5px] ${
+              error ? "border-red-500" : "border-[#e0e0e0]"
+            } rounded-xl px-4 py-3.5 text-base text-foreground ${
               disabled ? "opacity-50" : ""
             }`}
             placeholder={placeholder}
@@ -94,10 +109,21 @@ export function FieldRenderer({
               handleFieldChange(numValue);
             }}
             keyboardType="number-pad"
+            returnKeyType="done"
             editable={!disabled}
+            accessibilityLabel={config.label}
+            accessibilityHint={config.description || undefined}
+            accessibilityState={{ disabled, invalid: !!error }}
+            accessibilityLiveRegion={error ? "polite" : "none"}
           />
           {error && (
-            <Text className="text-sm text-destructive mt-1">{error}</Text>
+            <Text
+              className="text-sm text-destructive mt-1"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              {error}
+            </Text>
           )}
         </View>
       );
@@ -106,7 +132,9 @@ export function FieldRenderer({
       return (
         <View>
           <TextInput
-            className={`bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 pt-3.5 text-base text-foreground min-h-[100px] ${
+            className={`bg-white border-[1.5px] ${
+              error ? "border-red-500" : "border-[#e0e0e0]"
+            } rounded-xl px-4 py-3.5 pt-3.5 text-base text-foreground min-h-[100px] ${
               disabled ? "opacity-50" : ""
             }`}
             placeholder={placeholder}
@@ -116,10 +144,21 @@ export function FieldRenderer({
             multiline
             numberOfLines={4}
             textAlignVertical="top"
+            returnKeyType="default"
             editable={!disabled}
+            accessibilityLabel={config.label}
+            accessibilityHint={config.description || undefined}
+            accessibilityState={{ disabled, invalid: !!error }}
+            accessibilityLiveRegion={error ? "polite" : "none"}
           />
           {error && (
-            <Text className="text-sm text-destructive mt-1">{error}</Text>
+            <Text
+              className="text-sm text-destructive mt-1"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              {error}
+            </Text>
           )}
         </View>
       );
@@ -176,7 +215,10 @@ export function FieldRenderer({
     case "boolean":
       return (
         <View className="flex-row items-center justify-between py-2">
-          <Text className="text-base font-semibold text-foreground flex-1">
+          <Text
+            className="text-base font-semibold text-foreground flex-1"
+            accessibilityRole="text"
+          >
             {config.label}
           </Text>
           <Switch
@@ -185,7 +227,19 @@ export function FieldRenderer({
             trackColor={{ false: "#767577", true: "#007AFF" }}
             thumbColor="#fff"
             disabled={disabled}
+            accessibilityLabel={config.label}
+            accessibilityHint={config.description || undefined}
+            accessibilityState={{ disabled }}
           />
+          {error && (
+            <Text
+              className="text-sm text-destructive mt-1 absolute bottom-[-20] left-0"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              {error}
+            </Text>
+          )}
         </View>
       );
 

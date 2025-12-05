@@ -1,5 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
 import { supabase } from "@/lib/supabase";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -15,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -38,13 +40,12 @@ export default function LoginScreen() {
         return;
       }
 
-      // Success - auth state change will be handled by useAuth hook
-      // and the root layout will automatically redirect
+      // Success - redirect to new entry page
+      router.replace("/(tabs)/new-entry");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : (error as string);
       Alert.alert("Error", errorMessage);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -83,9 +84,9 @@ export default function LoginScreen() {
             </View>
 
             <TextInput
-              className="bg-white border-[1.5px] border-gray-300 rounded-xl px-4 py-3.5 text-base shadow-sm"
+              className="bg-card border border-border rounded-xl px-4 py-3.5 text-base text-foreground"
               placeholder="Email"
-              placeholderTextColor="#999"
+              placeholderTextColor="rgb(var(--color-muted-foreground))"
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -95,9 +96,9 @@ export default function LoginScreen() {
             />
 
             <TextInput
-              className="bg-white border-[1.5px] border-gray-300 rounded-xl px-4 py-3.5 text-base shadow-sm"
+              className="bg-card border border-border rounded-xl px-4 py-3.5 text-base text-foreground"
               placeholder="Password"
-              placeholderTextColor="#999"
+              placeholderTextColor="rgb(var(--color-muted-foreground))"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -109,16 +110,16 @@ export default function LoginScreen() {
             <Pressable
               onPress={handleLogin}
               disabled={isLoading}
-              className={`bg-blue-500 rounded-xl py-4 px-8 items-center justify-center mt-2 min-h-[52px] shadow-lg ${
+              className={`bg-primary rounded-xl py-4 px-8 items-center justify-center mt-2 min-h-[52px] shadow-lg ${
                 isLoading
                   ? "opacity-70"
-                  : "active:bg-blue-600 active:scale-[0.98]"
+                  : "active:opacity-90 active:scale-[0.98]"
               }`}
             >
               {isLoading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="rgb(var(--color-primary-foreground))" />
               ) : (
-                <Text className="text-white text-lg font-semibold">
+                <Text className="text-primary-foreground text-lg font-semibold">
                   Sign In
                 </Text>
               )}
