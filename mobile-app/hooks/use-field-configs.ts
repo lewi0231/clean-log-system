@@ -6,7 +6,7 @@ import { FieldType } from "@/shared/types/field-type";
 import { FormSectionWithFields } from "@/shared/types/form-section";
 import { useEffect, useState } from "react";
 
-export type FieldErrors = Partial<Record<FieldConfig["name"], string>>;
+export type FieldErrors = Partial<Record<FieldConfig["id"], string>>;
 
 // Helper: Get cluster identifier for a field
 export function getFieldCluster(fieldConfig: FieldConfig): string | null {

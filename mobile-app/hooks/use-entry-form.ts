@@ -115,7 +115,7 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
       if (activeClusters.length > 1) {
         activeClusters.forEach(({ fields }) => {
           fields.forEach((config) => {
-            errors[config.name] =
+            errors[config.id] =
               "Multiple tracking methods selected. Please use only one method.";
           });
         });
@@ -129,7 +129,7 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
             config.required &&
             !hasValue(submissionData[config.name], config.field_type)
           ) {
-            errors[config.name] = `${config.label} is required`;
+            errors[config.id] = `${config.label} is required`;
           }
         });
       } else if (activeClusters.length === 0) {
@@ -137,7 +137,7 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
         const requiredInGroup = configs.find((c) => c.required);
         if (requiredInGroup) {
           errors[
-            requiredInGroup.name
+            requiredInGroup.id
           ] = `Please select one tracking method: ${
             configs
               .map((c) => c.label)
@@ -159,7 +159,19 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
 
       validation.error.issues.forEach((issue) => {
         const path = issue.path[0] as string;
-        fieldErrors[path] = issue.message;
+        // Map field name to field id for error storage
+        const fieldConfig = fieldConfigs.find((fc) => fc.name === path);
+        if (fieldConfig) {
+          fieldErrors[fieldConfig.id] = issue.message;
+        } else if (path === "location_id") {
+          // Special handling for location_id - it's validated separately in the UI
+          // We can skip schema errors for this as it's handled in handleNext
+          // But if we want to show it, we'd need a special error key
+          // For now, skip it since location validation is handled in the UI
+        } else {
+          // Log unknown field errors for debugging
+          console.warn("Entry: validation error for unknown field:", path);
+        }
       });
 
       console.warn("Entry: form validation failed", { errors: fieldErrors });
@@ -206,10 +218,10 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
     setErrors({});
   };
 
-  const clearFieldError = (fieldName: string) => {
+  const clearFieldError = (fieldId: string) => {
     setErrors((prev) => {
       const newErrors = { ...prev };
-      delete newErrors[fieldName];
+      delete newErrors[fieldId];
       return newErrors;
     });
   };

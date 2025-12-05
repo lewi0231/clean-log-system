@@ -328,23 +328,21 @@ export default function NewEntryScreen() {
         setAlertTitle("Success");
         setAlertMessage("Entry submitted successfully!");
         setAlertOnConfirm(() => {
-          return () => {
-            // Reset form state
-            resetForm();
-            if (currentUserColleagueId) {
-              setSelectedColleagues([currentUserColleagueId]);
-            } else {
-              setSelectedColleagues([]);
-            }
-            setSelectedLocation("");
-            setStartTime(undefined);
-            setFinishTime(new Date());
-            setCurrentStep(0);
-            setSelectedClusters({});
-            // Close alert and navigate
-            setAlertOpen(false);
-            router.replace("./");
-          };
+          // Reset form state
+          resetForm();
+          if (currentUserColleagueId) {
+            setSelectedColleagues([currentUserColleagueId]);
+          } else {
+            setSelectedColleagues([]);
+          }
+          setSelectedLocation("");
+          setStartTime(undefined);
+          setFinishTime(new Date());
+          setCurrentStep(0);
+          setSelectedClusters({});
+          // Close alert and navigate
+          setAlertOpen(false);
+          router.replace("./");
         });
         setAlertOpen(true);
       }
@@ -991,16 +989,16 @@ export default function NewEntryScreen() {
                     </Text>
                   </View>
                   <View className="flex-col gap-2">
-                    {Object.entries(errors).map(([fieldName, errorMessage]) => {
+                    {Object.entries(errors).map(([fieldId, errorMessage]) => {
                       const field = fieldConfigs.find(
-                        (fc) => fc.name === fieldName
+                        (fc) => fc.id === fieldId
                       );
                       return (
                         <Text
-                          key={fieldName}
+                          key={fieldId}
                           className="text-sm text-red-200 leading-5"
                         >
-                          • {field?.label || fieldName}: {errorMessage}
+                          • {field?.label || fieldId}: {errorMessage}
                         </Text>
                       );
                     })}

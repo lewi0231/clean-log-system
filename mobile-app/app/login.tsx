@@ -40,7 +40,8 @@ export default function LoginScreen() {
         return;
       }
 
-      // Success - redirect to new entry page
+      // Success - reset loading state before navigation
+      setIsLoading(false);
       router.replace("/(tabs)/new-entry");
     } catch (error) {
       const errorMessage =

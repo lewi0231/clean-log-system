@@ -153,7 +153,7 @@ const Select = React.forwardRef<View, SelectProps>(
           <Text
             className={cn(
               "text-base flex-1",
-              !selectedValue ? "text-[#999]" : "text-[#999]"
+              !selectedValue ? "text-[#999]" : "text-gray-200"
             )}
             numberOfLines={1}
           >
