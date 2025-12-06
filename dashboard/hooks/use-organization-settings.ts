@@ -41,6 +41,8 @@ async function fetchOrganizationSettings(
     payment_provider: data.settings.payment_provider ?? null,
     currency: data.settings.currency ?? "AUD",
     locale: data.settings.locale ?? "en-AU",
+    default_exclusive_group_label:
+      data.settings.default_exclusive_group_label ?? null,
   };
 }
 

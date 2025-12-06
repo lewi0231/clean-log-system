@@ -1,6 +1,7 @@
 "use client";
 
 // 1. React
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 // 2. Third-party
@@ -45,11 +46,14 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 
 // 5. Services/Utils
+import { organizationSettingsKey } from "@/app/query-provider";
+import { supabase } from "@/lib/supabase";
 import { getTemplateDescription, getTemplateFields } from "@/lib/templates";
 
 export default function MobileConfigPage() {
   const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
   const [createdClusters, setCreatedClusters] = useState<string[]>([]);
+  const queryClient = useQueryClient();
 
   const {
     organizationId,
@@ -107,8 +111,8 @@ export default function MobileConfigPage() {
   return (
     <>
       <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div className="w-3/4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
             <h1 className="text-3xl font-bold tracking-tight">
               Mobile Application
             </h1>
@@ -276,6 +280,26 @@ export default function MobileConfigPage() {
                   onUpdateField={handleUpdateFieldConfig}
                   createdClusters={createdClusters}
                   onCreatedClustersChange={setCreatedClusters}
+                  defaultExclusiveGroupLabel={
+                    settings?.default_exclusive_group_label || null
+                  }
+                  onUpdateDefaultExclusiveGroupLabel={async (label) => {
+                    if (!organizationId) return;
+                    const { error } = await supabase.functions.invoke(
+                      "update-organization-settings",
+                      {
+                        body: {
+                          organization_id: organizationId,
+                          default_exclusive_group_label: label,
+                        },
+                      }
+                    );
+                    if (error) throw error;
+                    // Invalidate settings query to refetch updated data
+                    queryClient.invalidateQueries({
+                      queryKey: organizationSettingsKey(organizationId),
+                    });
+                  }}
                 />
               </CardContent>
             </CollapsibleContent>

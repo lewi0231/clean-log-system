@@ -32,6 +32,7 @@ serve(async (req) => {
       payment_provider,
       currency,
       locale,
+      default_exclusive_group_label,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -140,12 +141,19 @@ serve(async (req) => {
       updateData.locale = locale;
     }
 
+    if (default_exclusive_group_label !== undefined) {
+      updateData.default_exclusive_group_label =
+        default_exclusive_group_label === ""
+          ? null
+          : default_exclusive_group_label;
+    }
+
     const { data: organization, error: updateError } = await supabase
       .from("organization")
       .update(updateData)
       .eq("id", organization_id)
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
       )
       .single();
 
@@ -169,6 +177,8 @@ serve(async (req) => {
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",
         locale: organization?.locale ?? "en-AU",
+        default_exclusive_group_label:
+          organization?.default_exclusive_group_label ?? null,
       },
     });
   } catch (error) {

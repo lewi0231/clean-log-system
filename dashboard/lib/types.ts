@@ -79,6 +79,7 @@ export interface OrganizationSettings {
   payment_provider: string | null;
   currency: SupportedCurrency;
   locale: string;
+  default_exclusive_group_label: string | null;
 }
 
 export interface Job {

@@ -22,7 +22,7 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider, currency, locale",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
       )
       .eq("id", organization_id)
       .single();
@@ -47,6 +47,8 @@ serve(async (req) => {
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",
         locale: organization?.locale ?? "en-AU",
+        default_exclusive_group_label:
+          organization?.default_exclusive_group_label ?? null,
       },
     });
   } catch (error) {
