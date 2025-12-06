@@ -319,7 +319,49 @@ function calculateJobPricing({
   hierarchyNodes: LocationHierarchyNode[];
   servicePricingModes: ServicePricingModeRow[];
 }): InvoiceCalculation {
-  // Service-specific pricing mode override (takes precedence over location-level)
+  // Early return for fixed price locations (highest precedence)
+  // Field config data is still collected (in submission_data) but pricing is fixed
+  if (job.location?.pricing_mode === "fixed_price") {
+    const fixedCustomerPrice = job.location.fixed_customer_price || 0;
+    const fixedWorkerPayment = job.location.fixed_worker_payment || 0;
+
+    return {
+      job_id: job.id,
+      base_price: fixedCustomerPrice,
+      line_items: [], // No field-based line items for fixed pricing
+      applied_rules: [
+        {
+          pricing_rule_id: `fixed_location_${job.location.id}`,
+          scope: "global",
+          pricing_type: "fixed",
+          field_config_id: null,
+          option_value: null,
+          location_hierarchy_id: job.hierarchy_parent_id || null,
+          location_id: job.location_id,
+          amount: fixedCustomerPrice,
+          worker_payment: fixedWorkerPayment,
+          metadata: {
+            pricing_mode: "fixed_price",
+            location_id: job.location.id,
+            currency: job.location.fixed_price_currency || "USD",
+          },
+          snapshot_data: {
+            pricing_mode: "fixed_price",
+            fixed_customer_price: fixedCustomerPrice,
+            fixed_worker_payment: fixedWorkerPayment,
+            currency: job.location.fixed_price_currency || "USD",
+          },
+        },
+      ],
+      subtotal: fixedCustomerPrice,
+      total_adjustments: 0,
+      total: fixedCustomerPrice,
+      worker_payment_total: fixedWorkerPayment,
+      margin: fixedCustomerPrice - fixedWorkerPayment,
+    };
+  }
+
+  // Service-specific pricing mode override (takes precedence over field-based)
   const serviceOverride = findServicePricingOverride({
     job,
     fieldConfigMap,
@@ -357,48 +399,6 @@ function calculateJobPricing({
             fixed_worker_payment: fixedWorkerPayment,
             service_type_value: serviceOverride.service_type_value,
             currency: serviceOverride.fixed_price_currency || "USD",
-          },
-        },
-      ],
-      subtotal: fixedCustomerPrice,
-      total_adjustments: 0,
-      total: fixedCustomerPrice,
-      worker_payment_total: fixedWorkerPayment,
-      margin: fixedCustomerPrice - fixedWorkerPayment,
-    };
-  }
-
-  // Early return for fixed price locations
-  // Field config data is still collected (in submission_data) but pricing is fixed
-  if (job.location?.pricing_mode === "fixed_price") {
-    const fixedCustomerPrice = job.location.fixed_customer_price || 0;
-    const fixedWorkerPayment = job.location.fixed_worker_payment || 0;
-
-    return {
-      job_id: job.id,
-      base_price: fixedCustomerPrice,
-      line_items: [], // No field-based line items for fixed pricing
-      applied_rules: [
-        {
-          pricing_rule_id: `fixed_location_${job.location.id}`,
-          scope: "global",
-          pricing_type: "fixed",
-          field_config_id: null,
-          option_value: null,
-          location_hierarchy_id: job.hierarchy_parent_id || null,
-          location_id: job.location_id,
-          amount: fixedCustomerPrice,
-          worker_payment: fixedWorkerPayment,
-          metadata: {
-            pricing_mode: "fixed_price",
-            location_id: job.location.id,
-            currency: job.location.fixed_price_currency || "USD",
-          },
-          snapshot_data: {
-            pricing_mode: "fixed_price",
-            fixed_customer_price: fixedCustomerPrice,
-            fixed_worker_payment: fixedWorkerPayment,
-            currency: job.location.fixed_price_currency || "USD",
           },
         },
       ],

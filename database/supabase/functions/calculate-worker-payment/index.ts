@@ -338,7 +338,7 @@ function calculateWorkerPayment({
     };
   }
 
-  // Early return for fixed price locations
+  // Early return for fixed price locations (highest precedence)
   if (job.location?.pricing_mode === "fixed_price") {
     const fixedWorkerPayment = job.location.fixed_worker_payment || 0;
 

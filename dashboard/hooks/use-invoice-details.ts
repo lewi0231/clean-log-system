@@ -1,66 +1,50 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+
+import { invoiceDetailsKey } from "@/app/query-provider";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { InvoiceService } from "@/lib/services/invoice.service";
-import type { InvoiceWithJobs } from "@/lib/types";
-import { useEffect, useState } from "react";
+import type { InvoiceTemplateConfig, InvoiceWithJobs } from "@/lib/types";
+import { useCallback } from "react";
 
 interface UseInvoiceDetailsResult {
   invoice:
     | (InvoiceWithJobs & {
-        calculation: CalculateInvoiceResponse["calculation"];
-        template_config?: any;
-      })
+      calculation: CalculateInvoiceResponse["calculation"];
+      template_config?: InvoiceTemplateConfig | null;
+    })
     | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 }
 
+async function fetchInvoiceDetails(
+  invoiceId: string,
+): Promise<
+  InvoiceWithJobs & {
+    calculation: CalculateInvoiceResponse["calculation"];
+    template_config?: InvoiceTemplateConfig | null;
+  }
+> {
+  return InvoiceService.getInvoiceDetails(invoiceId);
+}
+
 export function useInvoiceDetails(
-  invoiceId: string | null
+  invoiceId: string | null,
 ): UseInvoiceDetailsResult {
-  const [invoice, setInvoice] = useState<
-    | (InvoiceWithJobs & {
-        calculation: CalculateInvoiceResponse["calculation"];
-      })
-    | null
-  >(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchInvoiceDetails = async () => {
-    if (!invoiceId) {
-      setLoading(false);
-      setInvoice(null);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const details = await InvoiceService.getInvoiceDetails(invoiceId);
-      setInvoice(details);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch invoice details"
-      );
-      setInvoice(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchInvoiceDetails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoiceId]);
+  const query = useQuery({
+    queryKey: invoiceDetailsKey(invoiceId),
+    enabled: !!invoiceId,
+    queryFn: () => fetchInvoiceDetails(invoiceId as string),
+    placeholderData: (previous) => previous,
+  });
 
   return {
-    invoice,
-    loading,
-    error,
-    refetch: fetchInvoiceDetails,
+    invoice: query.data ?? null,
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
   };
 }

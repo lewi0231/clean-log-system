@@ -1,8 +1,11 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { locationHierarchyKey } from "@/app/query-provider";
 import { LocationHierarchyService } from "@/lib/services";
 import type { LocationHierarchyNode } from "@/lib/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
 interface CreateNodeParams {
@@ -28,88 +31,93 @@ interface UseLocationHierarchyResult {
   deleteNode: (id: string) => Promise<void>;
 }
 
+async function fetchLocationHierarchy(
+  organizationId: string,
+): Promise<LocationHierarchyNode[]> {
+  const response = await LocationHierarchyService.list({
+    organization_id: organizationId,
+  });
+  return response.nodes;
+}
+
 export function useLocationHierarchy(): UseLocationHierarchyResult {
   const { organizationId } = useOrganization();
-  const [nodes, setNodes] = useState<LocationHierarchyNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchHierarchy = useCallback(async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: locationHierarchyKey(organizationId),
+    enabled: !!organizationId,
+    queryFn: () => fetchLocationHierarchy(organizationId as string),
+    select: (data) => data ?? [],
+    placeholderData: (previous) => previous,
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
+  const invalidateCache = useCallback(() => {
+    queryClient.invalidateQueries({
+      queryKey: locationHierarchyKey(organizationId),
+    });
+  }, [queryClient, organizationId]);
 
-      const response = await LocationHierarchyService.list({
-        organization_id: organizationId,
-      });
-
-      setNodes(response.nodes);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to load location hierarchy",
-      );
-      setNodes([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [organizationId]);
-
-  const createNode = useCallback(
-    async (params: CreateNodeParams): Promise<LocationHierarchyNode> => {
+  const createMutation = useMutation({
+    mutationFn: async (params: CreateNodeParams) => {
       if (!organizationId) {
         throw new Error("Organization ID is required");
       }
-
-      const newNode = await LocationHierarchyService.create({
+      return LocationHierarchyService.create({
         organization_id: organizationId,
         ...params,
       });
+    },
+    onSuccess: () => {
+      invalidateCache();
+    },
+  });
 
-      // Optimistically add to state
-      setNodes((prev) => [...prev, newNode]);
+  const updateMutation = useMutation({
+    mutationFn: LocationHierarchyService.update,
+    onSuccess: () => {
+      invalidateCache();
+    },
+  });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => LocationHierarchyService.delete({ id }),
+    onSuccess: () => {
+      invalidateCache();
+    },
+  });
+
+  const createNode = useCallback(
+    async (params: CreateNodeParams): Promise<LocationHierarchyNode> => {
+      const newNode = await createMutation.mutateAsync(params);
+      await query.refetch();
       return newNode;
     },
-    [organizationId],
+    [createMutation, query],
   );
 
   const updateNode = useCallback(
     async (params: UpdateNodeParams): Promise<LocationHierarchyNode> => {
-      const updatedNode = await LocationHierarchyService.update(params);
-
-      // Optimistically update state
-      setNodes((prev) =>
-        prev.map((node) => (node.id === params.id ? updatedNode : node))
-      );
-
+      const updatedNode = await updateMutation.mutateAsync(params);
+      await query.refetch();
       return updatedNode;
     },
-    [],
+    [updateMutation, query],
   );
 
-  const deleteNode = useCallback(async (id: string): Promise<void> => {
-    await LocationHierarchyService.delete({ id });
-
-    // Optimistically remove from state
-    setNodes((prev) => prev.filter((node) => node.id !== id));
-  }, []);
-
-  useEffect(() => {
-    fetchHierarchy();
-  }, [fetchHierarchy]);
+  const deleteNode = useCallback(
+    async (id: string): Promise<void> => {
+      await deleteMutation.mutateAsync(id);
+      await query.refetch();
+    },
+    [deleteMutation, query],
+  );
 
   return {
-    nodes,
-    loading,
-    error,
-    refetch: fetchHierarchy,
+    nodes: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
     createNode,
     updateNode,
     deleteNode,

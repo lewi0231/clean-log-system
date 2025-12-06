@@ -2,6 +2,7 @@ import Nav from "@/components/nav";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { QueryProvider } from "./query-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,16 +29,18 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* Gradient background - fixed positioning behind all content */}
-        <div
-          className="fixed inset-0 -z-10"
-          style={{
-            background:
-              "linear-gradient(135deg, #0a0e27 0%, #1a1f3a 25%, #0d1c2e 50%, #1a0f2e 75%, #0a0e27 100%)",
-          }}
-        />
-        <Nav />
-        {children}
+        <QueryProvider>
+          {/* Gradient background - fixed positioning behind all content */}
+          <div
+            className="fixed inset-0 -z-10"
+            style={{
+              background:
+                "linear-gradient(135deg, #0a0e27 0%, #1a1f3a 25%, #0d1c2e 50%, #1a0f2e 75%, #0a0e27 100%)",
+            }}
+          />
+          <Nav />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

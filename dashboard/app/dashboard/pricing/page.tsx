@@ -2,6 +2,7 @@
 
 import BasePricingEditor from "@/components/pricing/base-pricing-editor";
 import FieldPricingList from "@/components/pricing/field-pricing-list";
+import { useLocationFixedPricingGuard } from "@/components/pricing/location-fixed-pricing-guard";
 import LocationScopeSelector from "@/components/pricing/location-scope-selector";
 import OptionPricingEditor from "@/components/pricing/option-pricing-editor";
 import { PricingHistory } from "@/components/pricing/pricing-history";
@@ -10,6 +11,7 @@ import {
   usePricingScope,
 } from "@/components/pricing/pricing-scope-context";
 import { PricingScopeIndicator } from "@/components/pricing/pricing-scope-indicator";
+import ServiceTypePricingEditor from "@/components/pricing/service-type-pricing-editor";
 import { UnifiedInvoicePreview } from "@/components/pricing/unified-invoice-preview";
 import {
   Card,
@@ -22,8 +24,10 @@ import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
+import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import useOrganization from "@/hooks/useOrganization";
-import { CalendarRange } from "lucide-react";
+import { AlertTriangle, CalendarRange, ExternalLink } from "lucide-react";
+import Link from "next/link";
 import { useMemo } from "react";
 
 export default function PricingPage() {
@@ -34,12 +38,9 @@ export default function PricingPage() {
   } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
 
-  // Filter fields that support option pricing
+  // Filter fields that support option pricing (exclude select - those go in Service-Type Pricing)
   const optionPricingFields = useMemo(() => {
-    return fieldConfigs.filter(
-      (fc) =>
-        fc.field_type === "select" || fc.field_type === "grouped_breakdown"
-    );
+    return fieldConfigs.filter((fc) => fc.field_type === "grouped_breakdown");
   }, [fieldConfigs]);
 
   if (orgLoading) {
@@ -77,6 +78,9 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
     expirationDate,
     setExpirationDate,
   } = usePricingScope();
+
+  const { isFixedPricing, location } = useLocationFixedPricingGuard(locationId);
+  const { formatCurrency } = useOrganizationCurrency();
 
   return (
     <>
@@ -139,15 +143,71 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
             locationId={locationId}
           />
 
+          {isFixedPricing && location && (
+            <Card className="border-amber-500/20 bg-amber-500/5">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm font-medium">
+                      Fixed Pricing Enabled for This Location
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      This location uses fixed pricing. Customer pricing rules
+                      do not apply. All jobs at this location will be charged a
+                      fixed price.
+                    </p>
+                    <div className="flex items-center gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Customer Price:{" "}
+                        </span>
+                        <span className="font-medium">
+                          {formatCurrency(location.fixed_customer_price || 0)}
+                        </span>
+                      </div>
+                      {location.fixed_worker_payment !== null && (
+                        <div>
+                          <span className="text-muted-foreground">
+                            Worker Payment:{" "}
+                          </span>
+                          <span className="font-medium">
+                            {formatCurrency(location.fixed_worker_payment || 0)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <Link
+                      href="/dashboard/locations"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      Edit in Location Settings
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
             <div className="space-y-6">
               <Tabs defaultValue="field-pricing" className="space-y-6">
                 <TabsList className="w-full justify-start">
-                  <TabsTrigger value="field-pricing">Field Pricing</TabsTrigger>
-                  <TabsTrigger value="option-pricing">
+                  <TabsTrigger value="field-pricing" disabled={isFixedPricing}>
+                    Field Pricing
+                  </TabsTrigger>
+                  <TabsTrigger value="option-pricing" disabled={isFixedPricing}>
                     Group & Option Pricing
                   </TabsTrigger>
-                  <TabsTrigger value="base-pricing">Base Pricing</TabsTrigger>
+                  <TabsTrigger value="base-pricing" disabled={isFixedPricing}>
+                    Base Pricing
+                  </TabsTrigger>
+                  <TabsTrigger value="service-type-pricing">
+                    Service-Type Pricing
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="field-pricing" className="space-y-6">
@@ -178,9 +238,9 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                           <CardHeader>
                             <CardTitle>{fieldConfig.label}</CardTitle>
                             <CardDescription>
-                              {fieldConfig.field_type === "grouped_breakdown"
-                                ? "Set prices for each group (e.g., car makes, wipe types). Total = sum of (price_per_group × quantity_per_group) for all selected options."
-                                : "Set prices for each option. Total = sum of (price_per_option × quantity_per_option) for all selected options."}
+                              Set prices for each group (e.g., car makes, wipe
+                              types). Total = sum of (price_per_group ×
+                              quantity_per_group) for all selected options.
                             </CardDescription>
                           </CardHeader>
                           <CardContent>
@@ -197,10 +257,11 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                   ) : (
                     <Card>
                       <CardHeader>
-                        <CardTitle>No Group or Option Fields</CardTitle>
+                        <CardTitle>No Grouped Breakdown Fields</CardTitle>
                         <CardDescription>
-                          Create select or grouped breakdown fields in Mobile
-                          Application to configure option pricing.
+                          Create grouped breakdown fields in Mobile Application
+                          to configure option pricing. Select fields are
+                          configured in the Service-Type Pricing tab.
                         </CardDescription>
                       </CardHeader>
                     </Card>
@@ -219,6 +280,26 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                     </CardHeader>
                     <CardContent>
                       <BasePricingEditor
+                        locationHierarchyId={locationNodeId}
+                        locationId={locationId}
+                        effectiveAt={effectiveDate}
+                      />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="service-type-pricing" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Service-Type Pricing</CardTitle>
+                      <CardDescription>
+                        Configure fixed prices for specific service type
+                        options. When enabled, these service types will use a
+                        fixed price and bypass all field-based calculations.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ServiceTypePricingEditor
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
@@ -317,9 +398,9 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                         <CardHeader>
                           <CardTitle>{fieldConfig.label}</CardTitle>
                           <CardDescription>
-                            {fieldConfig.field_type === "grouped_breakdown"
-                              ? "Set payment rates for each group. Total = sum of (rate_per_group × quantity_per_group) for all selected options."
-                              : "Set payment rates for each option. Total = sum of (rate_per_option × quantity_per_option) for all selected options."}
+                            Set payment rates for each group. Total = sum of
+                            (rate_per_group × quantity_per_group) for all
+                            selected options.
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -337,10 +418,11 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                 ) : (
                   <Card>
                     <CardHeader>
-                      <CardTitle>No Group or Option Fields</CardTitle>
+                      <CardTitle>No Grouped Breakdown Fields</CardTitle>
                       <CardDescription>
-                        Create select or grouped breakdown fields in Mobile
-                        Application to configure option payment rates.
+                        Create grouped breakdown fields in Mobile Application to
+                        configure option payment rates. Select fields are
+                        configured in the Service-Type Pricing tab.
                       </CardDescription>
                     </CardHeader>
                   </Card>

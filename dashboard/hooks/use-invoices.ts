@@ -1,9 +1,12 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { invoicesKey } from "@/app/query-provider";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import type { CreateInvoiceRequest, InvoiceWithJobs } from "@/lib/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
 interface UseInvoicesResult {
@@ -12,48 +15,46 @@ interface UseInvoicesResult {
   error: string | null;
   refetch: () => Promise<void>;
   calculateInvoice: (
-    jobIds: string[]
+    jobIds: string[],
   ) => Promise<CalculateInvoiceResponse["calculation"]>;
   createInvoice: (request: CreateInvoiceRequest) => Promise<InvoiceWithJobs>;
 }
 
+async function fetchInvoices(
+  organizationId: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<InvoiceWithJobs[]> {
+  return InvoiceService.list({
+    organization_id: organizationId,
+    start_date: startDate,
+    end_date: endDate,
+  });
+}
+
 export function useInvoices(
   startDate?: string,
-  endDate?: string
+  endDate?: string,
 ): UseInvoicesResult {
   const { organizationId } = useOrganization();
-  const [invoices, setInvoices] = useState<InvoiceWithJobs[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchInvoices = useCallback(async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: invoicesKey(organizationId, startDate, endDate),
+    enabled: !!organizationId,
+    queryFn: () => fetchInvoices(organizationId as string, startDate, endDate),
+    select: (data) => data ?? [],
+    placeholderData: (previous) => previous,
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await InvoiceService.list({
-        organization_id: organizationId,
-        start_date: startDate,
-        end_date: endDate,
+  const createMutation = useMutation({
+    mutationFn: InvoiceService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: invoicesKey(organizationId, startDate, endDate),
       });
-
-      setInvoices(response || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch invoices");
-      setInvoices([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [organizationId, startDate, endDate]);
-
-  useEffect(() => {
-    fetchInvoices();
-  }, [fetchInvoices]);
+    },
+  });
 
   const calculateInvoice = useCallback(
     async (jobIds: string[]) => {
@@ -66,24 +67,23 @@ export function useInvoices(
         job_ids: jobIds,
       });
     },
-    [organizationId]
+    [organizationId],
   );
 
   const createInvoice = useCallback(
-    async (request: CreateInvoiceRequest) => {
-      const invoice = await InvoiceService.create(request);
-      // Refresh the list after creating
-      await fetchInvoices();
+    async (request: CreateInvoiceRequest): Promise<InvoiceWithJobs> => {
+      const invoice = await createMutation.mutateAsync(request);
+      await query.refetch();
       return invoice;
     },
-    [fetchInvoices]
+    [createMutation, query],
   );
 
   return {
-    invoices,
-    loading,
-    error,
-    refetch: fetchInvoices,
+    invoices: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
     calculateInvoice,
     createInvoice,
   };

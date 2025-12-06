@@ -1,5 +1,8 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { organizationUsersKey } from "@/app/query-provider";
 import { OrganizationUsersService } from "@/lib/services";
 import type { OrganizationUser } from "@/lib/types";
 import type {
@@ -7,7 +10,7 @@ import type {
   DeleteOrganizationUserRequest,
   UpdateOrganizationUserRequest,
 } from "@/lib/types/api";
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
 interface UseOrganizationUsersResult {
@@ -16,84 +19,99 @@ interface UseOrganizationUsersResult {
   error: string | null;
   refetch: () => Promise<void>;
   createOrganizationUser: (
-    request: CreateOrganizationUserRequest
+    request: CreateOrganizationUserRequest,
   ) => Promise<OrganizationUser>;
   updateOrganizationUser: (
-    request: UpdateOrganizationUserRequest
+    request: UpdateOrganizationUserRequest,
   ) => Promise<OrganizationUser>;
   deleteOrganizationUser: (
-    request: DeleteOrganizationUserRequest
+    request: DeleteOrganizationUserRequest,
   ) => Promise<void>;
+}
+
+async function fetchOrganizationUsers(
+  organizationId: string,
+): Promise<OrganizationUser[]> {
+  const response = await OrganizationUsersService.list({
+    organization_id: organizationId,
+  });
+  return response.organization_users || [];
 }
 
 export function useOrganizationUsers(): UseOrganizationUsersResult {
   const { organizationId } = useOrganization();
-  const [organizationUsers, setOrganizationUsers] = useState<
-    OrganizationUser[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchOrganizationUsers = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: organizationUsersKey(organizationId),
+    enabled: !!organizationId,
+    queryFn: () => fetchOrganizationUsers(organizationId as string),
+    select: (data) => data ?? [],
+    placeholderData: (previous) => previous,
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await OrganizationUsersService.list({
-        organization_id: organizationId,
+  const createMutation = useMutation({
+    mutationFn: OrganizationUsersService.create,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: organizationUsersKey(organizationId),
       });
+    },
+  });
 
-      setOrganizationUsers(response.organization_users || []);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to fetch organization users"
-      );
-      setOrganizationUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const updateMutation = useMutation({
+    mutationFn: OrganizationUsersService.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: organizationUsersKey(organizationId),
+      });
+    },
+  });
 
-  const createOrganizationUser = async (
-    request: CreateOrganizationUserRequest
-  ): Promise<OrganizationUser> => {
-    const user = await OrganizationUsersService.create(request);
-    await fetchOrganizationUsers();
-    return user;
-  };
+  const deleteMutation = useMutation({
+    mutationFn: OrganizationUsersService.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: organizationUsersKey(organizationId),
+      });
+    },
+  });
 
-  const updateOrganizationUser = async (
-    request: UpdateOrganizationUserRequest
-  ): Promise<OrganizationUser> => {
-    const user = await OrganizationUsersService.update(request);
-    await fetchOrganizationUsers();
-    return user;
-  };
+  const createOrganizationUser = useCallback(
+    async (
+      request: CreateOrganizationUserRequest,
+    ): Promise<OrganizationUser> => {
+      const user = await createMutation.mutateAsync(request);
+      await query.refetch();
+      return user;
+    },
+    [createMutation, query],
+  );
 
-  const deleteOrganizationUser = async (
-    request: DeleteOrganizationUserRequest
-  ): Promise<void> => {
-    await OrganizationUsersService.delete(request);
-    await fetchOrganizationUsers();
-  };
+  const updateOrganizationUser = useCallback(
+    async (
+      request: UpdateOrganizationUserRequest,
+    ): Promise<OrganizationUser> => {
+      const user = await updateMutation.mutateAsync(request);
+      await query.refetch();
+      return user;
+    },
+    [updateMutation, query],
+  );
 
-  useEffect(() => {
-    fetchOrganizationUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
+  const deleteOrganizationUser = useCallback(
+    async (request: DeleteOrganizationUserRequest): Promise<void> => {
+      await deleteMutation.mutateAsync(request);
+      await query.refetch();
+    },
+    [deleteMutation, query],
+  );
 
   return {
-    organizationUsers,
-    loading,
-    error,
-    refetch: fetchOrganizationUsers,
+    organizationUsers: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
     createOrganizationUser,
     updateOrganizationUser,
     deleteOrganizationUser,

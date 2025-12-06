@@ -37,14 +37,14 @@ serve(async (req) => {
       if (!location_id || locLinks.length === 0) return true;
 
       // Allow if explicitly linked to the requested location
-      return locLinks.some((link) => link.location_id === location_id);
+      return locLinks.some(
+        (link: { location_id: string }) => link.location_id === location_id,
+      );
     });
 
     const sanitized = filtered.map((config) => {
-      const { location_field_config, ...rest } = config as Record<
-        string,
-        unknown
-      >;
+      const { location_field_config: _location_field_config, ...rest } =
+        config as Record<string, unknown>;
       return rest;
     });
 

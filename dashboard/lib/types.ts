@@ -238,6 +238,22 @@ export interface BasePricing {
   location_node?: PricingRule["location_node"];
 }
 
+export interface ServicePricingMode {
+  id: string;
+  organization_id: string;
+  location_id: string | null;
+  service_type_field_config_id: string;
+  service_type_value: string;
+  pricing_mode: "field_based" | "fixed_price";
+  fixed_customer_price: number | null;
+  fixed_worker_payment: number | null;
+  fixed_price_currency: string;
+  created_at: string;
+  updated_at: string;
+  field_config?: { id: string; name: string; label: string } | null;
+  location?: { id: string; name: string } | null;
+}
+
 export interface InvoiceCalculation {
   job_id: string;
   base_price: number;

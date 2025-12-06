@@ -7,8 +7,8 @@ import type {
   DeleteLocationRequest,
   UpdateLocationRequest,
 } from "@/lib/types/api";
-import { useEffect, useState } from "react";
-import useOrganization from "./useOrganization";
+import { useCallback } from "react";
+import { useWorkersAndLocations } from "./use-workers-locations";
 
 interface UseLocationsResult {
   locations: Location[];
@@ -21,69 +21,40 @@ interface UseLocationsResult {
 }
 
 export function useLocations(): UseLocationsResult {
-  const { organizationId } = useOrganization();
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchLocations = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await LocationsService.listWorkersAndLocations({
-        organization_id: organizationId,
-      });
-
-      setLocations(response.locations || []);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch locations"
-      );
-      setLocations([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { locations, loading, error, refetch, invalidateCache } =
+    useWorkersAndLocations();
 
   const createLocation = async (
-    request: CreateLocationRequest
+    request: CreateLocationRequest,
   ): Promise<Location> => {
     const location = await LocationsService.create(request);
-    await fetchLocations();
+    invalidateCache();
+    await refetch();
     return location;
   };
 
   const updateLocation = async (
-    request: UpdateLocationRequest
+    request: UpdateLocationRequest,
   ): Promise<Location> => {
     const location = await LocationsService.update(request);
-    await fetchLocations();
+    invalidateCache();
+    await refetch();
     return location;
   };
 
   const deleteLocation = async (
-    request: DeleteLocationRequest
+    request: DeleteLocationRequest,
   ): Promise<void> => {
     await LocationsService.delete(request);
-    await fetchLocations();
+    invalidateCache();
+    await refetch();
   };
-
-  useEffect(() => {
-    fetchLocations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
 
   return {
     locations,
     loading,
     error,
-    refetch: fetchLocations,
+    refetch: useCallback(() => refetch(), [refetch]),
     createLocation,
     updateLocation,
     deleteLocation,

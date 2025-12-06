@@ -1,8 +1,11 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+
+import { jobsKey } from "@/app/query-provider";
 import { JobsService } from "@/lib/services";
 import type { Job } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
 interface UseJobsResult {
@@ -12,44 +15,28 @@ interface UseJobsResult {
   refetch: () => Promise<void>;
 }
 
+async function fetchJobs(organizationId: string): Promise<Job[]> {
+  const response = await JobsService.list({
+    organization_id: organizationId,
+  });
+  return response.jobs || [];
+}
+
 export function useJobs(): UseJobsResult {
   const { organizationId } = useOrganization();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchJobs = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await JobsService.list({
-        organization_id: organizationId,
-      });
-
-      setJobs(response.jobs || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch jobs");
-      setJobs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
+  const query = useQuery({
+    queryKey: jobsKey(organizationId),
+    enabled: !!organizationId,
+    queryFn: () => fetchJobs(organizationId as string),
+    select: (data) => data ?? [],
+    placeholderData: (previous) => previous,
+  });
 
   return {
-    jobs,
-    loading,
-    error,
-    refetch: fetchJobs,
+    jobs: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
   };
 }
