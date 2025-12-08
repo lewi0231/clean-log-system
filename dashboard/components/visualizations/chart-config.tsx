@@ -22,7 +22,7 @@ import {
   getChartableFields,
   getGroupingFields,
 } from "@/lib/visualization-utils";
-import type { FieldConfig } from "@/shared/types/field-config";
+import type { FieldConfig } from "@clean-log/shared/types";
 
 interface ChartConfigProps {
   fieldConfigs: FieldConfig[];

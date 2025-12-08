@@ -1,7 +1,7 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import type { ListFieldConfigsRequest } from "@/lib/types/api";
-import type { FieldConfig } from "@/shared/types/field-config";
+import type { FieldConfig } from "@clean-log/shared/types";
 
 export class FieldConfigsService {
   /**
@@ -17,7 +17,7 @@ export class FieldConfigsService {
         "list-field-configs",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {

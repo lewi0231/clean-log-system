@@ -1,9 +1,9 @@
 import { GroupedBreakdownItem } from "@/components/group-breakdown-field";
 import { supabase } from "@/lib/supabase";
 import { createSchemaFromFieldConfig } from "@/lib/utils";
-import { FieldConfig } from "@/shared/types/field-config";
-import { FieldType } from "@/shared/types/field-type";
-import { FormSectionWithFields } from "@/shared/types/form-section";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
+import { FieldType } from "@clean-log/shared/types/field-type";
+import { FormSectionWithFields } from "@clean-log/shared/types/form-section";
 import { useEffect, useState } from "react";
 
 export type FieldErrors = Partial<Record<FieldConfig["id"], string>>;

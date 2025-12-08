@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useOptimistic, useTransition } from "react";
+import { startTransition, useOptimistic } from "react";
 
 import { mobileConfigKey } from "@/app/query-provider";
 import { log } from "@/lib/logger";
@@ -51,7 +51,6 @@ export function useFieldConfigMutations({
     onRefetch,
 }: UseFieldConfigMutationsOptions) {
     const queryClient = useQueryClient();
-    const [, startTransition] = useTransition();
 
     const [optimisticFieldConfigs, updateOptimisticFieldConfigs] =
         useOptimistic(
@@ -189,6 +188,7 @@ export function useFieldConfigMutations({
             updated_at: new Date().toISOString(),
         };
 
+        // Call optimistic update in a transition (required by React 19)
         startTransition(() => {
             updateOptimisticFieldConfigs({
                 type: "add",
@@ -197,6 +197,7 @@ export function useFieldConfigMutations({
         });
 
         try {
+            // Execute async mutation (startTransition doesn't need to wrap it for our use case)
             await createMutation.mutateAsync(fieldConfigData);
             await onRefetch?.();
             log.info("MobileConfig: Field config created successfully");
@@ -225,6 +226,7 @@ export function useFieldConfigMutations({
             updated_at: new Date().toISOString(),
         };
 
+        // Call optimistic update in a transition (required by React 19)
         startTransition(() => {
             updateOptimisticFieldConfigs({
                 type: "update",
@@ -233,6 +235,7 @@ export function useFieldConfigMutations({
         });
 
         try {
+            // Execute async mutation
             await updateMutation.mutateAsync({
                 fieldConfigId,
                 fieldConfigData,
@@ -248,12 +251,13 @@ export function useFieldConfigMutations({
     };
 
     const handleDelete = async (fieldConfigId: string) => {
-        // Optimistically delete field config
+        // Optimistically delete field config - call in a transition (required by React 19)
         startTransition(() => {
             updateOptimisticFieldConfigs({ type: "delete", id: fieldConfigId });
         });
 
         try {
+            // Execute async mutation
             await deleteMutation.mutateAsync(fieldConfigId);
             await onRefetch?.();
             log.info("MobileConfig: Field config deleted successfully");
@@ -269,11 +273,12 @@ export function useFieldConfigMutations({
     const handleReorder = async (fieldConfigIds: string[]) => {
         if (!organizationId) return;
 
-        // Optimistically reorder
+        // Optimistically reorder - use current optimistic state
         const reorderedConfigs = fieldConfigIds
             .map((id) => optimisticFieldConfigs.find((fc) => fc.id === id))
             .filter((fc): fc is FieldConfig => fc !== undefined);
 
+        // Call optimistic update in a transition (required by React 19)
         startTransition(() => {
             updateOptimisticFieldConfigs({
                 type: "reorder",
@@ -282,6 +287,7 @@ export function useFieldConfigMutations({
         });
 
         try {
+            // Execute async mutation
             await reorderMutation.mutateAsync(fieldConfigIds);
             log.info("MobileConfig: Field configs reordered successfully");
         } catch (err) {

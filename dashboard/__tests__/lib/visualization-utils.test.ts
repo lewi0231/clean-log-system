@@ -8,7 +8,7 @@ import {
   getGroupingKey,
   processJobDataForChart,
 } from "@/lib/visualization-utils";
-import type { FieldConfig } from "@/shared/types/field-config";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { describe, expect, it } from "vitest";
 
 // Test fixtures
@@ -23,6 +23,10 @@ const createFieldConfig = (overrides: Partial<FieldConfig>): FieldConfig => ({
   order_position: 0,
   validation_rules: null,
   options: null,
+  mutually_exclusive_group: null,
+  group_cluster: null,
+  section_id: null,
+  conditional_logic: null,
   version: 1,
   active: true,
   archived_at: null,
@@ -189,7 +193,7 @@ describe("extractGroupedBreakdown", () => {
     const submissionData = { items: [] };
     const fieldConfig = createFieldConfig({ field_type: "number" });
     expect(
-      extractGroupedBreakdown(submissionData, fieldConfig, "brand")
+      extractGroupedBreakdown(submissionData, fieldConfig, "brand"),
     ).toBeNull();
   });
 
@@ -207,7 +211,7 @@ describe("extractGroupedBreakdown", () => {
     const result = extractGroupedBreakdown(
       submissionData,
       fieldConfig,
-      "brand"
+      "brand",
     );
     expect(result).toEqual([
       { brand: "Brand A", quantity: 5 },
@@ -231,7 +235,7 @@ describe("extractGroupedBreakdown", () => {
     const result = extractGroupedBreakdown(
       submissionData,
       fieldConfig,
-      "brand"
+      "brand",
     );
     expect(result).toEqual([
       { brand: "Brand A", quantity: 5 },
@@ -246,7 +250,7 @@ describe("extractGroupedBreakdown", () => {
       field_type: "grouped_breakdown",
     });
     expect(
-      extractGroupedBreakdown(submissionData, fieldConfig, "brand")
+      extractGroupedBreakdown(submissionData, fieldConfig, "brand"),
     ).toBeNull();
   });
 
@@ -259,7 +263,7 @@ describe("extractGroupedBreakdown", () => {
     const result = extractGroupedBreakdown(
       submissionData,
       fieldConfig,
-      "brand"
+      "brand",
     );
     expect(result).toEqual([]);
   });
@@ -461,7 +465,7 @@ describe("processJobDataForChart", () => {
       groupingDimension: "time",
     };
     expect(
-      processJobDataForChart(jobs, chartConfig, [numericFieldConfig])
+      processJobDataForChart(jobs, chartConfig, [numericFieldConfig]),
     ).toBeNull();
   });
 
@@ -473,7 +477,7 @@ describe("processJobDataForChart", () => {
       groupingDimension: "field",
     };
     expect(
-      processJobDataForChart(jobs, chartConfig, [numericFieldConfig])
+      processJobDataForChart(jobs, chartConfig, [numericFieldConfig]),
     ).toBeNull();
   });
 

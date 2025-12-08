@@ -1,5 +1,5 @@
 // Dashboard-specific types only
-// Shared types (FieldConfig, FieldType, ValidationRules) are imported from @/shared/types
+// Shared types (FieldConfig, FieldType, ValidationRules) are imported from @clean-log/shared/types
 
 export type ChartType = "area" | "line" | "pie" | "bar";
 

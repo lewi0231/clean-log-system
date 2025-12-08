@@ -1,4 +1,4 @@
-import { FieldConfig } from "@/shared/types/field-config";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { z } from "zod";
@@ -24,21 +24,21 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
             zodType = zodType.min(
               validationRules.minLength,
               validationRules.customMessage ||
-                `${field.label} must be at least ${validationRules.minLength} characters`
+                `${field.label} must be at least ${validationRules.minLength} characters`,
             );
           }
           if (validationRules.maxLength !== undefined) {
             zodType = zodType.max(
               validationRules.maxLength,
               validationRules.customMessage ||
-                `${field.label} must be at most ${validationRules.maxLength} characters`
+                `${field.label} must be at most ${validationRules.maxLength} characters`,
             );
           }
           if (validationRules.pattern) {
             zodType = zodType.regex(
               new RegExp(validationRules.pattern),
               validationRules.customMessage ||
-                `${field.label} format is invalid`
+                `${field.label} format is invalid`,
             );
           }
         }
@@ -47,28 +47,28 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
       case "email":
         zodType = z.email(
           validationRules?.customMessage ||
-            `${field.label} must be a valid email address`
+            `${field.label} must be a valid email address`,
         );
         if (validationRules) {
           if (validationRules.minLength !== undefined) {
             zodType = zodType.min(
               validationRules.minLength,
               validationRules.customMessage ||
-                `${field.label} must be at least ${validationRules.minLength} characters`
+                `${field.label} must be at least ${validationRules.minLength} characters`,
             );
           }
           if (validationRules.maxLength !== undefined) {
             zodType = zodType.max(
               validationRules.maxLength,
               validationRules.customMessage ||
-                `${field.label} must be at most ${validationRules.maxLength} characters`
+                `${field.label} must be at most ${validationRules.maxLength} characters`,
             );
           }
           if (validationRules.pattern) {
             zodType = zodType.regex(
               new RegExp(validationRules.pattern),
               validationRules.customMessage ||
-                `${field.label} format is invalid`
+                `${field.label} format is invalid`,
             );
           }
         }
@@ -81,7 +81,7 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
             zodType = zodType.regex(
               new RegExp(validationRules.pattern),
               validationRules.customMessage ||
-                `${field.label} must be a valid phone number`
+                `${field.label} must be a valid phone number`,
             );
           }
         }
@@ -94,14 +94,14 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
             zodType = zodType.min(
               validationRules.min,
               validationRules.customMessage ||
-                `${field.label} must be at least ${validationRules.min} characters`
+                `${field.label} must be at least ${validationRules.min} characters`,
             );
           }
           if (validationRules.max !== undefined) {
             zodType = zodType.max(
               validationRules.max,
               validationRules.customMessage ||
-                `${field.label} must be at most ${validationRules.max}`
+                `${field.label} must be at most ${validationRules.max}`,
             );
           }
         }
@@ -110,8 +110,7 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
         if (field.options && field.options.length > 0) {
           zodType = z.enum(field.options as [string, ...string[]], {
             error: () => ({
-              message:
-                validationRules?.customMessage ||
+              message: validationRules?.customMessage ||
                 `${field.label} must be one of ${field.options?.join(", ")}`,
             }),
           });
@@ -122,7 +121,7 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
       case "date":
         zodType = z.date(
           validationRules?.customMessage ||
-            `${field.label} must be a valid date`
+            `${field.label} must be a valid date`,
         );
         break;
       case "time":
@@ -131,7 +130,7 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
           .regex(
             /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/,
             validationRules?.customMessage ||
-              `${field.label} must be in HH:mm format`
+              `${field.label} must be in HH:mm format`,
           );
         break;
       case "grouped_breakdown":
@@ -146,14 +145,14 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
             zodType = zodType.min(
               validationRules.min_items,
               validationRules.customMessage ||
-                `${field.label} must have at least ${validationRules.min_items} item(s)`
+                `${field.label} must have at least ${validationRules.min_items} item(s)`,
             );
           }
           if (validationRules.max_items !== undefined) {
             zodType = zodType.max(
               validationRules.max_items,
               validationRules.customMessage ||
-                `${field.label} must have at most ${validationRules.max_items} item(s)`
+                `${field.label} must have at most ${validationRules.max_items} item(s)`,
             );
           }
         }

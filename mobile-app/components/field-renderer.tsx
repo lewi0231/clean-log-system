@@ -4,7 +4,7 @@ import {
 } from "@/components/group-breakdown-field";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Select, SelectItem } from "@/components/ui/select";
-import { FieldConfig } from "@/shared/types/field-config";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Switch, Text, TextInput, View } from "react-native";
 import { TimePicker } from "./ui/time-picker";
 
@@ -77,7 +77,7 @@ export function FieldRenderer({
             returnKeyType="next"
             accessibilityLabel={config.label}
             accessibilityHint={config.description || undefined}
-            accessibilityState={{ disabled, invalid: !!error }}
+            accessibilityState={{ disabled }}
             accessibilityLiveRegion={error ? "polite" : "none"}
           />
           {error && (
@@ -113,7 +113,7 @@ export function FieldRenderer({
             editable={!disabled}
             accessibilityLabel={config.label}
             accessibilityHint={config.description || undefined}
-            accessibilityState={{ disabled, invalid: !!error }}
+            accessibilityState={{ disabled }}
             accessibilityLiveRegion={error ? "polite" : "none"}
           />
           {error && (
@@ -148,7 +148,7 @@ export function FieldRenderer({
             editable={!disabled}
             accessibilityLabel={config.label}
             accessibilityHint={config.description || undefined}
-            accessibilityState={{ disabled, invalid: !!error }}
+            accessibilityState={{ disabled }}
             accessibilityLiveRegion={error ? "polite" : "none"}
           />
           {error && (

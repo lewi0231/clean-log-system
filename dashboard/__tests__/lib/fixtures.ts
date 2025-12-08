@@ -1,5 +1,5 @@
 import type { Job, Location, Worker } from "@/lib/types";
-import type { FieldConfig } from "@/shared/types/field-config";
+import type { FieldConfig } from "@clean-log/shared/types";
 
 /**
  * Test fixtures for consistent test data
@@ -17,7 +17,7 @@ export const createMockWorker = (overrides?: Partial<Worker>): Worker => ({
 });
 
 export const createMockLocation = (
-  overrides?: Partial<Location>
+  overrides?: Partial<Location>,
 ): Location => ({
   id: "location-1",
   name: "Main Office",
@@ -27,6 +27,7 @@ export const createMockLocation = (
   phone: "1234567890",
   active: true,
   created_at: "2024-01-01T00:00:00Z",
+  hierarchy_parent_id: null,
   ...overrides,
 });
 
@@ -57,7 +58,7 @@ export const createMockJob = (overrides?: Partial<Job>): Job => ({
 });
 
 export const createMockFieldConfig = (
-  overrides?: Partial<FieldConfig>
+  overrides?: Partial<FieldConfig>,
 ): FieldConfig => ({
   id: "field-1",
   organization_id: "org-1",
@@ -69,6 +70,10 @@ export const createMockFieldConfig = (
   order_position: 0,
   validation_rules: null,
   options: null,
+  mutually_exclusive_group: null,
+  group_cluster: null,
+  section_id: null,
+  conditional_logic: null,
   version: 1,
   active: true,
   archived_at: null,

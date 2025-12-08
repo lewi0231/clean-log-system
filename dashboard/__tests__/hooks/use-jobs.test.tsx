@@ -1,6 +1,8 @@
 import { useJobs } from "@/hooks/use-jobs";
 import { JobsService } from "@/lib/services";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockJob } from "../lib/fixtures";
 
@@ -22,6 +24,24 @@ vi.mock("@/hooks/useOrganization", () => ({
   default: mockUseOrganization,
 }));
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+
+  return Wrapper;
+}
+
 describe("useJobs", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -34,7 +54,9 @@ describe("useJobs", () => {
       jobs: mockJobs,
     });
 
-    const { result } = renderHook(() => useJobs());
+    const { result } = renderHook(() => useJobs(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -57,7 +79,9 @@ describe("useJobs", () => {
         })
     );
 
-    const { result } = renderHook(() => useJobs());
+    const { result } = renderHook(() => useJobs(), {
+      wrapper: createWrapper(),
+    });
 
     expect(result.current.loading).toBe(true);
 
@@ -70,7 +94,9 @@ describe("useJobs", () => {
     const mockError = new Error("Failed to fetch");
     vi.mocked(JobsService.list).mockRejectedValue(mockError);
 
-    const { result } = renderHook(() => useJobs());
+    const { result } = renderHook(() => useJobs(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -86,7 +112,9 @@ describe("useJobs", () => {
       jobs: [],
     });
 
-    const { result } = renderHook(() => useJobs());
+    const { result } = renderHook(() => useJobs(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

@@ -31,6 +31,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useLocations } from "@/hooks/use-locations";
+import useOrganization from "@/hooks/useOrganization";
+import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
   FieldType,
@@ -49,6 +52,7 @@ import {
   Layers,
   List,
   Mail,
+  MapPin,
   Pencil,
   Phone,
   Settings,
@@ -159,8 +163,18 @@ export function SectionEditor({
   const [descriptionInputValues, setDescriptionInputValues] = useState<
     Map<string, string>
   >(new Map());
+  // Location restrictions state
+  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<
+    Map<string, string[]>
+  >(new Map());
+  const [restrictToLocationsMap, setRestrictToLocationsMap] = useState<
+    Map<string, boolean>
+  >(new Map());
   // Track which fields are currently being edited to prevent sync overwrites
   const editingFieldsRef = useRef<Set<string>>(new Set());
+
+  const { locations } = useLocations();
+  const { organizationId } = useOrganization();
   const fieldMap = useMemo(
     () => new Map(fields.map((field) => [field.id, field])),
     [fields]
@@ -174,6 +188,59 @@ export function SectionEditor({
       next.set(fieldId, optionsString);
       return next;
     });
+  };
+
+  // Load location restrictions for a field
+  const loadLocationRestrictions = async (fieldId: string) => {
+    if (!organizationId) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        "list-field-configs",
+        {
+          body: {
+            organization_id: organizationId,
+            include_location_restrictions: true,
+          },
+        }
+      );
+
+      if (error) throw error;
+
+      const config = data?.field_configs?.find(
+        (fc: FieldConfig & { location_restrictions?: string[] }) =>
+          fc.id === fieldId
+      );
+
+      if (
+        config?.location_restrictions &&
+        config.location_restrictions.length > 0
+      ) {
+        setRestrictToLocationsMap((prev) => {
+          const next = new Map(prev);
+          next.set(fieldId, true);
+          return next;
+        });
+        setLocationRestrictionsMap((prev) => {
+          const next = new Map(prev);
+          next.set(fieldId, config.location_restrictions || []);
+          return next;
+        });
+      } else {
+        setRestrictToLocationsMap((prev) => {
+          const next = new Map(prev);
+          next.set(fieldId, false);
+          return next;
+        });
+        setLocationRestrictionsMap((prev) => {
+          const next = new Map(prev);
+          next.set(fieldId, []);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load location restrictions", err);
+    }
   };
 
   // Save all pending changes for a field when popover closes
@@ -209,6 +276,32 @@ export function SectionEditor({
     // Only update if there are actual changes
     if (hasChanges) {
       await onUpdateField(fieldId, updates);
+    }
+
+    // Save location restrictions
+    const restrictToLocations = restrictToLocationsMap.get(fieldId) || false;
+    const selectedLocationIds = locationRestrictionsMap.get(fieldId) || [];
+    const locationIds = restrictToLocations ? selectedLocationIds : [];
+
+    try {
+      const { error: locationError } = await supabase.functions.invoke(
+        "update-field-config-locations",
+        {
+          body: {
+            field_config_id: fieldId,
+            location_ids: locationIds,
+          },
+        }
+      );
+
+      if (locationError) {
+        console.error("Failed to save location restrictions", locationError);
+      } else {
+        // Refresh location restrictions after save
+        await loadLocationRestrictions(fieldId);
+      }
+    } catch (err) {
+      console.error("Failed to save location restrictions", err);
     }
 
     // Clear all local state for this field after saving
@@ -280,10 +373,54 @@ export function SectionEditor({
     return field.description || "";
   };
 
+  // Load location restrictions for all fields on mount
+  useEffect(() => {
+    if (!organizationId || fields.length === 0) return;
+
+    async function fetchAllLocationRestrictions() {
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "list-field-configs",
+          {
+            body: {
+              organization_id: organizationId,
+              include_location_restrictions: true,
+            },
+          }
+        );
+
+        if (error) throw error;
+
+        const restrictionsMap = new Map<string, string[]>();
+        const restrictMap = new Map<string, boolean>();
+
+        (data?.field_configs || []).forEach(
+          (fc: FieldConfig & { location_restrictions?: string[] }) => {
+            if (
+              fc.location_restrictions &&
+              fc.location_restrictions.length > 0
+            ) {
+              restrictionsMap.set(fc.id, fc.location_restrictions);
+              restrictMap.set(fc.id, true);
+            } else {
+              restrictMap.set(fc.id, false);
+            }
+          }
+        );
+
+        setLocationRestrictionsMap(restrictionsMap);
+        setRestrictToLocationsMap(restrictMap);
+      } catch (err) {
+        console.error("Failed to fetch location restrictions", err);
+      }
+    }
+
+    fetchAllLocationRestrictions();
+  }, [organizationId, fields]);
+
   // Keep local order in sync when sections change externally (but not during drag)
   useEffect(() => {
     if (!draggedSection) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSectionOrder(sections.map((s) => s.id));
     }
   }, [sections, draggedSection]);
@@ -291,7 +428,6 @@ export function SectionEditor({
   // Keep section field orders in sync when sections change externally
   useEffect(() => {
     if (!draggedSectionField) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSectionFieldOrders(
         new Map(sections.map((s) => [s.id, s.field_ids || []]))
       );
@@ -669,6 +805,27 @@ export function SectionEditor({
                                           Cluster: {clusterId}
                                         </Badge>
                                       )}
+                                      {locationRestrictionsMap.get(field.id) &&
+                                        locationRestrictionsMap.get(field.id)!
+                                          .length > 0 && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[11px] bg-amber-50 text-amber-700 border-amber-300"
+                                          >
+                                            <MapPin className="h-2.5 w-2.5 mr-0.5" />
+                                            {
+                                              locationRestrictionsMap.get(
+                                                field.id
+                                              )!.length
+                                            }{" "}
+                                            location
+                                            {locationRestrictionsMap.get(
+                                              field.id
+                                            )!.length !== 1
+                                              ? "s"
+                                              : ""}
+                                          </Badge>
+                                        )}
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -677,7 +834,12 @@ export function SectionEditor({
                                       {onUpdateField && (
                                         <Popover
                                           onOpenChange={(open) => {
-                                            if (!open) {
+                                            if (open) {
+                                              // Popover is opening, load location restrictions
+                                              loadLocationRestrictions(
+                                                field.id
+                                              );
+                                            } else {
                                               // Popover is closing, save all changes
                                               handlePopoverClose(field.id);
                                             }
@@ -871,6 +1033,152 @@ export function SectionEditor({
                                                     }
                                                   }}
                                                 />
+                                              </div>
+
+                                              {/* Location Restrictions */}
+                                              <div className="space-y-3 pt-4 border-t">
+                                                <div className="flex items-center space-x-2">
+                                                  <Switch
+                                                    id={`restrict-locations-${field.id}`}
+                                                    checked={
+                                                      restrictToLocationsMap.get(
+                                                        field.id
+                                                      ) || false
+                                                    }
+                                                    onCheckedChange={(
+                                                      checked
+                                                    ) => {
+                                                      setRestrictToLocationsMap(
+                                                        (prev) => {
+                                                          const next = new Map(
+                                                            prev
+                                                          );
+                                                          next.set(
+                                                            field.id,
+                                                            checked
+                                                          );
+                                                          return next;
+                                                        }
+                                                      );
+                                                      if (!checked) {
+                                                        setLocationRestrictionsMap(
+                                                          (prev) => {
+                                                            const next =
+                                                              new Map(prev);
+                                                            next.set(
+                                                              field.id,
+                                                              []
+                                                            );
+                                                            return next;
+                                                          }
+                                                        );
+                                                      }
+                                                    }}
+                                                  />
+                                                  <Label
+                                                    htmlFor={`restrict-locations-${field.id}`}
+                                                    className="text-xs cursor-pointer"
+                                                  >
+                                                    Restrict to specific
+                                                    locations
+                                                  </Label>
+                                                </div>
+                                                {restrictToLocationsMap.get(
+                                                  field.id
+                                                ) && (
+                                                  <div className="space-y-2 pl-6 border-l-2 border-muted">
+                                                    {locations.length === 0 ? (
+                                                      <p className="text-xs text-muted-foreground">
+                                                        No locations available
+                                                      </p>
+                                                    ) : (
+                                                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                        {locations
+                                                          .filter(
+                                                            (loc) => loc.active
+                                                          )
+                                                          .map((location) => (
+                                                            <div
+                                                              key={location.id}
+                                                              className="flex items-center space-x-2"
+                                                            >
+                                                              <input
+                                                                type="checkbox"
+                                                                id={`section-location-${field.id}-${location.id}`}
+                                                                checked={(
+                                                                  locationRestrictionsMap.get(
+                                                                    field.id
+                                                                  ) || []
+                                                                ).includes(
+                                                                  location.id
+                                                                )}
+                                                                onChange={(
+                                                                  e
+                                                                ) => {
+                                                                  const currentIds =
+                                                                    locationRestrictionsMap.get(
+                                                                      field.id
+                                                                    ) || [];
+                                                                  if (
+                                                                    e.target
+                                                                      .checked
+                                                                  ) {
+                                                                    setLocationRestrictionsMap(
+                                                                      (
+                                                                        prev
+                                                                      ) => {
+                                                                        const next =
+                                                                          new Map(
+                                                                            prev
+                                                                          );
+                                                                        next.set(
+                                                                          field.id,
+                                                                          [
+                                                                            ...currentIds,
+                                                                            location.id,
+                                                                          ]
+                                                                        );
+                                                                        return next;
+                                                                      }
+                                                                    );
+                                                                  } else {
+                                                                    setLocationRestrictionsMap(
+                                                                      (
+                                                                        prev
+                                                                      ) => {
+                                                                        const next =
+                                                                          new Map(
+                                                                            prev
+                                                                          );
+                                                                        next.set(
+                                                                          field.id,
+                                                                          currentIds.filter(
+                                                                            (
+                                                                              id
+                                                                            ) =>
+                                                                              id !==
+                                                                              location.id
+                                                                          )
+                                                                        );
+                                                                        return next;
+                                                                      }
+                                                                    );
+                                                                  }
+                                                                }}
+                                                                className="h-4 w-4 rounded border-gray-300"
+                                                              />
+                                                              <Label
+                                                                htmlFor={`section-location-${field.id}-${location.id}`}
+                                                                className="text-xs font-normal cursor-pointer"
+                                                              >
+                                                                {location.name}
+                                                              </Label>
+                                                            </div>
+                                                          ))}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
                                               </div>
 
                                               {/* Advanced Section */}

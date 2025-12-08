@@ -1,6 +1,16 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import {
+  type FeedbackEmailData,
+  generateFeedbackToken,
+  getFeedbackEmailRecipient,
+  sendFeedbackRequestEmail,
+} from "../_utils/feedback-email.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import type {
+  InvoiceEmailRecipientConfig,
+  JobContext,
+} from "../_utils/invoice-email.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
@@ -93,8 +103,8 @@ serve(async (req) => {
       throw orgError;
     }
 
-    const usePredefinedLocations =
-      organization?.use_predefined_locations ?? true;
+    const usePredefinedLocations = organization?.use_predefined_locations ??
+      true;
     console.log("✅ Create Job: Organization settings fetched", {
       usePredefinedLocations,
     });
@@ -117,8 +127,9 @@ serve(async (req) => {
       });
     } catch (parseError) {
       console.error("❌ Create Job: Failed to parse request body", {
-        error:
-          parseError instanceof Error ? parseError.message : String(parseError),
+        error: parseError instanceof Error
+          ? parseError.message
+          : String(parseError),
       });
       return errorResponse("Invalid request body", 400);
     }
@@ -151,8 +162,9 @@ serve(async (req) => {
       location_id: _location_id,
       ...fieldData
     } = submissionData;
-    const submissionDataJsonb =
-      Object.keys(fieldData).length > 0 ? fieldData : null;
+    const submissionDataJsonb = Object.keys(fieldData).length > 0
+      ? fieldData
+      : null;
 
     console.log("📋 Create Job: Processed submission data", {
       submissionDataKeys: Object.keys(fieldData),
@@ -162,8 +174,9 @@ serve(async (req) => {
     });
 
     // Normalize location_id (handle empty strings)
-    const normalizedLocationId =
-      locationId && locationId.trim() !== "" ? locationId : null;
+    const normalizedLocationId = locationId && locationId.trim() !== ""
+      ? locationId
+      : null;
 
     console.log("📍 Create Job: Location normalization", {
       originalLocationId: locationId,
@@ -179,7 +192,7 @@ serve(async (req) => {
       });
       return errorResponse(
         "Location ID is required when predefined locations are enabled",
-        400
+        400,
       );
     }
 
@@ -212,7 +225,7 @@ serve(async (req) => {
         });
         return errorResponse(
           "Location not found or does not belong to your organization",
-          400
+          400,
         );
       }
       console.log("✅ Create Job: Location validated", {
@@ -255,7 +268,7 @@ serve(async (req) => {
         });
         return errorResponse(
           "One or more colleagues not found or do not belong to your organization",
-          400
+          400,
         );
       }
       console.log("✅ Create Job: All colleagues validated", {
@@ -331,6 +344,223 @@ serve(async (req) => {
       console.log("✅ Create Job: Job_worker entries created successfully");
     }
 
+    // Handle feedback email sending if enabled
+    try {
+      console.log("📧 Create Job: Checking feedback email settings", {
+        organizationId,
+      });
+
+      // Fetch organization settings to check if feedback emails are enabled
+      const { data: orgSettings, error: orgSettingsError } = await supabaseAdmin
+        .from("organization")
+        .select("feedback_email_send_immediately, name")
+        .eq("id", organizationId)
+        .single();
+
+      if (orgSettingsError) {
+        console.error(
+          "❌ Create Job: Error fetching organization settings for feedback email",
+          {
+            error: orgSettingsError.message,
+          },
+        );
+        // Don't fail job creation if we can't check settings
+      } else if (orgSettings?.feedback_email_send_immediately) {
+        console.log("📧 Create Job: Feedback email sending is enabled");
+
+        // Generate feedback token
+        const feedbackToken = generateFeedbackToken();
+        console.log("🔑 Create Job: Generated feedback token", {
+          tokenLength: feedbackToken.length,
+        });
+
+        // Fetch invoice template config for email recipient configuration
+        const { data: templateConfig } = await supabaseAdmin
+          .from("invoice_template_config")
+          .select("email_recipient_config")
+          .eq("organization_id", organizationId)
+          .single();
+
+        const emailConfig: InvoiceEmailRecipientConfig = (templateConfig
+          ?.email_recipient_config as InvoiceEmailRecipientConfig) || {
+          location_email_source: "location_email",
+          form_field_email: null,
+          default_email: null,
+        };
+
+        // Fetch field configs for form field email mapping
+        const { data: fieldConfigs } = await supabaseAdmin
+          .from("organization_field_configs")
+          .select("id, name")
+          .eq("organization_id", organizationId)
+          .eq("active", true);
+
+        const fieldConfigMap = new Map<string, { name: string }>(
+          (fieldConfigs || []).map(
+            (fc: { id: string; name: string }) => [fc.id, { name: fc.name }],
+          ),
+        );
+
+        // Fetch job with location details for email recipient determination
+        const { data: jobWithLocation, error: jobLocationError } =
+          await supabaseAdmin
+            .from("job")
+            .select(
+              `
+              id,
+              location_id,
+              submission_data,
+              completed_at,
+              location:location_id (
+                id,
+                email,
+                contact_person,
+                name,
+                hierarchy_parent_id
+              )
+            `,
+            )
+            .eq("id", job.id)
+            .single();
+
+        if (jobLocationError || !jobWithLocation) {
+          console.error(
+            "❌ Create Job: Error fetching job with location for feedback email",
+            {
+              error: jobLocationError?.message,
+            },
+          );
+          // Still update job with token for manual sending later
+          await supabaseAdmin
+            .from("job")
+            .update({ feedback_token: feedbackToken })
+            .eq("id", job.id);
+        } else {
+          // Handle location (Supabase returns it as array or object depending on query)
+          const locationData = Array.isArray(jobWithLocation.location)
+            ? jobWithLocation.location[0]
+            : jobWithLocation.location;
+
+          // Build job context for email recipient determination
+          const jobContext: JobContext = {
+            location_id: jobWithLocation.location_id,
+            location: locationData
+              ? {
+                id: locationData.id,
+                email: locationData.email || null,
+                contact_person: locationData.contact_person || null,
+                hierarchy_parent_id: locationData.hierarchy_parent_id || null,
+              }
+              : null,
+            submission_data: jobWithLocation.submission_data as
+              | Record<
+                string,
+                unknown
+              >
+              | null,
+          };
+
+          // Get email recipient
+          const recipientEmail = await getFeedbackEmailRecipient(
+            supabaseAdmin,
+            jobContext,
+            emailConfig,
+            fieldConfigMap,
+          );
+
+          if (recipientEmail) {
+            console.log("📧 Create Job: Found feedback email recipient", {
+              email: recipientEmail,
+            });
+
+            // Get recipient name (from location contact_person or default)
+            const recipientName = locationData?.contact_person || null;
+
+            // Build feedback email data
+            const feedbackEmailData: FeedbackEmailData = {
+              recipientEmail,
+              recipientName,
+              organizationName: orgSettings.name || "Our Team",
+              jobId: job.id,
+              jobCompletedAt: jobWithLocation.completed_at,
+              locationName: locationData?.name || null,
+              feedbackToken,
+              feedbackReviewUrl: "", // Will be set by sendFeedbackRequestEmail
+            };
+
+            // Send feedback email
+            const emailResult = await sendFeedbackRequestEmail(
+              feedbackEmailData,
+              false, // Don't throw on error - job creation should succeed
+            );
+
+            if (emailResult.success) {
+              console.log("✅ Create Job: Feedback email sent successfully", {
+                emailId: emailResult.emailId,
+              });
+
+              // Update job with token and email tracking
+              const { error: updateError } = await supabaseAdmin
+                .from("job")
+                .update({
+                  feedback_token: feedbackToken,
+                  feedback_email_sent: true,
+                  feedback_email_sent_at: new Date().toISOString(),
+                })
+                .eq("id", job.id);
+
+              if (updateError) {
+                console.error(
+                  "❌ Create Job: Error updating job with feedback email tracking",
+                  {
+                    error: updateError.message,
+                  },
+                );
+                // Job was created and email was sent, so this is non-critical
+              }
+            } else {
+              console.error(
+                "❌ Create Job: Failed to send feedback email",
+                {
+                  error: emailResult.error,
+                },
+              );
+              // Still update job with token for manual sending later
+              await supabaseAdmin
+                .from("job")
+                .update({ feedback_token: feedbackToken })
+                .eq("id", job.id);
+            }
+          } else {
+            console.warn(
+              "⚠️ Create Job: No feedback email recipient found for job",
+              {
+                jobId: job.id,
+                locationId: jobWithLocation.location_id,
+              },
+            );
+            // Still update job with token for manual sending later
+            await supabaseAdmin
+              .from("job")
+              .update({ feedback_token: feedbackToken })
+              .eq("id", job.id);
+          }
+        }
+      } else {
+        console.log("📧 Create Job: Feedback email sending is disabled");
+      }
+    } catch (feedbackError) {
+      // Log error but don't fail job creation
+      console.error(
+        "❌ Create Job: Error in feedback email sending process",
+        {
+          error: feedbackError instanceof Error
+            ? feedbackError.message
+            : String(feedbackError),
+        },
+      );
+    }
+
     console.log("✅ Create Job: Request completed successfully", {
       jobId: job.id,
       status: 201,
@@ -347,7 +577,7 @@ serve(async (req) => {
           created_at: job.created_at,
         },
       },
-      201
+      201,
     );
   } catch (error) {
     const errorLog: Record<string, unknown> = {
@@ -368,8 +598,9 @@ serve(async (req) => {
 
     console.error("❌ Create Job: Unhandled error", errorLog);
 
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to create job";
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to create job";
 
     // Determine appropriate status code
     let statusCode = 500;

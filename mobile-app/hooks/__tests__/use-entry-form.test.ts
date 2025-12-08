@@ -1,4 +1,4 @@
-import { FieldConfig } from "@/shared/types/field-config";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { renderHook } from "@testing-library/react-native";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +17,7 @@ vi.mock("../use-field-configs", () => ({
 
 // Mock the useFieldConfigs import
 const mockUseFieldConfigs = vi.mocked(
-  await import("../use-field-configs")
+  await import("../use-field-configs"),
 ).useFieldConfigs;
 
 function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
@@ -32,6 +32,10 @@ function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
     order_position: 0,
     validation_rules: null,
     options: null,
+    mutually_exclusive_group: null,
+    group_cluster: null,
+    section_id: null,
+    conditional_logic: null,
     version: 1,
     active: true,
     archived_at: null,
@@ -64,6 +68,8 @@ describe("useEntryForm", () => {
     mockUseFieldConfigs.mockReturnValue({
       fieldConfigs,
       fieldValues: { "test-id": "" },
+      sections: [],
+      loading: false,
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
@@ -91,6 +97,8 @@ describe("useEntryForm", () => {
       fieldValues: { "field-1": "John Doe" },
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
+      sections: [],
+      loading: false,
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
@@ -125,6 +133,8 @@ describe("useEntryForm", () => {
       fieldValues: { "field-1": breakdownValue },
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
+      sections: [],
+      loading: false,
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
@@ -154,6 +164,8 @@ describe("useEntryForm", () => {
       fieldValues: {},
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
+      sections: [],
+      loading: false,
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
@@ -183,6 +195,8 @@ describe("useEntryForm", () => {
       fieldValues: { "field-1": "14:30" },
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
+      sections: [],
+      loading: false,
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
@@ -211,6 +225,8 @@ describe("useEntryForm", () => {
       fieldValues: { "field-1": "" },
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
+      sections: [],
+      loading: false,
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
@@ -237,6 +253,8 @@ describe("useEntryForm", () => {
     mockUseFieldConfigs.mockReturnValue({
       fieldConfigs,
       fieldValues: { "field-1": "" },
+      sections: [],
+      loading: false,
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
       FieldConfigSchema: createMockSchema({
@@ -278,6 +296,8 @@ describe("useEntryForm", () => {
     mockUseFieldConfigs.mockReturnValue({
       fieldConfigs,
       fieldValues: { "field-1": "John Doe" },
+      sections: [],
+      loading: false,
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
       FieldConfigSchema: createMockSchema({
@@ -335,6 +355,8 @@ describe("useEntryForm", () => {
       },
       resetFieldValues,
       updateFieldValue: vi.fn(),
+      sections: [],
+      loading: false,
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
@@ -367,6 +389,8 @@ describe("useEntryForm", () => {
     mockUseFieldConfigs.mockReturnValue({
       fieldConfigs,
       fieldValues: { "field-1": "" },
+      sections: [],
+      loading: false,
       resetFieldValues: vi.fn(),
       updateFieldValue: vi.fn(),
       FieldConfigSchema: createMockSchema({

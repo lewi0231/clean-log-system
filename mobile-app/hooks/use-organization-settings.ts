@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { OrganizationSettings } from "@/shared/types/organization-settings";
+import { OrganizationSettings } from "@clean-log/shared/types/organization-settings";
 import { useEffect, useState } from "react";
 
 export function useOrganizationSettings(organizationId: string | null) {
@@ -18,7 +18,7 @@ export function useOrganizationSettings(organizationId: string | null) {
           "get-organization-settings",
           {
             body: { organization_id: organizationId },
-          }
+          },
         );
 
         if (fetchError) {
@@ -40,7 +40,7 @@ export function useOrganizationSettings(organizationId: string | null) {
         setError(
           err instanceof Error
             ? err.message
-            : "Organization Settings: Failed to fetch"
+            : "Organization Settings: Failed to fetch",
         );
       } finally {
         setLoading(false);

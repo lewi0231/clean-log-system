@@ -1,6 +1,16 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import {
+  type FeedbackEmailData,
+  generateFeedbackToken,
+  getFeedbackEmailRecipient,
+  sendFeedbackRequestEmail,
+} from "../_utils/feedback-email.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import type {
+  InvoiceEmailRecipientConfig,
+  JobContext,
+} from "../_utils/invoice-email.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
@@ -339,6 +349,226 @@ serve(async (req) => {
       }
       console.log(
         "✅ Admin Create Job: Job_worker entries created successfully",
+      );
+    }
+
+    // Handle feedback email sending if enabled
+    try {
+      console.log("📧 Admin Create Job: Checking feedback email settings", {
+        organizationId,
+      });
+
+      // Fetch organization settings to check if feedback emails are enabled
+      const { data: orgSettings, error: orgSettingsError } = await supabaseAdmin
+        .from("organization")
+        .select("feedback_email_send_immediately, name")
+        .eq("id", organizationId)
+        .single();
+
+      if (orgSettingsError) {
+        console.error(
+          "❌ Admin Create Job: Error fetching organization settings for feedback email",
+          {
+            error: orgSettingsError.message,
+          },
+        );
+        // Don't fail job creation if we can't check settings
+      } else if (orgSettings?.feedback_email_send_immediately) {
+        console.log("📧 Admin Create Job: Feedback email sending is enabled");
+
+        // Generate feedback token
+        const feedbackToken = generateFeedbackToken();
+        console.log("🔑 Admin Create Job: Generated feedback token", {
+          tokenLength: feedbackToken.length,
+        });
+
+        // Fetch invoice template config for email recipient configuration
+        const { data: templateConfig } = await supabaseAdmin
+          .from("invoice_template_config")
+          .select("email_recipient_config")
+          .eq("organization_id", organizationId)
+          .single();
+
+        const emailConfig: InvoiceEmailRecipientConfig = (templateConfig
+          ?.email_recipient_config as InvoiceEmailRecipientConfig) || {
+          location_email_source: "location_email",
+          form_field_email: null,
+          default_email: null,
+        };
+
+        // Fetch field configs for form field email mapping
+        const { data: fieldConfigs } = await supabaseAdmin
+          .from("organization_field_configs")
+          .select("id, name")
+          .eq("organization_id", organizationId)
+          .eq("active", true);
+
+        const fieldConfigMap = new Map<string, { name: string }>(
+          (fieldConfigs || []).map(
+            (fc: { id: string; name: string }) => [fc.id, { name: fc.name }],
+          ),
+        );
+
+        // Fetch job with location details for email recipient determination
+        const { data: jobWithLocation, error: jobLocationError } =
+          await supabaseAdmin
+            .from("job")
+            .select(
+              `
+              id,
+              location_id,
+              submission_data,
+              completed_at,
+              location:location_id (
+                id,
+                email,
+                contact_person,
+                name,
+                hierarchy_parent_id
+              )
+            `,
+            )
+            .eq("id", job.id)
+            .single();
+
+        if (jobLocationError || !jobWithLocation) {
+          console.error(
+            "❌ Admin Create Job: Error fetching job with location for feedback email",
+            {
+              error: jobLocationError?.message,
+            },
+          );
+          // Still update job with token for manual sending later
+          await supabaseAdmin
+            .from("job")
+            .update({ feedback_token: feedbackToken })
+            .eq("id", job.id);
+        } else {
+          // Handle location (Supabase returns it as array or object depending on query)
+          const locationData = Array.isArray(jobWithLocation.location)
+            ? jobWithLocation.location[0]
+            : jobWithLocation.location;
+
+          // Build job context for email recipient determination
+          const jobContext: JobContext = {
+            location_id: jobWithLocation.location_id,
+            location: locationData
+              ? {
+                id: locationData.id,
+                email: locationData.email || null,
+                contact_person: locationData.contact_person || null,
+                hierarchy_parent_id: locationData.hierarchy_parent_id || null,
+              }
+              : null,
+            submission_data: jobWithLocation.submission_data as
+              | Record<
+                string,
+                unknown
+              >
+              | null,
+          };
+
+          // Get email recipient
+          const recipientEmail = await getFeedbackEmailRecipient(
+            supabaseAdmin,
+            jobContext,
+            emailConfig,
+            fieldConfigMap,
+          );
+
+          if (recipientEmail) {
+            console.log("📧 Admin Create Job: Found feedback email recipient", {
+              email: recipientEmail,
+            });
+
+            // Get recipient name (from location contact_person or default)
+            const recipientName = locationData?.contact_person || null;
+
+            // Build feedback email data
+            const feedbackEmailData: FeedbackEmailData = {
+              recipientEmail,
+              recipientName,
+              organizationName: orgSettings.name || "Our Team",
+              jobId: job.id,
+              jobCompletedAt: jobWithLocation.completed_at,
+              locationName: locationData?.name || null,
+              feedbackToken,
+              feedbackReviewUrl: "", // Will be set by sendFeedbackRequestEmail
+            };
+
+            // Send feedback email
+            const emailResult = await sendFeedbackRequestEmail(
+              feedbackEmailData,
+              false, // Don't throw on error - job creation should succeed
+            );
+
+            if (emailResult.success) {
+              console.log(
+                "✅ Admin Create Job: Feedback email sent successfully",
+                {
+                  emailId: emailResult.emailId,
+                },
+              );
+
+              // Update job with token and email tracking
+              const { error: updateError } = await supabaseAdmin
+                .from("job")
+                .update({
+                  feedback_token: feedbackToken,
+                  feedback_email_sent: true,
+                  feedback_email_sent_at: new Date().toISOString(),
+                })
+                .eq("id", job.id);
+
+              if (updateError) {
+                console.error(
+                  "❌ Admin Create Job: Error updating job with feedback email tracking",
+                  {
+                    error: updateError.message,
+                  },
+                );
+                // Job was created and email was sent, so this is non-critical
+              }
+            } else {
+              console.error(
+                "❌ Admin Create Job: Failed to send feedback email",
+                {
+                  error: emailResult.error,
+                },
+              );
+              // Still update job with token for manual sending later
+              await supabaseAdmin
+                .from("job")
+                .update({ feedback_token: feedbackToken })
+                .eq("id", job.id);
+            }
+          } else {
+            console.warn(
+              "⚠️ Admin Create Job: No feedback email recipient found for job",
+              {
+                jobId: job.id,
+                locationId: jobWithLocation.location_id,
+              },
+            );
+            // Still update job with token for manual sending later
+            await supabaseAdmin
+              .from("job")
+              .update({ feedback_token: feedbackToken })
+              .eq("id", job.id);
+          }
+        }
+      } else {
+        console.log("📧 Admin Create Job: Feedback email sending is disabled");
+      }
+    } catch (feedbackError) {
+      // Log error but don't fail job creation
+      console.error(
+        "❌ Admin Create Job: Error in feedback email sending process",
+        {
+          error: feedbackError instanceof Error
+            ? feedbackError.message
+            : String(feedbackError),
+        },
       );
     }
 

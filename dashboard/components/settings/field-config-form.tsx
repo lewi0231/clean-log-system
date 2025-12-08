@@ -21,10 +21,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useLocations } from "@/hooks/use-locations";
+import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
+import { supabase } from "@/lib/supabase";
 import { fieldConfigSchema } from "@/lib/validations";
 import { FieldConfig, FieldType, ValidationRules } from "@clean-log/shared";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ValidationRulesEditor from "./validation-rules-editor";
 
 const YARD_GROUP_ID = "yard_tracking_method";
@@ -138,11 +141,61 @@ export default function FieldConfigForm({
   const [selectedPreset, setSelectedPreset] = useState<YardPresetId | "custom">(
     "custom"
   );
+  const [restrictToLocations, setRestrictToLocations] = useState(false);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+
+  const { locations } = useLocations();
+  const { organizationId } = useOrganization();
 
   const isEditMode = !!fieldConfig;
   const isSelectField = fieldType === "select";
   const isGroupedBreakdownField = fieldType === "grouped_breakdown";
   const requiresOptions = isSelectField || isGroupedBreakdownField;
+
+  const loadLocationRestrictions = useCallback(
+    async (fieldConfigId: string) => {
+      if (!organizationId) return;
+
+      try {
+        setLoadingLocations(true);
+        const { data, error } = await supabase.functions.invoke(
+          "list-field-configs",
+          {
+            body: {
+              organization_id: organizationId,
+              include_location_restrictions: true,
+            },
+          }
+        );
+
+        if (error) throw error;
+
+        const config = data?.field_configs?.find(
+          (fc: FieldConfig & { location_restrictions?: string[] }) =>
+            fc.id === fieldConfigId
+        );
+
+        if (
+          config?.location_restrictions &&
+          config.location_restrictions.length > 0
+        ) {
+          setRestrictToLocations(true);
+          setSelectedLocationIds(config.location_restrictions);
+        } else {
+          setRestrictToLocations(false);
+          setSelectedLocationIds([]);
+        }
+      } catch (err) {
+        log.error("Failed to load location restrictions", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
+      } finally {
+        setLoadingLocations(false);
+      }
+    },
+    [organizationId]
+  );
 
   useEffect(() => {
     if (open) {
@@ -167,6 +220,11 @@ export default function FieldConfigForm({
         } else {
           setSelectedPreset("custom");
         }
+
+        // Load location restrictions
+        if (fieldConfig.id) {
+          loadLocationRestrictions(fieldConfig.id);
+        }
       } else {
         setName("");
         setLabel("");
@@ -179,10 +237,12 @@ export default function FieldConfigForm({
         setMutuallyExclusiveGroup("");
         setGroupCluster("");
         setSelectedPreset("custom");
+        setRestrictToLocations(false);
+        setSelectedLocationIds([]);
       }
       setErrors({});
     }
-  }, [open, fieldConfig]);
+  }, [open, fieldConfig, loadLocationRestrictions]);
 
   const validateInput = () => {
     log.debug("FieldConfigForm: Validating form input");
@@ -254,7 +314,37 @@ export default function FieldConfigForm({
         group_cluster: validatedData.group_cluster ?? null,
       };
 
+      // Save location restrictions
+      const locationIds = restrictToLocations ? selectedLocationIds : [];
+
+      // For updates, save restrictions before calling onSuccess
+      if (fieldConfig?.id) {
+        try {
+          const { error: locationError } = await supabase.functions.invoke(
+            "update-field-config-locations",
+            {
+              body: {
+                field_config_id: fieldConfig.id,
+                location_ids: locationIds,
+              },
+            }
+          );
+
+          if (locationError) {
+            log.error("Failed to update location restrictions", {
+              error: locationError,
+            });
+            // Don't fail the whole operation, just log the error
+          }
+        } catch (err) {
+          log.error("Failed to update location restrictions", {
+            error: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      }
+
       // Reset form
+      const savedName = name; // Save name for create case
       setName("");
       setLabel("");
       setFieldType("text");
@@ -265,9 +355,67 @@ export default function FieldConfigForm({
       setOptionsInput("");
       setMutuallyExclusiveGroup("");
       setGroupCluster("");
+      const savedRestrictToLocations = restrictToLocations;
+      const savedLocationIds = [...selectedLocationIds];
+      setRestrictToLocations(false);
+      setSelectedLocationIds([]);
       setErrors({});
       onOpenChange(false);
+
       await onSuccess(normalizedData, fieldConfig?.id);
+
+      // For creates, save location restrictions after field config is created
+      // We need to find the newly created field config by name
+      if (!fieldConfig?.id && savedRestrictToLocations && organizationId) {
+        try {
+          // Wait a bit for the field config to be created
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Fetch field configs to find the newly created one
+          const { data, error: fetchError } = await supabase.functions.invoke(
+            "list-field-configs",
+            {
+              body: {
+                organization_id: organizationId,
+              },
+            }
+          );
+
+          if (fetchError) throw fetchError;
+
+          const newFieldConfig = data?.field_configs?.find(
+            (fc: FieldConfig) => fc.name === savedName
+          );
+
+          if (newFieldConfig?.id) {
+            const { error: locationError } = await supabase.functions.invoke(
+              "update-field-config-locations",
+              {
+                body: {
+                  field_config_id: newFieldConfig.id,
+                  location_ids: savedLocationIds,
+                },
+              }
+            );
+
+            if (locationError) {
+              log.error(
+                "Failed to save location restrictions for new field config",
+                {
+                  error: locationError,
+                }
+              );
+            }
+          }
+        } catch (err) {
+          log.error(
+            "Failed to save location restrictions for new field config",
+            {
+              error: err instanceof Error ? err.message : "Unknown error",
+            }
+          );
+        }
+      }
     } catch (error) {
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("FieldConfigForm: Submission failed", {
@@ -619,6 +767,82 @@ export default function FieldConfigForm({
                 inside the mutually exclusive group. Think “cars wiped” + “cars
                 soaped” acting as one choice when crews log a yard.
               </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="restrict-to-locations"
+                  checked={restrictToLocations}
+                  onCheckedChange={setRestrictToLocations}
+                />
+                <Label
+                  htmlFor="restrict-to-locations"
+                  className="cursor-pointer"
+                >
+                  Restrict to specific locations
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                When enabled, this field will only be available at the selected
+                locations. Leave empty to make it available at all locations.
+              </p>
+
+              {restrictToLocations && (
+                <div className="space-y-2 pl-6 border-l-2 border-muted">
+                  {loadingLocations ? (
+                    <p className="text-sm text-muted-foreground">
+                      Loading locations...
+                    </p>
+                  ) : locations.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No locations available. Create locations first.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {locations
+                        .filter((loc) => loc.active)
+                        .map((location) => (
+                          <div
+                            key={location.id}
+                            className="flex items-center space-x-2"
+                          >
+                            <input
+                              type="checkbox"
+                              id={`location-${location.id}`}
+                              checked={selectedLocationIds.includes(
+                                location.id
+                              )}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedLocationIds([
+                                    ...selectedLocationIds,
+                                    location.id,
+                                  ]);
+                                } else {
+                                  setSelectedLocationIds(
+                                    selectedLocationIds.filter(
+                                      (id) => id !== location.id
+                                    )
+                                  );
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <Label
+                              htmlFor={`location-${location.id}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {location.name}
+                            </Label>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -15,7 +15,8 @@ serve(async (req) => {
       return errorResponse("Organization ID is required", 400);
     }
 
-    const { organization_id, location_id } = body;
+    const { organization_id, location_id, include_location_restrictions } =
+      body;
 
     const supabase = createServiceRoleClient();
 
@@ -43,8 +44,23 @@ serve(async (req) => {
     });
 
     const sanitized = filtered.map((config) => {
+      const locLinks = (config as typeof config & {
+        location_field_config?: { location_id: string }[] | null;
+      }).location_field_config || [];
+
       const { location_field_config: _location_field_config, ...rest } =
         config as Record<string, unknown>;
+
+      // Include location restrictions if requested (for admin UI)
+      if (include_location_restrictions) {
+        return {
+          ...rest,
+          location_restrictions: locLinks.map(
+            (link: { location_id: string }) => link.location_id,
+          ),
+        };
+      }
+
       return rest;
     });
 

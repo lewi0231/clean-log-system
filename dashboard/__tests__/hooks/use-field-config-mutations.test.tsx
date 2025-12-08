@@ -2,7 +2,7 @@ import { createMockFieldConfig } from "@/__tests__/lib/fixtures";
 import { useFieldConfigMutations } from "@/hooks/use-field-config-mutations";
 import { supabase } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -62,8 +62,9 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleAdd({
+    let promise: Promise<void>;
+    act(() => {
+      promise = result.current.handleAdd({
         name: "test_field",
         label: "Test Field",
         field_type: "text",
@@ -79,7 +80,15 @@ describe("useFieldConfigMutations", () => {
       });
     });
 
-    expect(result.current.optimisticFieldConfigs.length).toBeGreaterThan(0);
+    // Wait for the optimistic update to be applied (startTransition schedules it)
+    await waitFor(() => {
+      expect(result.current.optimisticFieldConfigs.length).toBeGreaterThan(0);
+    });
+
+    // Wait for the mutation to complete
+    await act(async () => {
+      await promise!;
+    });
     expect(supabase.functions.invoke).toHaveBeenCalledWith(
       "create-field-config",
       expect.objectContaining({
@@ -112,16 +121,25 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleUpdate("field-1", {
+    let promise: Promise<void>;
+    act(() => {
+      promise = result.current.handleUpdate("field-1", {
         label: "Updated Label",
       });
     });
 
-    const updated = result.current.optimisticFieldConfigs.find(
-      (fc) => fc.id === "field-1"
-    );
-    expect(updated?.label).toBe("Updated Label");
+    // Wait for the optimistic update to be applied (startTransition schedules it)
+    await waitFor(() => {
+      const updated = result.current.optimisticFieldConfigs.find(
+        (fc) => fc.id === "field-1"
+      );
+      expect(updated?.label).toBe("Updated Label");
+    });
+
+    // Wait for the mutation to complete
+    await act(async () => {
+      await promise!;
+    });
     expect(supabase.functions.invoke).toHaveBeenCalledWith(
       "update-field-config",
       expect.objectContaining({
@@ -151,14 +169,23 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleDelete("field-1");
+    let promise: Promise<void>;
+    act(() => {
+      promise = result.current.handleDelete("field-1");
     });
 
-    const deleted = result.current.optimisticFieldConfigs.find(
-      (fc) => fc.id === "field-1"
-    );
-    expect(deleted).toBeUndefined();
+    // Wait for the optimistic update to be applied
+    await waitFor(() => {
+      const deleted = result.current.optimisticFieldConfigs.find(
+        (fc) => fc.id === "field-1"
+      );
+      expect(deleted).toBeUndefined();
+    });
+
+    // Wait for the mutation to complete
+    await act(async () => {
+      await promise!;
+    });
     expect(supabase.functions.invoke).toHaveBeenCalledWith(
       "delete-field-config",
       expect.objectContaining({
@@ -188,13 +215,25 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleReorder(["field-2", "field-1"]);
+    let promise: Promise<void>;
+    act(() => {
+      promise = result.current.handleReorder(["field-2", "field-1"]);
     });
 
-    const reordered = result.current.optimisticFieldConfigs;
-    expect(reordered[0]?.id).toBe("field-2");
-    expect(reordered[1]?.id).toBe("field-1");
+    // Wait for the optimistic update to be applied
+    await waitFor(
+      () => {
+        const reordered = result.current.optimisticFieldConfigs;
+        expect(reordered[0]?.id).toBe("field-2");
+        expect(reordered[1]?.id).toBe("field-1");
+      },
+      { timeout: 2000 }
+    );
+
+    // Wait for the mutation to complete
+    await act(async () => {
+      await promise!;
+    });
     expect(supabase.functions.invoke).toHaveBeenCalledWith(
       "reorder-field-configs",
       expect.objectContaining({

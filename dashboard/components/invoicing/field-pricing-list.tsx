@@ -15,7 +15,7 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { useModeAwareLabels } from "@/hooks/use-mode-aware-labels";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
-import type { FieldConfig, FieldType } from "@/shared/types";
+import type { FieldConfig, FieldType } from "@clean-log/shared/types";
 import { ChevronDown, ChevronUp, DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 

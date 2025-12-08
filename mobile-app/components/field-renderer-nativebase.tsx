@@ -4,7 +4,7 @@ import {
 } from "@/components/group-breakdown-field";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Select, SelectItem } from "@/components/ui/select";
-import { FieldConfig } from "@/shared/types/field-config";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Ionicons } from "@expo/vector-icons";
 import { Switch, Text, TextInput, View } from "react-native";
 import { TimePicker } from "./ui/time-picker";

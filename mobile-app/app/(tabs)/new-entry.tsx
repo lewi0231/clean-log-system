@@ -27,8 +27,8 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
-import { ConditionalLogic, FieldConfig } from "@/shared/types";
-import { FormSectionWithFields } from "@/shared/types/form-section";
+import { ConditionalLogic, FieldConfig } from "@clean-log/shared/types";
+import { FormSectionWithFields } from "@clean-log/shared/types/form-section";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -731,15 +731,16 @@ export default function NewEntryScreen() {
           // Use custom label for default_exclusive_group if available, otherwise generate from group ID
           const firstField = fields[0];
           const isDefaultGroup = groupId === "default_exclusive_group";
-          const groupLabel = isDefaultGroup && settings?.default_exclusive_group_label
-            ? settings.default_exclusive_group_label
-            : firstField.mutually_exclusive_group
-                ?.split("_")
-                .map(
-                  (word) =>
-                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                )
-                .join(" ") || "Select Option";
+          const groupLabel =
+            isDefaultGroup && settings?.default_exclusive_group_label
+              ? settings.default_exclusive_group_label
+              : firstField.mutually_exclusive_group
+                  ?.split("_")
+                  .map(
+                    (word) =>
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                  )
+                  .join(" ") || "Select Option";
 
           return (
             <View key={groupId} className="mb-4">

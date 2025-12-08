@@ -1,4 +1,4 @@
-import { FieldConfig } from "@/shared/types/field-config";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { describe, expect, it } from "vitest";
 import { createSchemaFromFieldConfig } from "../utils";
 
@@ -15,6 +15,10 @@ function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
     order_position: 0,
     validation_rules: null,
     options: null,
+    mutually_exclusive_group: null,
+    group_cluster: null,
+    section_id: null,
+    conditional_logic: null,
     version: 1,
     active: true,
     archived_at: null,
@@ -235,7 +239,7 @@ describe("createSchemaFromFieldConfig", () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.issues[0].message).toBe(
-          "This is a custom error message"
+          "This is a custom error message",
         );
       }
     });

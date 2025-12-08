@@ -1,6 +1,8 @@
 import { useWorkers } from "@/hooks/use-workers";
 import { WorkersService } from "@/lib/services";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockWorker } from "../lib/fixtures";
 
@@ -25,6 +27,24 @@ vi.mock("@/hooks/useOrganization", () => ({
   default: mockUseOrganization,
 }));
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+
+  return Wrapper;
+}
+
 describe("useWorkers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,7 +58,9 @@ describe("useWorkers", () => {
       locations: [],
     });
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -65,7 +87,9 @@ describe("useWorkers", () => {
         })
     );
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     expect(result.current.loading).toBe(true);
 
@@ -80,7 +104,9 @@ describe("useWorkers", () => {
       mockError
     );
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -99,7 +125,9 @@ describe("useWorkers", () => {
     });
     vi.mocked(WorkersService.create).mockResolvedValue(mockWorker);
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -125,7 +153,9 @@ describe("useWorkers", () => {
     });
     vi.mocked(WorkersService.update).mockResolvedValue(mockWorker);
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -148,7 +178,9 @@ describe("useWorkers", () => {
     });
     vi.mocked(WorkersService.delete).mockResolvedValue(undefined);
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -167,7 +199,9 @@ describe("useWorkers", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => useWorkers());
+    const { result } = renderHook(() => useWorkers(), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

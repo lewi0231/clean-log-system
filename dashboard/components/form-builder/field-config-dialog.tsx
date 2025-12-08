@@ -20,6 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useLocations } from "@/hooks/use-locations";
+import useOrganization from "@/hooks/useOrganization";
+import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
   FieldType,
@@ -75,7 +78,12 @@ export function FieldConfigDialog({
   const [sectionId, setSectionId] = useState<string>("none");
   const [options, setOptions] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [restrictToLocations, setRestrictToLocations] = useState(false);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const nameManuallyEditedRef = useRef(false);
+
+  const { locations } = useLocations();
+  const { organizationId } = useOrganization();
 
   // Update name when label changes (only if not manually edited)
   useEffect(() => {
@@ -118,6 +126,8 @@ export function FieldConfigDialog({
           ? "Option 1, Option 2"
           : ""
       );
+      setRestrictToLocations(false);
+      setSelectedLocationIds([]);
       // Reset manual edit flag when dialog opens
       nameManuallyEditedRef.current = false;
     }
@@ -128,6 +138,7 @@ export function FieldConfigDialog({
 
     setSaving(true);
     try {
+      // Save the field first
       await onSave({
         name: name.trim(),
         label: label.trim(),
@@ -149,6 +160,57 @@ export function FieldConfigDialog({
         section_id: sectionId === "none" ? null : sectionId,
         conditional_logic: null,
       });
+
+      // Save location restrictions after field is created
+      // We need to find the newly created field config by name
+      if (
+        restrictToLocations &&
+        selectedLocationIds.length > 0 &&
+        organizationId
+      ) {
+        try {
+          // Wait a bit for the field config to be created
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Fetch field configs to find the newly created one
+          const { data, error: fetchError } = await supabase.functions.invoke(
+            "list-field-configs",
+            {
+              body: {
+                organization_id: organizationId,
+              },
+            }
+          );
+
+          if (!fetchError && data?.field_configs) {
+            const newFieldConfig = data.field_configs.find(
+              (fc: FieldConfig) => fc.name === name.trim()
+            );
+
+            if (newFieldConfig?.id) {
+              const { error: locationError } = await supabase.functions.invoke(
+                "update-field-config-locations",
+                {
+                  body: {
+                    field_config_id: newFieldConfig.id,
+                    location_ids: selectedLocationIds,
+                  },
+                }
+              );
+
+              if (locationError) {
+                console.error(
+                  "Failed to save location restrictions",
+                  locationError
+                );
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Failed to save location restrictions", err);
+        }
+      }
+
       onOpenChange(false);
     } finally {
       setSaving(false);
@@ -264,6 +326,72 @@ export function FieldConfigDialog({
               checked={required}
               onCheckedChange={setRequired}
             />
+          </div>
+
+          {/* Location Restrictions */}
+          <div className="space-y-3 pt-4 border-t">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="restrict-to-locations"
+                checked={restrictToLocations}
+                onCheckedChange={setRestrictToLocations}
+              />
+              <Label htmlFor="restrict-to-locations" className="cursor-pointer">
+                Restrict to specific locations
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              When enabled, this field will only be available at the selected
+              locations. Leave empty to make it available at all locations.
+            </p>
+
+            {restrictToLocations && (
+              <div className="space-y-2 pl-6 border-l-2 border-muted">
+                {locations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No locations available. Create locations first.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {locations
+                      .filter((loc) => loc.active)
+                      .map((location) => (
+                        <div
+                          key={location.id}
+                          className="flex items-center space-x-2"
+                        >
+                          <input
+                            type="checkbox"
+                            id={`dialog-location-${location.id}`}
+                            checked={selectedLocationIds.includes(location.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLocationIds([
+                                  ...selectedLocationIds,
+                                  location.id,
+                                ]);
+                              } else {
+                                setSelectedLocationIds(
+                                  selectedLocationIds.filter(
+                                    (id) => id !== location.id
+                                  )
+                                );
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label
+                            htmlFor={`dialog-location-${location.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {location.name}
+                          </Label>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

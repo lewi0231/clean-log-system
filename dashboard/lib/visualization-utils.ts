@@ -1,4 +1,4 @@
-import type { FieldConfig } from "@/shared/types/field-config";
+import type { FieldConfig } from "@clean-log/shared/types";
 import {
   format,
   parseISO,
@@ -26,7 +26,7 @@ export interface ProcessedChartData {
  */
 export function extractFieldValue(
   submissionData: Record<string, unknown> | null,
-  fieldConfig: FieldConfig
+  fieldConfig: FieldConfig,
 ): number | null {
   if (!submissionData) return null;
 
@@ -74,7 +74,7 @@ export function extractFieldValue(
 export function extractGroupedBreakdown(
   submissionData: Record<string, unknown> | null,
   fieldConfig: FieldConfig,
-  mode: "brand" | "quantity"
+  _mode: "brand" | "quantity",
 ): Array<{ brand: string; quantity: number }> | null {
   if (!submissionData || fieldConfig.field_type !== "grouped_breakdown") {
     return null;
@@ -92,7 +92,7 @@ export function extractGroupedBreakdown(
       "brand" in item &&
       "quantity" in item &&
       typeof item.brand === "string" &&
-      typeof item.quantity === "number"
+      typeof item.quantity === "number",
   );
 }
 
@@ -101,7 +101,7 @@ export function extractGroupedBreakdown(
  */
 export function formatTimeGroup(
   date: Date | string,
-  period: TimePeriod
+  period: TimePeriod,
 ): string {
   const dateObj = typeof date === "string" ? parseISO(date) : date;
 
@@ -126,7 +126,7 @@ export function getGroupingKey(
   job: Job,
   dimension: GroupingDimension,
   groupingFieldConfig?: FieldConfig | null,
-  timePeriod?: TimePeriod
+  timePeriod?: TimePeriod,
 ): string {
   switch (dimension) {
     case "time":
@@ -163,10 +163,10 @@ export function getGroupingKey(
 export function processJobDataForChart(
   jobs: Job[],
   chartConfig: ChartConfig,
-  fieldConfigs: FieldConfig[]
+  fieldConfigs: FieldConfig[],
 ): ProcessedChartData | null {
   const fieldConfig = fieldConfigs.find(
-    (fc) => fc.id === chartConfig.fieldConfigId
+    (fc) => fc.id === chartConfig.fieldConfigId,
   );
 
   if (!fieldConfig) return null;
@@ -197,16 +197,15 @@ export function processJobDataForChart(
       filteredJobs,
       fieldConfig,
       chartConfig,
-      fieldConfigs
+      fieldConfigs,
     );
   }
 
   // Handle regular fields
-  const groupingFieldConfig =
-    chartConfig.groupingDimension === "field" &&
-    chartConfig.groupingFieldConfigId
-      ? fieldConfigs.find((fc) => fc.id === chartConfig.groupingFieldConfigId)
-      : null;
+  const groupingFieldConfig = chartConfig.groupingDimension === "field" &&
+      chartConfig.groupingFieldConfigId
+    ? fieldConfigs.find((fc) => fc.id === chartConfig.groupingFieldConfigId)
+    : null;
 
   const groupedData = new Map<string, number[]>();
 
@@ -215,7 +214,7 @@ export function processJobDataForChart(
       job,
       chartConfig.groupingDimension,
       groupingFieldConfig,
-      chartConfig.timePeriod
+      chartConfig.timePeriod,
     );
 
     const value = extractFieldValue(job.submission_data, fieldConfig);
@@ -233,8 +232,8 @@ export function processJobDataForChart(
       let aggregatedValue: number;
       switch (chartConfig.aggregationType) {
         case "average":
-          aggregatedValue =
-            values.reduce((sum, val) => sum + val, 0) / values.length;
+          aggregatedValue = values.reduce((sum, val) => sum + val, 0) /
+            values.length;
           break;
         case "count":
           aggregatedValue = values.length;
@@ -249,7 +248,7 @@ export function processJobDataForChart(
         name,
         value: aggregatedValue,
       };
-    }
+    },
   );
 
   // Sort by name for consistent display (time-based should be chronological)
@@ -275,7 +274,7 @@ function processGroupedBreakdownData(
   jobs: Job[],
   fieldConfig: FieldConfig,
   chartConfig: ChartConfig,
-  fieldConfigs: FieldConfig[]
+  fieldConfigs: FieldConfig[],
 ): ProcessedChartData {
   const mode = chartConfig.groupedBreakdownMode || "quantity";
 
@@ -287,7 +286,7 @@ function processGroupedBreakdownData(
       const breakdown = extractGroupedBreakdown(
         job.submission_data,
         fieldConfig,
-        "brand"
+        "brand",
       );
       if (breakdown) {
         breakdown.forEach((item) => {
@@ -301,7 +300,7 @@ function processGroupedBreakdownData(
       ([brand, quantity]) => ({
         name: brand,
         value: quantity,
-      })
+      }),
     );
 
     data.sort((a, b) => b.value - a.value); // Sort by quantity descending
@@ -313,11 +312,10 @@ function processGroupedBreakdownData(
     };
   } else {
     // Quantity over time/worker/location
-    const groupingFieldConfig =
-      chartConfig.groupingDimension === "field" &&
-      chartConfig.groupingFieldConfigId
-        ? fieldConfigs.find((fc) => fc.id === chartConfig.groupingFieldConfigId)
-        : null;
+    const groupingFieldConfig = chartConfig.groupingDimension === "field" &&
+        chartConfig.groupingFieldConfigId
+      ? fieldConfigs.find((fc) => fc.id === chartConfig.groupingFieldConfigId)
+      : null;
 
     const groupedData = new Map<string, number>();
 
@@ -326,18 +324,18 @@ function processGroupedBreakdownData(
         job,
         chartConfig.groupingDimension,
         groupingFieldConfig,
-        chartConfig.timePeriod
+        chartConfig.timePeriod,
       );
 
       const breakdown = extractGroupedBreakdown(
         job.submission_data,
         fieldConfig,
-        "quantity"
+        "quantity",
       );
       if (breakdown) {
         const totalQuantity = breakdown.reduce(
           (sum, item) => sum + item.quantity,
-          0
+          0,
         );
         const current = groupedData.get(groupingKey) || 0;
         groupedData.set(groupingKey, current + totalQuantity);
@@ -348,7 +346,7 @@ function processGroupedBreakdownData(
       ([name, value]) => ({
         name,
         value,
-      })
+      }),
     );
 
     // Sort by name for time-based, by value for others
@@ -375,7 +373,7 @@ export function getChartableFields(fieldConfigs: FieldConfig[]): FieldConfig[] {
       fc.field_type === "number" ||
       fc.field_type === "grouped_breakdown" ||
       fc.field_type === "select" ||
-      fc.field_type === "boolean"
+      fc.field_type === "boolean",
   );
 }
 
@@ -387,6 +385,6 @@ export function getGroupingFields(fieldConfigs: FieldConfig[]): FieldConfig[] {
     (fc) =>
       fc.field_type === "select" ||
       fc.field_type === "text" ||
-      fc.field_type === "boolean"
+      fc.field_type === "boolean",
   );
 }

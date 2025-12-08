@@ -1,4 +1,4 @@
-import type { FieldType } from "@/shared/types";
+import type { FieldType } from "@clean-log/shared/types";
 import type { BusinessMode } from "./types";
 
 /**
@@ -115,7 +115,7 @@ export const FIELD_CONFIG_TEMPLATES: Record<
  * Get template fields for a business mode
  */
 export function getTemplateFields(
-  businessMode: BusinessMode
+  businessMode: BusinessMode,
 ): TemplateFieldConfig[] {
   return FIELD_CONFIG_TEMPLATES[businessMode] || [];
 }

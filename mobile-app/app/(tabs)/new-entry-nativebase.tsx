@@ -14,8 +14,8 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
-import { ConditionalLogic, FieldConfig } from "@/shared/types";
-import { FormSectionWithFields } from "@/shared/types/form-section";
+import { ConditionalLogic, FieldConfig } from "@clean-log/shared/types";
+import { FormSectionWithFields } from "@clean-log/shared/types/form-section";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -29,13 +29,7 @@ import {
   VStack,
 } from "native-base";
 import { JSX, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  View,
-} from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -134,13 +128,17 @@ function CollapsibleSection({
       overflow="hidden"
       shadow={3}
     >
-      <Pressable onPress={toggleCollapse}>
+      <Pressable
+        onPress={toggleCollapse}
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? "#374151" : "#1f2937",
+        })}
+      >
         <HStack
           alignItems="center"
           justifyContent="space-between"
           p={4}
           bg="gray.750"
-          _pressed={{ bg: "gray.700" }}
         >
           <VStack flex={1}>
             <Text fontSize="md" fontWeight="semibold" color="gray.100">
@@ -153,12 +151,7 @@ function CollapsibleSection({
             )}
           </VStack>
           <HStack alignItems="center" space={2}>
-            <Box
-              bg="gray.700"
-              px={2}
-              py={1}
-              borderRadius="full"
-            >
+            <Box bg="gray.700" px={2} py={1} borderRadius="full">
               <Text fontSize="xs" color="gray.300">
                 {fieldCount}
               </Text>
@@ -172,9 +165,9 @@ function CollapsibleSection({
         </HStack>
       </Pressable>
       <Animated.View style={animatedStyle}>
-        <Box p={4} space={4}>
+        <VStack p={4} space={4}>
           {children}
-        </Box>
+        </VStack>
       </Animated.View>
     </Box>
   );
@@ -466,7 +459,7 @@ export default function NewEntryScreen() {
         }}
         opacity={0.3}
       />
-      
+
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -496,7 +489,11 @@ export default function NewEntryScreen() {
               {/* Progress Indicator */}
               {!fieldsLoading && fieldConfigs.length > 0 && (
                 <Box mb={6}>
-                  <HStack justifyContent="space-between" alignItems="center" mb={2}>
+                  <HStack
+                    justifyContent="space-between"
+                    alignItems="center"
+                    mb={2}
+                  >
                     <Text fontSize="sm" fontWeight="semibold" color="gray.200">
                       Form Progress
                     </Text>
@@ -560,7 +557,14 @@ export default function NewEntryScreen() {
                     onValueChange={handleAddColleague}
                     placeholder="Select a colleague"
                     size="medium"
-                  />
+                  >
+                    {filteredColleagues.map((colleague) => (
+                      <SelectItem key={colleague.id} value={colleague.id}>
+                        {colleague.name.charAt(0).toUpperCase() +
+                          colleague.name.substring(1).toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </Select>
                   {selectedColleagues.length > 0 && (
                     <HStack flexWrap="wrap" space={2} mt={3}>
                       {selectedColleagues.map((colleagueId) => (
@@ -576,7 +580,11 @@ export default function NewEntryScreen() {
                             onPress={() => handleRemoveColleague(colleagueId)}
                             disabled={isSubmitting}
                           >
-                            <Ionicons name="close-circle" size={16} color="#fff" />
+                            <Ionicons
+                              name="close-circle"
+                              size={16}
+                              color="#fff"
+                            />
                           </Pressable>
                         </Badge>
                       ))}
@@ -601,7 +609,14 @@ export default function NewEntryScreen() {
                     value={selectedLocation}
                     onValueChange={setSelectedLocation}
                     size="medium"
-                  />
+                    placeholder="Select a location"
+                  >
+                    {locations.map((location) => (
+                      <SelectItem key={location.id} value={location.id}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
                   <Divider my={4} bg="gray.700" />
                 </Box>
               )}
@@ -650,7 +665,8 @@ export default function NewEntryScreen() {
 
                         Array.from(groupedFields.entries()).forEach(
                           ([groupId, configs]) => {
-                            const visibleConfigs = configs.filter(isFieldVisible);
+                            const visibleConfigs =
+                              configs.filter(isFieldVisible);
                             if (visibleConfigs.length === 0) return;
 
                             if (groupId) {
@@ -711,11 +727,7 @@ export default function NewEntryScreen() {
               size="lg"
               borderRadius="xl"
               leftIcon={
-                <Ionicons
-                  name="checkmark-circle"
-                  size={20}
-                  color="white"
-                />
+                <Ionicons name="checkmark-circle" size={20} color="white" />
               }
             >
               <Text color="white" fontSize="lg" fontWeight="semibold">
@@ -728,4 +740,3 @@ export default function NewEntryScreen() {
     </Box>
   );
 }
-

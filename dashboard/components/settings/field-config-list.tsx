@@ -18,7 +18,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { FieldConfig, FieldType, ValidationRules } from "@/shared/types";
+import useOrganization from "@/hooks/useOrganization";
+import { supabase } from "@/lib/supabase";
+import {
+  FieldConfig,
+  FieldType,
+  ValidationRules,
+} from "@clean-log/shared/types";
 import {
   closestCenter,
   DndContext,
@@ -36,8 +42,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { GripVertical, MapPin, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import FieldConfigForm from "./field-config-form";
 
 interface FieldConfigListProps {
@@ -72,7 +78,10 @@ function SortableFieldConfigItem({
   fieldConfig,
   onEdit,
   onDelete,
-}: SortableFieldConfigItemProps) {
+  locationRestrictions,
+}: SortableFieldConfigItemProps & {
+  locationRestrictions?: string[];
+}) {
   const {
     attributes,
     listeners,
@@ -116,6 +125,16 @@ function SortableFieldConfigItem({
                   {fieldConfig.group_cluster && (
                     <Badge variant="default" className="bg-purple-600">
                       Cluster: {fieldConfig.group_cluster}
+                    </Badge>
+                  )}
+                  {locationRestrictions && locationRestrictions.length > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="bg-amber-50 text-amber-700 border-amber-300"
+                    >
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {locationRestrictions.length} location
+                      {locationRestrictions.length !== 1 ? "s" : ""}
                     </Badge>
                   )}
                 </div>
@@ -170,6 +189,49 @@ export default function FieldConfigList({
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingFieldConfig, setDeletingFieldConfig] =
     useState<FieldConfig | null>(null);
+  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<
+    Record<string, string[]>
+  >({});
+  const { organizationId } = useOrganization();
+
+  // Fetch location restrictions for all field configs
+  useEffect(() => {
+    if (!organizationId || fieldConfigs.length === 0) return;
+
+    async function fetchLocationRestrictions() {
+      try {
+        const { data, error } = await supabase.functions.invoke(
+          "list-field-configs",
+          {
+            body: {
+              organization_id: organizationId,
+              include_location_restrictions: true,
+            },
+          }
+        );
+
+        if (error) throw error;
+
+        const restrictionsMap: Record<string, string[]> = {};
+        (data?.field_configs || []).forEach(
+          (fc: FieldConfig & { location_restrictions?: string[] }) => {
+            if (
+              fc.location_restrictions &&
+              fc.location_restrictions.length > 0
+            ) {
+              restrictionsMap[fc.id] = fc.location_restrictions;
+            }
+          }
+        );
+
+        setLocationRestrictionsMap(restrictionsMap);
+      } catch (err) {
+        console.error("Failed to fetch location restrictions", err);
+      }
+    }
+
+    fetchLocationRestrictions();
+  }, [organizationId, fieldConfigs]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -267,6 +329,7 @@ export default function FieldConfigList({
                   fieldConfig={fieldConfig}
                   onEdit={handleEdit}
                   onDelete={setDeletingFieldConfig}
+                  locationRestrictions={locationRestrictionsMap[fieldConfig.id]}
                 />
               ))}
             </div>

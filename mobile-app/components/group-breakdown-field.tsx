@@ -1,6 +1,6 @@
 import { Drawer } from "@/components/ui/drawer";
 import { Select, SelectItem } from "@/components/ui/select";
-import { FieldConfig } from "@/shared/types/field-config";
+import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
