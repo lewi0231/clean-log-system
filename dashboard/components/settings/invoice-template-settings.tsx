@@ -36,7 +36,8 @@ import type {
   LineItemDisplayConfig,
   ServiceAddressConfig,
 } from "@/lib/types";
-import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { validateInvoiceTemplateConfig } from "@/lib/validations/invoice-template";
+import { CheckCircle2, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { InvoiceHeaderSettings } from "./invoice-template/InvoiceHeaderSettings";
 
@@ -49,6 +50,10 @@ export default function InvoiceTemplateSettings() {
   } = useInvoiceTemplateConfig();
   const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
   const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<
+    Partial<Record<string, string>>
+  >({});
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Local state for form
   const [invoiceTitle, setInvoiceTitle] = useState<string>(
@@ -96,19 +101,54 @@ export default function InvoiceTemplateSettings() {
   const handleSave = async () => {
     if (!config) return;
 
+    // Clear previous validation errors
+    setValidationErrors({});
+
+    // Validate the config before saving
+    const configToSave = {
+      invoice_title: invoiceTitle,
+      show_logo: showLogo,
+      show_abn: showAbn,
+      service_address_config: serviceAddressConfig,
+      billing_address_config: billingAddressConfig,
+      email_recipient_config: emailRecipientConfig,
+      line_item_display: lineItemDisplay,
+    };
+
+    const validation = validateInvoiceTemplateConfig(configToSave);
+
+    if (!validation.success) {
+      setValidationErrors(validation.errors || {});
+      // Scroll to first error
+      const firstErrorKey = Object.keys(validation.errors || {})[0];
+      if (firstErrorKey) {
+        const errorElement = document.querySelector(
+          `[data-error-field="${firstErrorKey}"]`
+        );
+        errorElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+
     try {
       setSaving(true);
-      await updateConfig({
-        invoice_title: invoiceTitle,
-        show_logo: showLogo,
-        show_abn: showAbn,
-        service_address_config: serviceAddressConfig,
-        billing_address_config: billingAddressConfig,
-        email_recipient_config: emailRecipientConfig,
-        line_item_display: lineItemDisplay,
-      });
+      setSaveSuccess(false);
+      await updateConfig(configToSave);
+      // Clear errors on successful save
+      setValidationErrors({});
+      // Show success message
+      setSaveSuccess(true);
+      // Hide success message after 3 seconds
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to save invoice template configuration";
       console.error("Failed to save invoice template config:", err);
+      alert(
+        `Failed to save settings: ${errorMessage}. Please try again or contact support if the problem persists.`
+      );
     } finally {
       setSaving(false);
     }
@@ -575,11 +615,11 @@ export default function InvoiceTemplateSettings() {
               Form Field for Email (No Location)
             </Label>
             <Select
-              value={emailRecipientConfig.form_field_email || ""}
+              value={emailRecipientConfig.form_field_email || "__none__"}
               onValueChange={(value) =>
                 setEmailRecipientConfig((prev) => ({
                   ...prev,
-                  form_field_email: value || null,
+                  form_field_email: value === "__none__" ? null : value,
                 }))
               }
             >
@@ -587,7 +627,9 @@ export default function InvoiceTemplateSettings() {
                 <SelectValue placeholder="Select a field that contains email" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (use default email)</SelectItem>
+                <SelectItem value="__none__">
+                  None (use default email)
+                </SelectItem>
                 {fieldConfigs
                   .filter(
                     (field) =>
@@ -620,16 +662,38 @@ export default function InvoiceTemplateSettings() {
                   ...prev,
                   default_email: value,
                 }));
+                // Clear validation error when user types
+                if (validationErrors["email_recipient_config.default_email"]) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors["email_recipient_config.default_email"];
+                    return newErrors;
+                  });
+                }
               }}
               placeholder="default@example.com"
               pattern="[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
             />
-            <p className="text-xs text-muted-foreground">
+            <p
+              id="default-email-help"
+              className="text-xs text-muted-foreground"
+            >
               Fallback email address used when no other email source is
               available. Leave empty if you want invoices without valid email
               addresses to require manual review.
             </p>
+            {validationErrors["email_recipient_config.default_email"] && (
+              <p
+                id="default-email-error"
+                className="text-xs text-destructive"
+                data-error-field="email_recipient_config.default_email"
+                role="alert"
+              >
+                {validationErrors["email_recipient_config.default_email"]}
+              </p>
+            )}
             {emailRecipientConfig.default_email &&
+              !validationErrors["email_recipient_config.default_email"] &&
               !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(
                 emailRecipientConfig.default_email
               ) && (
@@ -678,15 +742,43 @@ export default function InvoiceTemplateSettings() {
               <Input
                 id="description-format"
                 value={lineItemDisplay.description_format}
-                onChange={(e) =>
+                onChange={(e) => {
                   setLineItemDisplay((prev) => ({
                     ...prev,
                     description_format: e.target.value,
-                  }))
-                }
+                  }));
+                  // Clear error when user types
+                  if (
+                    validationErrors["line_item_display.description_format"]
+                  ) {
+                    setValidationErrors((prev) => {
+                      const newErrors = { ...prev };
+                      delete newErrors["line_item_display.description_format"];
+                      return newErrors;
+                    });
+                  }
+                }}
                 placeholder="{field_label}: {option_value}"
+                data-error-field="line_item_display.description_format"
+                className={
+                  validationErrors["line_item_display.description_format"]
+                    ? "border-destructive"
+                    : ""
+                }
               />
-              <p className="text-xs text-muted-foreground">
+              {validationErrors["line_item_display.description_format"] && (
+                <p
+                  id="description-format-error"
+                  className="text-xs text-destructive"
+                  role="alert"
+                >
+                  {validationErrors["line_item_display.description_format"]}
+                </p>
+              )}
+              <p
+                id="description-format-help"
+                className="text-xs text-muted-foreground"
+              >
                 Use {"{field_label}"} for the field label and {"{option_value}"}{" "}
                 for the option value
               </p>
@@ -716,17 +808,66 @@ export default function InvoiceTemplateSettings() {
         </CardContent>
       </Card>
 
+      {/* Success Message */}
+      {saveSuccess && (
+        <Card className="border-green-500 bg-green-50 dark:bg-green-950">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                Invoice template settings saved successfully!
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Validation Errors Summary */}
+      {Object.keys(validationErrors).length > 0 && (
+        <Card className="border-destructive bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-destructive">
+                Please fix the following errors before saving:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm text-destructive">
+                {Object.entries(validationErrors).map(([field, error]) => (
+                  <li key={field}>
+                    <span className="font-medium">{field}:</span> {error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Save Button */}
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving || !config}>
+      <div className="flex justify-end gap-2">
+        {Object.keys(validationErrors).length > 0 && (
+          <p className="text-sm text-muted-foreground self-center">
+            {Object.keys(validationErrors).length} error
+            {Object.keys(validationErrors).length !== 1 ? "s" : ""} to fix
+          </p>
+        )}
+        <Button
+          onClick={handleSave}
+          disabled={
+            saving || !config || Object.keys(validationErrors).length > 0
+          }
+          aria-label="Save invoice template settings"
+        >
           {saving ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2
+                className="mr-2 h-4 w-4 animate-spin"
+                aria-hidden="true"
+              />
               Saving...
             </>
           ) : (
             <>
-              <Save className="mr-2 h-4 w-4" />
+              <Save className="mr-2 h-4 w-4" aria-hidden="true" />
               Save Changes
             </>
           )}

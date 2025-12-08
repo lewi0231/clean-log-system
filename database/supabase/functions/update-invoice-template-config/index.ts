@@ -7,6 +7,7 @@ import {
   DEFAULT_LINE_ITEM_DISPLAY,
   DEFAULT_SERVICE_ADDRESS_CONFIG,
 } from "../_utils/invoice-template-defaults.ts";
+import { validateInvoiceTemplateConfigUpdate } from "../_utils/invoice-template-validation.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -36,9 +37,41 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    // Validate all config updates before processing
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
+
+    // Build update data object for validation
+    const configToValidate: Record<string, unknown> = {};
+    if (invoice_title !== undefined) {
+      configToValidate.invoice_title = invoice_title;
+    }
+    if (show_logo !== undefined) configToValidate.show_logo = show_logo;
+    if (show_abn !== undefined) configToValidate.show_abn = show_abn;
+    if (service_address_config !== undefined) {
+      configToValidate.service_address_config = service_address_config;
+    }
+    if (billing_address_config !== undefined) {
+      configToValidate.billing_address_config = billing_address_config;
+    }
+    if (email_recipient_config !== undefined) {
+      configToValidate.email_recipient_config = email_recipient_config;
+    }
+    if (line_item_display !== undefined) {
+      configToValidate.line_item_display = line_item_display;
+    }
+
+    // Run validation
+    if (Object.keys(configToValidate).length > 0) {
+      const validation = validateInvoiceTemplateConfigUpdate(configToValidate);
+      if (!validation.valid && validation.errors) {
+        return errorResponse(
+          `Validation failed: ${validation.errors.join("; ")}`,
+          400,
+        );
+      }
+    }
 
     // Validate and add invoice_title
     if (invoice_title !== undefined) {

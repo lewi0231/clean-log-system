@@ -40,8 +40,13 @@ export function InvoiceHeaderSettings({
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-3">
-          <Label>Invoice Title</Label>
-          <RadioGroup value={invoiceTitle} onValueChange={onInvoiceTitleChange}>
+          <Label htmlFor="invoice-title-group">Invoice Title</Label>
+          <RadioGroup
+            id="invoice-title-group"
+            value={invoiceTitle}
+            onValueChange={onInvoiceTitleChange}
+            aria-label="Invoice title selection"
+          >
             <div className="flex items-center space-x-2">
               <RadioGroupItem
                 value={INVOICE_TITLE_OPTIONS.INVOICE}

@@ -25,8 +25,21 @@
 -- If both are enabled, location_hierarchy config takes precedence for those locations.
 -- Organization-level config applies to all invoices not covered by hierarchy-level config.
 
+-- Create organization_settings table if it doesn't exist
+CREATE TABLE IF NOT EXISTS organization_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organization(id) ON DELETE CASCADE NOT NULL UNIQUE,
+  auto_send_invoices_config JSONB DEFAULT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Add column if table already exists (for idempotency)
 ALTER TABLE organization_settings
   ADD COLUMN IF NOT EXISTS auto_send_invoices_config JSONB DEFAULT NULL;
+
+-- Add index for organization_id lookups
+CREATE INDEX IF NOT EXISTS idx_organization_settings_org_id ON organization_settings(organization_id);
 
 COMMENT ON COLUMN organization_settings.auto_send_invoices_config IS 'Organization-level auto-send invoice configuration: {enabled: boolean, period: "daily"|"weekly"|"monthly", day_of_week?: number, day_of_month?: number, time?: string}. Applies to invoices not covered by location_hierarchy auto-send config.';
 

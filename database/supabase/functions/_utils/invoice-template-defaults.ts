@@ -29,6 +29,17 @@ export const DEFAULT_LINE_ITEM_DISPLAY = {
 } as const;
 
 /**
+ * Valid location field names for service address
+ */
+export const VALID_LOCATION_FIELDS = [
+  "name",
+  "address",
+  "contact_person",
+  "email",
+  "phone",
+] as const;
+
+/**
  * Get default invoice template config for an organization
  */
 export function getDefaultInvoiceTemplateConfig(organizationId: string) {
