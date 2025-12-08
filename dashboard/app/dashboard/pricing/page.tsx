@@ -87,16 +87,16 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
         <p className="text-muted-foreground mt-2">
-          Configure how you charge customers for services and how you pay
-          workers. Prices are calculated using equations based on field values
-          from completed jobs.
+          Configure customer pricing and worker payments. Prices are calculated
+          using equations based on field values from completed jobs. Customer
+          pricing is used for invoicing, while worker payments determine how
+          much workers are paid for completed jobs.
         </p>
       </div>
 
       <Tabs defaultValue="set-pricing" className="space-y-6">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="set-pricing">Customer Pricing</TabsTrigger>
-          <TabsTrigger value="worker-payments">Worker Payments</TabsTrigger>
+          <TabsTrigger value="set-pricing">Pricing</TabsTrigger>
           <TabsTrigger value="pricing-history">Pricing History</TabsTrigger>
         </TabsList>
 
@@ -200,7 +200,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                     Field Pricing
                   </TabsTrigger>
                   <TabsTrigger value="option-pricing" disabled={isFixedPricing}>
-                    Group & Option Pricing
+                    Option Pricing
                   </TabsTrigger>
                   <TabsTrigger value="base-pricing" disabled={isFixedPricing}>
                     Base Pricing
@@ -225,6 +225,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
+                        showBothContexts={true}
                       />
                     </CardContent>
                   </Card>
@@ -249,6 +250,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                               locationHierarchyId={locationNodeId}
                               locationId={locationId}
                               effectiveAt={effectiveDate}
+                              showBothContexts={true}
                             />
                           </CardContent>
                         </Card>
@@ -283,6 +285,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
+                        showBothContexts={true}
                       />
                     </CardContent>
                   </Card>
@@ -313,142 +316,6 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
             <div>
               <UnifiedInvoicePreview />
             </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="worker-payments" className="space-y-6">
-          <LocationScopeSelector
-            selectedNodeId={locationNodeId}
-            selectedLocationId={locationId}
-            onNodeChange={setLocationNodeId}
-            onLocationChange={setLocationId}
-            effectiveDate={effectiveDate}
-            onEffectiveDateChange={setEffectiveDate}
-            expirationDate={expirationDate}
-            onExpirationDateChange={setExpirationDate}
-          />
-
-          {effectiveDate && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <CalendarRange className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">
-                      Viewing worker payment rules as of{" "}
-                      {new Date(effectiveDate).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      This is a view-only filter. Changes you save will create
-                      rules effective immediately (today).
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <PricingScopeIndicator
-            locationNodeId={locationNodeId}
-            locationId={locationId}
-          />
-
-          <div className="space-y-6">
-            <Tabs defaultValue="field-pricing" className="space-y-6">
-              <TabsList className="w-full justify-start">
-                <TabsTrigger value="field-pricing">Field Payments</TabsTrigger>
-                <TabsTrigger value="option-pricing">
-                  Group & Option Payments
-                </TabsTrigger>
-                <TabsTrigger value="base-pricing">Base Payments</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="field-pricing" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Field Payments</CardTitle>
-                    <CardDescription>
-                      Set payment rates for fields that collect quantities or
-                      counts. These rates are multiplied by the field value to
-                      calculate worker payment totals.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <FieldPricingList
-                      locationHierarchyId={locationNodeId}
-                      locationId={locationId}
-                      effectiveAt={effectiveDate}
-                      pricingContext="worker"
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="option-pricing" className="space-y-6">
-                {optionPricingFields.length > 0 ? (
-                  <div className="space-y-6">
-                    {optionPricingFields.map((fieldConfig) => (
-                      <Card key={fieldConfig.id}>
-                        <CardHeader>
-                          <CardTitle>{fieldConfig.label}</CardTitle>
-                          <CardDescription>
-                            Set payment rates for each group. Total = sum of
-                            (rate_per_group × quantity_per_group) for all
-                            selected options.
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <OptionPricingEditor
-                            fieldConfig={fieldConfig}
-                            locationHierarchyId={locationNodeId}
-                            locationId={locationId}
-                            effectiveAt={effectiveDate}
-                            pricingContext="worker"
-                          />
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>No Grouped Breakdown Fields</CardTitle>
-                      <CardDescription>
-                        Create grouped breakdown fields in Mobile Application to
-                        configure option payment rates. Select fields are
-                        configured in the Service-Type Pricing tab.
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                )}
-              </TabsContent>
-
-              <TabsContent value="base-pricing" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Base Payments</CardTitle>
-                    <CardDescription>
-                      Add fixed amounts or multiply the entire worker payment.
-                      Can be a fixed adjustment or vary by job type.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <BasePricingEditor
-                      locationHierarchyId={locationNodeId}
-                      locationId={locationId}
-                      effectiveAt={effectiveDate}
-                      pricingContext="worker"
-                    />
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
           </div>
         </TabsContent>
 

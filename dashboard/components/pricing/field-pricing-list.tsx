@@ -89,6 +89,7 @@ interface FieldPricingListProps {
   effectiveAt?: string | null;
   refreshToken?: number;
   pricingContext?: "customer" | "worker"; // Defaults to 'customer'
+  showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
 }
 
 export default function FieldPricingList({
@@ -97,27 +98,62 @@ export default function FieldPricingList({
   effectiveAt = null,
   refreshToken,
   pricingContext = "customer",
+  showBothContexts = false,
 }: FieldPricingListProps) {
   const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
   const {
-    fieldPricing,
-    loading: pricingLoading,
-    error: pricingError,
-    upsertPricing,
-    deletePricing,
+    fieldPricing: customerPricing,
+    loading: customerLoading,
+    error: customerError,
+    upsertPricing: upsertCustomerPricing,
+    deletePricing: deleteCustomerPricing,
   } = useFieldPricing({
     locationHierarchyId,
     locationId,
     effectiveAt,
     refreshToken,
-    pricingContext,
+    pricingContext: "customer",
   });
+  const {
+    fieldPricing: workerPricing,
+    loading: workerLoading,
+    error: workerError,
+    upsertPricing: upsertWorkerPricing,
+    deletePricing: deleteWorkerPricing,
+  } = useFieldPricing({
+    locationHierarchyId,
+    locationId,
+    effectiveAt,
+    refreshToken,
+    pricingContext: "worker",
+  });
+
+  // Use the appropriate pricing based on showBothContexts
+  const fieldPricing = showBothContexts
+    ? [...customerPricing, ...workerPricing]
+    : customerPricing;
+  const pricingLoading = showBothContexts
+    ? customerLoading || workerLoading
+    : customerLoading;
+  const pricingError = showBothContexts
+    ? customerError || workerError
+    : customerError;
+  const upsertPricing = showBothContexts
+    ? upsertCustomerPricing
+    : pricingContext === "customer"
+    ? upsertCustomerPricing
+    : upsertWorkerPricing;
+  const deletePricing = showBothContexts
+    ? deleteCustomerPricing
+    : pricingContext === "customer"
+    ? deleteCustomerPricing
+    : deleteWorkerPricing;
   const { setSelectedFieldId, expirationDate } = usePricingScope();
   const { formatCurrency } = useOrganizationCurrency();
 
-  const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
-    {}
-  );
+  const [editingPrices, setEditingPrices] = useState<
+    Record<string, { customer?: string; worker?: string }>
+  >({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(
     {}
@@ -149,13 +185,28 @@ export default function FieldPricingList({
   );
   const scopeSource = getPricingScopeSource(scopeParams);
 
-  const pricingMap = useMemo(() => {
+  const customerPricingMap = useMemo(() => {
     return buildScopedPricingMap(
-      fieldPricing,
+      customerPricing,
       scopeParams,
       (pricing) => pricing.field_config_id || null
     );
-  }, [fieldPricing, scopeParams]);
+  }, [customerPricing, scopeParams]);
+
+  const workerPricingMap = useMemo(() => {
+    return buildScopedPricingMap(
+      workerPricing,
+      scopeParams,
+      (pricing) => pricing.field_config_id || null
+    );
+  }, [workerPricing, scopeParams]);
+
+  // Combined map for backward compatibility
+  const pricingMap = showBothContexts
+    ? customerPricingMap
+    : pricingContext === "customer"
+    ? customerPricingMap
+    : workerPricingMap;
 
   const fieldLabelLookup = useMemo(() => {
     const lookup: Record<string, string> = {};
@@ -165,54 +216,140 @@ export default function FieldPricingList({
     return lookup;
   }, [fieldConfigs]);
 
-  const handlePriceChange = (fieldConfigId: string, value: string) => {
+  const handlePriceChange = (
+    fieldConfigId: string,
+    value: string,
+    type: "customer" | "worker" = "customer"
+  ) => {
     setEditingPrices((prev) => ({
       ...prev,
-      [fieldConfigId]: value,
+      [fieldConfigId]: {
+        ...prev[fieldConfigId],
+        [type]: value,
+      },
     }));
     setSelectedFieldId(fieldConfigId);
   };
 
   const handleSave = async (fieldConfig: FieldConfig) => {
-    const priceValue = editingPrices[fieldConfig.id];
-    if (!priceValue || priceValue.trim() === "") {
-      return;
-    }
+    const editing = editingPrices[fieldConfig.id];
+    if (!editing) return;
 
-    const customerPrice = parseFloat(priceValue);
-    if (isNaN(customerPrice) || customerPrice < 0) {
-      return;
-    }
+    if (showBothContexts) {
+      // Save both customer and worker pricing
+      const customerPrice = editing.customer
+        ? parseFloat(editing.customer)
+        : null;
+      const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
 
-    setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
-    try {
-      const pricingEntry = pricingMap[fieldConfig.id];
-      await upsertPricing(fieldConfig.id, customerPrice, {
-        appliesToFieldType: fieldConfig.field_type,
-        pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
-        locationHierarchyId,
-        locationId,
-        conditions:
-          pricingEntry?.record?.source_rule?.conditions?.map(
-            serializeCondition
-          ),
-        expirationDate,
-        pricingContext,
-      });
-      setEditingPrices((prev) => {
-        const next = { ...prev };
-        delete next[fieldConfig.id];
-        return next;
-      });
-      setSelectedFieldId(fieldConfig.id);
-    } catch (error) {
-      console.error("Failed to save pricing", error);
-    } finally {
-      setSaving((prev) => {
-        const next = { ...prev };
-        delete next[fieldConfig.id];
-        return next;
-      });
+      if (
+        (customerPrice === null || isNaN(customerPrice) || customerPrice < 0) &&
+        (workerPrice === null || isNaN(workerPrice) || workerPrice < 0)
+      ) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
+      try {
+        const customerEntry = customerPricingMap[fieldConfig.id];
+        const workerEntry = workerPricingMap[fieldConfig.id];
+
+        // Save customer pricing if provided
+        if (
+          customerPrice !== null &&
+          !isNaN(customerPrice) &&
+          customerPrice >= 0
+        ) {
+          await upsertCustomerPricing(fieldConfig.id, customerPrice, {
+            appliesToFieldType: fieldConfig.field_type,
+            pricingType:
+              fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+            locationHierarchyId,
+            locationId,
+            conditions:
+              customerEntry?.record?.source_rule?.conditions?.map(
+                serializeCondition
+              ),
+            expirationDate,
+            pricingContext: "customer",
+          });
+        }
+
+        // Save worker pricing if provided
+        if (workerPrice !== null && !isNaN(workerPrice) && workerPrice >= 0) {
+          await upsertWorkerPricing(fieldConfig.id, workerPrice, {
+            appliesToFieldType: fieldConfig.field_type,
+            pricingType:
+              fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+            locationHierarchyId,
+            locationId,
+            conditions:
+              workerEntry?.record?.source_rule?.conditions?.map(
+                serializeCondition
+              ),
+            expirationDate,
+            pricingContext: "worker",
+          });
+        }
+
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next[fieldConfig.id];
+          return next;
+        });
+        setSelectedFieldId(fieldConfig.id);
+      } catch (error) {
+        console.error("Failed to save pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next[fieldConfig.id];
+          return next;
+        });
+      }
+    } else {
+      // Original single-context save logic
+      const priceValue =
+        pricingContext === "customer" ? editing.customer : editing.worker;
+      if (!priceValue || priceValue.trim() === "") {
+        return;
+      }
+
+      const price = parseFloat(priceValue);
+      if (isNaN(price) || price < 0) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
+      try {
+        const pricingEntry = pricingMap[fieldConfig.id];
+        await upsertPricing(fieldConfig.id, price, {
+          appliesToFieldType: fieldConfig.field_type,
+          pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+          locationHierarchyId,
+          locationId,
+          conditions:
+            pricingEntry?.record?.source_rule?.conditions?.map(
+              serializeCondition
+            ),
+          expirationDate,
+          pricingContext,
+        });
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next[fieldConfig.id];
+          return next;
+        });
+        setSelectedFieldId(fieldConfig.id);
+      } catch (error) {
+        console.error("Failed to save pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next[fieldConfig.id];
+          return next;
+        });
+      }
     }
   };
 
@@ -337,19 +474,51 @@ export default function FieldPricingList({
     <>
       <div className="space-y-3">
         {pricingFieldConfigs.map((fieldConfig) => {
-          const pricingEntry = pricingMap[fieldConfig.id];
-          const scopedPricing = pricingEntry?.record;
-          const defaultPrice = scopedPricing?.customer_price ?? 0;
-          const currentPrice =
-            editingPrices[fieldConfig.id] !== undefined
-              ? editingPrices[fieldConfig.id]
-              : scopedPricing
-              ? scopedPricing.customer_price.toString()
+          const customerEntry = customerPricingMap[fieldConfig.id];
+          const workerEntry = workerPricingMap[fieldConfig.id];
+          const customerPricing = customerEntry?.record;
+          const workerPricing = workerEntry?.record;
+
+          // For backward compatibility
+          const pricingEntry = showBothContexts
+            ? customerEntry
+            : pricingContext === "customer"
+            ? customerEntry
+            : workerEntry;
+          const scopedPricing = showBothContexts
+            ? customerPricing
+            : pricingContext === "customer"
+            ? customerPricing
+            : workerPricing;
+
+          const editing = editingPrices[fieldConfig.id];
+          const currentCustomerPrice =
+            editing?.customer !== undefined
+              ? editing.customer
+              : customerPricing
+              ? customerPricing.customer_price.toString()
               : "";
-          const hasChanges =
-            editingPrices[fieldConfig.id] !== undefined &&
-            editingPrices[fieldConfig.id] !==
-              (scopedPricing?.customer_price.toString() || "");
+          const currentWorkerPrice =
+            editing?.worker !== undefined
+              ? editing.worker
+              : workerPricing
+              ? workerPricing.worker_payment_value?.toString() || ""
+              : "";
+
+          const hasCustomerChanges =
+            editing?.customer !== undefined &&
+            editing.customer !==
+              (customerPricing?.customer_price.toString() || "");
+          const hasWorkerChanges =
+            editing?.worker !== undefined &&
+            editing.worker !==
+              (workerPricing?.worker_payment_value?.toString() || "");
+          const hasChanges = showBothContexts
+            ? hasCustomerChanges || hasWorkerChanges
+            : pricingContext === "customer"
+            ? hasCustomerChanges
+            : hasWorkerChanges;
+
           const isSaving = saving[fieldConfig.id] || false;
           const overrides = getLocationOverrides(
             fieldPricing,
@@ -357,9 +526,10 @@ export default function FieldPricingList({
             locationId,
             locationHierarchyId
           );
-          const conditions = scopedPricing?.source_rule?.conditions ?? [];
+          const conditions = customerPricing?.source_rule?.conditions ?? [];
           const isExpanded = expandedCards[fieldConfig.id] ?? true;
           const hasScopedValue = isEntryForScope(pricingEntry, scopeSource);
+          const defaultPrice = scopedPricing?.customer_price ?? 0;
 
           return (
             <Collapsible
@@ -390,9 +560,45 @@ export default function FieldPricingList({
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {scopedPricing ? (
+                        {showBothContexts ? (
+                          <div className="flex items-center gap-3 text-xs">
+                            {customerPricing && (
+                              <div>
+                                <span className="text-muted-foreground">
+                                  Customer:{" "}
+                                </span>
+                                <span className="font-medium text-primary">
+                                  {formatCurrency(
+                                    customerPricing.customer_price
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {workerPricing && (
+                              <div>
+                                <span className="text-muted-foreground">
+                                  Worker:{" "}
+                                </span>
+                                <span className="font-medium text-primary">
+                                  {formatCurrency(
+                                    workerPricing.worker_payment_value || 0
+                                  )}
+                                </span>
+                              </div>
+                            )}
+                            {!customerPricing && !workerPricing && (
+                              <span className="text-muted-foreground">
+                                No prices set
+                              </span>
+                            )}
+                          </div>
+                        ) : scopedPricing ? (
                           <span className="text-sm font-medium text-primary">
-                            {formatCurrency(scopedPricing.customer_price)}
+                            {formatCurrency(
+                              pricingContext === "customer"
+                                ? scopedPricing.customer_price
+                                : scopedPricing.worker_payment_value || 0
+                            )}
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">
@@ -418,40 +624,123 @@ export default function FieldPricingList({
                       </span>
                     </div>
 
-                    <div className="grid gap-3 lg:grid-cols-[2fr_minmax(0,1fr)]">
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor={`price-${fieldConfig.id}`}
-                          className="text-sm"
-                        >
-                          Price per Unit
-                        </Label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            id={`price-${fieldConfig.id}`}
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={currentPrice}
-                            onChange={(e) =>
-                              handlePriceChange(fieldConfig.id, e.target.value)
-                            }
-                            className="pl-8"
-                            disabled={isSaving}
-                          />
+                    {showBothContexts ? (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor={`customer-price-${fieldConfig.id}`}
+                            className="text-sm"
+                          >
+                            Customer Price per Unit
+                          </Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id={`customer-price-${fieldConfig.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={currentCustomerPrice}
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  fieldConfig.id,
+                                  e.target.value,
+                                  "customer"
+                                )
+                              }
+                              className="pl-8"
+                              disabled={isSaving}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {getFieldTypeDescription(fieldConfig)}
+                          </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {getFieldTypeDescription(fieldConfig)}
-                        </p>
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor={`worker-price-${fieldConfig.id}`}
+                            className="text-sm"
+                          >
+                            Worker Payment per Unit
+                          </Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id={`worker-price-${fieldConfig.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={currentWorkerPrice}
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  fieldConfig.id,
+                                  e.target.value,
+                                  "worker"
+                                )
+                              }
+                              className="pl-8"
+                              disabled={isSaving}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Payment rate for workers
+                          </p>
+                        </div>
                       </div>
-                      <FieldPricePreview
-                        fieldType={fieldConfig.field_type}
-                        price={parseFloat(currentPrice) || defaultPrice}
-                        formatCurrency={formatCurrency}
-                      />
-                    </div>
+                    ) : (
+                      <div className="grid gap-3 lg:grid-cols-[2fr_minmax(0,1fr)]">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor={`price-${fieldConfig.id}`}
+                            className="text-sm"
+                          >
+                            {pricingContext === "customer"
+                              ? "Price per Unit"
+                              : "Payment per Unit"}
+                          </Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              id={`price-${fieldConfig.id}`}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={
+                                pricingContext === "customer"
+                                  ? currentCustomerPrice
+                                  : currentWorkerPrice
+                              }
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  fieldConfig.id,
+                                  e.target.value,
+                                  pricingContext
+                                )
+                              }
+                              className="pl-8"
+                              disabled={isSaving}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {getFieldTypeDescription(fieldConfig)}
+                          </p>
+                        </div>
+                        <FieldPricePreview
+                          fieldType={fieldConfig.field_type}
+                          price={
+                            parseFloat(
+                              pricingContext === "customer"
+                                ? currentCustomerPrice
+                                : currentWorkerPrice
+                            ) || defaultPrice
+                          }
+                          formatCurrency={formatCurrency}
+                        />
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
@@ -459,9 +748,21 @@ export default function FieldPricingList({
                         onClick={() => handleSave(fieldConfig)}
                         disabled={
                           !hasChanges ||
-                          !currentPrice ||
-                          isNaN(parseFloat(currentPrice)) ||
-                          parseFloat(currentPrice) < 0 ||
+                          (showBothContexts
+                            ? (!currentCustomerPrice && !currentWorkerPrice) ||
+                              (currentCustomerPrice &&
+                                (isNaN(parseFloat(currentCustomerPrice)) ||
+                                  parseFloat(currentCustomerPrice) < 0)) ||
+                              (currentWorkerPrice &&
+                                (isNaN(parseFloat(currentWorkerPrice)) ||
+                                  parseFloat(currentWorkerPrice) < 0))
+                            : pricingContext === "customer"
+                            ? !currentCustomerPrice ||
+                              isNaN(parseFloat(currentCustomerPrice)) ||
+                              parseFloat(currentCustomerPrice) < 0
+                            : !currentWorkerPrice ||
+                              isNaN(parseFloat(currentWorkerPrice)) ||
+                              parseFloat(currentWorkerPrice) < 0) ||
                           isSaving
                         }
                       >
@@ -506,25 +807,23 @@ export default function FieldPricingList({
                       )}
                     </div>
 
-                    {overrides.length > 0 && (
-                      <LocationOverridesMatrix
-                        rows={overrides}
-                        emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
-                        onDelete={async (id) => {
-                          setDeletingIds((prev) => new Set(prev).add(id));
-                          try {
-                            await deletePricing(id);
-                          } finally {
-                            setDeletingIds((prev) => {
-                              const next = new Set(prev);
-                              next.delete(id);
-                              return next;
-                            });
-                          }
-                        }}
-                        deletingIds={deletingIds}
-                      />
-                    )}
+                    <LocationOverridesMatrix
+                      rows={overrides}
+                      emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
+                      onDelete={async (id) => {
+                        setDeletingIds((prev) => new Set(prev).add(id));
+                        try {
+                          await deletePricing(id);
+                        } finally {
+                          setDeletingIds((prev) => {
+                            const next = new Set(prev);
+                            next.delete(id);
+                            return next;
+                          });
+                        }
+                      }}
+                      deletingIds={deletingIds}
+                    />
 
                     {isPricingRulesEnabled() && (
                       <ConditionalRuleChips

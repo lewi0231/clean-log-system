@@ -5,6 +5,10 @@ import {
   type ConditionalRuleDraft,
 } from "@/components/pricing/conditional-rule-builder";
 import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
+import {
+  LocationOverridesMatrix,
+  type LocationOverrideRow,
+} from "@/components/pricing/location-overrides-matrix";
 import { serializeCondition } from "@/components/pricing/pricing-condition-helpers";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +42,7 @@ import {
   getPricingScopeSource,
   isEntryForScope,
 } from "@/lib/pricing-scope";
+import type { BasePricing } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import { ChevronDown, DollarSign, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -47,6 +52,7 @@ interface BasePricingEditorProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   pricingContext?: "customer" | "worker"; // Defaults to 'customer'
+  showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
 }
 
 export default function BasePricingEditor({
@@ -54,15 +60,60 @@ export default function BasePricingEditor({
   locationId = null,
   effectiveAt = null,
   pricingContext = "customer",
+  showBothContexts = false,
 }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
-  const { basePricing, loading, error, upsertPricing, deletePricing } =
-    useBasePricing({
-      locationHierarchyId,
-      locationId,
-      effectiveAt,
-      pricingContext,
-    });
+  const {
+    basePricing: customerPricing,
+    loading: customerLoading,
+    error: customerError,
+    upsertPricing: upsertCustomerPricing,
+    deletePricing: deleteCustomerPricing,
+  } = useBasePricing({
+    locationHierarchyId,
+    locationId,
+    effectiveAt,
+    pricingContext: "customer",
+  });
+  const {
+    basePricing: workerPricing,
+    loading: workerLoading,
+    error: workerError,
+    upsertPricing: upsertWorkerPricing,
+    deletePricing: deleteWorkerPricing,
+  } = useBasePricing({
+    locationHierarchyId,
+    locationId,
+    effectiveAt,
+    pricingContext: "worker",
+  });
+
+  // Use the appropriate pricing based on showBothContexts
+  const basePricing = showBothContexts
+    ? [...customerPricing, ...workerPricing]
+    : pricingContext === "customer"
+    ? customerPricing
+    : workerPricing;
+  const loading = showBothContexts
+    ? customerLoading || workerLoading
+    : pricingContext === "customer"
+    ? customerLoading
+    : workerLoading;
+  const error = showBothContexts
+    ? customerError || workerError
+    : pricingContext === "customer"
+    ? customerError
+    : workerError;
+  const upsertPricing = showBothContexts
+    ? upsertCustomerPricing
+    : pricingContext === "customer"
+    ? upsertCustomerPricing
+    : upsertWorkerPricing;
+  const deletePricing = showBothContexts
+    ? deleteCustomerPricing
+    : pricingContext === "customer"
+    ? deleteCustomerPricing
+    : deleteWorkerPricing;
   useOrganizationCurrency(); // Hook used for currency context
 
   const scopeParams = useMemo(
@@ -85,9 +136,9 @@ export default function BasePricingEditor({
   const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
     string | null
   >(null);
-  const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
-    {}
-  );
+  const [editingPrices, setEditingPrices] = useState<
+    Record<string, { customer?: string; worker?: string }>
+  >({});
   const [editingAdjustmentTypes, setEditingAdjustmentTypes] = useState<
     Record<string, "add" | "multiply">
   >({});
@@ -105,39 +156,89 @@ export default function BasePricingEditor({
   }, [fieldConfigs]);
 
   // Create maps for quick lookup
-  const standaloneEntry = useMemo(() => {
+  const customerStandaloneEntry = useMemo(() => {
     const map = buildScopedPricingMap(
-      basePricing.filter((p) => !p.job_type_field_config_id),
+      customerPricing.filter((p) => !p.job_type_field_config_id),
       scopeParams,
       () => "standalone"
     );
     return map["standalone"];
-  }, [basePricing, scopeParams]);
+  }, [customerPricing, scopeParams]);
 
-  const standalonePricing = standaloneEntry?.record ?? null;
-  const standaloneConditions = standalonePricing?.source_rule?.conditions ?? [];
+  const workerStandaloneEntry = useMemo(() => {
+    const map = buildScopedPricingMap(
+      workerPricing.filter((p) => !p.job_type_field_config_id),
+      scopeParams,
+      () => "standalone"
+    );
+    return map["standalone"];
+  }, [workerPricing, scopeParams]);
+
+  // For backward compatibility
+  const standaloneEntry = showBothContexts
+    ? customerStandaloneEntry
+    : pricingContext === "customer"
+    ? customerStandaloneEntry
+    : workerStandaloneEntry;
+
+  const customerStandalonePricing = customerStandaloneEntry?.record ?? null;
+  const workerStandalonePricing = workerStandaloneEntry?.record ?? null;
+  const standalonePricing = showBothContexts
+    ? customerStandalonePricing
+    : pricingContext === "customer"
+    ? customerStandalonePricing
+    : workerStandalonePricing;
+  const standaloneConditions =
+    customerStandalonePricing?.source_rule?.conditions ?? [];
   const standaloneHasScopedValue = isEntryForScope(
     standaloneEntry,
     scopeSource
   );
 
-  const fieldBasedPricingMap = useMemo(() => {
+  const customerFieldBasedPricingMap = useMemo(() => {
     if (!selectedFieldConfigId) {
       return {};
     }
     return buildScopedPricingMap(
-      basePricing.filter(
+      customerPricing.filter(
         (p) => p.job_type_field_config_id === selectedFieldConfigId
       ),
       scopeParams,
       (record) => record.job_type_value || null
     );
-  }, [basePricing, selectedFieldConfigId, scopeParams]);
+  }, [customerPricing, selectedFieldConfigId, scopeParams]);
 
-  const handlePriceChange = (key: string, value: string) => {
+  const workerFieldBasedPricingMap = useMemo(() => {
+    if (!selectedFieldConfigId) {
+      return {};
+    }
+    return buildScopedPricingMap(
+      workerPricing.filter(
+        (p) => p.job_type_field_config_id === selectedFieldConfigId
+      ),
+      scopeParams,
+      (record) => record.job_type_value || null
+    );
+  }, [workerPricing, selectedFieldConfigId, scopeParams]);
+
+  // For backward compatibility
+  const fieldBasedPricingMap = showBothContexts
+    ? customerFieldBasedPricingMap
+    : pricingContext === "customer"
+    ? customerFieldBasedPricingMap
+    : workerFieldBasedPricingMap;
+
+  const handlePriceChange = (
+    key: string,
+    value: string,
+    type: "customer" | "worker" = "customer"
+  ) => {
     setEditingPrices((prev) => ({
       ...prev,
-      [key]: value,
+      [key]: {
+        ...prev[key],
+        [type]: value,
+      },
     }));
   };
 
@@ -203,120 +304,309 @@ export default function BasePricingEditor({
 
   const handleSaveStandalone = async () => {
     const editing = editingPrices["standalone"];
-    if (!editing || editing.trim() === "") {
-      return;
-    }
+    if (!editing) return;
 
-    const adjustmentType =
-      editingAdjustmentTypes["standalone"] ||
-      standalonePricing?.adjustment_type ||
-      "add";
+    if (showBothContexts) {
+      // Save both customer and worker pricing
+      const customerPrice = editing.customer
+        ? parseFloat(editing.customer)
+        : null;
+      const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
 
-    const customerPrice = parseFloat(editing);
-    if (isNaN(customerPrice)) {
-      return;
-    }
+      const adjustmentType =
+        editingAdjustmentTypes["standalone"] ||
+        customerStandalonePricing?.adjustment_type ||
+        "add";
 
-    // Validate based on adjustment type
-    if (adjustmentType === "add" && customerPrice < 0) {
-      return;
-    }
-    if (adjustmentType === "multiply" && customerPrice <= 0) {
-      return;
-    }
+      if (
+        (customerPrice === null || isNaN(customerPrice)) &&
+        (workerPrice === null || isNaN(workerPrice))
+      ) {
+        return;
+      }
 
-    setSaving((prev) => ({ ...prev, standalone: true }));
-    try {
-      const existingConditions =
-        standalonePricing?.source_rule?.conditions?.map(serializeCondition) ??
-        undefined;
-      const request = {
-        standalone_base_price: adjustmentType === "add" ? customerPrice : 0,
-        customer_base_price: customerPrice,
-        adjustment_type: adjustmentType,
-        conditions: existingConditions,
-        location_id: locationId,
-        pricingContext,
-      } as Parameters<typeof upsertPricing>[0];
-      await upsertPricing(request);
-      setEditingPrices((prev) => {
-        const next = { ...prev };
-        delete next.standalone;
-        return next;
-      });
-      setEditingAdjustmentTypes((prev) => {
-        const next = { ...prev };
-        delete next.standalone;
-        return next;
-      });
-    } catch (error) {
-      console.error("Failed to save standalone base pricing", error);
-    } finally {
-      setSaving((prev) => {
-        const next = { ...prev };
-        delete next.standalone;
-        return next;
-      });
+      // Validate based on adjustment type
+      if (
+        customerPrice !== null &&
+        !isNaN(customerPrice) &&
+        ((adjustmentType === "add" && customerPrice < 0) ||
+          (adjustmentType === "multiply" && customerPrice <= 0))
+      ) {
+        return;
+      }
+      if (
+        workerPrice !== null &&
+        !isNaN(workerPrice) &&
+        ((adjustmentType === "add" && workerPrice < 0) ||
+          (adjustmentType === "multiply" && workerPrice <= 0))
+      ) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, standalone: true }));
+      try {
+        const existingConditions =
+          customerStandalonePricing?.source_rule?.conditions?.map(
+            serializeCondition
+          ) ?? undefined;
+
+        // Save customer pricing if provided
+        if (customerPrice !== null && !isNaN(customerPrice)) {
+          await upsertCustomerPricing({
+            standalone_base_price: adjustmentType === "add" ? customerPrice : 0,
+            customer_base_price: customerPrice,
+            adjustment_type: adjustmentType,
+            conditions: existingConditions,
+            location_id: locationId,
+            pricingContext: "customer",
+          });
+        }
+
+        // Save worker pricing if provided
+        if (workerPrice !== null && !isNaN(workerPrice)) {
+          await upsertWorkerPricing({
+            standalone_base_price: adjustmentType === "add" ? workerPrice : 0,
+            customer_base_price: workerPrice, // For worker, this is the base payment
+            worker_base_payment: workerPrice,
+            adjustment_type: adjustmentType,
+            conditions: existingConditions,
+            location_id: locationId,
+            pricingContext: "worker",
+          });
+        }
+
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next.standalone;
+          return next;
+        });
+        setEditingAdjustmentTypes((prev) => {
+          const next = { ...prev };
+          delete next.standalone;
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to save standalone base pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next.standalone;
+          return next;
+        });
+      }
+    } else {
+      // Original single-context save logic
+      const priceValue =
+        pricingContext === "customer" ? editing.customer : editing.worker;
+      if (!priceValue || priceValue.trim() === "") {
+        return;
+      }
+
+      const adjustmentType =
+        editingAdjustmentTypes["standalone"] ||
+        standalonePricing?.adjustment_type ||
+        "add";
+
+      const price = parseFloat(priceValue);
+      if (isNaN(price)) {
+        return;
+      }
+
+      // Validate based on adjustment type
+      if (adjustmentType === "add" && price < 0) {
+        return;
+      }
+      if (adjustmentType === "multiply" && price <= 0) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, standalone: true }));
+      try {
+        const existingConditions =
+          standalonePricing?.source_rule?.conditions?.map(serializeCondition) ??
+          undefined;
+        const request = {
+          standalone_base_price: adjustmentType === "add" ? price : 0,
+          customer_base_price: price,
+          worker_base_payment: pricingContext === "worker" ? price : undefined,
+          adjustment_type: adjustmentType,
+          conditions: existingConditions,
+          location_id: locationId,
+          pricingContext,
+        } as Parameters<typeof upsertPricing>[0];
+        await upsertPricing(request);
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next.standalone;
+          return next;
+        });
+        setEditingAdjustmentTypes((prev) => {
+          const next = { ...prev };
+          delete next.standalone;
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to save standalone base pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next.standalone;
+          return next;
+        });
+      }
     }
   };
 
   const handleSaveFieldBased = async (optionValue: string) => {
     const editing = editingPrices[optionValue];
-    if (!editing || editing.trim() === "") {
-      return;
-    }
-
-    const pricingEntry = fieldBasedPricingMap[optionValue];
-    const adjustmentType =
-      editingAdjustmentTypes[optionValue] ||
-      pricingEntry?.record?.adjustment_type ||
-      "add";
-
-    const customerPrice = parseFloat(editing);
-    if (isNaN(customerPrice)) {
-      return;
-    }
-
-    // Validate based on adjustment type
-    if (adjustmentType === "add" && customerPrice < 0) {
-      return;
-    }
-    if (adjustmentType === "multiply" && customerPrice <= 0) {
-      return;
-    }
+    if (!editing) return;
 
     if (!selectedFieldConfigId) {
       return;
     }
 
-    setSaving((prev) => ({ ...prev, [optionValue]: true }));
-    try {
-      await upsertPricing({
-        job_type_field_config_id: selectedFieldConfigId,
-        job_type_value: optionValue,
-        customer_base_price: customerPrice,
-        adjustment_type: adjustmentType,
-        location_id: locationId,
-        pricingContext,
-      });
-      setEditingPrices((prev) => {
-        const next = { ...prev };
-        delete next[optionValue];
-        return next;
-      });
-      setEditingAdjustmentTypes((prev) => {
-        const next = { ...prev };
-        delete next[optionValue];
-        return next;
-      });
-    } catch (error) {
-      console.error("Failed to save field-based base pricing", error);
-    } finally {
-      setSaving((prev) => {
-        const next = { ...prev };
-        delete next[optionValue];
-        return next;
-      });
+    if (showBothContexts) {
+      // Save both customer and worker pricing
+      const customerPrice = editing.customer
+        ? parseFloat(editing.customer)
+        : null;
+      const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
+
+      const customerEntry = customerFieldBasedPricingMap[optionValue];
+      const workerEntry = workerFieldBasedPricingMap[optionValue];
+      const adjustmentType =
+        editingAdjustmentTypes[optionValue] ||
+        customerEntry?.record?.adjustment_type ||
+        "add";
+
+      if (
+        (customerPrice === null || isNaN(customerPrice)) &&
+        (workerPrice === null || isNaN(workerPrice))
+      ) {
+        return;
+      }
+
+      // Validate based on adjustment type
+      if (
+        customerPrice !== null &&
+        !isNaN(customerPrice) &&
+        ((adjustmentType === "add" && customerPrice < 0) ||
+          (adjustmentType === "multiply" && customerPrice <= 0))
+      ) {
+        return;
+      }
+      if (
+        workerPrice !== null &&
+        !isNaN(workerPrice) &&
+        ((adjustmentType === "add" && workerPrice < 0) ||
+          (adjustmentType === "multiply" && workerPrice <= 0))
+      ) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, [optionValue]: true }));
+      try {
+        // Save customer pricing if provided
+        if (customerPrice !== null && !isNaN(customerPrice)) {
+          await upsertCustomerPricing({
+            job_type_field_config_id: selectedFieldConfigId,
+            job_type_value: optionValue,
+            customer_base_price: customerPrice,
+            adjustment_type: adjustmentType,
+            location_id: locationId,
+            pricingContext: "customer",
+          });
+        }
+
+        // Save worker pricing if provided
+        if (workerPrice !== null && !isNaN(workerPrice)) {
+          await upsertWorkerPricing({
+            job_type_field_config_id: selectedFieldConfigId,
+            job_type_value: optionValue,
+            customer_base_price: workerPrice, // For worker, this is the base payment
+            worker_base_payment: workerPrice,
+            adjustment_type: adjustmentType,
+            location_id: locationId,
+            pricingContext: "worker",
+          });
+        }
+
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+        setEditingAdjustmentTypes((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to save field-based base pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      }
+    } else {
+      // Original single-context save logic
+      const priceValue =
+        pricingContext === "customer" ? editing.customer : editing.worker;
+      if (!priceValue || priceValue.trim() === "") {
+        return;
+      }
+
+      const pricingEntry = fieldBasedPricingMap[optionValue];
+      const adjustmentType =
+        editingAdjustmentTypes[optionValue] ||
+        pricingEntry?.record?.adjustment_type ||
+        "add";
+
+      const price = parseFloat(priceValue);
+      if (isNaN(price)) {
+        return;
+      }
+
+      // Validate based on adjustment type
+      if (adjustmentType === "add" && price < 0) {
+        return;
+      }
+      if (adjustmentType === "multiply" && price <= 0) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, [optionValue]: true }));
+      try {
+        await upsertPricing({
+          job_type_field_config_id: selectedFieldConfigId,
+          job_type_value: optionValue,
+          customer_base_price: price,
+          worker_base_payment: pricingContext === "worker" ? price : undefined,
+          adjustment_type: adjustmentType,
+          location_id: locationId,
+          pricingContext,
+        });
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+        setEditingAdjustmentTypes((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to save field-based base pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      }
     }
   };
 
@@ -475,59 +765,175 @@ export default function BasePricingEditor({
               </span>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="standalone-customer">
-                {(editingAdjustmentTypes["standalone"] ||
-                  standalonePricing?.adjustment_type ||
-                  "add") === "add"
-                  ? "Amount to Add (USD)"
-                  : "Multiplier (e.g., 1.2 = 20% increase)"}
-              </Label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="standalone-customer"
-                  type="number"
-                  step="0.01"
-                  min={
-                    (editingAdjustmentTypes["standalone"] ||
-                      standalonePricing?.adjustment_type ||
-                      "add") === "multiply"
-                      ? "0.01"
-                      : "0"
-                  }
-                  placeholder={
-                    (editingAdjustmentTypes["standalone"] ||
-                      standalonePricing?.adjustment_type ||
-                      "add") === "multiply"
-                      ? "1.00"
-                      : "0.00"
-                  }
-                  value={
-                    editingPrices["standalone"] !== undefined
-                      ? editingPrices["standalone"]
-                      : standalonePricing
-                      ? standalonePricing.customer_base_price.toString()
-                      : ""
-                  }
-                  onChange={(e) =>
-                    handlePriceChange("standalone", e.target.value)
-                  }
-                  className="pl-9"
-                  disabled={
-                    saving["standalone"] ||
-                    deleting[standalonePricing?.id || ""]
-                  }
-                />
+            {showBothContexts ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="standalone-customer">
+                    Customer{" "}
+                    {(editingAdjustmentTypes["standalone"] ||
+                      customerStandalonePricing?.adjustment_type ||
+                      "add") === "add"
+                      ? "Amount to Add"
+                      : "Multiplier"}
+                  </Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="standalone-customer"
+                      type="number"
+                      step="0.01"
+                      min={
+                        (editingAdjustmentTypes["standalone"] ||
+                          customerStandalonePricing?.adjustment_type ||
+                          "add") === "multiply"
+                          ? "0.01"
+                          : "0"
+                      }
+                      placeholder={
+                        (editingAdjustmentTypes["standalone"] ||
+                          customerStandalonePricing?.adjustment_type ||
+                          "add") === "multiply"
+                          ? "1.00"
+                          : "0.00"
+                      }
+                      value={
+                        editingPrices["standalone"]?.customer !== undefined
+                          ? editingPrices["standalone"].customer
+                          : customerStandalonePricing
+                          ? customerStandalonePricing.customer_base_price.toString()
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handlePriceChange(
+                          "standalone",
+                          e.target.value,
+                          "customer"
+                        )
+                      }
+                      className="pl-9"
+                      disabled={
+                        saving["standalone"] ||
+                        deleting[customerStandalonePricing?.id || ""]
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="standalone-worker">
+                    Worker{" "}
+                    {(editingAdjustmentTypes["standalone"] ||
+                      workerStandalonePricing?.adjustment_type ||
+                      "add") === "add"
+                      ? "Amount to Add"
+                      : "Multiplier"}
+                  </Label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="standalone-worker"
+                      type="number"
+                      step="0.01"
+                      min={
+                        (editingAdjustmentTypes["standalone"] ||
+                          workerStandalonePricing?.adjustment_type ||
+                          "add") === "multiply"
+                          ? "0.01"
+                          : "0"
+                      }
+                      placeholder={
+                        (editingAdjustmentTypes["standalone"] ||
+                          workerStandalonePricing?.adjustment_type ||
+                          "add") === "multiply"
+                          ? "1.00"
+                          : "0.00"
+                      }
+                      value={
+                        editingPrices["standalone"]?.worker !== undefined
+                          ? editingPrices["standalone"].worker
+                          : workerStandalonePricing
+                          ? workerStandalonePricing.worker_base_payment?.toString() ||
+                            ""
+                          : ""
+                      }
+                      onChange={(e) =>
+                        handlePriceChange(
+                          "standalone",
+                          e.target.value,
+                          "worker"
+                        )
+                      }
+                      className="pl-9"
+                      disabled={
+                        saving["standalone"] ||
+                        deleting[workerStandalonePricing?.id || ""]
+                      }
+                    />
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {(editingAdjustmentTypes["standalone"] ||
-                  standalonePricing?.adjustment_type ||
-                  "add") === "add"
-                  ? "A fixed amount added to every invoice"
-                  : "Multiplier applies to the entire invoice (1.0 = no change, 1.2 = 20% increase, 0.9 = 10% decrease)"}
-              </p>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="standalone-customer">
+                  {(editingAdjustmentTypes["standalone"] ||
+                    standalonePricing?.adjustment_type ||
+                    "add") === "add"
+                    ? "Amount to Add (USD)"
+                    : "Multiplier (e.g., 1.2 = 20% increase)"}
+                </Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="standalone-customer"
+                    type="number"
+                    step="0.01"
+                    min={
+                      (editingAdjustmentTypes["standalone"] ||
+                        standalonePricing?.adjustment_type ||
+                        "add") === "multiply"
+                        ? "0.01"
+                        : "0"
+                    }
+                    placeholder={
+                      (editingAdjustmentTypes["standalone"] ||
+                        standalonePricing?.adjustment_type ||
+                        "add") === "multiply"
+                        ? "1.00"
+                        : "0.00"
+                    }
+                    value={
+                      editingPrices["standalone"]?.[pricingContext] !==
+                      undefined
+                        ? editingPrices["standalone"][pricingContext]
+                        : standalonePricing
+                        ? pricingContext === "customer"
+                          ? standalonePricing.customer_base_price.toString()
+                          : standalonePricing.worker_base_payment?.toString() ||
+                            ""
+                        : ""
+                    }
+                    onChange={(e) =>
+                      handlePriceChange(
+                        "standalone",
+                        e.target.value,
+                        pricingContext
+                      )
+                    }
+                    className="pl-9"
+                    disabled={
+                      saving["standalone"] ||
+                      deleting[standalonePricing?.id || ""]
+                    }
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {(editingAdjustmentTypes["standalone"] ||
+                    standalonePricing?.adjustment_type ||
+                    "add") === "add"
+                    ? "A fixed amount added to every invoice"
+                    : "Multiplier applies to the entire invoice (1.0 = no change, 1.2 = 20% increase, 0.9 = 10% decrease)"}
+                </p>
+              </div>
+            )}
             <div className="flex gap-2">
               {standalonePricing && standaloneHasScopedValue && (
                 <Button
@@ -545,6 +951,31 @@ export default function BasePricingEditor({
                 onClick={handleSaveStandalone}
                 disabled={
                   !editingPrices["standalone"] ||
+                  (showBothContexts
+                    ? (!editingPrices["standalone"].customer ||
+                        isNaN(
+                          parseFloat(editingPrices["standalone"].customer || "")
+                        ) ||
+                        parseFloat(editingPrices["standalone"].customer || "") <
+                          0) &&
+                      (!editingPrices["standalone"].worker ||
+                        isNaN(
+                          parseFloat(editingPrices["standalone"].worker || "")
+                        ) ||
+                        parseFloat(editingPrices["standalone"].worker || "") <
+                          0)
+                    : pricingContext === "customer"
+                    ? !editingPrices["standalone"].customer ||
+                      isNaN(
+                        parseFloat(editingPrices["standalone"].customer || "")
+                      ) ||
+                      parseFloat(editingPrices["standalone"].customer || "") < 0
+                    : !editingPrices["standalone"].worker ||
+                      isNaN(
+                        parseFloat(editingPrices["standalone"].worker || "")
+                      ) ||
+                      parseFloat(editingPrices["standalone"].worker || "") <
+                        0) ||
                   saving["standalone"] ||
                   deleting[standalonePricing?.id || ""]
                 }
@@ -561,6 +992,30 @@ export default function BasePricingEditor({
                 )}
               </Button>
             </div>
+
+            {/* Location Overrides for Standalone */}
+            {(() => {
+              const standaloneOverrides = getBasePricingOverrides(
+                basePricing,
+                null, // standalone has no job_type_field_config_id
+                null, // standalone has no job_type_value
+                locationId,
+                locationHierarchyId
+              );
+              return (
+                <LocationOverridesMatrix
+                  rows={standaloneOverrides}
+                  emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit the base price to create an override."
+                  onDelete={async (id) => {
+                    try {
+                      await deletePricing(id);
+                    } catch (error) {
+                      console.error("Failed to delete override", error);
+                    }
+                  }}
+                />
+              );
+            })()}
 
             {standalonePricing && isPricingRulesEnabled() && (
               <Collapsible defaultOpen={standaloneConditions.length > 0}>
@@ -658,24 +1113,55 @@ export default function BasePricingEditor({
             {selectedFieldConfig && selectedFieldConfig.options && (
               <div className="space-y-3">
                 {selectedFieldConfig.options.map((optionValue) => {
-                  const pricingEntry = fieldBasedPricingMap[optionValue];
-                  const existingPricing = pricingEntry?.record;
+                  const customerEntry =
+                    customerFieldBasedPricingMap[optionValue];
+                  const workerEntry = workerFieldBasedPricingMap[optionValue];
+                  const customerPricing = customerEntry?.record;
+                  const workerPricing = workerEntry?.record;
+
+                  // For backward compatibility
+                  const pricingEntry = showBothContexts
+                    ? customerEntry
+                    : pricingContext === "customer"
+                    ? customerEntry
+                    : workerEntry;
+                  const existingPricing = showBothContexts
+                    ? customerPricing
+                    : pricingContext === "customer"
+                    ? customerPricing
+                    : workerPricing;
+
                   const editing = editingPrices[optionValue];
                   const currentAdjustmentType =
                     editingAdjustmentTypes[optionValue] ||
-                    existingPricing?.adjustment_type ||
+                    customerPricing?.adjustment_type ||
                     "add";
-                  const currentPrice =
-                    editing !== undefined
-                      ? editing
-                      : existingPricing
-                      ? existingPricing.customer_base_price.toString()
+                  const currentCustomerPrice =
+                    editing?.customer !== undefined
+                      ? editing.customer
+                      : customerPricing
+                      ? customerPricing.customer_base_price.toString()
+                      : "";
+                  const currentWorkerPrice =
+                    editing?.worker !== undefined
+                      ? editing.worker
+                      : workerPricing
+                      ? workerPricing.worker_base_payment?.toString() || ""
                       : "";
 
-                  const hasChanges =
-                    editing !== undefined &&
-                    editing !==
-                      (existingPricing?.customer_base_price.toString() || "");
+                  const hasCustomerChanges =
+                    editing?.customer !== undefined &&
+                    editing.customer !==
+                      (customerPricing?.customer_base_price.toString() || "");
+                  const hasWorkerChanges =
+                    editing?.worker !== undefined &&
+                    editing.worker !==
+                      (workerPricing?.worker_base_payment?.toString() || "");
+                  const hasChanges = showBothContexts
+                    ? hasCustomerChanges || hasWorkerChanges
+                    : pricingContext === "customer"
+                    ? hasCustomerChanges
+                    : hasWorkerChanges;
                   const hasScopedValue = isEntryForScope(
                     pricingEntry,
                     scopeSource
@@ -733,44 +1219,133 @@ export default function BasePricingEditor({
                         </div>
 
                         {/* Price Input */}
-                        <div className="space-y-2">
-                          <Label className="text-xs">
-                            {currentAdjustmentType === "add"
-                              ? "Amount to Add (USD)"
-                              : "Multiplier (e.g., 1.2 = 20% increase)"}
-                          </Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min={
-                                currentAdjustmentType === "multiply"
-                                  ? "0.01"
-                                  : "0"
-                              }
-                              placeholder={
-                                currentAdjustmentType === "multiply"
-                                  ? "1.00"
-                                  : "0.00"
-                              }
-                              value={currentPrice}
-                              onChange={(e) =>
-                                handlePriceChange(optionValue, e.target.value)
-                              }
-                              className="pl-7 h-9 text-sm"
-                              disabled={
-                                saving[optionValue] ||
-                                deleting[existingPricing?.id || ""]
-                              }
-                            />
+                        {showBothContexts ? (
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label className="text-xs">
+                                Customer{" "}
+                                {currentAdjustmentType === "add"
+                                  ? "Amount to Add"
+                                  : "Multiplier"}
+                              </Label>
+                              <div className="relative">
+                                <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min={
+                                    currentAdjustmentType === "multiply"
+                                      ? "0.01"
+                                      : "0"
+                                  }
+                                  placeholder={
+                                    currentAdjustmentType === "multiply"
+                                      ? "1.00"
+                                      : "0.00"
+                                  }
+                                  value={currentCustomerPrice}
+                                  onChange={(e) =>
+                                    handlePriceChange(
+                                      optionValue,
+                                      e.target.value,
+                                      "customer"
+                                    )
+                                  }
+                                  className="pl-7 h-9 text-sm"
+                                  disabled={
+                                    saving[optionValue] ||
+                                    deleting[customerPricing?.id || ""]
+                                  }
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">
+                                Worker{" "}
+                                {currentAdjustmentType === "add"
+                                  ? "Amount to Add"
+                                  : "Multiplier"}
+                              </Label>
+                              <div className="relative">
+                                <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min={
+                                    currentAdjustmentType === "multiply"
+                                      ? "0.01"
+                                      : "0"
+                                  }
+                                  placeholder={
+                                    currentAdjustmentType === "multiply"
+                                      ? "1.00"
+                                      : "0.00"
+                                  }
+                                  value={currentWorkerPrice}
+                                  onChange={(e) =>
+                                    handlePriceChange(
+                                      optionValue,
+                                      e.target.value,
+                                      "worker"
+                                    )
+                                  }
+                                  className="pl-7 h-9 text-sm"
+                                  disabled={
+                                    saving[optionValue] ||
+                                    deleting[workerPricing?.id || ""]
+                                  }
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {currentAdjustmentType === "add"
-                              ? "Fixed amount added when this option is selected"
-                              : "Multiplier for entire invoice (1.0 = no change)"}
-                          </p>
-                        </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Label className="text-xs">
+                              {currentAdjustmentType === "add"
+                                ? "Amount to Add (USD)"
+                                : "Multiplier (e.g., 1.2 = 20% increase)"}
+                            </Label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min={
+                                  currentAdjustmentType === "multiply"
+                                    ? "0.01"
+                                    : "0"
+                                }
+                                placeholder={
+                                  currentAdjustmentType === "multiply"
+                                    ? "1.00"
+                                    : "0.00"
+                                }
+                                value={
+                                  pricingContext === "customer"
+                                    ? currentCustomerPrice
+                                    : currentWorkerPrice
+                                }
+                                onChange={(e) =>
+                                  handlePriceChange(
+                                    optionValue,
+                                    e.target.value,
+                                    pricingContext
+                                  )
+                                }
+                                className="pl-7 h-9 text-sm"
+                                disabled={
+                                  saving[optionValue] ||
+                                  deleting[existingPricing?.id || ""]
+                                }
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {currentAdjustmentType === "add"
+                                ? "Fixed amount added when this option is selected"
+                                : "Multiplier for entire invoice (1.0 = no change)"}
+                            </p>
+                          </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div className="flex gap-2 justify-end">
@@ -793,8 +1368,20 @@ export default function BasePricingEditor({
                             onClick={() => handleSaveFieldBased(optionValue)}
                             disabled={
                               !hasChanges ||
-                              !currentPrice ||
-                              isNaN(parseFloat(currentPrice)) ||
+                              (showBothContexts
+                                ? (!currentCustomerPrice ||
+                                    isNaN(parseFloat(currentCustomerPrice)) ||
+                                    parseFloat(currentCustomerPrice) < 0) &&
+                                  (!currentWorkerPrice ||
+                                    isNaN(parseFloat(currentWorkerPrice)) ||
+                                    parseFloat(currentWorkerPrice) < 0)
+                                : pricingContext === "customer"
+                                ? !currentCustomerPrice ||
+                                  isNaN(parseFloat(currentCustomerPrice)) ||
+                                  parseFloat(currentCustomerPrice) < 0
+                                : !currentWorkerPrice ||
+                                  isNaN(parseFloat(currentWorkerPrice)) ||
+                                  parseFloat(currentWorkerPrice) < 0) ||
                               saving[optionValue] ||
                               deleting[existingPricing?.id || ""]
                             }
@@ -811,6 +1398,33 @@ export default function BasePricingEditor({
                             )}
                           </Button>
                         </div>
+
+                        {/* Location Overrides for Field-Based */}
+                        {(() => {
+                          const fieldBasedOverrides = getBasePricingOverrides(
+                            basePricing,
+                            selectedFieldConfigId,
+                            optionValue,
+                            locationId,
+                            locationHierarchyId
+                          );
+                          return (
+                            <LocationOverridesMatrix
+                              rows={fieldBasedOverrides}
+                              emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this option's price to create an override."
+                              onDelete={async (id) => {
+                                try {
+                                  await deletePricing(id);
+                                } catch (error) {
+                                  console.error(
+                                    "Failed to delete override",
+                                    error
+                                  );
+                                }
+                              }}
+                            />
+                          );
+                        })()}
                       </div>
                     </Card>
                   );
@@ -822,4 +1436,61 @@ export default function BasePricingEditor({
       )}
     </div>
   );
+}
+
+function getBasePricingOverrides(
+  allPricing: BasePricing[],
+  jobTypeFieldConfigId: string | null,
+  jobTypeValue: string | null,
+  currentLocationId: string | null = null,
+  currentLocationHierarchyId: string | null = null
+): LocationOverrideRow[] {
+  const now = new Date().toISOString();
+
+  return allPricing
+    .filter(
+      (pricing) =>
+        (jobTypeFieldConfigId === null
+          ? !pricing.job_type_field_config_id
+          : pricing.job_type_field_config_id === jobTypeFieldConfigId) &&
+        (jobTypeValue === null
+          ? !pricing.job_type_value
+          : pricing.job_type_value === jobTypeValue) &&
+        (pricing.location_id || pricing.location_hierarchy_id) &&
+        // Exclude current scope to avoid showing it as an override
+        !(
+          (currentLocationId && pricing.location_id === currentLocationId) ||
+          (currentLocationHierarchyId &&
+            pricing.location_hierarchy_id === currentLocationHierarchyId) ||
+          (!currentLocationId &&
+            !currentLocationHierarchyId &&
+            !pricing.location_id &&
+            !pricing.location_hierarchy_id)
+        )
+    )
+    .map<LocationOverrideRow>((pricing) => {
+      const effectiveAt = pricing.source_rule?.effective_at;
+      const expiresAt = pricing.source_rule?.expires_at || null;
+      const isActive = effectiveAt
+        ? effectiveAt <= now && (!expiresAt || expiresAt > now)
+        : undefined;
+      const isFuture = effectiveAt ? effectiveAt > now : undefined;
+
+      return {
+        id: pricing.id,
+        scopeLabel:
+          pricing.location?.name ||
+          pricing.location_node?.name ||
+          pricing.location_id ||
+          pricing.location_hierarchy_id ||
+          "Custom scope",
+        scopeType: pricing.location ? "location" : "hierarchy",
+        price: pricing.customer_base_price,
+        workerPayment: pricing.worker_base_payment,
+        effectiveAt,
+        expiresAt,
+        isActive,
+        isFuture,
+      };
+    });
 }

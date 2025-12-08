@@ -39,6 +39,7 @@ interface OptionPricingEditorProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   pricingContext?: "customer" | "worker"; // Defaults to 'customer'
+  showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
 }
 
 export default function OptionPricingEditor({
@@ -47,23 +48,69 @@ export default function OptionPricingEditor({
   locationId = null,
   effectiveAt = null,
   pricingContext = "customer",
+  showBothContexts = false,
 }: OptionPricingEditorProps) {
-  const { optionPricing, loading, error, upsertPricing, deletePricing } =
-    useOptionPricing(fieldConfig.id, {
-      locationHierarchyId,
-      locationId,
-      effectiveAt,
-      pricingContext,
-    });
+  const {
+    optionPricing: customerPricing,
+    loading: customerLoading,
+    error: customerError,
+    upsertPricing: upsertCustomerPricing,
+    deletePricing: deleteCustomerPricing,
+  } = useOptionPricing(fieldConfig.id, {
+    locationHierarchyId,
+    locationId,
+    effectiveAt,
+    pricingContext: "customer",
+  });
+  const {
+    optionPricing: workerPricing,
+    loading: workerLoading,
+    error: workerError,
+    upsertPricing: upsertWorkerPricing,
+    deletePricing: deleteWorkerPricing,
+  } = useOptionPricing(fieldConfig.id, {
+    locationHierarchyId,
+    locationId,
+    effectiveAt,
+    pricingContext: "worker",
+  });
+
+  // Use the appropriate pricing based on showBothContexts
+  const optionPricing = showBothContexts
+    ? [...customerPricing, ...workerPricing]
+    : pricingContext === "customer"
+    ? customerPricing
+    : workerPricing;
+  const loading = showBothContexts
+    ? customerLoading || workerLoading
+    : pricingContext === "customer"
+    ? customerLoading
+    : workerLoading;
+  const error = showBothContexts
+    ? customerError || workerError
+    : pricingContext === "customer"
+    ? customerError
+    : workerError;
+  const upsertPricing = showBothContexts
+    ? upsertCustomerPricing
+    : pricingContext === "customer"
+    ? upsertCustomerPricing
+    : upsertWorkerPricing;
+  const deletePricing = showBothContexts
+    ? deleteCustomerPricing
+    : pricingContext === "customer"
+    ? deleteCustomerPricing
+    : deleteWorkerPricing;
   const { expirationDate } = usePricingScope();
   const { formatCurrency } = useOrganizationCurrency();
 
-  const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
-    {}
-  );
+  const [editingPrices, setEditingPrices] = useState<
+    Record<string, { customer?: string; worker?: string }>
+  >({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [savingAll, setSavingAll] = useState(false);
-  const [bulkPrice, setBulkPrice] = useState("");
+  const [bulkCustomerPrice, setBulkCustomerPrice] = useState("");
+  const [bulkWorkerPrice, setBulkWorkerPrice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
@@ -73,55 +120,145 @@ export default function OptionPricingEditor({
   );
   const scopeSource = getPricingScopeSource(scopeParams);
 
-  const pricingMap = useMemo(() => {
+  const customerPricingMap = useMemo(() => {
     return buildScopedPricingMap(
-      optionPricing,
+      customerPricing,
       scopeParams,
       (record) => record.option_value || null
     );
-  }, [optionPricing, scopeParams]);
+  }, [customerPricing, scopeParams]);
+
+  const workerPricingMap = useMemo(() => {
+    return buildScopedPricingMap(
+      workerPricing,
+      scopeParams,
+      (record) => record.option_value || null
+    );
+  }, [workerPricing, scopeParams]);
+
+  // Combined map for backward compatibility
+  const pricingMap = showBothContexts
+    ? customerPricingMap
+    : pricingContext === "customer"
+    ? customerPricingMap
+    : workerPricingMap;
 
   const options = fieldConfig.options || [];
 
-  const handlePriceChange = (optionValue: string, value: string) => {
+  const handlePriceChange = (
+    optionValue: string,
+    value: string,
+    type: "customer" | "worker" = "customer"
+  ) => {
     setEditingPrices((prev) => ({
       ...prev,
-      [optionValue]: value,
+      [optionValue]: {
+        ...prev[optionValue],
+        [type]: value,
+      },
     }));
   };
 
   const handleSave = async (optionValue: string) => {
     const editing = editingPrices[optionValue];
-    if (!editing || editing.trim() === "") {
-      return;
-    }
+    if (!editing) return;
 
-    const customerPrice = parseFloat(editing);
-    if (isNaN(customerPrice) || customerPrice < 0) {
-      return;
-    }
+    if (showBothContexts) {
+      // Save both customer and worker pricing
+      const customerPrice = editing.customer
+        ? parseFloat(editing.customer)
+        : null;
+      const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
 
-    setSaving((prev) => ({ ...prev, [optionValue]: true }));
-    try {
-      await upsertPricing(fieldConfig.id, optionValue, customerPrice, {
-        locationId,
-        locationHierarchyId,
-        expirationDate,
-        pricingContext,
-      });
-      setEditingPrices((prev) => {
-        const next = { ...prev };
-        delete next[optionValue];
-        return next;
-      });
-    } catch (error) {
-      console.error("Failed to save option pricing", error);
-    } finally {
-      setSaving((prev) => {
-        const next = { ...prev };
-        delete next[optionValue];
-        return next;
-      });
+      if (
+        (customerPrice === null || isNaN(customerPrice) || customerPrice < 0) &&
+        (workerPrice === null || isNaN(workerPrice) || workerPrice < 0)
+      ) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, [optionValue]: true }));
+      try {
+        // Save customer pricing if provided
+        if (
+          customerPrice !== null &&
+          !isNaN(customerPrice) &&
+          customerPrice >= 0
+        ) {
+          await upsertCustomerPricing(
+            fieldConfig.id,
+            optionValue,
+            customerPrice,
+            {
+              locationId,
+              locationHierarchyId,
+              expirationDate,
+              pricingContext: "customer",
+            }
+          );
+        }
+
+        // Save worker pricing if provided
+        if (workerPrice !== null && !isNaN(workerPrice) && workerPrice >= 0) {
+          await upsertWorkerPricing(fieldConfig.id, optionValue, workerPrice, {
+            locationId,
+            locationHierarchyId,
+            expirationDate,
+            pricingContext: "worker",
+            workerPaymentRate: workerPrice,
+          });
+        }
+
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to save option pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      }
+    } else {
+      // Original single-context save logic
+      const priceValue =
+        pricingContext === "customer" ? editing.customer : editing.worker;
+      if (!priceValue || priceValue.trim() === "") {
+        return;
+      }
+
+      const price = parseFloat(priceValue);
+      if (isNaN(price) || price < 0) {
+        return;
+      }
+
+      setSaving((prev) => ({ ...prev, [optionValue]: true }));
+      try {
+        await upsertPricing(fieldConfig.id, optionValue, price, {
+          locationId,
+          locationHierarchyId,
+          expirationDate,
+          pricingContext,
+          ...(pricingContext === "worker" && { workerPaymentRate: price }),
+        });
+        setEditingPrices((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to save option pricing", error);
+      } finally {
+        setSaving((prev) => {
+          const next = { ...prev };
+          delete next[optionValue];
+          return next;
+        });
+      }
     }
   };
 
@@ -216,42 +353,106 @@ export default function OptionPricingEditor({
   };
 
   const handleApplyBulkPriceToAll = async () => {
-    const price = parseFloat(bulkPrice);
-    if (isNaN(price) || price < 0) return;
+    if (showBothContexts) {
+      const customerPrice = bulkCustomerPrice
+        ? parseFloat(bulkCustomerPrice)
+        : null;
+      const workerPrice = bulkWorkerPrice ? parseFloat(bulkWorkerPrice) : null;
 
-    // Add all options to editingPrices, then use save all
-    const newEditingPrices: Record<string, string> = {};
-    for (const optionValue of options) {
-      newEditingPrices[optionValue] = price.toString();
-    }
+      if (
+        (customerPrice === null || isNaN(customerPrice) || customerPrice < 0) &&
+        (workerPrice === null || isNaN(workerPrice) || workerPrice < 0)
+      ) {
+        return;
+      }
 
-    setEditingPrices((prev) => ({ ...prev, ...newEditingPrices }));
-    setBulkPrice("");
-
-    // Use save all mechanism
-    setSavingAll(true);
-    try {
-      await Promise.all(
-        options.map((optionValue) =>
-          upsertPricing(fieldConfig.id, optionValue, price, {
-            locationId,
-            locationHierarchyId,
-            expirationDate,
-            pricingContext,
+      setSavingAll(true);
+      try {
+        await Promise.all(
+          options.map(async (optionValue) => {
+            if (
+              customerPrice !== null &&
+              !isNaN(customerPrice) &&
+              customerPrice >= 0
+            ) {
+              await upsertCustomerPricing(
+                fieldConfig.id,
+                optionValue,
+                customerPrice,
+                {
+                  locationId,
+                  locationHierarchyId,
+                  expirationDate,
+                  pricingContext: "customer",
+                }
+              );
+            }
+            if (
+              workerPrice !== null &&
+              !isNaN(workerPrice) &&
+              workerPrice >= 0
+            ) {
+              await upsertWorkerPricing(
+                fieldConfig.id,
+                optionValue,
+                workerPrice,
+                {
+                  locationId,
+                  locationHierarchyId,
+                  expirationDate,
+                  pricingContext: "worker",
+                  workerPaymentRate: workerPrice,
+                }
+              );
+            }
           })
-        )
+        );
+      } catch (error) {
+        console.error("Failed to apply bulk pricing", error);
+      } finally {
+        setSavingAll(false);
+        setBulkCustomerPrice("");
+        setBulkWorkerPrice("");
+      }
+    } else {
+      // Original single-context logic
+      const price = parseFloat(
+        pricingContext === "customer" ? bulkCustomerPrice : bulkWorkerPrice
       );
-      setEditingPrices({});
-    } catch (error) {
-      console.error("Failed to apply bulk pricing", error);
-    } finally {
-      setSavingAll(false);
+      if (isNaN(price) || price < 0) return;
+
+      setSavingAll(true);
+      try {
+        await Promise.all(
+          options.map((optionValue) =>
+            upsertPricing(fieldConfig.id, optionValue, price, {
+              locationId,
+              locationHierarchyId,
+              expirationDate,
+              pricingContext,
+              ...(pricingContext === "worker" && { workerPaymentRate: price }),
+            })
+          )
+        );
+      } catch (error) {
+        console.error("Failed to apply bulk pricing", error);
+      } finally {
+        setSavingAll(false);
+        if (pricingContext === "customer") {
+          setBulkCustomerPrice("");
+        } else {
+          setBulkWorkerPrice("");
+        }
+      }
     }
   };
 
   // Count options with and without pricing (for the current scope)
-  const pricedCount = options.filter(
-    (opt) => pricingMap[opt]?.source === scopeSource
+  const pricedCount = options.filter((opt) =>
+    showBothContexts
+      ? customerPricingMap[opt]?.source === scopeSource ||
+        workerPricingMap[opt]?.source === scopeSource
+      : pricingMap[opt]?.source === scopeSource
   ).length;
   const unpricedCount = options.length - pricedCount;
 
@@ -259,15 +460,41 @@ export default function OptionPricingEditor({
   const pendingChangesCount = Object.keys(editingPrices).filter(
     (optionValue) => {
       const editing = editingPrices[optionValue];
-      if (!editing || editing.trim() === "") return false;
+      if (!editing) return false;
 
-      const customerPrice = parseFloat(editing);
-      if (isNaN(customerPrice) || customerPrice < 0) return false;
+      if (showBothContexts) {
+        const customerPrice = editing.customer
+          ? parseFloat(editing.customer)
+          : null;
+        const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
+        const customerEntry = customerPricingMap[optionValue];
+        const workerEntry = workerPricingMap[optionValue];
+        const existingCustomerPrice =
+          customerEntry?.record.customer_price.toString() || "";
+        const existingWorkerPrice =
+          workerEntry?.record.worker_payment_rate?.toString() || "";
 
-      const pricingEntry = pricingMap[optionValue];
-      const existingPrice =
-        pricingEntry?.record.customer_price.toString() || "";
-      return editing !== existingPrice;
+        return (
+          (editing.customer !== undefined &&
+            editing.customer !== existingCustomerPrice) ||
+          (editing.worker !== undefined &&
+            editing.worker !== existingWorkerPrice)
+        );
+      } else {
+        const priceValue =
+          pricingContext === "customer" ? editing.customer : editing.worker;
+        if (!priceValue || priceValue.trim() === "") return false;
+
+        const price = parseFloat(priceValue);
+        if (isNaN(price) || price < 0) return false;
+
+        const pricingEntry = pricingMap[optionValue];
+        const existingPrice =
+          pricingContext === "customer"
+            ? pricingEntry?.record.customer_price.toString() || ""
+            : pricingEntry?.record.worker_payment_rate?.toString() || "";
+        return priceValue !== existingPrice;
+      }
     }
   ).length;
 
@@ -333,62 +560,159 @@ export default function OptionPricingEditor({
         </div>
       )}
 
-      {/* Bulk Price Setter */}
+      {/* Bulk Price Update */}
       <div className="rounded-lg border border-dashed bg-muted/30 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Zap className="h-4 w-4 text-primary" />
-          <Label className="font-medium">Quick Set Default Price</Label>
+          <Label className="font-medium">Bulk Price Update</Label>
           <Badge variant="secondary" className="text-xs">
             {pricedCount}/{options.length} priced
           </Badge>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative w-32">
-            <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="0.00"
-              value={bulkPrice}
-              onChange={(e) => setBulkPrice(e.target.value)}
-              className="pl-7 h-9 text-sm"
-              disabled={savingAll}
-            />
+        {showBothContexts ? (
+          <div className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-xs">Customer Price</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={bulkCustomerPrice}
+                    onChange={(e) => setBulkCustomerPrice(e.target.value)}
+                    className="pl-7 h-9 text-sm"
+                    disabled={savingAll}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Worker Payment</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={bulkWorkerPrice}
+                    onChange={(e) => setBulkWorkerPrice(e.target.value)}
+                    className="pl-7 h-9 text-sm"
+                    disabled={savingAll}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleApplyBulkPrice}
+                disabled={
+                  savingAll ||
+                  ((!bulkCustomerPrice ||
+                    isNaN(parseFloat(bulkCustomerPrice)) ||
+                    parseFloat(bulkCustomerPrice) < 0) &&
+                    (!bulkWorkerPrice ||
+                      isNaN(parseFloat(bulkWorkerPrice)) ||
+                      parseFloat(bulkWorkerPrice) < 0)) ||
+                  unpricedCount === 0
+                }
+              >
+                {savingAll ? "Applying..." : `Set Unpriced (${unpricedCount})`}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleApplyBulkPriceToAll}
+                disabled={
+                  savingAll ||
+                  ((!bulkCustomerPrice ||
+                    isNaN(parseFloat(bulkCustomerPrice)) ||
+                    parseFloat(bulkCustomerPrice) < 0) &&
+                    (!bulkWorkerPrice ||
+                      isNaN(parseFloat(bulkWorkerPrice)) ||
+                      parseFloat(bulkWorkerPrice) < 0))
+                }
+              >
+                {savingAll ? "Applying..." : "Set All"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Apply prices to multiple options at once. Use &quot;Set
+              Unpriced&quot; to only fill in missing prices, or &quot;Set
+              All&quot; to override existing prices.
+            </p>
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleApplyBulkPrice}
-            disabled={
-              savingAll ||
-              !bulkPrice ||
-              isNaN(parseFloat(bulkPrice)) ||
-              parseFloat(bulkPrice) < 0 ||
-              unpricedCount === 0
-            }
-          >
-            {savingAll ? "Applying..." : `Set Unpriced (${unpricedCount})`}
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={handleApplyBulkPriceToAll}
-            disabled={
-              savingAll ||
-              !bulkPrice ||
-              isNaN(parseFloat(bulkPrice)) ||
-              parseFloat(bulkPrice) < 0
-            }
-          >
-            {savingAll ? "Applying..." : "Set All"}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Quickly apply a default price to all options. Use &quot;Set
-          Unpriced&quot; to only fill in missing prices, or &quot;Set All&quot;
-          to override existing prices.
-        </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="relative w-32">
+              <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={
+                  pricingContext === "customer"
+                    ? bulkCustomerPrice
+                    : bulkWorkerPrice
+                }
+                onChange={(e) =>
+                  pricingContext === "customer"
+                    ? setBulkCustomerPrice(e.target.value)
+                    : setBulkWorkerPrice(e.target.value)
+                }
+                className="pl-7 h-9 text-sm"
+                disabled={savingAll}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleApplyBulkPrice}
+                disabled={
+                  savingAll ||
+                  (pricingContext === "customer"
+                    ? !bulkCustomerPrice ||
+                      isNaN(parseFloat(bulkCustomerPrice)) ||
+                      parseFloat(bulkCustomerPrice) < 0
+                    : !bulkWorkerPrice ||
+                      isNaN(parseFloat(bulkWorkerPrice)) ||
+                      parseFloat(bulkWorkerPrice) < 0) ||
+                  unpricedCount === 0
+                }
+              >
+                {savingAll ? "Applying..." : `Set Unpriced (${unpricedCount})`}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleApplyBulkPriceToAll}
+                disabled={
+                  savingAll ||
+                  (pricingContext === "customer"
+                    ? !bulkCustomerPrice ||
+                      isNaN(parseFloat(bulkCustomerPrice)) ||
+                      parseFloat(bulkCustomerPrice) < 0
+                    : !bulkWorkerPrice ||
+                      isNaN(parseFloat(bulkWorkerPrice)) ||
+                      parseFloat(bulkWorkerPrice) < 0)
+                }
+              >
+                {savingAll ? "Applying..." : "Set All"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Apply prices to multiple options at once. Use &quot;Set
+              Unpriced&quot; to only fill in missing prices, or &quot;Set
+              All&quot; to override existing prices.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Collapsible Individual Options */}
@@ -404,19 +728,50 @@ export default function OptionPricingEditor({
         <CollapsibleContent className="pt-3">
           <div className="space-y-2">
             {options.map((optionValue) => {
-              const pricingEntry = pricingMap[optionValue];
-              const scopedPricing = pricingEntry?.record;
+              const customerEntry = customerPricingMap[optionValue];
+              const workerEntry = workerPricingMap[optionValue];
+              const customerPricing = customerEntry?.record;
+              const workerPricing = workerEntry?.record;
+
+              // For backward compatibility
+              const pricingEntry = showBothContexts
+                ? customerEntry
+                : pricingContext === "customer"
+                ? customerEntry
+                : workerEntry;
+              const scopedPricing = showBothContexts
+                ? customerPricing
+                : pricingContext === "customer"
+                ? customerPricing
+                : workerPricing;
+
               const editing = editingPrices[optionValue];
-              const currentPrice =
-                editing !== undefined
-                  ? editing
-                  : scopedPricing
-                  ? scopedPricing.customer_price.toString()
+              const currentCustomerPrice =
+                editing?.customer !== undefined
+                  ? editing.customer
+                  : customerPricing
+                  ? customerPricing.customer_price.toString()
+                  : "";
+              const currentWorkerPrice =
+                editing?.worker !== undefined
+                  ? editing.worker
+                  : workerPricing
+                  ? workerPricing.worker_payment_rate?.toString() || ""
                   : "";
 
-              const hasChanges =
-                editing !== undefined &&
-                editing !== (scopedPricing?.customer_price.toString() || "");
+              const hasCustomerChanges =
+                editing?.customer !== undefined &&
+                editing.customer !==
+                  (customerPricing?.customer_price.toString() || "");
+              const hasWorkerChanges =
+                editing?.worker !== undefined &&
+                editing.worker !==
+                  (workerPricing?.worker_payment_rate?.toString() || "");
+              const hasChanges = showBothContexts
+                ? hasCustomerChanges || hasWorkerChanges
+                : pricingContext === "customer"
+                ? hasCustomerChanges
+                : hasWorkerChanges;
 
               const isSaving = saving[optionValue] || false;
               const overrides = getOptionOverrides(
@@ -425,7 +780,14 @@ export default function OptionPricingEditor({
                 locationId,
                 locationHierarchyId
               );
-              const previewValue = parseFloat(currentPrice) || 0;
+              const previewValue =
+                parseFloat(
+                  showBothContexts
+                    ? currentCustomerPrice
+                    : pricingContext === "customer"
+                    ? currentCustomerPrice
+                    : currentWorkerPrice
+                ) || 0;
               const isScopedEntry = isEntryForScope(pricingEntry, scopeSource);
 
               return (
@@ -433,57 +795,156 @@ export default function OptionPricingEditor({
                   key={optionValue}
                   className="space-y-2 rounded-lg border p-3"
                 >
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex-1">
-                      <Label className="font-medium text-sm">
-                        {optionValue}
-                      </Label>
-                    </div>
-                    <div className="w-32">
-                      <div className="relative">
-                        <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={currentPrice}
-                          onChange={(e) =>
-                            handlePriceChange(optionValue, e.target.value)
+                  {showBothContexts ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Label className="font-medium text-sm flex-1">
+                          {optionValue}
+                        </Label>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Customer Price</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={currentCustomerPrice}
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  optionValue,
+                                  e.target.value,
+                                  "customer"
+                                )
+                              }
+                              className="pl-7 h-9 text-sm"
+                              disabled={isSaving || savingAll}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Worker Payment</Label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={currentWorkerPrice}
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  optionValue,
+                                  e.target.value,
+                                  "worker"
+                                )
+                              }
+                              className="pl-7 h-9 text-sm"
+                              disabled={isSaving || savingAll}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant={hasChanges ? "default" : "outline"}
+                          onClick={() => handleSave(optionValue)}
+                          disabled={
+                            !hasChanges ||
+                            ((!currentCustomerPrice ||
+                              isNaN(parseFloat(currentCustomerPrice)) ||
+                              parseFloat(currentCustomerPrice) < 0) &&
+                              (!currentWorkerPrice ||
+                                isNaN(parseFloat(currentWorkerPrice)) ||
+                                parseFloat(currentWorkerPrice) < 0)) ||
+                            isSaving ||
+                            savingAll
                           }
-                          className="pl-7 h-9 text-sm"
-                          disabled={isSaving || savingAll}
-                        />
+                        >
+                          {isSaving ? (
+                            "Saving..."
+                          ) : isScopedEntry ? (
+                            "Update"
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-3 w-3" />
+                              Save
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={hasChanges ? "default" : "outline"}
-                      onClick={() => handleSave(optionValue)}
-                      disabled={
-                        !hasChanges ||
-                        !currentPrice ||
-                        isNaN(parseFloat(currentPrice)) ||
-                        parseFloat(currentPrice) < 0 ||
-                        isSaving ||
-                        savingAll
-                      }
-                    >
-                      {isSaving ? (
-                        "Saving..."
-                      ) : isScopedEntry ? (
-                        "Update"
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-3 w-3" />
-                          Save
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Preview: {formatCurrency(previewValue)}
-                  </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex-1">
+                          <Label className="font-medium text-sm">
+                            {optionValue}
+                          </Label>
+                        </div>
+                        <div className="w-32">
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={
+                                pricingContext === "customer"
+                                  ? currentCustomerPrice
+                                  : currentWorkerPrice
+                              }
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  optionValue,
+                                  e.target.value,
+                                  pricingContext
+                                )
+                              }
+                              className="pl-7 h-9 text-sm"
+                              disabled={isSaving || savingAll}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={hasChanges ? "default" : "outline"}
+                          onClick={() => handleSave(optionValue)}
+                          disabled={
+                            !hasChanges ||
+                            (pricingContext === "customer"
+                              ? !currentCustomerPrice ||
+                                isNaN(parseFloat(currentCustomerPrice)) ||
+                                parseFloat(currentCustomerPrice) < 0
+                              : !currentWorkerPrice ||
+                                isNaN(parseFloat(currentWorkerPrice)) ||
+                                parseFloat(currentWorkerPrice) < 0) ||
+                            isSaving ||
+                            savingAll
+                          }
+                        >
+                          {isSaving ? (
+                            "Saving..."
+                          ) : isScopedEntry ? (
+                            "Update"
+                          ) : (
+                            <>
+                              <Save className="mr-2 h-3 w-3" />
+                              Save
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Preview: {formatCurrency(previewValue)}
+                      </div>
+                    </>
+                  )}
 
                   {overrides.length > 0 && (
                     <LocationOverridesMatrix

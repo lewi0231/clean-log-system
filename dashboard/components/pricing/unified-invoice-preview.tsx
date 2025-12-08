@@ -52,11 +52,11 @@ export function UnifiedInvoicePreview() {
 
               <Separator />
 
-              {/* Group & Option Pricing */}
+              {/* Option Pricing */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-foreground">
-                    Group & Option Pricing
+                    Option Pricing
                   </span>
                   <span className="font-mono font-medium">$180.00</span>
                 </div>
@@ -106,9 +106,9 @@ export function UnifiedInvoicePreview() {
             <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
               <p className="font-medium mb-1 text-foreground">How it works:</p>
               <p>
-                Prices are calculated in order: Field Pricing → Group & Option
-                Pricing → Base Pricing. Base pricing can add a fixed amount or
-                multiply the entire subtotal.
+                Prices are calculated in order: Field Pricing → Option Pricing →
+                Base Pricing. Base pricing can add a fixed amount or multiply
+                the entire subtotal.
               </p>
             </div>
           </CardContent>

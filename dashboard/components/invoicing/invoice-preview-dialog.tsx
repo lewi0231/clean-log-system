@@ -1,9 +1,15 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
@@ -93,6 +99,13 @@ export default function InvoicePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0">
+        <VisuallyHidden>
+          <DialogTitle>
+            {invoice
+              ? `Invoice ${invoice.invoice_number || invoice.id}`
+              : "Invoice Preview"}
+          </DialogTitle>
+        </VisuallyHidden>
         {loading && (
           <div className="p-8">
             <LoadingState message="Loading invoice details..." />
