@@ -1,0 +1,184 @@
+/**
+ * Invoice Email Recipient Utilities
+ * Determines the email address to send invoices to based on configuration
+ */
+
+import { SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * Validate email address using RFC-compliant regex
+ * @param email - Email address to validate
+ * @returns true if email is valid, false otherwise
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== "string") return false;
+
+  const trimmed = email.trim();
+  if (trimmed === "") return false;
+
+  // RFC 5322 compliant regex (simplified but covers most cases)
+  const emailRegex =
+    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+  return emailRegex.test(trimmed);
+}
+
+export interface InvoiceEmailRecipientConfig {
+  location_email_source:
+    | "location_email"
+    | "hierarchy_billing_email"
+    | "location_contact_email";
+  form_field_email: string | null;
+  default_email: string | null;
+}
+
+export interface JobContext {
+  location_id: string | null;
+  location?: {
+    id: string;
+    email: string | null;
+    contact_person: string | null;
+    hierarchy_parent_id: string | null;
+  } | null;
+  submission_data: Record<string, unknown> | null;
+}
+
+export interface HierarchyNode {
+  id: string;
+  type: string;
+  metadata: Record<string, unknown> | null;
+}
+
+/**
+ * Get email from hierarchy metadata billing address
+ */
+function getHierarchyBillingEmail(
+  hierarchyNode: HierarchyNode | null,
+): string | null {
+  if (!hierarchyNode || !hierarchyNode.metadata) return null;
+
+  const billingAddress = hierarchyNode.metadata.billing_address;
+  if (
+    !billingAddress ||
+    typeof billingAddress !== "object" ||
+    !("email" in billingAddress)
+  ) {
+    return null;
+  }
+
+  const email = billingAddress.email;
+  if (typeof email === "string" && email.trim() !== "") {
+    return email.trim();
+  }
+  return null;
+}
+
+/**
+ * Determine invoice email recipient for a job
+ */
+export async function getInvoiceEmailRecipient(
+  supabase: SupabaseClient,
+  job: JobContext,
+  config: InvoiceEmailRecipientConfig,
+  fieldConfigMap?: Map<string, { name: string }>,
+): Promise<string | null> {
+  // If job has location_id
+  if (job.location_id && job.location) {
+    const location = job.location;
+
+    // Check hierarchy billing email first if configured
+    if (config.location_email_source === "hierarchy_billing_email") {
+      if (location.hierarchy_parent_id) {
+        const { data: hierarchyNode } = await supabase
+          .from("location_hierarchy")
+          .select("id, type, metadata")
+          .eq("id", location.hierarchy_parent_id)
+          .single();
+
+        if (hierarchyNode) {
+          const email = getHierarchyBillingEmail(hierarchyNode);
+          if (email && isValidEmail(email)) {
+            return email;
+          }
+        }
+      }
+    }
+
+    // Check location email
+    if (config.location_email_source === "location_email" && location.email) {
+      const locationEmail = location.email.trim();
+      if (isValidEmail(locationEmail)) {
+        return locationEmail;
+      }
+    }
+
+    // Check location contact email (if stored separately - would need schema change)
+    // For now, this would require a contact_email field on location
+    // if (config.location_email_source === "location_contact_email") {
+    //   // Would need location.contact_email field
+    // }
+  }
+
+  // If job has no location_id, check form fields
+  if (!job.location_id && job.submission_data && config.form_field_email) {
+    // Need field config name to submission_data field name mapping
+    if (fieldConfigMap) {
+      const fieldConfig = fieldConfigMap.get(config.form_field_email);
+      if (fieldConfig) {
+        const emailValue = job.submission_data[fieldConfig.name];
+        if (emailValue && typeof emailValue === "string") {
+          const email = emailValue.trim();
+          // Validate email format
+          if (isValidEmail(email)) {
+            return email;
+          }
+        }
+      }
+    } else {
+      // Fallback: try direct field name match
+      const emailValue = job.submission_data[config.form_field_email];
+      if (emailValue && typeof emailValue === "string") {
+        const email = emailValue.trim();
+        if (isValidEmail(email)) {
+          return email;
+        }
+      }
+    }
+  }
+
+  // Fallback to default email
+  if (config.default_email) {
+    const defaultEmail = config.default_email.trim();
+    if (isValidEmail(defaultEmail)) {
+      return defaultEmail;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get invoice email recipients for multiple jobs (returns unique emails)
+ */
+export async function getInvoiceEmailRecipients(
+  supabase: SupabaseClient,
+  jobs: JobContext[],
+  config: InvoiceEmailRecipientConfig,
+  fieldConfigMap?: Map<string, { name: string }>,
+): Promise<string[]> {
+  const emailSet = new Set<string>();
+
+  for (const job of jobs) {
+    const email = await getInvoiceEmailRecipient(
+      supabase,
+      job,
+      config,
+      fieldConfigMap,
+    );
+    if (email) {
+      emailSet.add(email);
+    }
+  }
+
+  return Array.from(emailSet);
+}

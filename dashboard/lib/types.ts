@@ -348,6 +348,7 @@ export interface InvoiceWithJobs extends Invoice {
         address: string | null;
         contact_person: string | null;
         phone: string | null;
+        hierarchy_parent_id?: string | null;
       } | null;
     };
   }>;
@@ -372,13 +373,43 @@ export interface LineItemDisplayConfig {
   show_base_price_separately: boolean;
 }
 
+export interface ServiceAddressConfig {
+  source: "auto" | "location" | "form_fields";
+  location_fields?: (
+    | "name"
+    | "email"
+    | "address"
+    | "contact_person"
+    | "phone"
+  )[];
+  form_fields?: string[]; // Field config names (for form_fields source)
+}
+
+export interface BillingAddressConfig {
+  enabled: boolean;
+  source: "auto" | "organization" | "hierarchy" | "form_fields";
+  form_fields?: string[]; // Field config names (for form_fields source)
+}
+
+export interface InvoiceEmailRecipientConfig {
+  location_email_source:
+    | "location_email"
+    | "hierarchy_billing_email"
+    | "location_contact_email";
+  form_field_email: string | null; // Field config ID that contains email for jobs without location
+  default_email: string | null; // Organization default email for invoices (fallback)
+}
+
 export interface InvoiceTemplateConfig {
   id: string;
   organization_id: string;
   invoice_title: string;
   show_logo: boolean;
   show_abn: boolean;
-  bill_to_fields: string[]; // Array of field_config names to display in Bill To section
+  bill_to_fields: string[]; // Array of field_config names to display in Bill To section (legacy/fallback)
+  service_address_config?: ServiceAddressConfig;
+  billing_address_config?: BillingAddressConfig;
+  email_recipient_config?: InvoiceEmailRecipientConfig;
   line_item_display: LineItemDisplayConfig;
   created_at: string;
   updated_at: string;

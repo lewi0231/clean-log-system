@@ -78,7 +78,7 @@ export function validateEmailConfig(): EmailValidationResult {
  */
 export function formatWorkerInvitationData(
   data: WorkerInvitationData,
-  config: EmailConfig
+  config: EmailConfig,
 ): {
   from: string;
   to: string[];
@@ -89,13 +89,13 @@ export function formatWorkerInvitationData(
   >;
 } {
   // Format worker name (capitalize first letter)
-  const workerName =
-    data.workerName.charAt(0).toUpperCase() +
+  const workerName = data.workerName.charAt(0).toUpperCase() +
     data.workerName.substring(1).toLowerCase();
 
   // Ensure base URL doesn't end with /
   const baseUrl = config.workerInvitationBaseUrl.replace(/\/$/, "");
-  const invitationLink = `${baseUrl}/worker/accept-invite/${data.invitationToken}`;
+  const invitationLink =
+    `${baseUrl}/worker/accept-invite/${data.invitationToken}`;
 
   const templateVariables = {
     WORKER_NAME: workerName || "Worker",
@@ -103,7 +103,8 @@ export function formatWorkerInvitationData(
     INVITATION_LINK: invitationLink,
   };
 
-  const fromEmail = `${data.organizationName} <onboarding@${config.resendFromDomain}>`;
+  const fromEmail =
+    `${data.organizationName} <onboarding@${config.resendFromDomain}>`;
   const emailSubject = `${data.organizationName} requires you to authenticate`;
 
   return {
@@ -121,7 +122,7 @@ export function validateWorkerInvitationData(
   workerName: string,
   workerEmail: string,
   organizationName: string,
-  invitationToken: string
+  invitationToken: string,
 ): { valid: boolean; error?: string } {
   if (
     !workerName ||
@@ -174,7 +175,7 @@ export function validateWorkerInvitationData(
  */
 export async function sendWorkerInvitationEmail(
   data: WorkerInvitationData,
-  throwOnError = false
+  throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
   // Validate configuration
   const configResult = validateEmailConfig();
@@ -191,7 +192,7 @@ export async function sendWorkerInvitationEmail(
     data.workerName,
     data.workerEmail,
     data.organizationName,
-    data.invitationToken
+    data.invitationToken,
   );
   if (!validationResult.valid) {
     const error = validationResult.error || "Invalid worker invitation data";
@@ -214,7 +215,8 @@ export async function sendWorkerInvitationEmail(
     //   id: "cleanlogworkerinvite",
     //   variables: emailData.templateVariables,
     // },
-    html: `<p>Click this to sign up - ${emailData.templateVariables.INVITATION_LINK}</p>`,
+    html:
+      `<p>Click this to sign up - ${emailData.templateVariables.INVITATION_LINK}</p>`,
   };
 
   const requestBodyStr = JSON.stringify(requestBody);
@@ -272,12 +274,11 @@ export async function sendWorkerInvitationEmail(
         requestBody: requestBodyStr,
       });
 
-      const errorMessage =
-        (errorBody &&
-          typeof errorBody === "object" &&
-          "message" in errorBody &&
-          typeof errorBody.message === "string" &&
-          errorBody.message) ||
+      const errorMessage = (errorBody &&
+        typeof errorBody === "object" &&
+        "message" in errorBody &&
+        typeof errorBody.message === "string" &&
+        errorBody.message) ||
         (errorBody &&
           typeof errorBody === "object" &&
           "error" in errorBody &&
@@ -308,10 +309,9 @@ export async function sendWorkerInvitationEmail(
     }
   } catch (error) {
     console.error("Failed to send invitation email:", error);
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : "Failed to send invitation email";
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to send invitation email";
     if (throwOnError) {
       throw error;
     }
@@ -324,7 +324,7 @@ export async function sendWorkerInvitationEmail(
  */
 export async function getOrganizationName(
   supabase: SupabaseClient,
-  organizationId: string
+  organizationId: string,
 ): Promise<string> {
   const { data: organization, error: orgError } = await supabase
     .from("organization")
@@ -349,4 +349,248 @@ export async function getOrganizationName(
   }
 
   return orgName;
+}
+
+/**
+ * Validate email address using RFC-compliant regex
+ */
+export function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== "string") return false;
+
+  const trimmed = email.trim();
+  if (trimmed === "") return false;
+
+  // RFC 5322 compliant regex (simplified but covers most cases)
+  const emailRegex =
+    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+  return emailRegex.test(trimmed);
+}
+
+export interface InvoiceEmailData {
+  invoiceNumber: string;
+  organizationName: string;
+  recipientEmails: string[];
+  invoiceUrl?: string; // URL to view invoice (optional, can be added later)
+  total: number;
+  currency: string;
+  dueDate: string;
+}
+
+/**
+ * Send invoice email via Resend API
+ */
+export async function sendInvoiceEmail(
+  data: InvoiceEmailData,
+  throwOnError = false,
+): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  // Validate configuration
+  const configResult = validateEmailConfig();
+  if (!configResult.valid || !configResult.config) {
+    const error = configResult.error || "Email configuration is invalid";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate recipient emails
+  if (!data.recipientEmails || data.recipientEmails.length === 0) {
+    const error = "No recipient emails provided";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate all recipient emails
+  for (const email of data.recipientEmails) {
+    if (!isValidEmail(email)) {
+      const error = `Invalid recipient email: ${email}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+  }
+
+  // Format currency
+  const currencySymbol = data.currency === "AUD"
+    ? "A$"
+    : data.currency === "USD"
+    ? "$"
+    : data.currency === "GBP"
+    ? "£"
+    : data.currency === "EUR"
+    ? "€"
+    : data.currency === "CAD"
+    ? "C$"
+    : data.currency === "NZD"
+    ? "NZ$"
+    : data.currency;
+
+  const formattedTotal = `${currencySymbol}${data.total.toFixed(2)}`;
+
+  // Format due date
+  const dueDate = new Date(data.dueDate);
+  const formattedDueDate = dueDate.toLocaleDateString("en-AU", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const fromEmail =
+    `${data.organizationName} <invoices@${configResult.config.resendFromDomain}>`;
+  const emailSubject =
+    `Invoice ${data.invoiceNumber} from ${data.organizationName}`;
+
+  // Build email HTML
+  const invoiceUrlHtml = data.invoiceUrl
+    ? `<p><a href="${data.invoiceUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Invoice</a></p>`
+    : "";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+          .invoice-details { background-color: #fff; border: 1px solid #ddd; padding: 20px; border-radius: 5px; }
+          .total { font-size: 18px; font-weight: bold; color: #007bff; margin-top: 20px; }
+          .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Invoice ${data.invoiceNumber}</h1>
+            <p>From: ${data.organizationName}</p>
+          </div>
+          <div class="invoice-details">
+            <p>Dear Customer,</p>
+            <p>Please find your invoice details below:</p>
+            <ul>
+              <li><strong>Invoice Number:</strong> ${data.invoiceNumber}</li>
+              <li><strong>Total Amount:</strong> ${formattedTotal}</li>
+              <li><strong>Due Date:</strong> ${formattedDueDate}</li>
+            </ul>
+            ${invoiceUrlHtml}
+            <p class="total">Total Due: ${formattedTotal}</p>
+          </div>
+          <div class="footer">
+            <p>This is an automated email from ${data.organizationName}.</p>
+            <p>If you have any questions, please contact us.</p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const requestBody = {
+    from: fromEmail,
+    to: data.recipientEmails,
+    subject: emailSubject,
+    html: html,
+  };
+
+  const requestBodyStr = JSON.stringify(requestBody);
+  if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
+    console.error("Request body contains null values:", requestBodyStr);
+    const error = "Request contains null values";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate from email
+  if (
+    !fromEmail ||
+    fromEmail.includes("null") ||
+    fromEmail.includes("undefined")
+  ) {
+    console.error("Invalid fromEmail:", fromEmail);
+    const error = "Invalid from email address";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  try {
+    console.log("Sending invoice email:", {
+      invoiceNumber: data.invoiceNumber,
+      recipients: data.recipientEmails,
+    });
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${configResult.config.apiKey}`,
+      },
+      body: requestBodyStr,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorBody: unknown;
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = { message: errorText };
+      }
+
+      console.error("Resend API error:", {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorBody,
+      });
+
+      const errorMessage = (errorBody &&
+        typeof errorBody === "object" &&
+        "message" in errorBody &&
+        typeof errorBody.message === "string" &&
+        errorBody.message) ||
+        (errorBody &&
+          typeof errorBody === "object" &&
+          "error" in errorBody &&
+          errorBody.error &&
+          typeof errorBody.error === "object" &&
+          "message" in errorBody.error &&
+          typeof errorBody.error.message === "string" &&
+          errorBody.error.message) ||
+        res.statusText ||
+        "Unknown error";
+
+      const error = `Failed to send invoice email: ${errorMessage}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+
+    const emailResponse = await res.json();
+    const emailId = emailResponse.id;
+
+    if (emailId) {
+      console.log("Invoice email sent successfully:", emailId);
+      return { success: true, emailId };
+    } else {
+      console.warn("Resend response missing ID:", emailResponse);
+      return { success: true }; // Consider it successful even without ID
+    }
+  } catch (error) {
+    console.error("Failed to send invoice email:", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to send invoice email";
+    if (throwOnError) {
+      throw error;
+    }
+    return { success: false, error: errorMessage };
+  }
 }

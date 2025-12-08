@@ -79,7 +79,7 @@ export class InvoiceService {
    * Calculate invoice totals for one or more jobs
    */
   static async calculate(
-    request: CalculateInvoiceRequest
+    request: CalculateInvoiceRequest,
   ): Promise<CalculateInvoiceResponse["calculation"]> {
     try {
       log.debug("InvoiceService: Calculating invoice", {
@@ -91,7 +91,7 @@ export class InvoiceService {
         "calculate-invoice",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {
@@ -126,7 +126,7 @@ export class InvoiceService {
         "create-invoice",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {
@@ -201,7 +201,7 @@ export class InvoiceService {
           body: {
             invoice_id: invoiceId,
           },
-        }
+        },
       );
 
       if (error) {
@@ -223,6 +223,47 @@ export class InvoiceService {
       };
     } catch (err) {
       log.error("InvoiceService: Failed to get invoice details", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Update invoice status
+   */
+  static async updateStatus(
+    invoiceId: string,
+    status: "draft" | "sent" | "paid" | "overdue" | "cancelled",
+  ): Promise<InvoiceWithJobs> {
+    try {
+      log.debug("InvoiceService: Updating invoice status", {
+        invoiceId,
+        status,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "update-invoice-status",
+        {
+          body: {
+            invoice_id: invoiceId,
+            status: status,
+          },
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || !data.success || !data.invoice) {
+        throw new Error("Failed to update invoice status");
+      }
+
+      log.info("InvoiceService: Invoice status updated successfully");
+      return data.invoice as InvoiceWithJobs;
+    } catch (err) {
+      log.error("InvoiceService: Failed to update invoice status", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       throw err;

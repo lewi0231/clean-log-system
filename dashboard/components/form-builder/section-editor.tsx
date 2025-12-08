@@ -55,7 +55,7 @@ import {
   Trash2,
   Type,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConditionalLogicEditor } from "./conditional-logic-editor";
 
 interface SectionEditorProps {
@@ -149,24 +149,135 @@ export function SectionEditor({
   const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
     Map<string, boolean>
   >(new Map());
+  // Local state for text inputs to prevent re-render issues during typing
+  const [optionsInputValues, setOptionsInputValues] = useState<
+    Map<string, string>
+  >(new Map());
+  const [labelInputValues, setLabelInputValues] = useState<Map<string, string>>(
+    new Map()
+  );
+  const [descriptionInputValues, setDescriptionInputValues] = useState<
+    Map<string, string>
+  >(new Map());
+  // Track which fields are currently being edited to prevent sync overwrites
+  const editingFieldsRef = useRef<Set<string>>(new Set());
   const fieldMap = useMemo(
     () => new Map(fields.map((field) => [field.id, field])),
     [fields]
   );
 
-  // Handle options update for select fields
-  const handleOptionsChange = async (
-    fieldId: string,
-    optionsString: string
-  ) => {
-    if (!onUpdateField) return;
-    const options = optionsString
-      .split(",")
-      .map((o) => o.trim())
-      .filter((o) => o.length > 0);
-    await onUpdateField(fieldId, {
-      options: options.length > 0 ? options : null,
+  // Handle options update for select fields - update local state immediately
+  const handleOptionsChange = (fieldId: string, optionsString: string) => {
+    editingFieldsRef.current.add(fieldId);
+    setOptionsInputValues((prev) => {
+      const next = new Map(prev);
+      next.set(fieldId, optionsString);
+      return next;
     });
+  };
+
+  // Save all pending changes for a field when popover closes
+  const handlePopoverClose = async (fieldId: string) => {
+    if (!onUpdateField) return;
+
+    const updates: Partial<FieldConfig> = {};
+    let hasChanges = false;
+
+    // Save label if changed
+    if (labelInputValues.has(fieldId)) {
+      updates.label = labelInputValues.get(fieldId) || "";
+      hasChanges = true;
+    }
+
+    // Save description if changed
+    if (descriptionInputValues.has(fieldId)) {
+      updates.description = descriptionInputValues.get(fieldId) || null;
+      hasChanges = true;
+    }
+
+    // Save options if changed
+    if (optionsInputValues.has(fieldId)) {
+      const optionsString = optionsInputValues.get(fieldId) || "";
+      const options = optionsString
+        .split(",")
+        .map((o) => o.trim())
+        .filter((o) => o.length > 0);
+      updates.options = options.length > 0 ? options : null;
+      hasChanges = true;
+    }
+
+    // Only update if there are actual changes
+    if (hasChanges) {
+      await onUpdateField(fieldId, updates);
+    }
+
+    // Clear all local state for this field after saving
+    setLabelInputValues((prev) => {
+      const next = new Map(prev);
+      next.delete(fieldId);
+      return next;
+    });
+    setDescriptionInputValues((prev) => {
+      const next = new Map(prev);
+      next.delete(fieldId);
+      return next;
+    });
+    setOptionsInputValues((prev) => {
+      const next = new Map(prev);
+      next.delete(fieldId);
+      return next;
+    });
+    editingFieldsRef.current.delete(fieldId);
+  };
+
+  // Get the current options input value, falling back to field value if not in local state
+  const getOptionsInputValue = (
+    fieldId: string,
+    field: FieldConfig
+  ): string => {
+    if (optionsInputValues.has(fieldId)) {
+      return optionsInputValues.get(fieldId) || "";
+    }
+    return (field.options || []).join(", ");
+  };
+
+  // Handle label update - update local state immediately
+  const handleLabelChange = (fieldId: string, label: string) => {
+    editingFieldsRef.current.add(fieldId);
+    setLabelInputValues((prev) => {
+      const next = new Map(prev);
+      next.set(fieldId, label);
+      return next;
+    });
+  };
+
+  // Get the current label input value, falling back to field value if not in local state
+  const getLabelInputValue = (fieldId: string, field: FieldConfig): string => {
+    if (labelInputValues.has(fieldId)) {
+      return labelInputValues.get(fieldId) || "";
+    }
+    return field.label;
+  };
+
+  // Handle description update - update local state immediately
+  const handleDescriptionChange = (fieldId: string, description: string) => {
+    editingFieldsRef.current.add(fieldId);
+    setDescriptionInputValues((prev) => {
+      const next = new Map(prev);
+      next.set(fieldId, description);
+      return next;
+    });
+  };
+
+  // Get the current description input value, falling back to field value if not in local state
+  const getDescriptionInputValue = (
+    fieldId: string,
+    field: FieldConfig
+  ): string => {
+    if (descriptionInputValues.has(fieldId)) {
+      return descriptionInputValues.get(fieldId) || "";
+    }
+    return field.description || "";
   };
 
   // Keep local order in sync when sections change externally (but not during drag)
@@ -564,7 +675,14 @@ export function SectionEditor({
                                     <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
                                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                       {onUpdateField && (
-                                        <Popover>
+                                        <Popover
+                                          onOpenChange={(open) => {
+                                            if (!open) {
+                                              // Popover is closing, save all changes
+                                              handlePopoverClose(field.id);
+                                            }
+                                          }}
+                                        >
                                           <PopoverTrigger asChild>
                                             <Button
                                               variant="ghost"
@@ -589,17 +707,16 @@ export function SectionEditor({
                                                   Label
                                                 </Label>
                                                 <Input
-                                                  value={field.label}
-                                                  onChange={async (e) => {
-                                                    if (onUpdateField) {
-                                                      await onUpdateField(
-                                                        field.id,
-                                                        {
-                                                          label: e.target.value,
-                                                        }
-                                                      );
-                                                    }
-                                                  }}
+                                                  value={getLabelInputValue(
+                                                    field.id,
+                                                    field
+                                                  )}
+                                                  onChange={(e) =>
+                                                    handleLabelChange(
+                                                      field.id,
+                                                      e.target.value
+                                                    )
+                                                  }
                                                 />
                                               </div>
 
@@ -609,21 +726,16 @@ export function SectionEditor({
                                                   Description / Placeholder
                                                 </Label>
                                                 <Textarea
-                                                  value={
-                                                    field.description || ""
+                                                  value={getDescriptionInputValue(
+                                                    field.id,
+                                                    field
+                                                  )}
+                                                  onChange={(e) =>
+                                                    handleDescriptionChange(
+                                                      field.id,
+                                                      e.target.value
+                                                    )
                                                   }
-                                                  onChange={async (e) => {
-                                                    if (onUpdateField) {
-                                                      await onUpdateField(
-                                                        field.id,
-                                                        {
-                                                          description:
-                                                            e.target.value ||
-                                                            null,
-                                                        }
-                                                      );
-                                                    }
-                                                  }}
                                                   rows={2}
                                                 />
                                               </div>
@@ -676,9 +788,10 @@ export function SectionEditor({
                                                     Options (comma-separated)
                                                   </Label>
                                                   <Input
-                                                    value={(
-                                                      field.options || []
-                                                    ).join(", ")}
+                                                    value={getOptionsInputValue(
+                                                      field.id,
+                                                      field
+                                                    )}
                                                     onChange={(e) =>
                                                       handleOptionsChange(
                                                         field.id,

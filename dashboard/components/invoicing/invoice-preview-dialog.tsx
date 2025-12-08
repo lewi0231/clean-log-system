@@ -5,7 +5,10 @@ import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
-import { Printer } from "lucide-react";
+import { log } from "@/lib/logger";
+import { InvoiceService } from "@/lib/services/invoice.service";
+import { Mail, Printer } from "lucide-react";
+import { useState } from "react";
 import InvoicePreview from "./invoice-preview";
 
 interface InvoicePreviewDialogProps {
@@ -19,9 +22,10 @@ export default function InvoicePreviewDialog({
   onOpenChange,
   invoiceId,
 }: InvoicePreviewDialogProps) {
-  const { invoice, loading, error } = useInvoiceDetails(
+  const { invoice, loading, error, refetch } = useInvoiceDetails(
     open ? invoiceId : null
   );
+  const [sending, setSending] = useState(false);
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -63,6 +67,29 @@ export default function InvoicePreviewDialog({
     }, 250);
   };
 
+  const handleSend = async () => {
+    if (!invoiceId || !invoice) return;
+
+    try {
+      setSending(true);
+      log.info("Sending invoice", { invoiceId });
+
+      await InvoiceService.updateStatus(invoiceId, "sent");
+
+      // Refetch invoice to get updated status
+      await refetch();
+
+      log.info("Invoice sent successfully");
+    } catch (err) {
+      log.error("Failed to send invoice", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      alert("Failed to send invoice. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0">
@@ -87,10 +114,16 @@ export default function InvoicePreviewDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button onClick={handlePrint}>
+              <Button variant="outline" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />
                 Print
               </Button>
+              {invoice.status === "draft" && (
+                <Button onClick={handleSend} disabled={sending}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  {sending ? "Sending..." : "Send Invoice"}
+                </Button>
+              )}
             </DialogFooter>
           </>
         )}

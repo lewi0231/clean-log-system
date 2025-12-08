@@ -218,32 +218,57 @@ serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     // Filter pricing rules to only worker pricing
+    // Query pricing_rule without embedded conditions to avoid reverse relationship issues
     const { data: pricingRules, error: pricingRulesError } = await supabase
       .from("pricing_rule")
-      .select(
-        `
-        *,
-        conditions:pricing_condition (
-          id,
-          condition_field_config_id,
-          operator,
-          condition_value,
-          action_type,
-          action_value,
-          metadata,
-          priority
-        )
-      `,
-      )
+      .select("*")
       .eq("organization_id", organization_id)
       .eq("active", true)
       .eq("pricing_context", "worker") // Only worker pricing
       .lte("effective_at", nowIso)
-      .or(`expires_at.is.null,expires_at.gt.${nowIso}`, {
-        referencedTable: "pricing_rule",
-      });
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
 
     if (pricingRulesError) throw pricingRulesError;
+
+    // Query pricing_condition separately to avoid reverse relationship issues
+    const pricingConditionsMap = new Map<string, PricingConditionRow[]>();
+    if (pricingRules && pricingRules.length > 0) {
+      const pricingRuleIds = pricingRules.map((rule) => rule.id);
+      const { data: pricingConditions, error: conditionsError } = await supabase
+        .from("pricing_condition")
+        .select(
+          "id, pricing_rule_id, condition_field_config_id, operator, condition_value, action_type, action_value, metadata, priority",
+        )
+        .in("pricing_rule_id", pricingRuleIds)
+        .order("priority", { ascending: true });
+
+      if (conditionsError) throw conditionsError;
+
+      // Group conditions by pricing_rule_id
+      if (pricingConditions) {
+        pricingConditions.forEach((condition) => {
+          if (!pricingConditionsMap.has(condition.pricing_rule_id)) {
+            pricingConditionsMap.set(condition.pricing_rule_id, []);
+          }
+          pricingConditionsMap.get(condition.pricing_rule_id)!.push({
+            id: condition.id,
+            condition_field_config_id: condition.condition_field_config_id,
+            operator: condition.operator,
+            condition_value: condition.condition_value,
+            action_type: condition.action_type,
+            action_value: condition.action_value,
+            metadata: condition.metadata,
+            priority: condition.priority,
+          });
+        });
+      }
+    }
+
+    // Attach conditions to pricing rules
+    const pricingRulesWithConditions = (pricingRules || []).map((rule) => ({
+      ...rule,
+      conditions: pricingConditionsMap.get(rule.id) || [],
+    }));
 
     const fieldConfigMap = new Map<string, FieldConfig>(
       (fieldConfigs || []).map((config) => [config.id, config as FieldConfig]),
@@ -255,7 +280,7 @@ serve(async (req) => {
       const calculation = calculateWorkerPayment({
         job,
         fieldConfigMap,
-        pricingRules: (pricingRules || []) as PricingRuleRow[],
+        pricingRules: pricingRulesWithConditions as PricingRuleRow[],
         hierarchyNodes: (hierarchyNodes || []) as LocationHierarchyNode[],
         servicePricingModes:
           (servicePricingModes || []) as ServicePricingModeRow[],

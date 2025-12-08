@@ -1,6 +1,11 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import type { ListJobsRequest, ListJobsResponse } from "@/lib/types/api";
+import type {
+  CreateJobRequest,
+  CreateJobResponse,
+  ListJobsRequest,
+  ListJobsResponse,
+} from "@/lib/types/api";
 
 export class JobsService {
   /**
@@ -30,6 +35,44 @@ export class JobsService {
       return data as ListJobsResponse;
     } catch (err) {
       log.error("JobsService: Failed to fetch jobs", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Create a job (admin only)
+   */
+  static async create(request: CreateJobRequest): Promise<CreateJobResponse> {
+    try {
+      log.debug("JobsService: Creating job", {
+        organizationId: request.organization_id,
+        hasLocationId: !!request.location_id,
+        workerIdsCount: request.worker_ids?.length || 0,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "admin-create-job",
+        {
+          body: request,
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || !data.success) {
+        throw new Error("Failed to create job");
+      }
+
+      log.info("JobsService: Job created successfully", {
+        jobId: data.job?.id,
+      });
+      return data as CreateJobResponse;
+    } catch (err) {
+      log.error("JobsService: Failed to create job", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       throw err;

@@ -1,5 +1,12 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  DEFAULT_BILLING_ADDRESS_CONFIG,
+  DEFAULT_EMAIL_RECIPIENT_CONFIG,
+  DEFAULT_INVOICE_TITLE,
+  DEFAULT_LINE_ITEM_DISPLAY,
+  DEFAULT_SERVICE_ADDRESS_CONFIG,
+} from "../_utils/invoice-template-defaults.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -21,6 +28,9 @@ serve(async (req) => {
       show_logo,
       show_abn,
       bill_to_fields,
+      service_address_config,
+      billing_address_config,
+      email_recipient_config,
       line_item_display,
     } = body;
 
@@ -82,7 +92,7 @@ serve(async (req) => {
       ) {
         return errorResponse(
           "line_item_display.include_option_value must be a boolean",
-          400
+          400,
         );
       }
 
@@ -92,7 +102,7 @@ serve(async (req) => {
       ) {
         return errorResponse(
           "line_item_display.description_format must be a string",
-          400
+          400,
         );
       }
 
@@ -102,11 +112,160 @@ serve(async (req) => {
       ) {
         return errorResponse(
           "line_item_display.show_base_price_separately must be a boolean",
-          400
+          400,
         );
       }
 
       updateData.line_item_display = line_item_display;
+    }
+
+    // Validate and add service_address_config
+    if (service_address_config !== undefined) {
+      if (
+        typeof service_address_config !== "object" ||
+        service_address_config === null
+      ) {
+        return errorResponse("service_address_config must be an object", 400);
+      }
+
+      // Validate source
+      if (
+        service_address_config.source !== undefined &&
+        !["auto", "location", "form_fields"].includes(
+          service_address_config.source,
+        )
+      ) {
+        return errorResponse(
+          "service_address_config.source must be 'auto', 'location', or 'form_fields'",
+          400,
+        );
+      }
+
+      // Validate location_fields if provided
+      if (service_address_config.location_fields !== undefined) {
+        if (!Array.isArray(service_address_config.location_fields)) {
+          return errorResponse(
+            "service_address_config.location_fields must be an array",
+            400,
+          );
+        }
+        const validFields = [
+          "name",
+          "email",
+          "address",
+          "contact_person",
+          "phone",
+        ];
+        if (
+          !service_address_config.location_fields.every((field: string) =>
+            validFields.includes(field)
+          )
+        ) {
+          return errorResponse(
+            "service_address_config.location_fields must contain only valid field names",
+            400,
+          );
+        }
+      }
+
+      updateData.service_address_config = service_address_config;
+    }
+
+    // Validate and add billing_address_config
+    if (billing_address_config !== undefined) {
+      if (
+        typeof billing_address_config !== "object" ||
+        billing_address_config === null
+      ) {
+        return errorResponse("billing_address_config must be an object", 400);
+      }
+
+      // Validate enabled
+      if (
+        billing_address_config.enabled !== undefined &&
+        typeof billing_address_config.enabled !== "boolean"
+      ) {
+        return errorResponse(
+          "billing_address_config.enabled must be a boolean",
+          400,
+        );
+      }
+
+      // Validate source
+      if (
+        billing_address_config.source !== undefined &&
+        !["auto", "organization", "hierarchy", "form_fields"].includes(
+          billing_address_config.source,
+        )
+      ) {
+        return errorResponse(
+          "billing_address_config.source must be 'auto', 'organization', 'hierarchy', or 'form_fields'",
+          400,
+        );
+      }
+
+      updateData.billing_address_config = billing_address_config;
+    }
+
+    // Validate and add email_recipient_config
+    if (email_recipient_config !== undefined) {
+      if (
+        typeof email_recipient_config !== "object" ||
+        email_recipient_config === null
+      ) {
+        return errorResponse("email_recipient_config must be an object", 400);
+      }
+
+      // Validate location_email_source
+      if (
+        email_recipient_config.location_email_source !== undefined &&
+        !["location_email", "hierarchy_billing_email", "location_contact_email"]
+          .includes(email_recipient_config.location_email_source)
+      ) {
+        return errorResponse(
+          "email_recipient_config.location_email_source must be 'location_email', 'hierarchy_billing_email', or 'location_contact_email'",
+          400,
+        );
+      }
+
+      // Validate form_field_email
+      if (email_recipient_config.form_field_email !== undefined) {
+        if (
+          email_recipient_config.form_field_email !== null &&
+          typeof email_recipient_config.form_field_email !== "string"
+        ) {
+          return errorResponse(
+            "email_recipient_config.form_field_email must be a string or null",
+            400,
+          );
+        }
+      }
+
+      // Validate default_email
+      if (email_recipient_config.default_email !== undefined) {
+        if (
+          email_recipient_config.default_email !== null &&
+          typeof email_recipient_config.default_email !== "string"
+        ) {
+          return errorResponse(
+            "email_recipient_config.default_email must be a string or null",
+            400,
+          );
+        }
+        // Validate email format if provided (RFC-compliant)
+        if (email_recipient_config.default_email) {
+          const emailRegex =
+            /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+          if (!emailRegex.test(email_recipient_config.default_email.trim())) {
+            return errorResponse(
+              "email_recipient_config.default_email must be a valid email address",
+              400,
+            );
+          }
+        }
+      }
+
+      updateData.email_recipient_config = email_recipient_config;
     }
 
     // Check if config exists
@@ -132,15 +291,11 @@ serve(async (req) => {
       // Create new config with defaults
       const newConfig = {
         organization_id,
-        invoice_title: invoice_title ?? "Tax Invoice",
+        invoice_title: invoice_title ?? DEFAULT_INVOICE_TITLE,
         show_logo: show_logo ?? true,
         show_abn: show_abn ?? true,
         bill_to_fields: bill_to_fields ?? [],
-        line_item_display: line_item_display ?? {
-          include_option_value: true,
-          description_format: "{field_label}: {option_value}",
-          show_base_price_separately: true,
-        },
+        line_item_display: line_item_display ?? DEFAULT_LINE_ITEM_DISPLAY,
         ...updateData,
       };
 
@@ -159,15 +314,18 @@ serve(async (req) => {
       config: {
         id: config.id,
         organization_id: config.organization_id,
-        invoice_title: config.invoice_title ?? "Tax Invoice",
+        invoice_title: config.invoice_title ?? DEFAULT_INVOICE_TITLE,
         show_logo: config.show_logo ?? true,
         show_abn: config.show_abn ?? true,
         bill_to_fields: config.bill_to_fields ?? [],
-        line_item_display: config.line_item_display ?? {
-          include_option_value: true,
-          description_format: "{field_label}: {option_value}",
-          show_base_price_separately: true,
-        },
+        service_address_config: config.service_address_config ??
+          DEFAULT_SERVICE_ADDRESS_CONFIG,
+        billing_address_config: config.billing_address_config ??
+          DEFAULT_BILLING_ADDRESS_CONFIG,
+        email_recipient_config: config.email_recipient_config ??
+          DEFAULT_EMAIL_RECIPIENT_CONFIG,
+        line_item_display: config.line_item_display ??
+          DEFAULT_LINE_ITEM_DISPLAY,
         created_at: config.created_at,
         updated_at: config.updated_at,
       },
@@ -177,7 +335,7 @@ serve(async (req) => {
     return errorResponse(
       error instanceof Error
         ? error
-        : "Failed to update invoice template config"
+        : "Failed to update invoice template config",
     );
   }
 });

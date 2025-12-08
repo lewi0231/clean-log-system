@@ -1,5 +1,13 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  DEFAULT_BILLING_ADDRESS_CONFIG,
+  DEFAULT_EMAIL_RECIPIENT_CONFIG,
+  DEFAULT_INVOICE_TITLE,
+  DEFAULT_LINE_ITEM_DISPLAY,
+  DEFAULT_SERVICE_ADDRESS_CONFIG,
+  getDefaultInvoiceTemplateConfig,
+} from "../_utils/invoice-template-defaults.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -28,18 +36,7 @@ serve(async (req) => {
 
     // If config doesn't exist, create default one
     if (configError && configError.code === "PGRST116") {
-      const defaultConfig = {
-        organization_id,
-        invoice_title: "Tax Invoice",
-        show_logo: true,
-        show_abn: true,
-        bill_to_fields: [],
-        line_item_display: {
-          include_option_value: true,
-          description_format: "{field_label}: {option_value}",
-          show_base_price_separately: true,
-        },
-      };
+      const defaultConfig = getDefaultInvoiceTemplateConfig(organization_id);
 
       const { data: newConfig, error: insertError } = await supabase
         .from("invoice_template_config")
@@ -58,15 +55,18 @@ serve(async (req) => {
       config: {
         id: config.id,
         organization_id: config.organization_id,
-        invoice_title: config.invoice_title ?? "Tax Invoice",
+        invoice_title: config.invoice_title ?? DEFAULT_INVOICE_TITLE,
         show_logo: config.show_logo ?? true,
         show_abn: config.show_abn ?? true,
         bill_to_fields: config.bill_to_fields ?? [],
-        line_item_display: config.line_item_display ?? {
-          include_option_value: true,
-          description_format: "{field_label}: {option_value}",
-          show_base_price_separately: true,
-        },
+        service_address_config: config.service_address_config ??
+          DEFAULT_SERVICE_ADDRESS_CONFIG,
+        billing_address_config: config.billing_address_config ??
+          DEFAULT_BILLING_ADDRESS_CONFIG,
+        email_recipient_config: config.email_recipient_config ??
+          DEFAULT_EMAIL_RECIPIENT_CONFIG,
+        line_item_display: config.line_item_display ??
+          DEFAULT_LINE_ITEM_DISPLAY,
         created_at: config.created_at,
         updated_at: config.updated_at,
       },
@@ -74,7 +74,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Get invoice template config error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to get invoice template config"
+      error instanceof Error ? error : "Failed to get invoice template config",
     );
   }
 });
