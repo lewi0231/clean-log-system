@@ -13,7 +13,11 @@ import {
 import useOrganization from "@/hooks/useOrganization";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { supabase } from "@/lib/supabase";
-import type { InvoiceWithJobs } from "@/lib/types";
+import type {
+  BillingAddressConfig,
+  InvoiceWithJobs,
+  ServiceAddressConfig,
+} from "@/lib/types";
 import { format } from "date-fns";
 import Image from "next/image";
 import React, { useEffect, useState } from "react";
@@ -25,13 +29,41 @@ interface InvoicePreviewProps {
       invoice_title?: string;
       show_logo?: boolean;
       show_abn?: boolean;
-      bill_to_fields?: string[];
+      bill_to_fields?: string[]; // Legacy field
+      service_address_config?: ServiceAddressConfig;
+      billing_address_config?: BillingAddressConfig;
       line_item_display?: {
         include_option_value?: boolean;
         description_format?: string;
         show_base_price_separately?: boolean;
       };
     } | null;
+    hierarchy_metadata?: Record<
+      string,
+      {
+        id: string;
+        type: string;
+        name: string;
+        metadata?: Record<string, unknown>;
+      }
+    >;
+    invoice_job?: Array<{
+      job: {
+        id: string;
+        completed_at: string;
+        created_at: string;
+        submission_data?: Record<string, unknown> | null;
+        location: {
+          id: string;
+          name: string;
+          email: string;
+          address: string | null;
+          contact_person: string | null;
+          phone: string | null;
+          hierarchy_parent_id?: string | null;
+        } | null;
+      };
+    }>;
   };
 }
 
@@ -42,11 +74,44 @@ interface OrganizationInfo {
   primary_contact_email: string | null;
 }
 
+interface LocationWithHierarchy {
+  id: string;
+  name: string;
+  email: string;
+  address: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  hierarchy_parent_id?: string | null;
+}
+
+// Helper function to format currency based on invoice currency
+const formatCurrency = (amount: number, currency: string): string => {
+  // Map currency to locale for proper formatting
+  const currencyLocaleMap: Record<string, string> = {
+    AUD: "en-AU",
+    USD: "en-US",
+    GBP: "en-GB",
+    EUR: "de-DE",
+    CAD: "en-CA",
+    NZD: "en-NZ",
+  };
+
+  const locale = currencyLocaleMap[currency] || "en-AU";
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency,
+    maximumFractionDigits: 2,
+  }).format(isNaN(amount) ? 0 : amount);
+};
+
 export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
   const { organizationId } = useOrganization();
   const [orgInfo, setOrgInfo] = useState<OrganizationInfo | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
+
+  // Get currency from invoice
+  const currency = invoice.currency || "AUD";
 
   useEffect(() => {
     if (!organizationId) return;
@@ -119,41 +184,125 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
         return dateA - dateB;
       }) || [];
 
-  // Extract Bill To data from job submission_data using template config fields
+  // Get template config and primary job data
   const templateConfig = invoice.template_config;
-  const billToFields = templateConfig?.bill_to_fields || [];
-
-  // Get Bill To data from first job's submission_data
   const firstJob = sortedJobs[0];
   const submissionData = firstJob?.submission_data;
+  const primaryLocation = (invoice.invoice_job?.[0]?.job?.location ||
+    (invoice.invoice_job?.length > 0 &&
+    invoice.invoice_job.some((ij) => ij.job?.location)
+      ? invoice.invoice_job.find((ij) => ij.job?.location)?.job.location
+      : null)) as LocationWithHierarchy | null | undefined;
 
-  // Extract values for configured Bill To fields
-  const billToValues: Array<{ fieldName: string; value: string }> = [];
-  if (submissionData && billToFields.length > 0) {
-    billToFields.forEach((fieldName: string) => {
+  // Service Address Configuration
+  const serviceAddressConfig = templateConfig?.service_address_config || {
+    source: "auto",
+    location_fields: ["name", "address", "contact_person", "email", "phone"],
+  };
+
+  // Determine service address source
+  let serviceAddressSource = serviceAddressConfig.source;
+  if (serviceAddressSource === "auto") {
+    serviceAddressSource = primaryLocation?.id ? "location" : "form_fields";
+  }
+
+  // Build service address display
+  const serviceAddressLines: string[] = [];
+
+  if (serviceAddressSource === "location" && primaryLocation) {
+    const locationFieldsToShow = serviceAddressConfig.location_fields || [
+      "name",
+      "address",
+      "contact_person",
+      "email",
+      "phone",
+    ];
+
+    locationFieldsToShow.forEach((field) => {
+      const value = primaryLocation[field as keyof typeof primaryLocation];
+      if (value && String(value).trim() !== "") {
+        serviceAddressLines.push(String(value));
+      }
+    });
+  } else if (
+    serviceAddressSource === "form_fields" &&
+    submissionData &&
+    serviceAddressConfig.form_fields
+  ) {
+    serviceAddressConfig.form_fields.forEach((fieldName: string) => {
       const fieldValue = submissionData[fieldName];
       if (
         fieldValue !== null &&
         fieldValue !== undefined &&
-        fieldValue !== ""
+        String(fieldValue).trim() !== ""
       ) {
-        billToValues.push({
-          fieldName,
-          value: String(fieldValue),
-        });
+        serviceAddressLines.push(String(fieldValue));
       }
     });
+  } else if (serviceAddressSource === "form_fields") {
+    // Legacy fallback: use bill_to_fields if form_fields not configured
+    const legacyBillToFields = templateConfig?.bill_to_fields || [];
+    if (submissionData && legacyBillToFields.length > 0) {
+      legacyBillToFields.forEach((fieldName: string) => {
+        const fieldValue = submissionData[fieldName];
+        if (
+          fieldValue !== null &&
+          fieldValue !== undefined &&
+          String(fieldValue).trim() !== ""
+        ) {
+          serviceAddressLines.push(String(fieldValue));
+        }
+      });
+    }
   }
 
-  // Fallback to location if no Bill To fields are configured
-  const primaryLocation =
-    billToFields.length > 0
-      ? null // Use mapped data instead
-      : invoice.invoice_job?.[0]?.job?.location ||
-        (invoice.invoice_job?.length > 0 &&
-        invoice.invoice_job.some((ij) => ij.job?.location)
-          ? invoice.invoice_job.find((ij) => ij.job?.location)?.job.location
-          : null);
+  // Billing Address Configuration
+  const billingAddressConfig = templateConfig?.billing_address_config || {
+    enabled: false,
+    source: "auto",
+  };
+
+  // Get billing address from hierarchy if enabled
+  const billingAddressLines: string[] = [];
+  const hierarchyMetadata = invoice.hierarchy_metadata || {};
+
+  // Get hierarchy_parent_id from location (may not be in type but is fetched from backend)
+  const hierarchyParentId = (
+    primaryLocation as LocationWithHierarchy | null | undefined
+  )?.hierarchy_parent_id;
+
+  if (
+    billingAddressConfig.enabled &&
+    hierarchyParentId &&
+    hierarchyMetadata[hierarchyParentId]
+  ) {
+    const hierarchyNode = hierarchyMetadata[hierarchyParentId];
+
+    // Check if it's a company type
+    if (hierarchyNode.type === "company") {
+      const billingAddress = hierarchyNode.metadata?.billing_address as
+        | Record<string, unknown>
+        | undefined;
+
+      if (billingAddress) {
+        if (billingAddress.name) {
+          billingAddressLines.push(String(billingAddress.name));
+        }
+        if (billingAddress.address) {
+          billingAddressLines.push(String(billingAddress.address));
+        }
+        if (billingAddress.contact_person) {
+          billingAddressLines.push(String(billingAddress.contact_person));
+        }
+        if (billingAddress.email) {
+          billingAddressLines.push(String(billingAddress.email));
+        }
+        if (billingAddress.phone) {
+          billingAddressLines.push(String(billingAddress.phone));
+        }
+      }
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const variants: Record<
@@ -227,37 +376,40 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
       <div className="grid grid-cols-2 gap-8">
         <div className="space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground mb-2">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3">
               Bill To
             </h3>
-            {billToFields.length > 0 ? (
-              // Use mapped data from submission_data
-              billToValues.length > 0 ? (
+
+            {/* Service Address Section */}
+            <div className="mb-4">
+              <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                Service Address:
+              </h4>
+              {serviceAddressLines.length > 0 ? (
                 <div className="space-y-1 text-sm">
-                  {billToValues.map((item, index) => (
-                    <p key={`${item.fieldName}-${index}`}>{item.value}</p>
+                  {serviceAddressLines.map((line, index) => (
+                    <p key={`service-address-${index}`}>{line}</p>
                   ))}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No Bill To information found
+                  No service address information available
                 </p>
-              )
-            ) : primaryLocation ? (
-              // Fallback to location data
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">{primaryLocation.name}</p>
-                {primaryLocation.address && <p>{primaryLocation.address}</p>}
-                {primaryLocation.contact_person && (
-                  <p>{primaryLocation.contact_person}</p>
-                )}
-                {primaryLocation.email && <p>{primaryLocation.email}</p>}
-                {primaryLocation.phone && <p>{primaryLocation.phone}</p>}
+              )}
+            </div>
+
+            {/* Billing Address Section (if enabled and available) */}
+            {billingAddressConfig.enabled && billingAddressLines.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                  Billing Address:
+                </h4>
+                <div className="space-y-1 text-sm">
+                  {billingAddressLines.map((line, index) => (
+                    <p key={`billing-address-${index}`}>{line}</p>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No location information
-              </p>
             )}
           </div>
         </div>
@@ -321,10 +473,10 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                       <TableCell>Base Price</TableCell>
                       <TableCell className="text-right">1</TableCell>
                       <TableCell className="text-right">
-                        ${calculation.base_price.toFixed(2)}
+                        {formatCurrency(calculation.base_price, currency)}
                       </TableCell>
                       <TableCell className="text-right">
-                        ${calculation.base_price.toFixed(2)}
+                        {formatCurrency(calculation.base_price, currency)}
                       </TableCell>
                     </TableRow>
                   )}
@@ -359,27 +511,41 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                           {item.quantity}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${item.unit_price.toFixed(2)}
+                          {formatCurrency(item.unit_price, currency)}
                         </TableCell>
                         <TableCell className="text-right">
-                          ${item.total.toFixed(2)}
+                          {formatCurrency(item.total, currency)}
                         </TableCell>
                       </TableRow>
                     );
                   })}
 
-                  {/* Pricing Rules Applied */}
-                  {calculation.applied_rules.length > 0 &&
-                    calculation.applied_rules.map((rule, ruleIndex) => (
+                  {/* Pricing Rules Applied (only adjustments, not line items) */}
+                  {calculation.applied_rules
+                    .filter(
+                      (rule) =>
+                        // Only show adjustments: base, global, or conditional rules
+                        // Exclude field and option scope rules as they're already shown as line items
+                        (rule.scope === "base" ||
+                          rule.scope === "global" ||
+                          rule.pricing_type === "conditional") &&
+                        rule.amount !== 0
+                    )
+                    .map((rule, ruleIndex) => (
                       <TableRow key={`${job.id}-rule-${ruleIndex}`}>
                         <TableCell
                           colSpan={3}
                           className="text-sm text-muted-foreground"
                         >
-                          {rule.scope} — {rule.pricing_type}
+                          {rule.scope === "base"
+                            ? "Base Price"
+                            : rule.scope === "global"
+                            ? "Adjustment"
+                            : "Conditional Adjustment"}
                         </TableCell>
                         <TableCell className="text-right text-sm">
-                          {rule.amount >= 0 ? "+" : ""}${rule.amount.toFixed(2)}
+                          {rule.amount >= 0 ? "+" : ""}
+                          {formatCurrency(Math.abs(rule.amount), currency)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -388,7 +554,7 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                   <TableRow className="font-medium">
                     <TableCell colSpan={3}>Job Total</TableCell>
                     <TableCell className="text-right">
-                      ${calculation.total.toFixed(2)}
+                      {formatCurrency(calculation.total, currency)}
                     </TableCell>
                   </TableRow>
 
@@ -411,24 +577,24 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal:</span>
             <span className="font-medium">
-              ${invoice.calculation.total_subtotal.toFixed(2)}
+              {formatCurrency(invoice.calculation.total_subtotal, currency)}
             </span>
           </div>
           {invoice.calculation.total_adjustments !== 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Adjustments:</span>
               <span className="font-medium">
-                ${invoice.calculation.total_adjustments.toFixed(2)}
+                {formatCurrency(
+                  invoice.calculation.total_adjustments,
+                  currency
+                )}
               </span>
             </div>
           )}
           <Separator />
           <div className="flex justify-between text-lg font-bold">
             <span>Total:</span>
-            <span>${invoice.calculation.total.toFixed(2)}</span>
-          </div>
-          <div className="text-xs text-muted-foreground text-right">
-            {invoice.currency}
+            <span>{formatCurrency(invoice.calculation.total, currency)}</span>
           </div>
         </div>
       </div>

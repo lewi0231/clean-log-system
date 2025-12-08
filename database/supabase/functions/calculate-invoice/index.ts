@@ -147,22 +147,10 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    // Query jobs first without location join to avoid PostgREST reverse relationship issues
     const { data: jobsRaw, error: jobsError } = await supabase
       .from("job")
-      .select(`
-        id,
-        organization_id,
-        location_id,
-        submission_data,
-        location:location_id (
-          id,
-          hierarchy_parent_id,
-          pricing_mode,
-          fixed_customer_price,
-          fixed_worker_payment,
-          fixed_price_currency
-        )
-      `)
+      .select("id, organization_id, location_id, submission_data")
       .eq("organization_id", organization_id)
       .in("id", job_ids);
 
@@ -171,35 +159,55 @@ serve(async (req) => {
       return errorResponse("No jobs found", 404);
     }
 
-    // Flatten the location join to get hierarchy_parent_id and pricing info directly on job
-    // Note: Supabase returns the joined location as an object (single relation via FK)
+    // Get unique location IDs
+    const locationIds = [
+      ...new Set(
+        jobsRaw
+          .map((job) => job.location_id)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+
+    // Query locations separately to avoid reverse relationship issues with pricing_rule
+    let locationMap = new Map<string, LocationRecord>();
+    if (locationIds.length > 0) {
+      const { data: locations, error: locationsError } = await supabase
+        .from("location")
+        .select(
+          "id, hierarchy_parent_id, pricing_mode, fixed_customer_price, fixed_worker_payment, fixed_price_currency",
+        )
+        .in("id", locationIds);
+
+      if (locationsError) throw locationsError;
+      if (locations) {
+        locationMap = new Map(
+          locations.map((loc) => [
+            loc.id,
+            {
+              id: loc.id,
+              hierarchy_parent_id: loc.hierarchy_parent_id,
+              pricing_mode: loc.pricing_mode,
+              fixed_customer_price: loc.fixed_customer_price,
+              fixed_worker_payment: loc.fixed_worker_payment,
+              fixed_price_currency: loc.fixed_price_currency,
+            },
+          ]),
+        );
+      }
+    }
+
+    // Combine jobs with location data
     const jobs = jobsRaw.map((job) => {
-      const locationData = job.location as unknown as
-        | {
-          id: string;
-          hierarchy_parent_id: string | null;
-          pricing_mode: string | null;
-          fixed_customer_price: number | null;
-          fixed_worker_payment: number | null;
-          fixed_price_currency: string | null;
-        }
-        | null;
+      const locationData = job.location_id
+        ? locationMap.get(job.location_id) || null
+        : null;
       return {
         id: job.id,
         organization_id: job.organization_id,
         location_id: job.location_id,
         submission_data: job.submission_data,
         hierarchy_parent_id: locationData?.hierarchy_parent_id || null,
-        location: locationData
-          ? {
-            id: locationData.id,
-            hierarchy_parent_id: locationData.hierarchy_parent_id,
-            pricing_mode: locationData.pricing_mode,
-            fixed_customer_price: locationData.fixed_customer_price,
-            fixed_worker_payment: locationData.fixed_worker_payment,
-            fixed_price_currency: locationData.fixed_price_currency,
-          }
-          : null,
+        location: locationData,
       };
     });
 
@@ -231,32 +239,57 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
     // Filter pricing rules to only customer pricing (for invoicing)
     // Worker pricing rules will be used separately for worker payment calculations
+    // Query pricing_rule without embedded conditions to avoid reverse relationship issues
     const { data: pricingRules, error: pricingRulesError } = await supabase
       .from("pricing_rule")
-      .select(
-        `
-        *,
-        conditions:pricing_condition (
-          id,
-          condition_field_config_id,
-          operator,
-          condition_value,
-          action_type,
-          action_value,
-          metadata,
-          priority
-        )
-      `,
-      )
+      .select("*")
       .eq("organization_id", organization_id)
       .eq("active", true)
       .eq("pricing_context", "customer") // Only customer pricing for invoicing
       .lte("effective_at", nowIso)
-      .or(`expires_at.is.null,expires_at.gt.${nowIso}`, {
-        referencedTable: "pricing_rule",
-      });
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
 
     if (pricingRulesError) throw pricingRulesError;
+
+    // Query pricing_condition separately to avoid reverse relationship issues
+    const pricingConditionsMap = new Map<string, PricingConditionRow[]>();
+    if (pricingRules && pricingRules.length > 0) {
+      const pricingRuleIds = pricingRules.map((rule) => rule.id);
+      const { data: pricingConditions, error: conditionsError } = await supabase
+        .from("pricing_condition")
+        .select(
+          "id, pricing_rule_id, condition_field_config_id, operator, condition_value, action_type, action_value, metadata, priority",
+        )
+        .in("pricing_rule_id", pricingRuleIds)
+        .order("priority", { ascending: true });
+
+      if (conditionsError) throw conditionsError;
+
+      // Group conditions by pricing_rule_id
+      if (pricingConditions) {
+        pricingConditions.forEach((condition) => {
+          if (!pricingConditionsMap.has(condition.pricing_rule_id)) {
+            pricingConditionsMap.set(condition.pricing_rule_id, []);
+          }
+          pricingConditionsMap.get(condition.pricing_rule_id)!.push({
+            id: condition.id,
+            condition_field_config_id: condition.condition_field_config_id,
+            operator: condition.operator,
+            condition_value: condition.condition_value,
+            action_type: condition.action_type,
+            action_value: condition.action_value,
+            metadata: condition.metadata,
+            priority: condition.priority,
+          });
+        });
+      }
+    }
+
+    // Attach conditions to pricing rules
+    const pricingRulesWithConditions = (pricingRules || []).map((rule) => ({
+      ...rule,
+      conditions: pricingConditionsMap.get(rule.id) || [],
+    }));
 
     const fieldConfigMap = new Map<string, FieldConfig>(
       (fieldConfigs || []).map((config) => [config.id, config as FieldConfig]),
@@ -268,7 +301,7 @@ serve(async (req) => {
       const calculation = calculateJobPricing({
         job,
         fieldConfigMap,
-        pricingRules: (pricingRules || []) as PricingRuleRow[],
+        pricingRules: pricingRulesWithConditions as PricingRuleRow[],
         hierarchyNodes: (hierarchyNodes || []) as LocationHierarchyNode[],
         servicePricingModes:
           (servicePricingModes || []) as ServicePricingModeRow[],
@@ -319,7 +352,49 @@ function calculateJobPricing({
   hierarchyNodes: LocationHierarchyNode[];
   servicePricingModes: ServicePricingModeRow[];
 }): InvoiceCalculation {
-  // Service-specific pricing mode override (takes precedence over location-level)
+  // Early return for fixed price locations (highest precedence)
+  // Field config data is still collected (in submission_data) but pricing is fixed
+  if (job.location?.pricing_mode === "fixed_price") {
+    const fixedCustomerPrice = job.location.fixed_customer_price || 0;
+    const fixedWorkerPayment = job.location.fixed_worker_payment || 0;
+
+    return {
+      job_id: job.id,
+      base_price: fixedCustomerPrice,
+      line_items: [], // No field-based line items for fixed pricing
+      applied_rules: [
+        {
+          pricing_rule_id: `fixed_location_${job.location.id}`,
+          scope: "global",
+          pricing_type: "fixed",
+          field_config_id: null,
+          option_value: null,
+          location_hierarchy_id: job.hierarchy_parent_id || null,
+          location_id: job.location_id,
+          amount: fixedCustomerPrice,
+          worker_payment: fixedWorkerPayment,
+          metadata: {
+            pricing_mode: "fixed_price",
+            location_id: job.location.id,
+            currency: job.location.fixed_price_currency || "USD",
+          },
+          snapshot_data: {
+            pricing_mode: "fixed_price",
+            fixed_customer_price: fixedCustomerPrice,
+            fixed_worker_payment: fixedWorkerPayment,
+            currency: job.location.fixed_price_currency || "USD",
+          },
+        },
+      ],
+      subtotal: fixedCustomerPrice,
+      total_adjustments: 0,
+      total: fixedCustomerPrice,
+      worker_payment_total: fixedWorkerPayment,
+      margin: fixedCustomerPrice - fixedWorkerPayment,
+    };
+  }
+
+  // Service-specific pricing mode override (takes precedence over field-based)
   const serviceOverride = findServicePricingOverride({
     job,
     fieldConfigMap,
@@ -357,48 +432,6 @@ function calculateJobPricing({
             fixed_worker_payment: fixedWorkerPayment,
             service_type_value: serviceOverride.service_type_value,
             currency: serviceOverride.fixed_price_currency || "USD",
-          },
-        },
-      ],
-      subtotal: fixedCustomerPrice,
-      total_adjustments: 0,
-      total: fixedCustomerPrice,
-      worker_payment_total: fixedWorkerPayment,
-      margin: fixedCustomerPrice - fixedWorkerPayment,
-    };
-  }
-
-  // Early return for fixed price locations
-  // Field config data is still collected (in submission_data) but pricing is fixed
-  if (job.location?.pricing_mode === "fixed_price") {
-    const fixedCustomerPrice = job.location.fixed_customer_price || 0;
-    const fixedWorkerPayment = job.location.fixed_worker_payment || 0;
-
-    return {
-      job_id: job.id,
-      base_price: fixedCustomerPrice,
-      line_items: [], // No field-based line items for fixed pricing
-      applied_rules: [
-        {
-          pricing_rule_id: `fixed_location_${job.location.id}`,
-          scope: "global",
-          pricing_type: "fixed",
-          field_config_id: null,
-          option_value: null,
-          location_hierarchy_id: job.hierarchy_parent_id || null,
-          location_id: job.location_id,
-          amount: fixedCustomerPrice,
-          worker_payment: fixedWorkerPayment,
-          metadata: {
-            pricing_mode: "fixed_price",
-            location_id: job.location.id,
-            currency: job.location.fixed_price_currency || "USD",
-          },
-          snapshot_data: {
-            pricing_mode: "fixed_price",
-            fixed_customer_price: fixedCustomerPrice,
-            fixed_worker_payment: fixedWorkerPayment,
-            currency: job.location.fixed_price_currency || "USD",
           },
         },
       ],

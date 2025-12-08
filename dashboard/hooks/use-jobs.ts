@@ -1,8 +1,12 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { jobsKey } from "@/app/query-provider";
 import { JobsService } from "@/lib/services";
 import type { Job } from "@/lib/types";
-import { useEffect, useState } from "react";
+import type { CreateJobRequest } from "@/lib/types/api";
+import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
 interface UseJobsResult {
@@ -10,46 +14,59 @@ interface UseJobsResult {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
+  createJob: (request: CreateJobRequest) => Promise<Job>;
+}
+
+async function fetchJobs(organizationId: string): Promise<Job[]> {
+  const response = await JobsService.list({
+    organization_id: organizationId,
+  });
+  return response.jobs || [];
 }
 
 export function useJobs(): UseJobsResult {
   const { organizationId } = useOrganization();
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchJobs = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: jobsKey(organizationId),
+    enabled: !!organizationId,
+    queryFn: () => fetchJobs(organizationId as string),
+    select: (data) => data ?? [],
+    placeholderData: (previous) => previous,
+  });
 
-    try {
-      setLoading(true);
-      setError(null);
+  const createJob = useCallback(
+    async (request: CreateJobRequest): Promise<Job> => {
+      const response = await JobsService.create(request);
 
-      const response = await JobsService.list({
-        organization_id: organizationId,
+      // Invalidate and refetch jobs
+      await queryClient.invalidateQueries({
+        queryKey: jobsKey(organizationId),
       });
+      await query.refetch();
 
-      setJobs(response.jobs || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch jobs");
-      setJobs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
+      // Return the created job (we'll need to fetch it from the list)
+      // For now, return a partial job object
+      return {
+        id: response.job.id,
+        organization_id: response.job.organization_id,
+        location_id: response.job.location_id,
+        submission_data: null, // Will be populated on refetch
+        completed_at: response.job.completed_at,
+        created_at: response.job.created_at,
+        location: null,
+        workers: [],
+      };
+    },
+    [queryClient, organizationId, query],
+  );
 
   return {
-    jobs,
-    loading,
-    error,
-    refetch: fetchJobs,
+    jobs: query.data ?? [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
+    createJob,
   };
 }

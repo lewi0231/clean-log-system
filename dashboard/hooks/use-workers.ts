@@ -7,8 +7,8 @@ import type {
   DeleteWorkerRequest,
   UpdateWorkerRequest,
 } from "@/lib/types/api";
-import { useEffect, useState } from "react";
-import useOrganization from "./useOrganization";
+import { useCallback } from "react";
+import { useWorkersAndLocations } from "./use-workers-locations";
 
 interface UseWorkersResult {
   workers: Worker[];
@@ -22,58 +22,36 @@ interface UseWorkersResult {
 }
 
 export function useWorkers(): UseWorkersResult {
-  const { organizationId } = useOrganization();
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchWorkers = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await WorkersService.listWorkersAndLocations({
-        organization_id: organizationId,
-      });
-
-      setWorkers(response.workers || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch workers");
-      setWorkers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { workers, loading, error, refetch, invalidateCache } =
+    useWorkersAndLocations();
 
   const createWorker = async (
-    request: CreateWorkerRequest
+    request: CreateWorkerRequest,
   ): Promise<Worker> => {
     const worker = await WorkersService.create(request);
-    await fetchWorkers();
+    invalidateCache();
+    await refetch();
     return worker;
   };
 
   const updateWorker = async (
-    request: UpdateWorkerRequest
+    request: UpdateWorkerRequest,
   ): Promise<Worker> => {
     const worker = await WorkersService.update(request);
-    await fetchWorkers();
+    invalidateCache();
+    await refetch();
     return worker;
   };
 
   const deleteWorker = async (request: DeleteWorkerRequest): Promise<void> => {
     await WorkersService.delete(request);
-    await fetchWorkers();
+    invalidateCache();
+    await refetch();
   };
 
   const resendInvitation = async (
     workerId: string,
-    orgId: string
+    orgId: string,
   ): Promise<void> => {
     if (!orgId) {
       throw new Error("Organization ID is required");
@@ -85,16 +63,11 @@ export function useWorkers(): UseWorkersResult {
     // Don't refetch workers as nothing changes in the list
   };
 
-  useEffect(() => {
-    fetchWorkers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId]);
-
   return {
     workers,
     loading,
     error,
-    refetch: fetchWorkers,
+    refetch: useCallback(() => refetch(), [refetch]),
     createWorker,
     updateWorker,
     deleteWorker,

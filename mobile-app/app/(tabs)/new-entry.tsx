@@ -728,16 +728,18 @@ export default function NewEntryScreen() {
           const clusters = getClustersForGroup(groupId);
           const selectedCluster = selectedClusters[groupId] || null;
 
-          // Get the first field to use its group name for the label
+          // Use custom label for default_exclusive_group if available, otherwise generate from group ID
           const firstField = fields[0];
-          const groupLabel =
-            firstField.mutually_exclusive_group
-              ?.split("_")
-              .map(
-                (word) =>
-                  word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-              )
-              .join(" ") || "Select Option";
+          const isDefaultGroup = groupId === "default_exclusive_group";
+          const groupLabel = isDefaultGroup && settings?.default_exclusive_group_label
+            ? settings.default_exclusive_group_label
+            : firstField.mutually_exclusive_group
+                ?.split("_")
+                .map(
+                  (word) =>
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                )
+                .join(" ") || "Select Option";
 
           return (
             <View key={groupId} className="mb-4">

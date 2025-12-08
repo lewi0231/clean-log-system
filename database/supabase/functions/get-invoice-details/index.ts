@@ -37,11 +37,12 @@ serve(async (req) => {
               email,
               address,
               contact_person,
-              phone
+              phone,
+              hierarchy_parent_id
             )
           )
         )
-        `
+        `,
       )
       .eq("id", invoice_id)
       .single();
@@ -67,8 +68,8 @@ serve(async (req) => {
     }
 
     // Call calculate-invoice function to get line items and calculations
-    const { data: calculationData, error: calcError } =
-      await supabase.functions.invoke("calculate-invoice", {
+    const { data: calculationData, error: calcError } = await supabase.functions
+      .invoke("calculate-invoice", {
         body: {
           organization_id: invoice.organization_id,
           job_ids: jobIds,
@@ -96,6 +97,20 @@ serve(async (req) => {
         show_logo: true,
         show_abn: true,
         bill_to_fields: [],
+        service_address_config: {
+          source: "auto",
+          location_fields: [
+            "name",
+            "address",
+            "contact_person",
+            "email",
+            "phone",
+          ],
+        },
+        billing_address_config: {
+          enabled: false,
+          source: "auto",
+        },
         line_item_display: {
           include_option_value: true,
           description_format: "{field_label}: {option_value}",
@@ -118,6 +133,20 @@ serve(async (req) => {
         show_logo: configData.show_logo ?? true,
         show_abn: configData.show_abn ?? true,
         bill_to_fields: billToFields,
+        service_address_config: configData.service_address_config ?? {
+          source: "auto",
+          location_fields: [
+            "name",
+            "address",
+            "contact_person",
+            "email",
+            "phone",
+          ],
+        },
+        billing_address_config: configData.billing_address_config ?? {
+          enabled: false,
+          source: "auto",
+        },
         line_item_display: configData.line_item_display ?? {
           include_option_value: true,
           description_format: "{field_label}: {option_value}",
@@ -131,6 +160,20 @@ serve(async (req) => {
         show_logo: true,
         show_abn: true,
         bill_to_fields: [],
+        service_address_config: {
+          source: "auto",
+          location_fields: [
+            "name",
+            "address",
+            "contact_person",
+            "email",
+            "phone",
+          ],
+        },
+        billing_address_config: {
+          enabled: false,
+          source: "auto",
+        },
         line_item_display: {
           include_option_value: true,
           description_format: "{field_label}: {option_value}",
@@ -139,16 +182,54 @@ serve(async (req) => {
       };
     }
 
+    // Fetch location hierarchy metadata for billing address detection
+    const locationIds: string[] = [];
+    const hierarchyParentIds: string[] = [];
+
+    if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
+      for (const invoiceJob of invoice.invoice_job) {
+        if (invoiceJob.job?.location?.id) {
+          locationIds.push(invoiceJob.job.location.id);
+        }
+        if (invoiceJob.job?.location?.hierarchy_parent_id) {
+          hierarchyParentIds.push(invoiceJob.job.location.hierarchy_parent_id);
+        }
+      }
+    }
+
+    // Fetch hierarchy nodes for billing address detection
+    const hierarchyMetadata: Record<string, unknown> = {};
+    if (hierarchyParentIds.length > 0) {
+      const uniqueHierarchyIds = [...new Set(hierarchyParentIds)];
+      const { data: hierarchyNodes, error: hierarchyError } = await supabase
+        .from("location_hierarchy")
+        .select("id, type, name, metadata")
+        .in("id", uniqueHierarchyIds);
+
+      if (!hierarchyError && hierarchyNodes) {
+        // Build metadata map keyed by hierarchy ID
+        for (const node of hierarchyNodes) {
+          hierarchyMetadata[node.id] = {
+            id: node.id,
+            type: node.type,
+            name: node.name,
+            metadata: node.metadata,
+          };
+        }
+      }
+    }
+
     return jsonResponse({
       success: true,
       invoice: invoice,
       calculation: calculationData.calculation,
       template_config: templateConfig,
+      hierarchy_metadata: hierarchyMetadata,
     });
   } catch (error) {
     console.error("Get invoice details error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to get invoice details"
+      error instanceof Error ? error : "Failed to get invoice details",
     );
   }
 });

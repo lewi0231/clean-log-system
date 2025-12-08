@@ -14,9 +14,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useInvoices } from "@/hooks/use-invoices";
+import { log } from "@/lib/logger";
+import { InvoiceService } from "@/lib/services/invoice.service";
 import type { InvoiceWithJobs } from "@/lib/types";
 import { format } from "date-fns";
-import { FileText } from "lucide-react";
+import { FileText, Mail } from "lucide-react";
 import { useState } from "react";
 
 interface InvoiceListProps {
@@ -26,10 +28,11 @@ interface InvoiceListProps {
 export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const { invoices, loading, error } = useInvoices(
+  const { invoices, loading, error, refetch } = useInvoices(
     startDate || undefined,
     endDate || undefined
   );
+  const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<
@@ -70,6 +73,28 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
   };
 
   const hasFilters = startDate || endDate;
+
+  const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
+    e.stopPropagation(); // Prevent row click
+    try {
+      setSendingInvoiceId(invoiceId);
+      log.info("Sending invoice", { invoiceId });
+
+      await InvoiceService.updateStatus(invoiceId, "sent");
+
+      // Refetch invoices to get updated status
+      await refetch();
+
+      log.info("Invoice sent successfully");
+    } catch (err) {
+      log.error("Failed to send invoice", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      alert("Failed to send invoice. Please try again.");
+    } finally {
+      setSendingInvoiceId(null);
+    }
+  };
 
   if (loading) {
     return <LoadingState message="Loading invoices..." />;
@@ -139,6 +164,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Due Date</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -166,6 +192,21 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
                   <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                   <TableCell>
                     {format(new Date(invoice.due_date), "MMM d, yyyy")}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {invoice.status === "draft" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleSendInvoice(e, invoice.id)}
+                        disabled={sendingInvoiceId === invoice.id}
+                      >
+                        <Mail className="mr-1 h-3 w-3" />
+                        {sendingInvoiceId === invoice.id
+                          ? "Sending..."
+                          : "Send"}
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

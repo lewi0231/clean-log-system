@@ -11,7 +11,7 @@ interface UseInvoiceTemplateConfigResult {
   error: string | null;
   refetch: () => Promise<void>;
   updateConfig: (
-    updates: Partial<InvoiceTemplateConfig>
+    updates: Partial<InvoiceTemplateConfig>,
   ) => Promise<InvoiceTemplateConfig>;
 }
 
@@ -33,12 +33,12 @@ export function useInvoiceTemplateConfig(): UseInvoiceTemplateConfigResult {
       setError(null);
 
       const fetchedConfig = await InvoiceTemplateService.getConfig(
-        organizationId
+        organizationId,
       );
       setConfig(fetchedConfig);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to fetch template config"
+        err instanceof Error ? err.message : "Failed to fetch template config",
       );
       setConfig(null);
     } finally {
@@ -52,7 +52,7 @@ export function useInvoiceTemplateConfig(): UseInvoiceTemplateConfigResult {
 
   const updateConfig = useCallback(
     async (
-      updates: Partial<InvoiceTemplateConfig>
+      updates: Partial<InvoiceTemplateConfig>,
     ): Promise<InvoiceTemplateConfig> => {
       if (!organizationId) {
         throw new Error("Organization ID is required");
@@ -66,21 +66,23 @@ export function useInvoiceTemplateConfig(): UseInvoiceTemplateConfigResult {
           show_logo: updates.show_logo,
           show_abn: updates.show_abn,
           bill_to_fields: updates.bill_to_fields,
+          service_address_config: updates.service_address_config,
+          billing_address_config: updates.billing_address_config,
+          email_recipient_config: updates.email_recipient_config,
           line_item_display: updates.line_item_display,
         });
 
         setConfig(updatedConfig);
         return updatedConfig;
       } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "Failed to update template config";
+        const errorMessage = err instanceof Error
+          ? err.message
+          : "Failed to update template config";
         setError(errorMessage);
         throw err;
       }
     },
-    [organizationId]
+    [organizationId],
   );
 
   return {

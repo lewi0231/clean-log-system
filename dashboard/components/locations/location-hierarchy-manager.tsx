@@ -32,6 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
 import type { LocationHierarchyNode } from "@/lib/types";
 import {
@@ -189,10 +191,19 @@ function TreeNode({
   );
 }
 
+interface AutoSendConfig {
+  enabled: boolean;
+  period: "daily" | "weekly" | "monthly";
+  day_of_week?: number;
+  day_of_month?: number;
+  time?: string;
+}
+
 interface NodeFormData {
   name: string;
   type: NodeType;
   parent_id: string | null;
+  autoSend: AutoSendConfig;
 }
 
 export default function LocationHierarchyManager() {
@@ -207,6 +218,11 @@ export default function LocationHierarchyManager() {
     name: "",
     type: "company",
     parent_id: null,
+    autoSend: {
+      enabled: false,
+      period: "daily",
+      time: "09:00",
+    },
   });
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -226,16 +242,35 @@ export default function LocationHierarchyManager() {
       name: "",
       type: defaultType,
       parent_id: parentId || null,
+      autoSend: {
+        enabled: false,
+        period: "daily",
+        time: "09:00",
+      },
     });
     setDialogOpen(true);
   };
 
   const handleOpenEdit = (node: LocationHierarchyNode) => {
     setEditingNode(node);
+
+    // Extract auto-send config from metadata
+    const metadata = node.metadata || {};
+    const autoSendData = metadata.auto_send_invoices as
+      | Partial<AutoSendConfig>
+      | undefined;
+
     setFormData({
       name: node.name,
       type: node.type as NodeType,
       parent_id: node.parent_id,
+      autoSend: {
+        enabled: autoSendData?.enabled || false,
+        period: autoSendData?.period || "daily",
+        day_of_week: autoSendData?.day_of_week,
+        day_of_month: autoSendData?.day_of_month,
+        time: autoSendData?.time || "09:00",
+      },
     });
     setDialogOpen(true);
   };
@@ -251,22 +286,59 @@ export default function LocationHierarchyManager() {
     try {
       setSaving(true);
 
+      // Build metadata with auto-send config
+      const metadata: Record<string, unknown> = {};
+      if (formData.autoSend.enabled) {
+        metadata.auto_send_invoices = {
+          enabled: true,
+          period: formData.autoSend.period,
+          ...(formData.autoSend.day_of_week !== undefined && {
+            day_of_week: formData.autoSend.day_of_week,
+          }),
+          ...(formData.autoSend.day_of_month !== undefined && {
+            day_of_month: formData.autoSend.day_of_month,
+          }),
+          time: formData.autoSend.time || "09:00",
+        };
+      } else {
+        // If disabled, remove from metadata (or set to disabled)
+        metadata.auto_send_invoices = { enabled: false };
+      }
+
       if (editingNode) {
+        // Preserve existing metadata and merge auto-send config
+        const existingMetadata = editingNode.metadata || {};
+        const updatedMetadata = {
+          ...existingMetadata,
+          ...metadata,
+        };
+
         await updateNode({
           id: editingNode.id,
           name: formData.name.trim(),
+          metadata: updatedMetadata,
         });
       } else {
         await createNode({
           name: formData.name.trim(),
           type: formData.type,
           parent_id: formData.parent_id,
+          metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         });
       }
 
       setDialogOpen(false);
       setEditingNode(null);
-      setFormData({ name: "", type: "company", parent_id: null });
+      setFormData({
+        name: "",
+        type: "company",
+        parent_id: null,
+        autoSend: {
+          enabled: false,
+          period: "daily",
+          time: "09:00",
+        },
+      });
     } catch (err) {
       console.error("Failed to save node:", err);
       alert(
@@ -485,6 +557,139 @@ export default function LocationHierarchyManager() {
                 )}
               </>
             )}
+
+            {/* Auto-Send Invoice Configuration */}
+            <Separator />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-send-enabled">Auto-Send Invoices</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically send draft invoices for locations in this
+                    hierarchy node based on a schedule
+                  </p>
+                </div>
+                <Switch
+                  id="auto-send-enabled"
+                  checked={formData.autoSend.enabled}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      autoSend: { ...prev.autoSend, enabled: checked },
+                    }))
+                  }
+                />
+              </div>
+
+              {formData.autoSend.enabled && (
+                <div className="space-y-4 pl-6 border-l-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="auto-send-period">Send Frequency</Label>
+                    <Select
+                      value={formData.autoSend.period}
+                      onValueChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          autoSend: {
+                            ...prev.autoSend,
+                            period: value as "daily" | "weekly" | "monthly",
+                          },
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="auto-send-period">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.autoSend.period === "weekly" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="auto-send-day-of-week">Day of Week</Label>
+                      <Select
+                        value={String(formData.autoSend.day_of_week ?? 1)}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            autoSend: {
+                              ...prev.autoSend,
+                              day_of_week: Number(value),
+                            },
+                          }))
+                        }
+                      >
+                        <SelectTrigger id="auto-send-day-of-week">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">Sunday</SelectItem>
+                          <SelectItem value="1">Monday</SelectItem>
+                          <SelectItem value="2">Tuesday</SelectItem>
+                          <SelectItem value="3">Wednesday</SelectItem>
+                          <SelectItem value="4">Thursday</SelectItem>
+                          <SelectItem value="5">Friday</SelectItem>
+                          <SelectItem value="6">Saturday</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {formData.autoSend.period === "monthly" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="auto-send-day-of-month">
+                        Day of Month
+                      </Label>
+                      <Input
+                        id="auto-send-day-of-month"
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={formData.autoSend.day_of_month ?? ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            autoSend: {
+                              ...prev.autoSend,
+                              day_of_month:
+                                e.target.value === ""
+                                  ? undefined
+                                  : Number(e.target.value),
+                            },
+                          }))
+                        }
+                        placeholder="1-31"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="auto-send-time">Time</Label>
+                    <Input
+                      id="auto-send-time"
+                      type="time"
+                      value={formData.autoSend.time || "09:00"}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          autoSend: {
+                            ...prev.autoSend,
+                            time: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Time of day to send invoices (24-hour format)
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <DialogFooter>

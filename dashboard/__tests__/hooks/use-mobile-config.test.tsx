@@ -3,7 +3,9 @@ import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import type { FormSectionWithFields } from "@clean-log/shared";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase", () => ({
@@ -38,6 +40,24 @@ const createMockSection = (
   ...overrides,
 });
 
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+
+  return Wrapper;
+}
+
 describe("useMobileConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,7 +77,9 @@ describe("useMobileConfig", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useMobileConfig("org-1"));
+    const { result } = renderHook(() => useMobileConfig("org-1"), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -84,13 +106,15 @@ describe("useMobileConfig", () => {
       error: mockError,
     });
 
-    const { result } = renderHook(() => useMobileConfig("org-1"));
+    const { result } = renderHook(() => useMobileConfig("org-1"), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.error).toBe("Failed to fetch field configs");
+    expect(result.current.error).toContain("Failed to fetch");
     expect(log.error).toHaveBeenCalled();
   });
 
@@ -112,7 +136,9 @@ describe("useMobileConfig", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useMobileConfig("org-1"));
+    const { result } = renderHook(() => useMobileConfig("org-1"), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -166,7 +192,9 @@ describe("useMobileConfig", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useMobileConfig("org-1"));
+    const { result } = renderHook(() => useMobileConfig("org-1"), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -207,7 +235,9 @@ describe("useMobileConfig", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useMobileConfig("org-1"));
+    const { result } = renderHook(() => useMobileConfig("org-1"), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -251,7 +281,9 @@ describe("useMobileConfig", () => {
         error: null,
       });
 
-    const { result } = renderHook(() => useMobileConfig("org-1"));
+    const { result } = renderHook(() => useMobileConfig("org-1"), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

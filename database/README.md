@@ -15,3 +15,7 @@ supabase migration up
 <!-- Logs you into remote supabase -->
 supabase link
 ```
+
+## Run Tests
+
+`deno test --allow-all database/supabase/functions/_utils/__tests__/invoice-email.test.ts`

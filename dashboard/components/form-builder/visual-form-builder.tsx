@@ -313,7 +313,7 @@ export function VisualFormBuilder({
 
       <div className="flex flex-col lg:flex-row gap-6 items-start min-h-screen">
         {/* Left Panel - Field Configuration */}
-        <div className="flex-1 flex flex-col space-y-4 lg:max-w-2xl w-full">
+        <div className="flex-1 flex flex-col space-y-4 w-full min-w-0">
           {/* Field Type Selector */}
           <Card className="shrink-0">
             <CardHeader className="pb-3">
@@ -935,6 +935,12 @@ export function VisualFormBuilder({
               formTitle="New Entry"
               formDescription="Fill out the form below"
             />
+            <div className="mt-4 p-3 rounded-md bg-muted/50 border border-muted">
+              <p className="text-xs text-muted-foreground">
+                <strong>Note:</strong> Fields will not appear in the preview
+                unless they are added to a Section.
+              </p>
+            </div>
           </Card>
         </div>
       </div>

@@ -103,6 +103,25 @@ export interface ListJobsResponse {
   jobs: Job[];
 }
 
+export interface CreateJobRequest {
+  organization_id: string;
+  location_id?: string | null;
+  worker_ids?: string[];
+  submission_data: Record<string, unknown>;
+  completed_at?: string; // ISO timestamp, defaults to now
+}
+
+export interface CreateJobResponse {
+  success: boolean;
+  job: {
+    id: string;
+    organization_id: string;
+    location_id: string | null;
+    completed_at: string;
+    created_at: string;
+  };
+}
+
 // Feedback API
 export interface ListFeedbackRequest {
   organization_id: string;

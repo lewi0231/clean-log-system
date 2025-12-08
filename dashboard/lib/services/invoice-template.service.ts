@@ -1,6 +1,12 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import type { InvoiceTemplateConfig, LineItemDisplayConfig } from "@/lib/types";
+import type {
+  BillingAddressConfig,
+  InvoiceEmailRecipientConfig,
+  InvoiceTemplateConfig,
+  LineItemDisplayConfig,
+  ServiceAddressConfig,
+} from "@/lib/types";
 
 export interface GetInvoiceTemplateConfigRequest {
   organization_id: string;
@@ -17,6 +23,9 @@ export interface UpdateInvoiceTemplateConfigRequest {
   show_logo?: boolean;
   show_abn?: boolean;
   bill_to_fields?: string[];
+  service_address_config?: ServiceAddressConfig;
+  billing_address_config?: BillingAddressConfig;
+  email_recipient_config?: InvoiceEmailRecipientConfig;
   line_item_display?: Partial<LineItemDisplayConfig>;
 }
 
@@ -30,7 +39,7 @@ export class InvoiceTemplateService {
    * Get invoice template configuration for an organization
    */
   static async getConfig(
-    organizationId: string
+    organizationId: string,
   ): Promise<InvoiceTemplateConfig> {
     try {
       log.debug("InvoiceTemplateService: Getting template config", {
@@ -43,7 +52,7 @@ export class InvoiceTemplateService {
           body: {
             organization_id: organizationId,
           },
-        }
+        },
       );
 
       if (error) {
@@ -55,7 +64,7 @@ export class InvoiceTemplateService {
       }
 
       log.info(
-        "InvoiceTemplateService: Template config retrieved successfully"
+        "InvoiceTemplateService: Template config retrieved successfully",
       );
       return data.config as InvoiceTemplateConfig;
     } catch (err) {
@@ -70,7 +79,7 @@ export class InvoiceTemplateService {
    * Update invoice template configuration for an organization
    */
   static async updateConfig(
-    request: UpdateInvoiceTemplateConfigRequest
+    request: UpdateInvoiceTemplateConfigRequest,
   ): Promise<InvoiceTemplateConfig> {
     try {
       log.debug("InvoiceTemplateService: Updating template config", {
@@ -81,7 +90,7 @@ export class InvoiceTemplateService {
         "update-invoice-template-config",
         {
           body: request,
-        }
+        },
       );
 
       if (error) {
