@@ -27,7 +27,7 @@ describe("Invoice Template Config Validation - P1 Tests", () => {
             const validConfig = {
                 source: SERVICE_ADDRESS_SOURCE.LOCATION,
                 location_fields: ["name", "address", "email"],
-                form_fields: [],
+                form_fields: ["address"],
             };
 
             const result = serviceAddressConfigSchema.safeParse(validConfig);
@@ -193,7 +193,7 @@ describe("Invoice Template Config Validation - P1 Tests", () => {
                 service_address_config: {
                     source: SERVICE_ADDRESS_SOURCE.AUTO,
                     location_fields: ["name", "address"],
-                    form_fields: [],
+                    form_fields: ["address"],
                 },
                 billing_address_config: {
                     enabled: false,
@@ -224,7 +224,7 @@ describe("Invoice Template Config Validation - P1 Tests", () => {
                 service_address_config: {
                     source: SERVICE_ADDRESS_SOURCE.AUTO,
                     location_fields: ["name"],
-                    form_fields: [],
+                    form_fields: ["address"],
                 },
                 billing_address_config: {
                     enabled: false,
@@ -263,7 +263,7 @@ describe("Invoice Template Config Validation - P1 Tests", () => {
                 service_address_config: {
                     source: SERVICE_ADDRESS_SOURCE.AUTO,
                     location_fields: ["name"],
-                    form_fields: [],
+                    form_fields: ["address"],
                 },
                 billing_address_config: {
                     enabled: false,
@@ -296,7 +296,7 @@ describe("Invoice Template Config Validation - P1 Tests", () => {
                 service_address_config: {
                     source: SERVICE_ADDRESS_SOURCE.AUTO,
                     location_fields: ["name", "address"],
-                    form_fields: [],
+                    form_fields: ["address"],
                 },
                 billing_address_config: {
                     enabled: false,

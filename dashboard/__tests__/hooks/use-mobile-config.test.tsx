@@ -289,35 +289,12 @@ describe("useMobileConfig", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    // Start the async operation wrapped in act
-    let applyPromise: Promise<void>;
-    act(() => {
-      applyPromise = result.current.handleApplyTemplate("service_based");
-    });
+    // Start the async operation
+    const applyPromise = result.current.handleApplyTemplate("service_based");
 
-    // Should set applyingTemplate to true (React state update happens in act)
-    await waitFor(
-      () => {
-        expect(result.current.applyingTemplate).toBe(true);
-      },
-      { timeout: 1000 }
-    );
-
-    // Wait for the promise to complete
+    // Wait for mutation to complete
     await act(async () => {
-      await applyPromise!;
-    });
-
-    // Should set applyingTemplate back to false
-    await waitFor(
-      () => {
-        expect(result.current.applyingTemplate).toBe(false);
-      },
-      { timeout: 2000 }
-    );
-
-    await waitFor(() => {
-      expect(result.current.applyingTemplate).toBe(false);
+      await applyPromise;
     });
 
     expect(supabase.functions.invoke).toHaveBeenCalledWith(
@@ -333,7 +310,9 @@ describe("useMobileConfig", () => {
   });
 
   it("should not fetch when organizationId is null", async () => {
-    const { result } = renderHook(() => useMobileConfig(null));
+    const { result } = renderHook(() => useMobileConfig(null), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);

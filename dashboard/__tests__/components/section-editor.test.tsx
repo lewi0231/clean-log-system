@@ -1,8 +1,51 @@
 import { createMockFieldConfig } from "@/__tests__/lib/fixtures";
 import { SectionEditor } from "@/components/form-builder/section-editor";
 import type { FormSectionWithFields } from "@clean-log/shared";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+        error: null,
+      }),
+      onAuthStateChange: vi.fn(() => {
+        return {
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        };
+      }),
+    },
+    functions: {
+      invoke: vi.fn(),
+    },
+  },
+}));
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+
+  return Wrapper;
+}
 
 const createMockSection = (
   overrides?: Partial<FormSectionWithFields>
@@ -48,7 +91,8 @@ describe("SectionEditor", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     expect(screen.getByText("Test Section")).toBeInTheDocument();
@@ -71,7 +115,8 @@ describe("SectionEditor", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     // Section should be expanded by default
@@ -95,7 +140,8 @@ describe("SectionEditor", () => {
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
         onRemoveFieldFromSection={mockOnRemoveFieldFromSection}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     // Find the field row container
@@ -143,7 +189,8 @@ describe("SectionEditor", () => {
         onReorderSections={mockOnReorderSections}
         draggedFieldId="field-1"
         onDropFieldToSection={mockOnDropFieldToSection}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     const dropZone = screen.getByText(
@@ -168,7 +215,8 @@ describe("SectionEditor", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     expect(screen.getByText("No sections yet")).toBeInTheDocument();
@@ -195,7 +243,8 @@ describe("SectionEditor", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     expect(

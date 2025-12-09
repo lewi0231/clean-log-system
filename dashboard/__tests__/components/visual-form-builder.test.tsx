@@ -3,8 +3,51 @@ import React from "react";
 import { createMockFieldConfig } from "@/__tests__/lib/fixtures";
 import { VisualFormBuilder } from "@/components/form-builder/visual-form-builder";
 import type { FormSectionWithFields } from "@clean-log/shared";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+        error: null,
+      }),
+      onAuthStateChange: vi.fn(() => {
+        return {
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        };
+      }),
+    },
+    functions: {
+      invoke: vi.fn(),
+    },
+  },
+}));
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+
+  return Wrapper;
+}
 
 vi.mock("@/components/ui/popover", () => ({
   Popover: ({ children }: { children: React.ReactNode }) => (
@@ -65,7 +108,8 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     expect(screen.getByText("Test Field")).toBeInTheDocument();
@@ -93,7 +137,8 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     // SectionEditor should receive the fields prop and display the field
@@ -116,7 +161,8 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     expect(screen.getByText("No fields yet")).toBeInTheDocument();
@@ -140,7 +186,8 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     // The badge appears in the "Form Fields" section header
@@ -182,7 +229,8 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     expect(
@@ -212,7 +260,8 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     const advancedButtons = screen.getAllByText("Advanced Options");

@@ -188,8 +188,7 @@ export default function BasePricingEditor({
     : pricingContext === "customer"
     ? customerStandalonePricing
     : workerStandalonePricing;
-  const standaloneConditions =
-    customerStandalonePricing?.source_rule?.conditions ?? [];
+  const standaloneConditions = standalonePricing?.source_rule?.conditions ?? [];
   const standaloneHasScopedValue = isEntryForScope(
     standaloneEntry,
     scopeSource
@@ -477,6 +476,7 @@ export default function BasePricingEditor({
       const adjustmentType =
         editingAdjustmentTypes[optionValue] ||
         customerEntry?.record?.adjustment_type ||
+        workerEntry?.record?.adjustment_type ||
         "add";
 
       if (
@@ -1134,7 +1134,7 @@ export default function BasePricingEditor({
                   const editing = editingPrices[optionValue];
                   const currentAdjustmentType =
                     editingAdjustmentTypes[optionValue] ||
-                    customerPricing?.adjustment_type ||
+                    existingPricing?.adjustment_type ||
                     "add";
                   const currentCustomerPrice =
                     editing?.customer !== undefined

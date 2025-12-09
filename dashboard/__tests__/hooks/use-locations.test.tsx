@@ -1,5 +1,5 @@
 import { useLocations } from "@/hooks/use-locations";
-import { LocationsService } from "@/lib/services";
+import { LocationsService, WorkersService } from "@/lib/services";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
@@ -8,10 +8,12 @@ import { createMockLocation } from "../lib/fixtures";
 
 vi.mock("@/lib/services", () => ({
   LocationsService: {
-    listWorkersAndLocations: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+  },
+  WorkersService: {
+    listWorkersAndLocations: vi.fn(),
   },
 }));
 
@@ -52,7 +54,7 @@ describe("useLocations", () => {
 
   it("should fetch locations on mount", async () => {
     const mockLocations = [createMockLocation()];
-    vi.mocked(LocationsService.listWorkersAndLocations).mockResolvedValue({
+    vi.mocked(WorkersService.listWorkersAndLocations).mockResolvedValue({
       success: true,
       workers: [],
       locations: mockLocations,
@@ -72,7 +74,7 @@ describe("useLocations", () => {
 
   it("should handle error state", async () => {
     const mockError = new Error("Failed to fetch");
-    vi.mocked(LocationsService.listWorkersAndLocations).mockRejectedValue(
+    vi.mocked(WorkersService.listWorkersAndLocations).mockRejectedValue(
       mockError
     );
 
@@ -90,7 +92,7 @@ describe("useLocations", () => {
 
   it("should create location and refetch", async () => {
     const mockLocation = createMockLocation();
-    vi.mocked(LocationsService.listWorkersAndLocations).mockResolvedValue({
+    vi.mocked(WorkersService.listWorkersAndLocations).mockResolvedValue({
       success: true,
       workers: [],
       locations: [],
@@ -114,6 +116,8 @@ describe("useLocations", () => {
     });
 
     expect(LocationsService.create).toHaveBeenCalled();
-    expect(LocationsService.listWorkersAndLocations).toHaveBeenCalledTimes(2);
+    // Initial mount + invalidateCache (triggers refetch) + explicit refetch = 3 calls
+    // Or: initial mount + invalidateCache + refetch = 3 calls
+    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(3);
   });
 });

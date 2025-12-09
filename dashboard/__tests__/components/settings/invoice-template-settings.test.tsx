@@ -115,7 +115,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       service_address_config: {
         source: "auto" as const,
         location_fields: ["name" as const, "address" as const],
-        form_fields: [],
+        form_fields: ["address"],
       },
       billing_address_config: {
         enabled: false,
@@ -163,7 +163,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     it("P2: should render save button", () => {
       render(<InvoiceTemplateSettings />);
       expect(
-        screen.getByRole("button", { name: /save changes/i })
+        screen.getByRole("button", { name: /save invoice template settings/i })
       ).toBeInTheDocument();
     });
 
@@ -171,7 +171,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       mockUpdateConfig.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -194,7 +196,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       service_address_config: {
         source: "auto" as const,
         location_fields: ["name" as const, "address" as const],
-        form_fields: [],
+        form_fields: ["address"],
       },
       billing_address_config: {
         enabled: false,
@@ -227,7 +229,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should call updateConfig when save button is clicked", async () => {
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -238,7 +242,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should pass correct config data to updateConfig", async () => {
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -265,7 +271,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       service_address_config: {
         source: "auto" as const,
         location_fields: ["name" as const, "address" as const],
-        form_fields: [],
+        form_fields: ["address"],
       },
       billing_address_config: {
         enabled: false,
@@ -297,7 +303,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should display validation errors when save is clicked with invalid data", async () => {
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -310,7 +318,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should disable save button when validation errors exist", async () => {
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -321,7 +331,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should show error count in save button area", async () => {
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -342,7 +354,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       service_address_config: {
         source: "auto" as const,
         location_fields: ["name" as const, "address" as const],
-        form_fields: [],
+        form_fields: ["address"],
       },
       billing_address_config: {
         enabled: false,
@@ -375,7 +387,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should show success message after successful save", async () => {
       render(<InvoiceTemplateSettings />);
-      const saveButton = screen.getByRole("button", { name: /save changes/i });
+      const saveButton = screen.getByRole("button", {
+        name: /save invoice template settings/i,
+      });
 
       fireEvent.click(saveButton);
 
@@ -399,7 +413,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       service_address_config: {
         source: "auto" as const,
         location_fields: ["name" as const, "address" as const],
-        form_fields: [],
+        form_fields: ["address"],
       },
       billing_address_config: {
         enabled: false,

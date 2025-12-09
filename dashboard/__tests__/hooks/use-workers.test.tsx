@@ -141,7 +141,8 @@ describe("useWorkers", () => {
     });
 
     expect(WorkersService.create).toHaveBeenCalled();
-    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(2);
+    // Initial mount + invalidateCache (triggers refetch) + explicit refetch = 3 calls
+    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(3);
   });
 
   it("should update worker and refetch", async () => {
@@ -167,7 +168,8 @@ describe("useWorkers", () => {
     });
 
     expect(WorkersService.update).toHaveBeenCalled();
-    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(2);
+    // Initial mount + invalidateCache (triggers refetch) + explicit refetch = 3 calls
+    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(3);
   });
 
   it("should delete worker and refetch", async () => {
@@ -189,7 +191,8 @@ describe("useWorkers", () => {
     await result.current.deleteWorker({ id: "worker-1" });
 
     expect(WorkersService.delete).toHaveBeenCalled();
-    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(2);
+    // Initial mount + invalidateCache (triggers refetch) + explicit refetch = 3 calls
+    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(3);
   });
 
   it("should not fetch when organizationId is null", async () => {

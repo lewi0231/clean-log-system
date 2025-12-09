@@ -1,6 +1,49 @@
 import FieldConfigForm from "@/components/settings/field-config-form";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: null },
+        error: null,
+      }),
+      onAuthStateChange: vi.fn(() => {
+        return {
+          data: {
+            subscription: {
+              unsubscribe: vi.fn(),
+            },
+          },
+        };
+      }),
+    },
+    functions: {
+      invoke: vi.fn(),
+    },
+  },
+}));
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+
+  return Wrapper;
+}
 
 describe("FieldConfigForm", () => {
   it("applies yard tracking presets and auto-populates fields", async () => {
@@ -10,7 +53,8 @@ describe("FieldConfigForm", () => {
         onOpenChange={vi.fn()}
         onSuccess={vi.fn()}
         fieldConfig={null}
-      />
+      />,
+      { wrapper: createWrapper() }
     );
 
     const presetLabel = screen.getByLabelText("Cars wiped breakdown");

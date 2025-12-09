@@ -4,7 +4,9 @@
     "jsx": "react-jsx",
     "target": "esnext",
     "module": "esnext",
-    "lib": ["esnext"],
+    "lib": [
+      "esnext"
+    ],
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "allowJs": true,
@@ -15,8 +17,12 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./*"],
-      "@/shared/*": ["../shared/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@/shared/*": [
+        "../shared/*"
+      ]
     }
   },
   "include": [
@@ -27,5 +33,8 @@
     "nativewind-env.d.ts",
     "../shared/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ],
+  "extends": "expo/tsconfig.base"
 }

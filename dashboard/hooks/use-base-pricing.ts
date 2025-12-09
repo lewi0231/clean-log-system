@@ -27,6 +27,7 @@ interface UseBasePricingResult {
     adjustment_type?: "add" | "multiply";
     location_id?: string | null;
     currency?: string;
+    conditions?: UpsertPricingRuleRequest["conditions"];
     pricingContext?: "customer" | "worker";
   }) => Promise<BasePricing>;
   deletePricing: (id: string) => Promise<void>;

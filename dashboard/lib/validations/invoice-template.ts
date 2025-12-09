@@ -109,20 +109,6 @@ export const lineItemDisplayConfigSchema = z.object({
     description_format: z
         .string()
         .min(1, "Description format is required")
-        .refine(
-            (format) => {
-                // Must contain {field_label} and {option_value} placeholders
-                // Only validate if include_option_value is true (checked at parent level)
-                return (
-                    format.includes("{field_label}") &&
-                    format.includes("{option_value}")
-                );
-            },
-            {
-                message:
-                    "Description format must include {field_label} and {option_value} placeholders",
-            },
-        )
         .optional(),
     show_base_price_separately: z.boolean(),
 });
