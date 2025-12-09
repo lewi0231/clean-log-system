@@ -104,6 +104,9 @@ export default function NewEntryScreen() {
   const { user } = useAuth();
   const { locations } = useLocations(organizationId);
   const { colleagues } = useColleagues(organizationId);
+  const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+
   const {
     fieldConfigs,
     fieldValues,
@@ -115,7 +118,7 @@ export default function NewEntryScreen() {
     validateInputs,
     resetForm,
     clearFieldError,
-  } = useEntryForm({ organizationId });
+  } = useEntryForm({ organizationId, locationId: selectedLocation });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -140,8 +143,6 @@ export default function NewEntryScreen() {
     return currentUser?.id || null;
   }, [user, colleagues]);
 
-  const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string>("");
   // Track selected clusters for mutual exclusion groups
   const [selectedClusters, setSelectedClusters] = useState<
     Record<string, string | null>
@@ -242,6 +243,40 @@ export default function NewEntryScreen() {
         setAlertOpen(true);
         return;
       }
+    } else if (currentStep > 0 && currentStep < totalSteps - 1) {
+      // Validate section steps: Check if mutual exclusion groups have selections
+      const sectionFields = organizedFields.get(currentSection?.id || "") || [];
+      const visibleFields = sectionFields.filter(isFieldVisible);
+      const mutualExclusionGroups =
+        groupFieldsByMutualExclusivity(visibleFields);
+
+      // Check each mutual exclusion group
+      for (const [groupId, configs] of mutualExclusionGroups.entries()) {
+        if (!groupId) continue; // Skip ungrouped fields
+
+        const selectedCluster = selectedClusters[groupId];
+        if (!selectedCluster) {
+          // Find the group label
+          const firstField = configs[0];
+          const isDefaultGroup = groupId === "default_exclusive_group";
+          const groupLabel =
+            isDefaultGroup && settings?.default_exclusive_group_label
+              ? settings.default_exclusive_group_label
+              : firstField.mutually_exclusive_group
+                  ?.split("_")
+                  .map(
+                    (word) =>
+                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                  )
+                  .join(" ") || "an option";
+
+          setAlertTitle("Required Field");
+          setAlertMessage(`Please select ${groupLabel} to continue.`);
+          setAlertOnConfirm(null);
+          setAlertOpen(true);
+          return;
+        }
+      }
     }
     if (currentStep < totalSteps - 1) {
       setCurrentStep(currentStep + 1);
@@ -340,9 +375,11 @@ export default function NewEntryScreen() {
           setFinishTime(new Date());
           setCurrentStep(0);
           setSelectedClusters({});
-          // Close alert and navigate
-          setAlertOpen(false);
-          router.replace("./");
+          // Navigate after a brief delay to avoid updating component during render
+          // The alert is closed by the onPress handler, so we just need to navigate
+          setTimeout(() => {
+            router.replace("./");
+          }, 100);
         });
         setAlertOpen(true);
       }
@@ -747,9 +784,14 @@ export default function NewEntryScreen() {
               <View className="mb-2">
                 <Text className="text-sm font-medium text-gray-200">
                   {groupLabel}
+                  <Text className="text-red-400 ml-1">*</Text>
                 </Text>
               </View>
-              <View className="border border-gray-700 rounded-xl overflow-hidden h-12">
+              <View
+                className={`border rounded-xl overflow-hidden h-12 ${
+                  !selectedCluster ? "border-red-500" : "border-gray-700"
+                }`}
+              >
                 <Select
                   value={selectedCluster || ""}
                   onValueChange={(value) =>
@@ -766,6 +808,11 @@ export default function NewEntryScreen() {
                   ))}
                 </Select>
               </View>
+              {!selectedCluster && (
+                <Text className="text-sm text-red-400 mt-1">
+                  {groupLabel} is required
+                </Text>
+              )}
 
               {/* Render fields only for the selected cluster */}
               {selectedCluster &&
@@ -1091,7 +1138,12 @@ export default function NewEntryScreen() {
 
       {/* Alert Dialog */}
       <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          onInteractOutside={() => {
+            // Allow dismissing by clicking outside
+            setAlertOpen(false);
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>{alertTitle}</AlertDialogTitle>
             <AlertDialogDescription>{alertMessage}</AlertDialogDescription>
@@ -1100,10 +1152,13 @@ export default function NewEntryScreen() {
             <AlertDialogAction>
               <Pressable
                 onPress={() => {
-                  if (alertOnConfirm) {
-                    alertOnConfirm();
-                  }
                   setAlertOpen(false);
+                  // Execute callback after alert closes to avoid render conflicts
+                  if (alertOnConfirm) {
+                    setTimeout(() => {
+                      alertOnConfirm();
+                    }, 0);
+                  }
                 }}
                 className="bg-primary-500 active:bg-primary-600 px-6 py-3 rounded-lg"
               >

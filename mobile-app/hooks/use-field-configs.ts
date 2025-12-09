@@ -310,7 +310,7 @@ export function useFieldConfigs(
     }
 
     fetchFieldConfigs();
-  }, [organizationId]);
+  }, [organizationId, locationId]);
 
   return {
     fieldValues,

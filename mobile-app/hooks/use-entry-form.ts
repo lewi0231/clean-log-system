@@ -12,9 +12,13 @@ import { useOrganizationSettings } from "./use-organization-settings";
 
 interface UseEntryFormProps {
   organizationId: string | null;
+  locationId?: string | null;
 }
 
-export function useEntryForm({ organizationId }: UseEntryFormProps) {
+export function useEntryForm({
+  organizationId,
+  locationId,
+}: UseEntryFormProps) {
   const {
     fieldConfigs,
     fieldValues,
@@ -23,7 +27,7 @@ export function useEntryForm({ organizationId }: UseEntryFormProps) {
     resetFieldValues,
     updateFieldValue,
     FieldConfigSchema,
-  } = useFieldConfigs(organizationId);
+  } = useFieldConfigs(organizationId, locationId);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   //   Fetch org settings
