@@ -159,9 +159,9 @@ export function GroupedBreakdownField({
         size="medium"
       >
         <ScrollView className="px-4 py-2" keyboardShouldPersistTaps="handled">
-          <View className="space-y-4">
+          <View className="space-y-4 ">
             {/* Brand Select */}
-            <View>
+            <View className="">
               <Text className="text-base font-semibold mb-2 text-foreground">
                 Brand
               </Text>

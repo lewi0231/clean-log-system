@@ -2,54 +2,55 @@ import { vars } from "nativewind";
 
 export const themes = {
   light: vars({
-    // Primary colors
-    "--color-primary": "0 0 0",
-    "--color-primary-foreground": "255 255 255",
-    "--color-foreground": "13 13 13",
+    // Modern SaaS Light Theme
+    // Primary colors - Vibrant blue for actions
+    "--color-primary": "37 99 235", // #2563eb - Vibrant blue
+    "--color-primary-foreground": "255 255 255", // White text on primary
+    "--color-foreground": "30 41 59", // #1e293b - Dark slate text
 
     // General context (background) and cards / popovers
-    "--color-background": "255 255 255",
-    "--color-background-foreground": "13 13 13",
-    "--color-card": "255 255 255",
-    "--color-card-foreground": "13 13 13",
-    "--color-popover": "255 255 255",
-    "--color-popover-foreground": "13 13 13",
+    "--color-background": "248 249 250", // #f8f9fa - Light grey background
+    "--color-background-foreground": "30 41 59", // Dark slate text
+    "--color-card": "255 255 255", // #ffffff - White cards/surface
+    "--color-card-foreground": "30 41 59", // Dark slate text
+    "--color-popover": "255 255 255", // White popovers
+    "--color-popover-foreground": "30 41 59", // Dark slate text
 
     // Secondary colors
-    "--color-secondary": "45 45 45",
-    "--color-secondary-foreground": "255 255 255",
-    "--color-foreground-muted": "115 115 115",
-    "--color-muted-foreground": "115 115 115",
-    "--color-muted": "240 240 240",
+    "--color-secondary": "226 232 240", // #e2e8f0 - Subtle borders/backgrounds
+    "--color-secondary-foreground": "30 41 59", // Dark slate text
+    "--color-foreground-muted": "100 116 139", // #64748b - Grey text (secondary)
+    "--color-muted-foreground": "100 116 139", // #64748b - Grey text
+    "--color-muted": "241 245 249", // Slightly lighter grey for muted backgrounds
 
     // Accent colors
-    "--color-accent": "145 145 145",
-    "--color-accent-foreground": "255 255 255",
+    "--color-accent": "226 232 240", // Subtle accent
+    "--color-accent-foreground": "30 41 59", // Dark slate text
 
     // Status colors
-    "--color-destructive": "239 68 68",
-    "--color-destructive-foreground": "250 250 250",
+    "--color-destructive": "220 38 38", // #dc2626 - Red for errors
+    "--color-destructive-foreground": "255 255 255", // White text
 
-    "--color-success": "34 197 94",
-    "--color-success-foreground": "250 250 250",
+    "--color-success": "22 163 74", // Green for success
+    "--color-success-foreground": "255 255 255", // White text
 
-    "--color-warning": "234 179  8",
-    "--color-warning-foreground": "13 13 13",
+    "--color-warning": "234 179 8", // Yellow/amber for warnings
+    "--color-warning-foreground": "30 41 59", // Dark text
 
-    "--color-info": "59 130 246",
-    "--color-info-foreground": "250 250 250",
+    "--color-info": "37 99 235", // Blue for info (same as primary)
+    "--color-info-foreground": "255 255 255", // White text
 
     // Borders, inputs and "rings"
-    "--border": "229 231 235",
-    "--border-foreground": "13 13 13",
-    "--input": "229 231 235",
-    "--input-foreground": "13 13 13",
-    "--ring": "13 13 13",
+    "--border": "229 231 235", // #e5e7eb - Very subtle borders (lighter grey for less visibility)
+    "--border-foreground": "30 41 59", // Dark slate
+    "--input": "255 255 255", // White input backgrounds
+    "--input-foreground": "30 41 59", // Dark slate text
+    "--ring": "37 99 235", // Blue ring for focus
 
     // Toggle specific colors
-    "--toggle-active": "45 45 45",
-    "--toggle-active-foreground": "255 255 255",
-    "--toggle-border": "229 231 235",
+    "--toggle-active": "37 99 235", // Blue when active
+    "--toggle-active-foreground": "255 255 255", // White text
+    "--toggle-border": "226 232 240", // Subtle border
   }),
 
   dark: vars({

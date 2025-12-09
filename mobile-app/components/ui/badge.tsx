@@ -1,7 +1,7 @@
-import * as React from "react";
-import { View, Text, Pressable, ViewStyle } from "react-native";
 import { cn } from "@/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
+import * as React from "react";
+import { Pressable, Text, View, ViewStyle } from "react-native";
 
 const badgeVariants = cva(
   "flex-row items-center justify-center rounded-full px-2.5 py-1",
@@ -9,7 +9,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: "bg-primary",
-        secondary: "bg-secondary",
+        secondary: "bg-primary/60",
         destructive: "bg-destructive",
         outline: "border border-input bg-transparent",
       },
@@ -26,8 +26,7 @@ const badgeVariants = cva(
   }
 );
 
-export interface BadgeProps
-  extends VariantProps<typeof badgeVariants> {
+export interface BadgeProps extends VariantProps<typeof badgeVariants> {
   className?: string;
   style?: ViewStyle;
   children: React.ReactNode;
@@ -60,7 +59,7 @@ function Badge({
     if (variant === "default") {
       textStyle = cn(textStyle, "text-primary-foreground");
     } else if (variant === "secondary") {
-      textStyle = cn(textStyle, "text-secondary-foreground");
+      textStyle = cn(textStyle, "text-primary");
     } else if (variant === "destructive") {
       textStyle = cn(textStyle, "text-destructive-foreground");
     } else if (variant === "outline") {
@@ -71,12 +70,12 @@ function Badge({
   };
 
   const content = (
-    <View className={cn(badgeVariants({ variant, size, className }))} style={style}>
-      {typeof children === 'string' ? (
-        <Text
-          className={getTextStyle()}
-          numberOfLines={1}
-        >
+    <View
+      className={cn(badgeVariants({ variant, size, className }))}
+      style={style}
+    >
+      {typeof children === "string" ? (
+        <Text className={getTextStyle()} numberOfLines={1}>
           {children}
         </Text>
       ) : (
@@ -90,12 +89,13 @@ function Badge({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel || (typeof children === 'string' ? children : undefined)}
+        accessibilityLabel={
+          accessibilityLabel ||
+          (typeof children === "string" ? children : undefined)
+        }
       >
         {({ pressed }) => (
-          <View style={{ opacity: pressed ? 0.7 : 1 }}>
-            {content}
-          </View>
+          <View style={{ opacity: pressed ? 0.7 : 1 }}>{content}</View>
         )}
       </Pressable>
     );
@@ -106,4 +106,4 @@ function Badge({
 
 Badge.displayName = "Badge";
 
-export { Badge, badgeVariants }; 
+export { Badge, badgeVariants };

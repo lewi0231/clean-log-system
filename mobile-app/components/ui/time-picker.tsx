@@ -87,10 +87,12 @@ const TimePicker = React.forwardRef<View, TimePickerProps>(
           onPress={openPicker}
           disabled={disabled}
           className={cn(
-            "w-full rounded-xl border border-gray-700 bg-gray-800 flex-row items-center justify-between",
+            "w-full rounded-xl border border-border bg-card flex-row items-center justify-between",
             sizeClasses[size],
-            value ? "border-gray-600" : "",
-            disabled ? "opacity-50 cursor-not-allowed" : "active:bg-gray-750",
+            value ? "border-primary" : "",
+            disabled
+              ? "opacity-50 cursor-not-allowed"
+              : "active:bg-secondary/50",
             className
           )}
           {...props}
@@ -103,7 +105,10 @@ const TimePicker = React.forwardRef<View, TimePickerProps>(
             />
           </View>
           <Text
-            className={cn("flex-1 text-gray-100", !value && "text-gray-400")}
+            className={cn(
+              "flex-1 text-card-foreground",
+              !value && "text-muted-foreground"
+            )}
             numberOfLines={1}
           >
             {displayValue}

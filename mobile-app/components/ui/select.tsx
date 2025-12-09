@@ -136,13 +136,9 @@ const Select = React.forwardRef<View, SelectProps>(
           disabled={disabled}
           onPress={() => setOpen(true)}
           className={cn(
-            "flex-row h-12 items-center justify-between rounded-md border border-input bg-transparent",
-            "shadow-sm",
-            "active:opacity-70",
+            "flex-row h-12 items-center justify-between rounded-xl border border-border bg-card",
             disabled && "opacity-50",
-            Platform.OS === "ios"
-              ? "ios:shadow-sm ios:shadow-foreground/10"
-              : "android:elevation-1",
+            Platform.OS === "ios" ? "ios:shadow-sm" : "android:elevation-1",
             // Default padding if not specified in triggerClassName
             !triggerClassName?.includes("pl-") &&
               !triggerClassName?.includes("px-") &&
@@ -153,7 +149,7 @@ const Select = React.forwardRef<View, SelectProps>(
           <Text
             className={cn(
               "text-base flex-1",
-              !selectedValue ? "text-[#999]" : "text-gray-200"
+              !selectedValue ? "text-muted-foreground" : "text-foreground"
             )}
             numberOfLines={1}
           >
@@ -234,7 +230,7 @@ const SelectItem = React.forwardRef<typeof Pressable, SelectItemProps>(
         onPress={handlePress}
         className={cn(
           "flex-row h-14 items-center justify-between px-4 py-2",
-          isSelected ? "bg-gray-700" : "active:bg-gray-700/50",
+          isSelected ? "bg-secondary" : "active:bg-secondary/50",
           disabled && "opacity-50",
           className
         )}
@@ -243,7 +239,9 @@ const SelectItem = React.forwardRef<typeof Pressable, SelectItemProps>(
         <Text
           className={cn(
             "text-base",
-            isSelected ? "text-gray-100 font-medium" : "text-gray-200"
+            isSelected
+              ? "text-secondary-foreground font-medium"
+              : "text-foreground"
           )}
         >
           {children}

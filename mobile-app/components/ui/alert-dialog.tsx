@@ -1,16 +1,15 @@
+import { cn } from "@/lib/utils";
 import * as React from "react";
 import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  TouchableWithoutFeedback,
-  Platform,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  View,
 } from "react-native";
-import { cn } from "@/lib/utils";
 
 interface AlertDialogProps {
   children: React.ReactNode;
@@ -68,7 +67,7 @@ const AlertDialogContext = React.createContext<{
   handleClose?: () => void;
 }>({
   open: false,
-  setOpen: () => { },
+  setOpen: () => {},
 });
 
 const AlertDialog = React.forwardRef<View, AlertDialogProps>(
@@ -204,16 +203,20 @@ const AlertDialogContent = React.forwardRef<View, AlertDialogContentProps>(
           animationType="none"
           onRequestClose={handleClose}
         >
-          <TouchableWithoutFeedback
+          <Pressable
+            style={{ flex: 1 }}
             onPress={() => {
               onInteractOutside?.();
+              handleClose();
             }}
           >
-            <Animated.View
-              className="flex-1 justify-center items-center bg-black/50"
-              style={{ opacity: fadeAnim }}
-            >
-              <TouchableWithoutFeedback>
+            <View className="flex-1 justify-center items-center bg-black/50">
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                }}
+                style={{ width: "85%", maxWidth: 384 }}
+              >
                 <KeyboardAvoidingView
                   behavior={Platform.OS === "ios" ? "padding" : undefined}
                   keyboardVerticalOffset={
@@ -223,8 +226,7 @@ const AlertDialogContent = React.forwardRef<View, AlertDialogContentProps>(
                   <Animated.View
                     ref={ref}
                     className={cn(
-                      "bg-background m-6 rounded-2xl",
-                      "w-[85%] max-w-sm",
+                      "bg-card border border-border m-6 rounded-2xl",
                       Platform.OS === "ios"
                         ? "ios:shadow-xl"
                         : "android:elevation-8",
@@ -232,15 +234,16 @@ const AlertDialogContent = React.forwardRef<View, AlertDialogContentProps>(
                     )}
                     style={{
                       transform: [{ scale: scaleAnim }],
+                      opacity: fadeAnim,
                     }}
                     {...props}
                   >
                     {children}
                   </Animated.View>
                 </KeyboardAvoidingView>
-              </TouchableWithoutFeedback>
-            </Animated.View>
-          </TouchableWithoutFeedback>
+              </Pressable>
+            </View>
+          </Pressable>
         </Modal>
       </AlertDialogContext.Provider>
     );
@@ -351,12 +354,12 @@ AlertDialogCancel.displayName = "AlertDialogCancel";
 
 export {
   AlertDialog,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
   AlertDialogAction,
   AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 };

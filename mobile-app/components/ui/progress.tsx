@@ -39,7 +39,7 @@ function Progress({
           <View className="flex-row items-center gap-2">
             <View className="w-2 h-2 rounded-full bg-blue-500" />
             <View className="flex-1">
-              <View className="h-2 bg-gray-700 rounded-full overflow-hidden">
+              <View className="h-2 bg-secondary rounded-full overflow-hidden">
                 <Animated.View
                   className="h-full bg-primary rounded-full"
                   style={animatedStyle}

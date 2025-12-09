@@ -16,10 +16,12 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useColleagues } from "@/hooks/use-colleagues";
+import { useCurrentWorker } from "@/hooks/use-current-worker";
 import { useEntryForm } from "@/hooks/use-entry-form";
 import {
   getFieldCluster,
   groupFieldsByMutualExclusivity,
+  hasValue,
   isFieldDisabled,
 } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
@@ -102,6 +104,7 @@ export default function NewEntryScreen() {
   const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings(organizationId);
   const { user } = useAuth();
+  const { worker } = useCurrentWorker();
   const { locations } = useLocations(organizationId);
   const { colleagues } = useColleagues(organizationId);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
@@ -147,6 +150,13 @@ export default function NewEntryScreen() {
   const [selectedClusters, setSelectedClusters] = useState<
     Record<string, string | null>
   >({});
+
+  // Track touched fields for validation UX (only show errors after interaction)
+  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+
+  const markFieldAsTouched = (fieldId: string) => {
+    setTouchedFields((prev) => new Set(prev).add(fieldId));
+  };
 
   const filteredColleagues = useMemo(() => {
     if (!currentUserColleagueId) return colleagues;
@@ -359,6 +369,7 @@ export default function NewEntryScreen() {
           }
         } catch (err) {}
 
+        // Show success alert first, then navigate on OK click
         setIsSubmitting(false);
         setAlertTitle("Success");
         setAlertMessage("Entry submitted successfully!");
@@ -375,11 +386,9 @@ export default function NewEntryScreen() {
           setFinishTime(new Date());
           setCurrentStep(0);
           setSelectedClusters({});
-          // Navigate after a brief delay to avoid updating component during render
-          // The alert is closed by the onPress handler, so we just need to navigate
-          setTimeout(() => {
-            router.replace("./");
-          }, 100);
+          setTouchedFields(new Set()); // Reset touched fields
+          // Navigate back to home after alert is dismissed
+          router.replace("./");
         });
         setAlertOpen(true);
       }
@@ -434,7 +443,9 @@ export default function NewEntryScreen() {
     }
 
     const disabled = isFieldDisabled(config, fieldConfigs, fieldValues);
-    const hasError = !!errors[config.id];
+    const isTouched = touchedFields.has(config.id);
+    // Only show error if field has been touched AND has an error
+    const hasError = isTouched && !!errors[config.id];
 
     return (
       <View
@@ -448,8 +459,15 @@ export default function NewEntryScreen() {
         <FieldRendererNativeBase
           config={config}
           value={fieldValues[config.id]}
-          error={errors[config.id]}
-          onChange={(value) => updateFieldValue(config.id, value)}
+          error={hasError ? errors[config.id] : undefined}
+          onChange={(value) => {
+            updateFieldValue(config.id, value);
+            markFieldAsTouched(config.id);
+            // Clear error when user starts typing/selecting
+            if (errors[config.id]) {
+              clearFieldError(config.id);
+            }
+          }}
           onErrorClear={() => clearFieldError(config.id)}
           disabled={disabled}
         />
@@ -539,20 +557,28 @@ export default function NewEntryScreen() {
         {filteredColleagues.length > 0 && (
           <View>
             <View className="mb-2">
-              <Text className="text-sm font-medium text-gray-200">
+              <Text className="text-sm font-medium text-foreground">
                 Who worked on this job?
               </Text>
             </View>
-            <View className="border border-gray-700 rounded-xl overflow-hidden h-12">
+            <View className="rounded-xl h-12 bg-card border border-border">
               <Select
                 value=""
                 onValueChange={handleAddColleague}
-                placeholder="Select a colleague"
+                placeholder={
+                  selectedColleagues.length > 0
+                    ? "Add another colleague"
+                    : "Add a colleague"
+                }
                 size="medium"
                 triggerClassName="border-0 h-12 pl-5"
               >
                 {filteredColleagues.map((colleague) => (
-                  <SelectItem key={colleague.id} value={colleague.id}>
+                  <SelectItem
+                    key={colleague.id}
+                    value={colleague.id}
+                    className=""
+                  >
                     {colleague.name.charAt(0).toUpperCase() +
                       colleague.name.substring(1).toLowerCase()}
                   </SelectItem>
@@ -573,8 +599,10 @@ export default function NewEntryScreen() {
                     <Pressable
                       onPress={() => handleRemoveColleague(colleagueId)}
                       disabled={isSubmitting}
+                      className="min-w-[44px] min-h-[44px] items-center justify-center -mr-2"
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <Ionicons name="close-circle" size={16} color="#fff" />
+                      <Ionicons name="close-circle" size={20} color="#fff" />
                     </Pressable>
                   </Badge>
                 ))}
@@ -587,19 +615,25 @@ export default function NewEntryScreen() {
         {locations.length > 0 && settings?.use_predefined_locations && (
           <View>
             <View className="mb-2">
-              <Text className="text-sm font-medium text-gray-200">
+              <Text className="text-sm font-medium text-foreground">
                 Where did you work?
-                <Text className="text-red-400 ml-1">*</Text>
+                <Text className="text-destructive ml-1">*</Text>
               </Text>
             </View>
             <View
-              className={`border rounded-xl overflow-hidden h-12 ${
-                !selectedLocation ? "border-red-500" : "border-gray-700"
+              className={`rounded-xl h-12 bg-card border ${
+                touchedFields.has("location") && !selectedLocation
+                  ? "border-destructive"
+                  : "border-border"
               }`}
             >
               <Select
                 value={selectedLocation}
-                onValueChange={setSelectedLocation}
+                onValueChange={(value) => {
+                  setSelectedLocation(value);
+                  markFieldAsTouched("location");
+                }}
+                placeholder="Choose work location"
                 size="medium"
                 triggerClassName="border-0 h-12 pl-5"
               >
@@ -610,8 +644,8 @@ export default function NewEntryScreen() {
                 ))}
               </Select>
             </View>
-            {!selectedLocation && (
-              <Text className="text-sm text-red-400 mt-1">
+            {touchedFields.has("location") && !selectedLocation && (
+              <Text className="text-sm text-destructive mt-1">
                 Location is required
               </Text>
             )}
@@ -621,27 +655,47 @@ export default function NewEntryScreen() {
         {/* Start Time */}
         <View>
           <View className="mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               What time did you start?
-              <Text className="text-red-400 ml-1">*</Text>
+              <Text className="text-destructive ml-1">*</Text>
             </Text>
           </View>
           <View
-            className={`bg-gray-800 border rounded-xl h-12 justify-center ${
-              !startTime ? "border-red-500" : "border-gray-700"
+            className={`bg-card border rounded-xl h-12 justify-center ${
+              touchedFields.has("startTime") && !startTime
+                ? "border-destructive"
+                : "border-border"
             }`}
           >
             <TimePicker
               value={startTime}
-              onValueChange={setStartTime}
-              placeholder="Select start time"
+              onValueChange={(value) => {
+                setStartTime(value);
+                markFieldAsTouched("startTime");
+              }}
+              placeholder={
+                startTime
+                  ? `${startTime
+                      .getHours()
+                      .toString()
+                      .padStart(2, "0")}:${startTime
+                      .getMinutes()
+                      .toString()
+                      .padStart(2, "0")}`
+                  : "Select start time"
+              }
               disabled={false}
               className="bg-transparent border-0 h-12"
               size="md"
             />
           </View>
-          {!startTime && (
-            <Text className="text-sm text-red-400 mt-1">
+          {startTime && (
+            <Text className="text-xs text-muted-foreground mt-1">
+              Tap to change
+            </Text>
+          )}
+          {touchedFields.has("startTime") && !startTime && (
+            <Text className="text-sm text-destructive mt-1">
               Start time is required
             </Text>
           )}
@@ -650,15 +704,15 @@ export default function NewEntryScreen() {
         {/* Finish Time */}
         <View>
           <View className="mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               What time did you finish?
             </Text>
           </View>
           <View
-            className={`bg-gray-800 border rounded-xl h-12 justify-center ${
+            className={`bg-card border rounded-xl h-12 justify-center ${
               finishTime && finishTime > new Date()
-                ? "border-red-500"
-                : "border-gray-700"
+                ? "border-destructive"
+                : "border-border"
             }`}
           >
             <TimePicker
@@ -668,17 +722,27 @@ export default function NewEntryScreen() {
                   setFinishTime(value);
                 }
               }}
-              placeholder="Select finish time"
+              placeholder={
+                finishTime
+                  ? `${finishTime
+                      .getHours()
+                      .toString()
+                      .padStart(2, "0")}:${finishTime
+                      .getMinutes()
+                      .toString()
+                      .padStart(2, "0")}`
+                  : "Select finish time"
+              }
               disabled={false}
               className="bg-transparent border-0 h-12"
               size="md"
             />
           </View>
-          <Text className="text-xs text-gray-400 mt-1">
-            Defaults to current time
+          <Text className="text-xs text-muted-foreground mt-1">
+            {finishTime ? "Tap to change" : "Defaults to current time"}
           </Text>
           {finishTime && finishTime > new Date() && (
-            <Text className="text-sm text-red-400 mt-1">
+            <Text className="text-sm text-destructive mt-1">
               Finish time cannot be in the future
             </Text>
           )}
@@ -751,11 +815,13 @@ export default function NewEntryScreen() {
     return (
       <View className="flex-col gap-4">
         <View className="mb-2">
-          <Text className="text-lg font-bold text-gray-100 mb-1">
+          <Text className="text-lg font-bold text-foreground mb-1">
             {section.title}
           </Text>
           {section.description && (
-            <Text className="text-sm text-gray-400">{section.description}</Text>
+            <Text className="text-sm text-muted-foreground">
+              {section.description}
+            </Text>
           )}
         </View>
 
@@ -782,22 +848,26 @@ export default function NewEntryScreen() {
           return (
             <View key={groupId} className="mb-4">
               <View className="mb-2">
-                <Text className="text-sm font-medium text-gray-200">
+                <Text className="text-sm font-medium text-foreground">
                   {groupLabel}
-                  <Text className="text-red-400 ml-1">*</Text>
+                  <Text className="text-destructive ml-1">*</Text>
                 </Text>
               </View>
               <View
-                className={`border rounded-xl overflow-hidden h-12 ${
-                  !selectedCluster ? "border-red-500" : "border-gray-700"
+                className={`rounded-xl h-12 bg-card border ${
+                  touchedFields.has(`mutual-exclusion-${groupId}`) &&
+                  !selectedCluster
+                    ? "border-destructive"
+                    : "border-border"
                 }`}
               >
                 <Select
                   value={selectedCluster || ""}
-                  onValueChange={(value) =>
-                    handleClusterSelect(groupId, value || null)
-                  }
-                  placeholder={`Select ${groupLabel}`}
+                  onValueChange={(value) => {
+                    handleClusterSelect(groupId, value || null);
+                    markFieldAsTouched(`mutual-exclusion-${groupId}`);
+                  }}
+                  placeholder={`Choose ${groupLabel.toLowerCase()}`}
                   size="medium"
                   triggerClassName="border-0 h-12 pl-5"
                 >
@@ -808,11 +878,12 @@ export default function NewEntryScreen() {
                   ))}
                 </Select>
               </View>
-              {!selectedCluster && (
-                <Text className="text-sm text-red-400 mt-1">
-                  {groupLabel} is required
-                </Text>
-              )}
+              {touchedFields.has(`mutual-exclusion-${groupId}`) &&
+                !selectedCluster && (
+                  <Text className="text-sm text-destructive mt-1">
+                    {groupLabel} is required
+                  </Text>
+                )}
 
               {/* Render fields only for the selected cluster */}
               {selectedCluster &&
@@ -873,35 +944,46 @@ export default function NewEntryScreen() {
 
   // Render Summary Step
   const renderSummaryStep = () => {
-    const allVisibleSections = sortedSections.filter((section) => {
+    // Get visible sections (same logic as getCurrentSection)
+    const visibleSections = sortedSections.filter((section) => {
       const sectionFields = organizedFields.get(section.id) || [];
       return sectionFields.filter(isFieldVisible).length > 0;
     });
 
+    const allVisibleSections = visibleSections;
+
     return (
       <View className="flex-col gap-4">
         <View className="mb-4">
-          <Text className="text-xl font-bold text-gray-100 mb-2">
+          <Text className="text-xl font-bold text-foreground mb-2">
             Review Your Entry
           </Text>
-          <Text className="text-sm text-gray-400">
-            Please review all information before submitting
+          <Text className="text-sm text-muted-foreground">
+            Review your entry. You can edit any section before submitting.
           </Text>
         </View>
 
         {/* Basic Info Section */}
-        <View className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <Text className="text-lg font-semibold text-gray-100 mb-3">
-            Basic Information
-          </Text>
-          <View className="flex-col gap-3">
+        <View className="bg-card rounded-xl p-4">
+          <View className="flex-row justify-between items-center mb-3">
+            <Text className="text-lg font-semibold text-card-foreground">
+              Basic Information
+            </Text>
+            <Pressable
+              onPress={() => setCurrentStep(0)}
+              className="px-3 py-1.5 rounded-lg bg-secondary active:opacity-80"
+            >
+              <Text className="text-sm text-primary font-medium">Edit</Text>
+            </Pressable>
+          </View>
+          <View className="flex-col gap-4">
             {/* Colleagues */}
             {selectedColleagues.length > 0 && (
-              <View>
-                <Text className="text-sm text-gray-400 mb-1">
+              <View className="flex-row justify-between items-start">
+                <Text className="text-sm text-muted-foreground flex-1">
                   Who worked on this job?
                 </Text>
-                <Text className="text-base text-gray-100">
+                <Text className="text-base text-card-foreground flex-1 text-right">
                   {selectedColleagues
                     .map((id) => getColleagueName(id))
                     .join(", ")}
@@ -911,11 +993,11 @@ export default function NewEntryScreen() {
 
             {/* Location */}
             {selectedLocation && (
-              <View>
-                <Text className="text-sm text-gray-400 mb-1">
+              <View className="flex-row justify-between items-start">
+                <Text className="text-sm text-muted-foreground flex-1">
                   Where did you work?
                 </Text>
-                <Text className="text-base text-gray-100">
+                <Text className="text-base text-card-foreground flex-1 text-right">
                   {locations.find((l) => l.id === selectedLocation)?.name ||
                     selectedLocation}
                 </Text>
@@ -924,9 +1006,11 @@ export default function NewEntryScreen() {
 
             {/* Start Time */}
             {startTime && (
-              <View>
-                <Text className="text-sm text-gray-400 mb-1">Start Time</Text>
-                <Text className="text-base text-gray-100">
+              <View className="flex-row justify-between items-start">
+                <Text className="text-sm text-muted-foreground flex-1">
+                  Start Time
+                </Text>
+                <Text className="text-base text-card-foreground flex-1 text-right">
                   {startTime.getHours().toString().padStart(2, "0")}:
                   {startTime.getMinutes().toString().padStart(2, "0")}
                 </Text>
@@ -935,9 +1019,11 @@ export default function NewEntryScreen() {
 
             {/* Finish Time */}
             {finishTime && (
-              <View>
-                <Text className="text-sm text-gray-400 mb-1">Finish Time</Text>
-                <Text className="text-base text-gray-100">
+              <View className="flex-row justify-between items-start">
+                <Text className="text-sm text-muted-foreground flex-1">
+                  Finish Time
+                </Text>
+                <Text className="text-base text-card-foreground flex-1 text-right">
                   {finishTime.getHours().toString().padStart(2, "0")}:
                   {finishTime.getMinutes().toString().padStart(2, "0")}
                 </Text>
@@ -947,44 +1033,70 @@ export default function NewEntryScreen() {
         </View>
 
         {/* Field Sections */}
-        {allVisibleSections.map((section) => {
+        {allVisibleSections.map((section, sectionIndex) => {
           const sectionFields = organizedFields.get(section.id) || [];
           const visibleFields = sectionFields.filter(isFieldVisible);
 
-          if (visibleFields.length === 0) return null;
+          // Filter out optional empty fields
+          const fieldsToShow = visibleFields.filter((config) => {
+            const value = fieldValues[config.id];
+            // Show if required OR has a value
+            return config.required || hasValue(value, config.field_type);
+          });
+
+          if (fieldsToShow.length === 0) return null;
+
+          // Calculate which step this section corresponds to
+          // Step 0 = Basic Info, Step 1+ = Sections (in order)
+          const sectionStep = 1 + sectionIndex; // Step 0 is basic info, sections start at 1
 
           return (
-            <View
-              key={section.id}
-              className="bg-gray-800 rounded-xl p-4 border border-gray-700"
-            >
-              <Text className="text-lg font-semibold text-gray-100 mb-3">
-                {section.title}
-              </Text>
-              {section.description && (
-                <Text className="text-sm text-gray-400 mb-3">
-                  {section.description}
-                </Text>
-              )}
-              <View className="flex-col gap-3">
-                {visibleFields.map((config) => {
-                  const value = fieldValues[config.id];
-                  const displayValue = formatFieldValue(config, value);
+            <View key={section.id}>
+              {sectionIndex > 0 && <View className="h-px bg-border/30 mb-4" />}
+              <View className="bg-card rounded-xl p-4">
+                <View className="flex-row justify-between items-center mb-3">
+                  <View className="flex-1">
+                    <Text className="text-lg font-semibold text-card-foreground">
+                      {section.title}
+                    </Text>
+                    {section.description && (
+                      <Text className="text-sm text-muted-foreground mt-1">
+                        {section.description}
+                      </Text>
+                    )}
+                  </View>
+                  <Pressable
+                    onPress={() => setCurrentStep(sectionStep)}
+                    className="px-3 py-1.5 rounded-lg bg-secondary active:opacity-80 ml-3"
+                  >
+                    <Text className="text-sm text-primary font-medium">
+                      Edit
+                    </Text>
+                  </Pressable>
+                </View>
+                <View className="flex-col gap-4">
+                  {fieldsToShow.map((config) => {
+                    const value = fieldValues[config.id];
+                    const displayValue = formatFieldValue(config, value);
 
-                  return (
-                    <View key={config.id}>
-                      <Text className="text-sm text-gray-400 mb-1">
-                        {config.label}
-                        {config.required && (
-                          <Text className="text-red-400 ml-1">*</Text>
-                        )}
-                      </Text>
-                      <Text className="text-base text-gray-100">
-                        {displayValue}
-                      </Text>
-                    </View>
-                  );
-                })}
+                    return (
+                      <View
+                        key={config.id}
+                        className="flex-row justify-between items-start"
+                      >
+                        <Text className="text-sm text-muted-foreground flex-1">
+                          {config.label}
+                          {config.required && (
+                            <Text className="text-destructive ml-1">*</Text>
+                          )}
+                        </Text>
+                        <Text className="text-base text-card-foreground flex-1 text-right">
+                          {displayValue}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             </View>
           );
@@ -993,21 +1105,48 @@ export default function NewEntryScreen() {
     );
   };
 
-  const progressPercentage = ((currentStep + 1) / totalSteps) * 100;
+  // Calculate progress percentage - simplified to step-based for accuracy
+  const progressPercentage = Math.round(((currentStep + 1) / totalSteps) * 100);
 
   return (
-    <View className="flex-1 bg-gray-900">
-      {/* Background gradient overlay */}
-      <View className="absolute inset-0 bg-gray-900 opacity-30" />
-
+    <View className="flex-1 bg-background">
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        {/* User Header */}
+        {user && (
+          <View className="bg-background px-4 pt-2 pb-2">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2">
+                <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
+                  {worker?.name ? (
+                    <Text className="text-xs font-semibold text-primary">
+                      {worker.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .slice(0, 2)}
+                    </Text>
+                  ) : (
+                    <Ionicons name="person" size={16} color="rgb(37 99 235)" />
+                  )}
+                </View>
+                <View>
+                  <Text className="text-sm font-medium text-foreground">
+                    {worker?.name || user.email?.split("@")[0] || "User"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Progress Bar at Top */}
-        <View className="bg-gray-800 border-b border-gray-700 px-4 pt-3 pb-3">
+        <View className="bg-background px-4 pt-4 pb-3">
           <View className="flex-row justify-between items-center mb-2">
-            <Text className="text-sm font-semibold text-gray-200">
+            <Text className="text-sm font-semibold text-foreground">
               Step {currentStep + 1} of {totalSteps}
             </Text>
-            <Text className="text-sm font-bold text-primary-500">
+            <Text className="text-sm font-bold text-primary">
               {Math.round(progressPercentage)}%
             </Text>
           </View>
@@ -1028,13 +1167,20 @@ export default function NewEntryScreen() {
             keyboardDismissMode="on-drag"
           >
             {/* Main Card Container */}
-            <View className="bg-gray-800 rounded-2xl p-6 mb-10 border border-gray-700 shadow-lg">
+            <View
+              className="bg-card rounded-2xl p-6 mb-10"
+              style={{ borderWidth: 0, outlineWidth: 0 }}
+            >
               {/* Error Summary */}
               {Object.keys(errors).length > 0 && (
-                <View className="bg-red-900 border-2 border-red-600 rounded-xl p-4 mb-6">
+                <View className="bg-destructive/10 border-2 border-destructive rounded-xl p-4 mb-6">
                   <View className="flex-row items-center gap-2 mb-3">
-                    <Ionicons name="alert-circle" size={22} color="#ef4444" />
-                    <Text className="text-base font-bold text-red-100">
+                    <Ionicons
+                      name="alert-circle"
+                      size={22}
+                      color="rgb(220 38 38)"
+                    />
+                    <Text className="text-base font-bold text-destructive">
                       Please fix the following errors:
                     </Text>
                   </View>
@@ -1046,7 +1192,7 @@ export default function NewEntryScreen() {
                       return (
                         <Text
                           key={fieldId}
-                          className="text-sm text-red-200 leading-5"
+                          className="text-sm text-destructive leading-5"
                         >
                           • {field?.label || fieldId}: {errorMessage}
                         </Text>
@@ -1080,7 +1226,7 @@ export default function NewEntryScreen() {
           </ScrollView>
 
           {/* Fixed Bottom Action Bar */}
-          <View className="absolute bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-4 py-4 shadow-2xl">
+          <View className="absolute bottom-0 left-0 right-0 bg-card border-t border-border/50 px-4 py-4 shadow-2xl">
             <View className="flex-row gap-3">
               {/* Previous Button - shown on all steps except first */}
               {currentStep > 0 && (
@@ -1089,10 +1235,14 @@ export default function NewEntryScreen() {
                   disabled={isSubmitting}
                   variant="secondary"
                   size="lg"
-                  className="flex-1 bg-gray-700"
+                  className="flex-1 bg-secondary"
                 >
-                  <Ionicons name="chevron-back" size={20} color="white" />
-                  <Text className="text-white text-base font-semibold">
+                  <Ionicons
+                    name="chevron-back"
+                    size={20}
+                    color="rgb(var(--color-secondary-foreground))"
+                  />
+                  <Text className="text-secondary-foreground text-base font-semibold">
                     Previous
                   </Text>
                 </Button>
@@ -1100,7 +1250,18 @@ export default function NewEntryScreen() {
               {/* Next Button - shown on all steps except last */}
               {!isLastStep && (
                 <Button
-                  onPress={handleNext}
+                  onPress={async () => {
+                    if (Platform.OS === "ios") {
+                      try {
+                        await Haptics.impactAsync(
+                          Haptics.ImpactFeedbackStyle.Light
+                        );
+                      } catch (err) {
+                        // Haptics not available
+                      }
+                    }
+                    handleNext();
+                  }}
                   disabled={isSubmitting}
                   variant="default"
                   size="lg"
@@ -1115,7 +1276,18 @@ export default function NewEntryScreen() {
               {/* Submit Button - shown only on last step */}
               {isLastStep && (
                 <Button
-                  onPress={handleSubmit}
+                  onPress={async () => {
+                    if (Platform.OS === "ios") {
+                      try {
+                        await Haptics.impactAsync(
+                          Haptics.ImpactFeedbackStyle.Medium
+                        );
+                      } catch (err) {
+                        // Haptics not available
+                      }
+                    }
+                    handleSubmit();
+                  }}
                   disabled={isSubmitting}
                   variant="default"
                   size="lg"
@@ -1139,16 +1311,21 @@ export default function NewEntryScreen() {
       {/* Alert Dialog */}
       <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
         <AlertDialogContent
+          className="bg-secondary border-border"
           onInteractOutside={() => {
             // Allow dismissing by clicking outside
             setAlertOpen(false);
           }}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle>{alertTitle}</AlertDialogTitle>
-            <AlertDialogDescription>{alertMessage}</AlertDialogDescription>
+            <AlertDialogTitle className="text-card-foreground">
+              {alertTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {alertMessage}
+            </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="justify-center">
             <AlertDialogAction>
               <Pressable
                 onPress={() => {
@@ -1160,7 +1337,7 @@ export default function NewEntryScreen() {
                     }, 0);
                   }
                 }}
-                className="bg-primary-500 active:bg-primary-600 px-6 py-3 rounded-lg"
+                className="bg-primary active:bg-primary-600 px-6 py-3 rounded-lg"
               >
                 <Text className="text-white text-base font-semibold">OK</Text>
               </Pressable>

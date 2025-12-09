@@ -29,8 +29,8 @@ export default function RootLayout() {
       </View>
     );
   }
-  // Default to dark theme to match dashboard
-  const theme = colorScheme || "dark";
+  // Default to light theme for better UX and readability
+  const theme = colorScheme || "light";
 
   return (
     <ThemeProvider defaultTheme={theme}>

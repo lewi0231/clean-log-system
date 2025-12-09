@@ -69,14 +69,16 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <View
-            className={`bg-gray-800 border rounded-xl overflow-hidden ${
-              isInvalid ? "border-red-500" : "border-gray-700"
+            className={`bg-card border rounded-xl overflow-hidden ${
+              isInvalid ? "border-destructive" : "border-border"
             }`}
           >
             <View className="flex-row items-center">
@@ -88,7 +90,7 @@ export function FieldRendererNativeBase({
                 />
               </View>
               <TextInput
-                className="flex-1 bg-transparent text-gray-100 px-4 py-3.5 text-base"
+                className="flex-1 bg-transparent text-card-foreground px-4 py-3.5 text-base"
                 placeholder={config.description || config.label}
                 placeholderTextColor="#6b7280"
                 value={String(value || "")}
@@ -116,11 +118,13 @@ export function FieldRendererNativeBase({
             </View>
           </View>
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -128,14 +132,16 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <View
-            className={`bg-gray-800 border rounded-xl overflow-hidden ${
-              isInvalid ? "border-red-500" : "border-gray-700"
+            className={`bg-card border rounded-xl overflow-hidden ${
+              isInvalid ? "border-destructive" : "border-border"
             }`}
           >
             <View className="flex-row items-center">
@@ -147,7 +153,7 @@ export function FieldRendererNativeBase({
                 />
               </View>
               <TextInput
-                className="flex-1 bg-transparent text-gray-100 px-4 py-3.5 text-base"
+                className="flex-1 bg-transparent text-card-foreground px-4 py-3.5 text-base"
                 placeholder={config.description || config.label}
                 placeholderTextColor="#6b7280"
                 value={String(value || "0")}
@@ -162,11 +168,13 @@ export function FieldRendererNativeBase({
             </View>
           </View>
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -174,18 +182,20 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <View
-            className={`bg-gray-800 border rounded-xl overflow-hidden ${
-              isInvalid ? "border-red-500" : "border-gray-700"
+            className={`bg-card border rounded-xl overflow-hidden ${
+              isInvalid ? "border-destructive" : "border-border"
             }`}
           >
             <TextInput
-              className="bg-transparent text-gray-100 px-4 py-3.5 text-base min-h-[128px]"
+              className="bg-transparent text-card-foreground px-4 py-3.5 text-base min-h-[128px]"
               placeholder={config.description || config.label}
               placeholderTextColor="#6b7280"
               value={String(value || "")}
@@ -198,11 +208,13 @@ export function FieldRendererNativeBase({
             />
           </View>
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -210,11 +222,11 @@ export function FieldRendererNativeBase({
       if (!config.options || config.options.length === 0) {
         return (
           <View className="mb-4">
-            <Text className="text-red-400 text-sm py-2">
+            <Text className="text-destructive text-sm py-2">
               No options configured for {config.label}
             </Text>
             {error && (
-              <Text className="text-sm text-red-400 mt-1">{error}</Text>
+              <Text className="text-sm text-destructive mt-1">{error}</Text>
             )}
           </View>
         );
@@ -222,9 +234,11 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <Select
@@ -241,11 +255,13 @@ export function FieldRendererNativeBase({
             ))}
           </Select>
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -253,9 +269,11 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <GroupedBreakdownField
@@ -265,11 +283,13 @@ export function FieldRendererNativeBase({
             disabled={disabled}
           />
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -277,19 +297,21 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <View
-            className={`bg-gray-800 border rounded-xl px-4 py-3 flex-row items-center justify-between h-12 ${
-              isInvalid ? "border-red-500" : "border-gray-700"
+            className={`bg-card border rounded-xl px-4 py-3 flex-row items-center justify-between h-12 ${
+              isInvalid ? "border-destructive" : "border-border"
             }`}
           >
             <View className="flex-1">
               {config.description && (
-                <Text className="text-xs text-gray-400">
+                <Text className="text-xs text-muted-foreground">
                   {config.description}
                 </Text>
               )}
@@ -297,13 +319,15 @@ export function FieldRendererNativeBase({
             <Switch
               value={Boolean(value)}
               onValueChange={(newValue) => handleFieldChange(newValue)}
-              trackColor={{ false: "#4b5563", true: "#0ea5e9" }}
+              trackColor={{ false: "rgb(226 232 240)", true: "rgb(37 99 235)" }}
               thumbColor="#ffffff"
               disabled={disabled}
               style={{ opacity: disabled ? 0.5 : 1 }}
             />
           </View>
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -324,9 +348,11 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <DateTimePicker
@@ -341,15 +367,17 @@ export function FieldRendererNativeBase({
             }}
             placeholder={config.description || config.label}
             disabled={disabled}
-            className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3.5"
+            className="bg-card border border-border rounded-xl px-4 py-3.5"
             size="md"
           />
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
@@ -378,9 +406,11 @@ export function FieldRendererNativeBase({
       return (
         <View className="mb-4">
           <View className="flex-row items-center mb-2">
-            <Text className="text-sm font-medium text-gray-200">
+            <Text className="text-sm font-medium text-foreground">
               {config.label}
-              {config.required && <Text className="text-red-400 ml-1">*</Text>}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
             </Text>
           </View>
           <TimePicker
@@ -400,22 +430,24 @@ export function FieldRendererNativeBase({
             }}
             placeholder={config.description || "Select time"}
             disabled={disabled}
-            className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3.5"
+            className="bg-card border border-border rounded-xl px-4 py-3.5"
             size="lg"
           />
           {config.description && (
-            <Text className="text-xs text-gray-400 mt-1">
+            <Text className="text-xs text-muted-foreground mt-1">
               {config.description}
             </Text>
           )}
-          {error && <Text className="text-sm text-red-400 mt-1">{error}</Text>}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
         </View>
       );
 
     default:
       return (
         <View className="mb-4">
-          <Text className="text-red-400 text-sm py-2">
+          <Text className="text-destructive text-sm py-2">
             Unknown field type: {config.field_type}
           </Text>
         </View>

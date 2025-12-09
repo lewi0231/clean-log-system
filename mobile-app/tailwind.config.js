@@ -78,18 +78,19 @@ module.exports = {
     ({ addBase }) => {
       addBase({
         ":root": {
-          "--color-primary": "0 0 0",
-          "--color-secondary": "45 45 45",
-          "--color-background": "255 255 255",
-          "--color-primary-foreground": "255 255 255",
-          "--color-foreground": "0 0 0",
-          "--color-destructive": "239 68 68",
-          "--color-success": "34 197 94",
-          "--color-warning": "234 179 8",
-          "--color-info": "59 130 246",
-          "--color-muted": "115 115 115",
-          "--toggle-active": "45 45 45",
-          "--toggle-border": "229 231 235",
+          "--color-primary": "37 99 235", // #2563eb - Vibrant blue
+          "--color-secondary": "226 232 240", // #e2e8f0 - Subtle borders
+          "--color-background": "248 249 250", // #f8f9fa - Light grey background
+          "--color-primary-foreground": "255 255 255", // White text on primary
+          "--color-foreground": "30 41 59", // #1e293b - Dark slate text
+          "--color-destructive": "220 38 38", // #dc2626 - Red for errors
+          "--color-success": "22 163 74", // Green for success
+          "--color-warning": "234 179 8", // Yellow/amber for warnings
+          "--color-info": "37 99 235", // Blue for info (same as primary)
+          "--color-muted": "100 116 139", // #64748b - Grey text
+          "--toggle-active": "37 99 235", // Blue when active
+          "--toggle-border": "229 231 235", // Very subtle border
+          "--border": "229 231 235", // Very subtle borders
         },
       });
     },

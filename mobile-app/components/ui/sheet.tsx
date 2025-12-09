@@ -335,7 +335,7 @@ const Sheet = React.forwardRef<View, SheetProps>(
               getSheetDimensions(),
             ]}
             className={cn(
-              "absolute bg-gray-800",
+              "absolute bg-secondary",
               Platform.OS === "ios" ? "ios:shadow-xl" : "android:elevation-24",
               getSheetPosition(),
               contentClassName
@@ -343,22 +343,22 @@ const Sheet = React.forwardRef<View, SheetProps>(
           >
             <SafeAreaView edges={getSafeAreaEdges()} className="flex-1">
               <View className="flex-1">
-                <View className="flex-row items-center justify-between p-4 border-b border-gray-700">
+                <View className="flex-row items-center justify-between p-4 border-b border-border/50">
                   <View className="flex-1">
                     {title && (
-                      <Text className="text-lg font-semibold text-gray-100">
+                      <Text className="text-lg font-semibold text-foreground">
                         {title}
                       </Text>
                     )}
                     {description && (
-                      <Text className="text-sm text-gray-400 mt-1">
+                      <Text className="text-sm text-muted-foreground mt-1">
                         {description}
                       </Text>
                     )}
                   </View>
                   <TouchableWithoutFeedback onPress={animateClose}>
-                    <View className="p-2 rounded-full bg-gray-700">
-                      <Feather name="x" size={20} color="#9CA3AF" />
+                    <View className="p-2 rounded-full bg-secondary/50">
+                      <Feather name="x" size={20} color="rgb(100 116 139)" />
                     </View>
                   </TouchableWithoutFeedback>
                 </View>
