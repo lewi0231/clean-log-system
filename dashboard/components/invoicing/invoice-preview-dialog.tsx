@@ -9,13 +9,20 @@ import {
 } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
+import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
-import { Mail, Printer } from "lucide-react";
+import { Mail, Plus, Printer } from "lucide-react";
 import { useState } from "react";
 import InvoicePreview from "./invoice-preview";
+import ManualPaymentDialog from "./manual-payment-dialog";
+import PaymentHistory from "./payment-history";
+import PaymentLinkButton from "./payment-link-button";
+import { formatCurrency } from "./payment-utils";
 
 interface InvoicePreviewDialogProps {
   open: boolean;
@@ -31,7 +38,9 @@ export default function InvoicePreviewDialog({
   const { invoice, loading, error, refetch } = useInvoiceDetails(
     open ? invoiceId : null
   );
+  const { organizationId } = useOrganization();
   const [sending, setSending] = useState(false);
+  const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -121,7 +130,97 @@ export default function InvoicePreviewDialog({
         {!loading && !error && invoice && (
           <>
             <div className="p-6 pb-0">
-              <InvoicePreview invoice={invoice} />
+              <Tabs defaultValue="preview" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="preview">Invoice Preview</TabsTrigger>
+                  <TabsTrigger value="payments">Payments</TabsTrigger>
+                </TabsList>
+                <TabsContent value="preview" className="mt-4">
+                  <InvoicePreview invoice={invoice} />
+                </TabsContent>
+                <TabsContent value="payments" className="mt-4 space-y-6">
+                  {/* Payment Summary */}
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Payment Summary</h3>
+                      {invoice.status !== "draft" && (
+                        <div className="flex gap-2">
+                          <PaymentLinkButton
+                            invoiceId={invoice.id}
+                            onLinkCreated={() => {
+                              // Refetch invoice to get updated payment link
+                              refetch();
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setManualPaymentOpen(true)}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Record Payment
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Invoice Total</p>
+                        <p className="text-lg font-semibold">
+                          {formatCurrency(invoice.total, invoice.currency)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Amount Paid</p>
+                        <p className="text-lg font-semibold text-green-600">
+                          {formatCurrency(
+                            invoice.total_paid || 0,
+                            invoice.currency
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Remaining</p>
+                        <p className="text-lg font-semibold">
+                          {formatCurrency(
+                            invoice.total - (invoice.total_paid || 0),
+                            invoice.currency
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Payment Count</p>
+                        <p className="text-lg font-semibold">
+                          {invoice.payment_count || 0}
+                        </p>
+                      </div>
+                    </div>
+                    {invoice.payment_method_used && (
+                      <div className="text-sm">
+                        <p className="text-muted-foreground">
+                          Payment Method:{" "}
+                          <span className="font-medium">
+                            {invoice.payment_method_used
+                              .replace("_", " ")
+                              .replace(/\b\w/g, (l) => l.toUpperCase())}
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Payment History */}
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <h3 className="text-lg font-semibold">Payment History</h3>
+                    <Separator />
+                    <PaymentHistory
+                      invoiceId={invoice.id}
+                      currency={invoice.currency}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
             <DialogFooter className="p-6 pt-4 border-t">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -138,6 +237,19 @@ export default function InvoicePreviewDialog({
                 </Button>
               )}
             </DialogFooter>
+
+            {/* Manual Payment Dialog */}
+            {organizationId && (
+              <ManualPaymentDialog
+                open={manualPaymentOpen}
+                onOpenChange={setManualPaymentOpen}
+                invoiceId={invoice.id}
+                invoiceTotal={invoice.total}
+                totalPaid={invoice.total_paid || 0}
+                currency={invoice.currency}
+                organizationId={organizationId}
+              />
+            )}
           </>
         )}
       </DialogContent>

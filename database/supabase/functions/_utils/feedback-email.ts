@@ -4,7 +4,12 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import { validateEmailConfig } from "./email.ts";
+import {
+  getTestModeRecipient,
+  getTestModeTags,
+  isTestMode,
+  validateEmailConfig,
+} from "./email.ts";
 import {
   getInvoiceEmailRecipient,
   type InvoiceEmailRecipientConfig,
@@ -81,6 +86,9 @@ export async function sendFeedbackRequestEmail(
     }
     return { success: false, error };
   }
+
+  // Check if test mode is enabled
+  const testMode = isTestMode();
 
   // Build review URL
   const reviewUrl = `${
@@ -164,21 +172,57 @@ Best regards,
 The ${data.organizationName} Team
   `.trim();
 
+  // Determine recipient and subject based on test mode
+  const testRecipient = testMode
+    ? getTestModeRecipient("feedback", data.jobId, data.recipientEmail)
+    : data.recipientEmail;
+
+  const emailSubject = testMode
+    ? `[TEST] How was your service? We'd love your feedback!`
+    : `How was your service? We'd love your feedback!`;
+
+  // Log test mode redirection if enabled
+  if (testMode) {
+    console.log("[TEST MODE] Feedback email redirected to test address", {
+      testRecipient,
+      originalRecipient: data.recipientEmail,
+      jobId: data.jobId,
+    });
+  }
+
   // Send email via Resend
   try {
+    const emailBody: {
+      from: string;
+      to: string[];
+      subject: string;
+      html: string;
+      text: string;
+      tags?: Array<{ name: string; value: string }>;
+    } = {
+      from: `noreply@${config.resendFromDomain}`,
+      to: [testRecipient],
+      subject: emailSubject,
+      html: emailHtml,
+      text: emailText,
+    };
+
+    // Add test mode tags if in test mode
+    if (testMode) {
+      emailBody.tags = getTestModeTags(
+        "feedback",
+        data.jobId,
+        data.recipientEmail,
+      );
+    }
+
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
       },
-      body: JSON.stringify({
-        from: `noreply@${config.resendFromDomain}`,
-        to: [data.recipientEmail],
-        subject: `How was your service? We'd love your feedback!`,
-        html: emailHtml,
-        text: emailText,
-      }),
+      body: JSON.stringify(emailBody),
     });
 
     if (!res.ok) {
@@ -209,7 +253,19 @@ The ${data.organizationName} Team
     const emailId = emailResponse.id;
 
     if (emailId) {
-      console.log("Feedback email sent successfully:", emailId);
+      if (testMode) {
+        console.log("[TEST MODE] Feedback email sent to test address", {
+          mode: "test",
+          emailType: "feedback",
+          testRecipient,
+          originalRecipient: data.recipientEmail,
+          jobId: data.jobId,
+          emailId,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.log("Feedback email sent successfully:", emailId);
+      }
       return { success: true, emailId };
     } else {
       console.warn("Resend response missing ID:", emailResponse);

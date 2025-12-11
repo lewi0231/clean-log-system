@@ -122,6 +122,28 @@ export interface CreateJobResponse {
   };
 }
 
+export interface UpdateJobRequest {
+  id: string;
+  location_id?: string | null;
+  worker_ids?: string[];
+  submission_data?: Record<string, unknown>;
+  completed_at?: string; // ISO timestamp
+}
+
+export interface UpdateJobResponse {
+  success: boolean;
+  job: Job;
+}
+
+export interface GetJobEditsRequest {
+  job_id: string;
+}
+
+export interface GetJobEditsResponse {
+  success: boolean;
+  edits: JobEdit[];
+}
+
 // Feedback API
 export interface ListFeedbackRequest {
   organization_id: string;

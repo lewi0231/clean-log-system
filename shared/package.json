@@ -6,6 +6,13 @@
   "types": "./types/index.ts",
   "exports": {
     ".": "./types/index.ts",
-    "./types": "./types/index.ts"
+    "./types": "./types/index.ts",
+    "./types/field-config": "./types/field-config.ts",
+    "./types/form-section": "./types/form-section.ts",
+    "./types/field-type": "./types/field-type.ts",
+    "./types/organization-settings": "./types/organization-settings.ts",
+    "./types/conditional-logic": "./types/conditional-logic.ts",
+    "./types/field-template": "./types/field-template.ts",
+    "./types/validation-rule": "./types/validation-rule.ts"
   }
 }

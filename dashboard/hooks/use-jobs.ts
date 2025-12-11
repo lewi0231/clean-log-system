@@ -4,8 +4,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { jobsKey } from "@/app/query-provider";
 import { JobsService } from "@/lib/services";
-import type { Job } from "@/lib/types";
-import type { CreateJobRequest } from "@/lib/types/api";
+import type { Job, JobEdit } from "@/lib/types";
+import type {
+  CreateJobRequest,
+  GetJobEditsRequest,
+  UpdateJobRequest,
+} from "@/lib/types/api";
 import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
@@ -15,6 +19,8 @@ interface UseJobsResult {
   error: string | null;
   refetch: () => Promise<void>;
   createJob: (request: CreateJobRequest) => Promise<Job>;
+  updateJob: (request: UpdateJobRequest) => Promise<Job>;
+  getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
 }
 
 async function fetchJobs(organizationId: string): Promise<Job[]> {
@@ -62,11 +68,36 @@ export function useJobs(): UseJobsResult {
     [queryClient, organizationId, query],
   );
 
+  const updateJob = useCallback(
+    async (request: UpdateJobRequest): Promise<Job> => {
+      const response = await JobsService.update(request);
+
+      // Invalidate and refetch jobs
+      await queryClient.invalidateQueries({
+        queryKey: jobsKey(organizationId),
+      });
+      await query.refetch();
+
+      return response.job;
+    },
+    [queryClient, organizationId, query],
+  );
+
+  const getJobEdits = useCallback(
+    async (request: GetJobEditsRequest): Promise<JobEdit[]> => {
+      const response = await JobsService.getEdits(request);
+      return response.edits || [];
+    },
+    [],
+  );
+
   return {
     jobs: query.data ?? [],
     loading: query.isLoading,
     error: query.error ? (query.error as Error).message : null,
     refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
     createJob,
+    updateJob,
+    getJobEdits,
   };
 }

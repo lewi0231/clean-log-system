@@ -535,6 +535,100 @@ Track:
 - Average time from email send to feedback submission
 - Feedback quality (ratings distribution, comment length)
 
+## Test Mode Configuration
+
+### Resend Test Mode
+
+The system supports Resend's test mode for safe email testing without sending emails to real recipients.
+
+#### Environment Variable
+
+Set `RESEND_TEST_MODE=true` in your Supabase project environment variables to enable test mode.
+
+#### Test Mode Behavior
+
+When `RESEND_TEST_MODE=true`:
+
+- **All emails are redirected** to Resend test addresses:
+  - Feedback emails: `delivered+feedback-{jobId}@resend.dev`
+  - Invoice emails: `delivered+invoice-{invoiceNumber}@resend.dev`
+  - Worker invitations: `delivered+invitation-{token}@resend.dev`
+- **Email subjects are prefixed** with `[TEST]` for easy identification
+- **Resend tags are added** for tracking:
+  - `test-mode`: Email type (feedback, invoice, invitation)
+  - `identifier`: Job ID, invoice number, or invitation token
+  - `original-recipient`: The original recipient email address
+- **Enhanced logging** includes test mode indicators and original recipients
+
+#### Test Addresses
+
+Resend provides several test addresses for different scenarios:
+
+- `delivered@resend.dev` - Simulates successful delivery (default for test mode)
+- `bounced@resend.dev` - Simulates bounced email
+- `complained@resend.dev` - Simulates spam complaint
+
+Labels can be added after the `+` symbol (e.g., `delivered+feedback-123@resend.dev`) for tracking.
+
+#### Usage
+
+**For Testing:**
+
+```bash
+# Set in Supabase project settings
+RESEND_TEST_MODE=true
+```
+
+**For Production:**
+
+```bash
+# Set to false or don't set at all
+RESEND_TEST_MODE=false
+# or simply omit the variable
+```
+
+#### Running Tests
+
+**Unit Tests:**
+
+```bash
+deno test --allow-all database/supabase/functions/_utils/__tests__/feedback-email.test.ts
+```
+
+**Integration Tests:**
+
+```bash
+deno test --allow-all database/supabase/functions/__tests__/feedback-email-integration.test.ts
+```
+
+**All Feedback Email Tests:**
+
+```bash
+deno test --allow-all --filter "feedback"
+```
+
+#### Test Coverage
+
+The test suite covers:
+
+- Token generation (uniqueness, URL-safety, entropy)
+- Email recipient resolution (all precedence scenarios)
+- Test mode detection and redirection
+- Email sending (success, errors, test mode)
+- Integration with job creation flow
+- Error handling and graceful degradation
+
+#### Manual Testing Checklist
+
+1. Set `RESEND_TEST_MODE=true` in Supabase environment
+2. Create a job with `feedback_email_send_immediately=true`
+3. Verify email goes to test address (`delivered+feedback-{jobId}@resend.dev`)
+4. Check email subject includes `[TEST]` prefix
+5. Verify tags in Resend dashboard
+6. Check logs for test mode indicators
+7. Verify original recipient is logged correctly
+8. Test with `RESEND_TEST_MODE=false` to verify production behavior
+
 ## Conclusion
 
 This implementation provides a robust, scalable solution for automatic feedback request emails that:
@@ -544,5 +638,6 @@ This implementation provides a robust, scalable solution for automatic feedback 
 - ✅ Handles errors gracefully
 - ✅ Provides good user experience
 - ✅ Is maintainable and extensible
+- ✅ Includes comprehensive test mode support for safe testing
 
 The phased approach allows for incremental implementation and testing, reducing risk and allowing for adjustments based on user feedback.

@@ -438,12 +438,6 @@ verify_jwt = false
 import_map = "./functions/update-organization-settings/deno.json"
 entrypoint = "./functions/update-organization-settings/index.ts"
 
-[functions.update-field-config]
-enabled = true
-verify_jwt = false
-import_map = "./functions/update-field-config/deno.json"
-entrypoint = "./functions/update-field-config/index.ts"
-
 [functions.reorder-field-configs]
 enabled = true
 verify_jwt = false
@@ -455,6 +449,18 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/list-field-configs/deno.json"
 entrypoint = "./functions/list-field-configs/index.ts"
+
+[functions.update-field-config]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-field-config/deno.json"
+entrypoint = "./functions/update-field-config/index.ts"
+
+[functions.update-field-config-locations]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-field-config-locations/deno.json"
+entrypoint = "./functions/update-field-config-locations/index.ts"
 
 [functions.get-organization-settings]
 enabled = true
@@ -468,17 +474,35 @@ verify_jwt = false
 import_map = "./functions/accept-worker-invitation/deno.json"
 entrypoint = "./functions/accept-worker-invitation/index.ts"
 
+[functions.admin-create-job]
+enabled = true
+verify_jwt = false
+import_map = "./functions/admin-create-job/deno.json"
+entrypoint = "./functions/admin-create-job/index.ts"
+
 [functions.apply-field-config-template]
 enabled = true
 verify_jwt = false
 import_map = "./functions/apply-field-config-template/deno.json"
 entrypoint = "./functions/apply-field-config-template/index.ts"
 
+[functions.auto-send-invoices]
+enabled = true
+verify_jwt = false
+import_map = "./functions/auto-send-invoices/deno.json"
+entrypoint = "./functions/auto-send-invoices/index.ts"
+
 [functions.calculate-invoice]
 enabled = true
 verify_jwt = false
 import_map = "./functions/calculate-invoice/deno.json"
 entrypoint = "./functions/calculate-invoice/index.ts"
+
+[functions.calculate-worker-payment]
+enabled = true
+verify_jwt = false
+import_map = "./functions/calculate-worker-payment/deno.json"
+entrypoint = "./functions/calculate-worker-payment/index.ts"
 
 [functions.create-field-config]
 enabled = true
@@ -564,6 +588,12 @@ verify_jwt = false
 import_map = "./functions/delete-pricing-rule/deno.json"
 entrypoint = "./functions/delete-pricing-rule/index.ts"
 
+[functions.delete-service-pricing-mode]
+enabled = true
+verify_jwt = false
+import_map = "./functions/delete-service-pricing-mode/deno.json"
+entrypoint = "./functions/delete-service-pricing-mode/index.ts"
+
 [functions.get-invoice-details]
 enabled = true
 verify_jwt = false
@@ -575,6 +605,18 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/get-invoice-template-config/deno.json"
 entrypoint = "./functions/get-invoice-template-config/index.ts"
+
+[functions.get-job-by-token]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-job-by-token/deno.json"
+entrypoint = "./functions/get-job-by-token/index.ts"
+
+[functions.get-job-edits]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-job-edits/deno.json"
+entrypoint = "./functions/get-job-edits/index.ts"
 
 [functions.get-worker]
 enabled = true
@@ -593,6 +635,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/list-field-pricing/deno.json"
 entrypoint = "./functions/list-field-pricing/index.ts"
+
+[functions.list-feedback]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-feedback/deno.json"
+entrypoint = "./functions/list-feedback/index.ts"
 
 [functions.list-form-sections]
 enabled = true
@@ -636,6 +684,12 @@ verify_jwt = false
 import_map = "./functions/list-pricing-rules/deno.json"
 entrypoint = "./functions/list-pricing-rules/index.ts"
 
+[functions.list-service-pricing-modes]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-service-pricing-modes/deno.json"
+entrypoint = "./functions/list-service-pricing-modes/index.ts"
+
 [functions.resend-worker-invitation]
 enabled = true
 verify_jwt = false
@@ -653,6 +707,18 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/update-invoice-template-config/deno.json"
 entrypoint = "./functions/update-invoice-template-config/index.ts"
+
+[functions.update-invoice-status]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-invoice-status/deno.json"
+entrypoint = "./functions/update-invoice-status/index.ts"
+
+[functions.update-job]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-job/deno.json"
+entrypoint = "./functions/update-job/index.ts"
 
 [functions.update-location-hierarchy]
 enabled = true
@@ -695,3 +761,27 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/upsert-option-pricing/deno.json"
 entrypoint = "./functions/upsert-option-pricing/index.ts"
+
+[functions.upsert-service-pricing-mode]
+enabled = true
+verify_jwt = false
+import_map = "./functions/upsert-service-pricing-mode/deno.json"
+entrypoint = "./functions/upsert-service-pricing-mode/index.ts"
+
+[functions.create-payment-link]
+enabled = true
+verify_jwt = false
+import_map = "./functions/create-payment-link/deno.json"
+entrypoint = "./functions/create-payment-link/index.ts"
+
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/stripe-webhook/deno.json"
+entrypoint = "./functions/stripe-webhook/index.ts"
+
+[functions.submit-feedback]
+enabled = true
+verify_jwt = false
+import_map = "./functions/submit-feedback/deno.json"
+entrypoint = "./functions/submit-feedback/index.ts"

@@ -1,4 +1,5 @@
 import type { Job, Location, Worker } from "@/lib/types";
+import type { Payment, PaymentLink } from "@/lib/types/payment";
 import type { FieldConfig } from "@clean-log/shared/types";
 
 /**
@@ -79,6 +80,52 @@ export const createMockFieldConfig = (
   archived_at: null,
   created_at: "2024-01-01T00:00:00Z",
   updated_at: "2024-01-01T00:00:00Z",
+  ...overrides,
+});
+
+export const createMockPayment = (overrides?: Partial<Payment>): Payment => ({
+  id: "payment-1",
+  organization_id: "org-1",
+  invoice_id: "invoice-1",
+  amount: 1000.0,
+  currency: "AUD",
+  payment_method: "stripe_checkout_card",
+  stripe_payment_intent_id: "pi_test_123",
+  stripe_checkout_session_id: "cs_test_123",
+  stripe_customer_id: "cus_test_123",
+  stripe_charge_id: "ch_test_123",
+  status: "succeeded",
+  payment_reference: null,
+  payment_date: null,
+  received_at: "2025-01-15T10:00:00Z",
+  fees: 30.0,
+  net_amount: 970.0,
+  reconciled_at: null,
+  reconciled_by: null,
+  reconciliation_notes: null,
+  created_at: "2025-01-15T10:00:00Z",
+  updated_at: "2025-01-15T10:00:00Z",
+  metadata: {},
+  ...overrides,
+});
+
+export const createMockPaymentLink = (
+  overrides?: Partial<PaymentLink>,
+): PaymentLink => ({
+  id: "plink-1",
+  organization_id: "org-1",
+  invoice_id: "invoice-1",
+  stripe_checkout_session_id: "cs_test_123",
+  checkout_url: "https://checkout.stripe.com/test",
+  status: "open",
+  clicked_at: null,
+  clicked_count: 0,
+  payment_completed_at: null,
+  expires_at: "2025-02-15T10:00:00Z",
+  customer_email: null,
+  amount_total: 1000.0,
+  created_at: "2025-01-15T10:00:00Z",
+  updated_at: "2025-01-15T10:00:00Z",
   ...overrides,
 });
 

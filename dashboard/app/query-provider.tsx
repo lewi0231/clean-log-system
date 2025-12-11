@@ -65,3 +65,8 @@ export const mobileConfigKey = (orgId: string | null): QueryKey => [
   "mobile-config",
   orgId,
 ];
+
+export const workerPaymentHistoryKey = (orgId: string | null): QueryKey => [
+  "worker-payment-history",
+  orgId,
+];

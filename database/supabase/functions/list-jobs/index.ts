@@ -20,7 +20,7 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
-    // Fetch jobs with location info
+    // Fetch jobs with location info and invoice data
     const { data: jobs, error: jobsError } = await supabase
       .from("job")
       .select(
@@ -38,8 +38,16 @@ serve(async (req) => {
           address,
           contact_person,
           phone
+        ),
+        invoice_job:invoice_job (
+          invoice:invoice_id (
+            id,
+            invoice_number,
+            status,
+            paid_at
+          )
         )
-      `
+      `,
       )
       .eq("organization_id", organization_id)
       .order("completed_at", { ascending: false });
@@ -62,7 +70,7 @@ serve(async (req) => {
             email,
             phone
           )
-        `
+        `,
         )
         .in("job_id", jobIds);
 
@@ -102,7 +110,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("List jobs error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to list jobs"
+      error instanceof Error ? error : "Failed to list jobs",
     );
   }
 });

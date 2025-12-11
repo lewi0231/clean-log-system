@@ -74,6 +74,46 @@ export function validateEmailConfig(): EmailValidationResult {
 }
 
 /**
+ * Check if test mode is enabled
+ */
+export function isTestMode(): boolean {
+  return Deno.env.get("RESEND_TEST_MODE") === "true";
+}
+
+/**
+ * Get test mode recipient address for a given email type and identifier
+ * Returns Resend test address with label for tracking
+ */
+export function getTestModeRecipient(
+  emailType: "feedback" | "invoice" | "invitation",
+  identifier: string,
+  _originalRecipient: string,
+): string {
+  const testAddresses = {
+    feedback: `delivered+feedback-${identifier}@resend.dev`,
+    invoice: `delivered+invoice-${identifier}@resend.dev`,
+    invitation: `delivered+invitation-${identifier}@resend.dev`,
+  };
+
+  return testAddresses[emailType];
+}
+
+/**
+ * Get test mode tags for Resend API
+ */
+export function getTestModeTags(
+  emailType: "feedback" | "invoice" | "invitation",
+  identifier: string,
+  originalRecipient: string,
+): Array<{ name: string; value: string }> {
+  return [
+    { name: "test-mode", value: emailType },
+    { name: "identifier", value: identifier },
+    { name: "original-recipient", value: originalRecipient },
+  ];
+}
+
+/**
  * Format worker invitation email data
  */
 export function formatWorkerInvitationData(
@@ -205,12 +245,43 @@ export async function sendWorkerInvitationEmail(
   // Format email data
   const emailData = formatWorkerInvitationData(data, configResult.config);
 
+  // Check if test mode is enabled
+  const testMode = isTestMode();
+
+  // Determine recipient and subject based on test mode
+  // Use invitation token as identifier since we don't have worker ID yet
+  const testRecipient = testMode
+    ? getTestModeRecipient("invitation", data.invitationToken, data.workerEmail)
+    : emailData.to[0];
+
+  const emailSubject = testMode
+    ? `[TEST] ${emailData.subject}`
+    : emailData.subject;
+
+  // Log test mode redirection if enabled
+  if (testMode) {
+    console.log(
+      "[TEST MODE] Worker invitation email redirected to test address",
+      {
+        testRecipient,
+        originalRecipient: data.workerEmail,
+        invitationToken: data.invitationToken,
+      },
+    );
+  }
+
   //   TODO - Troubleshoot why template isn't working.
   // Final validation - ensure email doesn't contain null values
-  const requestBody = {
+  const requestBody: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    tags?: Array<{ name: string; value: string }>;
+  } = {
     from: emailData.from,
-    to: emailData.to,
-    subject: emailData.subject,
+    to: [testRecipient],
+    subject: emailSubject,
     // template: {
     //   id: "cleanlogworkerinvite",
     //   variables: emailData.templateVariables,
@@ -218,6 +289,15 @@ export async function sendWorkerInvitationEmail(
     html:
       `<p>Click this to sign up - ${emailData.templateVariables.INVITATION_LINK}</p>`,
   };
+
+  // Add test mode tags if in test mode
+  if (testMode) {
+    requestBody.tags = getTestModeTags(
+      "invitation",
+      data.invitationToken,
+      data.workerEmail,
+    );
+  }
 
   const requestBodyStr = JSON.stringify(requestBody);
   if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
@@ -301,7 +381,22 @@ export async function sendWorkerInvitationEmail(
     const emailId = emailResponse.id;
 
     if (emailId) {
-      console.log("Invitation email sent successfully:", emailId);
+      if (testMode) {
+        console.log(
+          "[TEST MODE] Worker invitation email sent to test address",
+          {
+            mode: "test",
+            emailType: "invitation",
+            testRecipient,
+            originalRecipient: data.workerEmail,
+            invitationToken: data.invitationToken,
+            emailId,
+            timestamp: new Date().toISOString(),
+          },
+        );
+      } else {
+        console.log("Invitation email sent successfully:", emailId);
+      }
       return { success: true, emailId };
     } else {
       console.warn("Resend response missing ID:", emailResponse);
@@ -372,6 +467,7 @@ export interface InvoiceEmailData {
   organizationName: string;
   recipientEmails: string[];
   invoiceUrl?: string; // URL to view invoice (optional, can be added later)
+  paymentLinkUrl?: string; // Stripe payment link URL (optional)
   total: number;
   currency: string;
   dueDate: string;
@@ -441,12 +537,38 @@ export async function sendInvoiceEmail(
 
   const fromEmail =
     `${data.organizationName} <invoices@${configResult.config.resendFromDomain}>`;
-  const emailSubject =
-    `Invoice ${data.invoiceNumber} from ${data.organizationName}`;
+
+  // Check if test mode is enabled
+  const testMode = isTestMode();
+
+  // Determine recipients and subject based on test mode
+  // In test mode, redirect all recipients to test address
+  const testRecipients = testMode
+    ? data.recipientEmails.map((email) =>
+      getTestModeRecipient("invoice", data.invoiceNumber, email)
+    )
+    : data.recipientEmails;
+
+  const emailSubject = testMode
+    ? `[TEST] Invoice ${data.invoiceNumber} from ${data.organizationName}`
+    : `Invoice ${data.invoiceNumber} from ${data.organizationName}`;
+
+  // Log test mode redirection if enabled
+  if (testMode) {
+    console.log("[TEST MODE] Invoice email redirected to test addresses", {
+      testRecipients,
+      originalRecipients: data.recipientEmails,
+      invoiceNumber: data.invoiceNumber,
+    });
+  }
 
   // Build email HTML
   const invoiceUrlHtml = data.invoiceUrl
-    ? `<p><a href="${data.invoiceUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Invoice</a></p>`
+    ? `<p><a href="${data.invoiceUrl}" style="background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">View Invoice</a></p>`
+    : "";
+
+  const paymentLinkHtml = data.paymentLinkUrl
+    ? `<p style="margin-top: 20px;"><a href="${data.paymentLinkUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">Pay Now</a></p>`
     : "";
 
   const html = `
@@ -478,6 +600,7 @@ export async function sendInvoiceEmail(
               <li><strong>Due Date:</strong> ${formattedDueDate}</li>
             </ul>
             ${invoiceUrlHtml}
+            ${paymentLinkHtml}
             <p class="total">Total Due: ${formattedTotal}</p>
           </div>
           <div class="footer">
@@ -489,12 +612,28 @@ export async function sendInvoiceEmail(
     </html>
   `;
 
-  const requestBody = {
+  const requestBody: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    tags?: Array<{ name: string; value: string }>;
+  } = {
     from: fromEmail,
-    to: data.recipientEmails,
+    to: testRecipients,
     subject: emailSubject,
     html: html,
   };
+
+  // Add test mode tags if in test mode
+  // Use first recipient for original-recipient tag (or combine all)
+  if (testMode && data.recipientEmails.length > 0) {
+    requestBody.tags = getTestModeTags(
+      "invoice",
+      data.invoiceNumber,
+      data.recipientEmails.join(","),
+    );
+  }
 
   const requestBodyStr = JSON.stringify(requestBody);
   if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
@@ -521,10 +660,18 @@ export async function sendInvoiceEmail(
   }
 
   try {
-    console.log("Sending invoice email:", {
-      invoiceNumber: data.invoiceNumber,
-      recipients: data.recipientEmails,
-    });
+    if (testMode) {
+      console.log("[TEST MODE] Sending invoice email to test addresses", {
+        invoiceNumber: data.invoiceNumber,
+        testRecipients,
+        originalRecipients: data.recipientEmails,
+      });
+    } else {
+      console.log("Sending invoice email:", {
+        invoiceNumber: data.invoiceNumber,
+        recipients: data.recipientEmails,
+      });
+    }
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -577,7 +724,19 @@ export async function sendInvoiceEmail(
     const emailId = emailResponse.id;
 
     if (emailId) {
-      console.log("Invoice email sent successfully:", emailId);
+      if (testMode) {
+        console.log("[TEST MODE] Invoice email sent to test addresses", {
+          mode: "test",
+          emailType: "invoice",
+          testRecipients,
+          originalRecipients: data.recipientEmails,
+          invoiceNumber: data.invoiceNumber,
+          emailId,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.log("Invoice email sent successfully:", emailId);
+      }
       return { success: true, emailId };
     } else {
       console.warn("Resend response missing ID:", emailResponse);

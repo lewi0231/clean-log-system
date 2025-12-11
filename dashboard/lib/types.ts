@@ -103,6 +103,14 @@ export interface Job {
     email: string;
     phone: string | null;
   }>;
+  invoice_job?: Array<{
+    invoice: {
+      id: string;
+      invoice_number: string;
+      status: InvoiceStatus;
+      paid_at: string | null;
+    } | null;
+  }>;
 }
 
 export type PricingType =
@@ -332,6 +340,15 @@ export interface Invoice {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Payment tracking fields (from migration)
+  payment_link_id?: string | null;
+  stripe_customer_id?: string | null;
+  bsb?: string | null;
+  account_number?: string | null;
+  account_name?: string | null;
+  total_paid?: number;
+  payment_count?: number;
+  payment_method_used?: string | null;
 }
 
 export interface InvoiceWithJobs extends Invoice {
@@ -366,6 +383,15 @@ export interface ListInvoicesRequest {
   start_date?: string;
   end_date?: string;
 }
+
+// Re-export payment types for convenience
+export type {
+  Payment,
+  PaymentLink,
+  PaymentLinkStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "./types/payment";
 
 export interface LineItemDisplayConfig {
   include_option_value: boolean;
@@ -434,4 +460,16 @@ export interface Feedback {
       name: string;
     }>;
   };
+}
+
+export interface JobEdit {
+  id: number;
+  job_id: string;
+  edited_by_email: string;
+  edited_by_user_id: string | null;
+  action: "UPDATE" | "DELETE";
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  changed_fields: string[];
+  changed_at: string;
 }

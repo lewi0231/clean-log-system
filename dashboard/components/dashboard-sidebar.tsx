@@ -11,6 +11,7 @@ import {
   Smartphone,
   Star,
   Users,
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -52,6 +53,11 @@ const navigation = [
     icon: FileText,
   },
   {
+    name: "Worker Payments",
+    href: "/dashboard/worker-payments",
+    icon: Wallet,
+  },
+  {
     name: "Settings",
     href: "/dashboard/settings",
     icon: Settings,
@@ -67,10 +73,10 @@ export default function DashboardSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-gradient-to-b from-sidebar/95 to-sidebar/90 backdrop-blur-xl border-r border-sidebar-border/50 flex flex-col p-6 gap-8 fixed h-screen overflow-y-auto">
+    <aside className="w-64 bg-linear-to-b from-sidebar/95 to-sidebar/90 backdrop-blur-xl border-r border-sidebar-border/50 flex flex-col p-6 gap-8 fixed h-screen overflow-y-auto">
       {/* Logo/Branding Section */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-lg bg-linear-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
           <ChartBar className="w-6 h-6 text-white" strokeWidth={3} />
         </div>
         <div>
