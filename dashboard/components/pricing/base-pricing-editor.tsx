@@ -1399,32 +1399,34 @@ export default function BasePricingEditor({
                           </Button>
                         </div>
 
-                        {/* Location Overrides for Field-Based */}
-                        {(() => {
-                          const fieldBasedOverrides = getBasePricingOverrides(
-                            basePricing,
-                            selectedFieldConfigId,
-                            optionValue,
-                            locationId,
-                            locationHierarchyId
-                          );
-                          return (
-                            <LocationOverridesMatrix
-                              rows={fieldBasedOverrides}
-                              emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this option's price to create an override."
-                              onDelete={async (id) => {
-                                try {
-                                  await deletePricing(id);
-                                } catch (error) {
-                                  console.error(
-                                    "Failed to delete override",
-                                    error
-                                  );
-                                }
-                              }}
-                            />
-                          );
-                        })()}
+                        {/* Location Overrides for Field-Based - Only show when organizational default is selected */}
+                        {!locationId &&
+                          !locationHierarchyId &&
+                          (() => {
+                            const fieldBasedOverrides = getBasePricingOverrides(
+                              basePricing,
+                              selectedFieldConfigId,
+                              optionValue,
+                              locationId,
+                              locationHierarchyId
+                            );
+                            return (
+                              <LocationOverridesMatrix
+                                rows={fieldBasedOverrides}
+                                emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this option's price to create an override."
+                                onDelete={async (id) => {
+                                  try {
+                                    await deletePricing(id);
+                                  } catch (error) {
+                                    console.error(
+                                      "Failed to delete override",
+                                      error
+                                    );
+                                  }
+                                }}
+                              />
+                            );
+                          })()}
                       </div>
                     </Card>
                   );

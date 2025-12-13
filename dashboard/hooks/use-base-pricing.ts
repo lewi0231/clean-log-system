@@ -92,13 +92,20 @@ export function useBasePricing(
     const targetLocationId = request.location_id ?? filters?.locationId ?? null;
 
     const isFieldBased = Boolean(request.job_type_field_config_id);
+    const targetPricingContext = request.pricingContext ||
+      filters?.pricingContext || "customer";
 
+    // Find existing rule matching location, job type (if applicable), AND pricing_context
+    // Customer and worker pricing are separate rules
     const existing = basePricing.find((pricing) => {
+      const ruleContext = pricing.source_rule?.pricing_context || "customer"; // Default to 'customer' for backward compatibility
       const matchesLocation =
         (pricing.location_hierarchy_id || null) === targetLocationHierarchyId &&
         (pricing.location_id || null) === targetLocationId;
 
-      if (!matchesLocation) return false;
+      if (!matchesLocation || ruleContext !== targetPricingContext) {
+        return false;
+      }
 
       if (isFieldBased) {
         return (
@@ -114,13 +121,13 @@ export function useBasePricing(
     const adjustmentType = request.adjustment_type || "add";
     const pricingType = adjustmentType === "add" ? "fixed" : "percentage";
 
-    const pricing = await PricingService.upsertRule({
+    // Build the request object
+    const pricingRequest: UpsertPricingRuleRequest = {
       id: existing?.id,
       organization_id: organizationId,
       scope: "base",
       pricing_type: pricingType,
-      pricing_context: request.pricingContext || filters?.pricingContext ||
-        "customer",
+      pricing_context: targetPricingContext,
       field_config_id: request.job_type_field_config_id || null,
       option_value: request.job_type_value || null,
       base_price: adjustmentType === "add" ? request.customer_base_price : null,
@@ -132,13 +139,20 @@ export function useBasePricing(
       },
       location_hierarchy_id: targetLocationHierarchyId,
       location_id: request.location_id ?? targetLocationId,
-      worker_payment_type: request.worker_base_payment
-        ? "fixed_rate"
-        : existing?.worker_payment_type || null,
-      worker_payment_value: request.worker_base_payment ?? null,
       currency: request.currency || "USD",
       conditions: request.conditions,
-    });
+    };
+
+    // Only include worker_payment fields for customer pricing rules
+    // Worker pricing rules use base_price directly and cannot have worker_payment fields
+    if (targetPricingContext === "customer") {
+      pricingRequest.worker_payment_type = request.worker_base_payment
+        ? "fixed_rate"
+        : existing?.worker_payment_type || null;
+      pricingRequest.worker_payment_value = request.worker_base_payment ?? null;
+    }
+
+    const pricing = await PricingService.upsertRule(pricingRequest);
 
     await fetchBasePricing();
     return transformBaseRule(pricing);
@@ -170,6 +184,7 @@ export function useBasePricing(
 }
 
 const transformBaseRule = (rule: PricingRule): BasePricing => {
+  const isWorkerContext = rule.pricing_context === "worker";
   const adjustmentType =
     (typeof (rule.metadata as Record<string, unknown> | undefined)?.[
         "adjustment_type"
@@ -190,7 +205,11 @@ const transformBaseRule = (rule: PricingRule): BasePricing => {
     job_type_value: rule.option_value || null,
     adjustment_type: adjustmentType,
     customer_base_price: customerValue,
-    worker_base_payment: rule.worker_payment_value ?? null,
+    // For worker context rules, worker_base_payment comes from base_price
+    // For customer context rules, it comes from worker_payment_value field
+    worker_base_payment: isWorkerContext
+      ? customerValue
+      : rule.worker_payment_value ?? null,
     worker_payment_type: rule.worker_payment_type ?? null,
     location_id: rule.location_id,
     location_hierarchy_id: rule.location_hierarchy_id,

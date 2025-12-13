@@ -106,31 +106,47 @@ export function useFieldPricing(
 
     const targetLocationHierarchyId = options?.locationHierarchyId ?? null;
     const targetLocationId = options?.locationId ?? null;
+    const targetPricingContext = options?.pricingContext || "customer";
 
+    // Find existing rule matching field, location, AND pricing_context
+    // Customer and worker pricing are separate rules
     const existingRule = fieldPricing.find(
-      (rule) =>
-        rule.field_config_id === fieldConfigId &&
-        (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
-        (rule.location_id || null) === targetLocationId,
+      (rule) => {
+        const ruleContext = rule.source_rule?.pricing_context || "customer"; // Default to 'customer' for backward compatibility
+        return (
+          rule.field_config_id === fieldConfigId &&
+          (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
+          (rule.location_id || null) === targetLocationId &&
+          ruleContext === targetPricingContext
+        );
+      },
     );
 
-    const pricing = await PricingService.upsertRule({
+    // Build the request object
+    const request: UpsertPricingRuleRequest = {
       id: existingRule?.id,
       organization_id: organizationId,
       scope: "field",
       pricing_type: options?.pricingType || "unit",
-      pricing_context: options?.pricingContext || "customer",
+      pricing_context: targetPricingContext,
       field_config_id: fieldConfigId,
       applies_to_field_type: options?.appliesToFieldType,
       base_price: customerPrice,
       currency: options?.currency || "USD",
       location_hierarchy_id: targetLocationHierarchyId,
       location_id: targetLocationId,
-      worker_payment_type: options?.workerPaymentType || null,
-      worker_payment_value: options?.workerPaymentValue ?? null,
       conditions: options?.conditions,
       expires_at: options?.expirationDate || null,
-    });
+    };
+
+    // Only include worker_payment fields for customer pricing rules
+    // Worker pricing rules use base_price directly and cannot have worker_payment fields
+    if (targetPricingContext === "customer") {
+      request.worker_payment_type = options?.workerPaymentType || null;
+      request.worker_payment_value = options?.workerPaymentValue ?? null;
+    }
+
+    const pricing = await PricingService.upsertRule(request);
 
     await fetchFieldPricing();
     return transformFieldPricing(pricing);
@@ -160,22 +176,31 @@ export function useFieldPricing(
   };
 }
 
-const transformFieldPricing = (rule: PricingRule): FieldPricing => ({
-  id: rule.id,
-  organization_id: rule.organization_id,
-  field_config_id: rule.field_config_id || "",
-  location_id: rule.location_id,
-  location_hierarchy_id: rule.location_hierarchy_id,
-  pricing_type: rule.pricing_type,
-  customer_price: rule.pricing_type === "percentage"
+const transformFieldPricing = (rule: PricingRule): FieldPricing => {
+  const isWorkerContext = rule.pricing_context === "worker";
+  const basePrice = rule.pricing_type === "percentage"
     ? rule.percentage_rate ?? 0
-    : rule.base_price ?? 0,
-  currency: rule.currency,
-  applies_to_field_type: rule.applies_to_field_type || null,
-  worker_payment_type: rule.worker_payment_type,
-  worker_payment_value: rule.worker_payment_value,
-  source_rule: rule,
-  field_config: rule.field_config,
-  location: rule.location,
-  location_node: rule.location_node,
-});
+    : rule.base_price ?? 0;
+
+  return {
+    id: rule.id,
+    organization_id: rule.organization_id,
+    field_config_id: rule.field_config_id || "",
+    location_id: rule.location_id,
+    location_hierarchy_id: rule.location_hierarchy_id,
+    pricing_type: rule.pricing_type,
+    customer_price: basePrice,
+    currency: rule.currency,
+    applies_to_field_type: rule.applies_to_field_type || null,
+    worker_payment_type: rule.worker_payment_type,
+    // For worker context rules, worker_payment_value comes from base_price
+    // For customer context rules, it comes from worker_payment_value field
+    worker_payment_value: isWorkerContext
+      ? basePrice
+      : rule.worker_payment_value,
+    source_rule: rule,
+    field_config: rule.field_config,
+    location: rule.location,
+    location_node: rule.location_node,
+  };
+};

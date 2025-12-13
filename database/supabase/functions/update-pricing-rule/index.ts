@@ -5,6 +5,7 @@ import { validateRequiredFields } from "../_utils/validation.ts";
 
 interface UpdatePricingRuleRequest {
   id: string;
+  organization_id?: string; // Optional but recommended for security validation
   scope?: "field" | "option" | "base" | "global";
   pricing_type?: "unit" | "fixed" | "tiered" | "percentage" | "conditional";
   pricing_context?: "customer" | "worker";
@@ -79,6 +80,28 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    // Verify the pricing rule exists and optionally validate organization_id
+    const { data: existingRule, error: fetchError } = await supabase
+      .from("pricing_rule")
+      .select("id, organization_id")
+      .eq("id", body.id)
+      .single();
+
+    if (fetchError || !existingRule) {
+      return errorResponse("Pricing rule not found", 404);
+    }
+
+    // If organization_id is provided, validate it matches
+    if (
+      body.organization_id &&
+      existingRule.organization_id !== body.organization_id
+    ) {
+      return errorResponse(
+        "Pricing rule does not belong to the specified organization",
+        403,
+      );
+    }
+
     const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
@@ -129,7 +152,14 @@ serve(async (req) => {
       .select("*")
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("Database update error:", updateError);
+      throw updateError;
+    }
+
+    if (!pricingRule) {
+      return errorResponse("Pricing rule not found", 404);
+    }
 
     if (body.conditions) {
       await supabase
@@ -163,8 +193,26 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Update pricing rule error:", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to update pricing rule",
-    );
+
+    // Extract error message from various error types
+    let errorMessage = "Failed to update pricing rule";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === "object" && error !== null) {
+      // Handle Postgres errors and other object errors
+      if ("message" in error && typeof error.message === "string") {
+        errorMessage = error.message;
+      } else if ("details" in error && typeof error.details === "string") {
+        errorMessage = error.details;
+      } else if ("hint" in error && typeof error.hint === "string") {
+        errorMessage = error.hint;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    }
+
+    return errorResponse(errorMessage, 500);
   }
 });

@@ -747,23 +747,31 @@ export default function FieldPricingList({
                         size="sm"
                         onClick={() => handleSave(fieldConfig)}
                         disabled={
+                          isSaving ||
                           !hasChanges ||
                           (showBothContexts
-                            ? (!currentCustomerPrice && !currentWorkerPrice) ||
-                              (currentCustomerPrice &&
-                                (isNaN(parseFloat(currentCustomerPrice)) ||
-                                  parseFloat(currentCustomerPrice) < 0)) ||
-                              (currentWorkerPrice &&
-                                (isNaN(parseFloat(currentWorkerPrice)) ||
-                                  parseFloat(currentWorkerPrice) < 0))
+                            ? // Allow saving if at least one valid price is provided
+                              (() => {
+                                const customerValid =
+                                  currentCustomerPrice &&
+                                  currentCustomerPrice.trim() !== "" &&
+                                  !isNaN(parseFloat(currentCustomerPrice)) &&
+                                  parseFloat(currentCustomerPrice) >= 0;
+                                const workerValid =
+                                  currentWorkerPrice &&
+                                  currentWorkerPrice.trim() !== "" &&
+                                  !isNaN(parseFloat(currentWorkerPrice)) &&
+                                  parseFloat(currentWorkerPrice) >= 0;
+                                // Disable if both are empty or both are invalid
+                                return !customerValid && !workerValid;
+                              })()
                             : pricingContext === "customer"
                             ? !currentCustomerPrice ||
                               isNaN(parseFloat(currentCustomerPrice)) ||
                               parseFloat(currentCustomerPrice) < 0
                             : !currentWorkerPrice ||
                               isNaN(parseFloat(currentWorkerPrice)) ||
-                              parseFloat(currentWorkerPrice) < 0) ||
-                          isSaving
+                              parseFloat(currentWorkerPrice) < 0)
                         }
                       >
                         {isSaving ? (
@@ -807,23 +815,26 @@ export default function FieldPricingList({
                       )}
                     </div>
 
-                    <LocationOverridesMatrix
-                      rows={overrides}
-                      emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
-                      onDelete={async (id) => {
-                        setDeletingIds((prev) => new Set(prev).add(id));
-                        try {
-                          await deletePricing(id);
-                        } finally {
-                          setDeletingIds((prev) => {
-                            const next = new Set(prev);
-                            next.delete(id);
-                            return next;
-                          });
-                        }
-                      }}
-                      deletingIds={deletingIds}
-                    />
+                    {/* Only show location overrides when organizational default is selected */}
+                    {!locationId && !locationHierarchyId && (
+                      <LocationOverridesMatrix
+                        rows={overrides}
+                        emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
+                        onDelete={async (id) => {
+                          setDeletingIds((prev) => new Set(prev).add(id));
+                          try {
+                            await deletePricing(id);
+                          } finally {
+                            setDeletingIds((prev) => {
+                              const next = new Set(prev);
+                              next.delete(id);
+                              return next;
+                            });
+                          }
+                        }}
+                        deletingIds={deletingIds}
+                      />
+                    )}
 
                     {isPricingRulesEnabled() && (
                       <ConditionalRuleChips

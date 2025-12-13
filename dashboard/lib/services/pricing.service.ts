@@ -114,18 +114,125 @@ export class PricingService {
         body: request,
       });
 
-      if (error) throw error;
+      // Handle Supabase FunctionsHttpError - when edge function returns non-2xx
+      if (error) {
+        // Try to extract error message from multiple sources
+        let errorMessage = "Failed to upsert pricing rule";
+
+        // First, check if data contains error information (sometimes Supabase puts error response in data)
+        if (data && typeof data === "object" && "error" in data) {
+          if (typeof data.error === "string") {
+            errorMessage = data.error;
+          }
+        }
+
+        // Check if error has a context with response data
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "context" in error &&
+          typeof error.context === "object" &&
+          error.context !== null
+        ) {
+          const context = error.context as Record<string, unknown>;
+          // Check for response body
+          if ("body" in context) {
+            try {
+              const body = typeof context.body === "string"
+                ? JSON.parse(context.body)
+                : context.body;
+              if (
+                typeof body === "object" &&
+                body !== null &&
+                "error" in body &&
+                typeof body.error === "string"
+              ) {
+                errorMessage = body.error;
+              }
+            } catch {
+              // Ignore JSON parse errors
+            }
+          }
+          // Check for response data directly
+          if ("data" in context && typeof context.data === "object") {
+            const responseData = context.data as Record<string, unknown>;
+            if (
+              "error" in responseData &&
+              typeof responseData.error === "string"
+            ) {
+              errorMessage = responseData.error;
+            }
+          }
+        }
+
+        // Check if error has message property
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof error.message === "string" &&
+          errorMessage === "Failed to upsert pricing rule"
+        ) {
+          errorMessage = error.message;
+        } else if (
+          error instanceof Error &&
+          errorMessage === "Failed to upsert pricing rule"
+        ) {
+          errorMessage = error.message;
+        } else if (typeof error === "string") {
+          errorMessage = error;
+        }
+
+        log.error("PricingService: Supabase function invoke error", {
+          error: errorMessage,
+          errorObject: error,
+          errorType: error?.constructor?.name,
+          hasContext: error && typeof error === "object" && "context" in error,
+          data,
+        });
+        throw new Error(errorMessage);
+      }
+
+      // Check for error in response data (edge functions return errors in data.error)
+      if (data && typeof data === "object" && "error" in data) {
+        const errorMessage = typeof data.error === "string"
+          ? data.error
+          : "Failed to upsert pricing rule";
+        log.error("PricingService: Edge function returned error", {
+          error: errorMessage,
+          data,
+        });
+        throw new Error(errorMessage);
+      }
 
       if (!data || !data.pricing_rule) {
-        throw new Error("Failed to upsert pricing rule");
+        const errorMessage = data?.error || "Failed to upsert pricing rule";
+        log.error("PricingService: Missing pricing rule in response", {
+          data,
+        });
+        throw new Error(errorMessage);
       }
 
       return data.pricing_rule as PricingRule;
     } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : typeof err === "object" && err !== null && "message" in err
+        ? String(err.message)
+        : "Unknown error";
+
       log.error("PricingService: Failed to upsert pricing rule", {
-        error: err instanceof Error ? err.message : "Unknown error",
+        error: errorMessage,
+        errorObject: err,
+        request: {
+          organizationId: request.organization_id,
+          scope: request.scope,
+          pricingType: request.pricing_type,
+          hasId: Boolean(request.id),
+        },
       });
-      throw err;
+
+      throw err instanceof Error ? err : new Error(errorMessage);
     }
   }
 

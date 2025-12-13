@@ -243,8 +243,26 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Create pricing rule error:", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to create pricing rule",
-    );
+
+    // Extract error message from various error types
+    let errorMessage = "Failed to create pricing rule";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === "object" && error !== null) {
+      // Handle Postgres errors and other object errors
+      if ("message" in error && typeof error.message === "string") {
+        errorMessage = error.message;
+      } else if ("details" in error && typeof error.details === "string") {
+        errorMessage = error.details;
+      } else if ("hint" in error && typeof error.hint === "string") {
+        errorMessage = error.hint;
+      } else {
+        errorMessage = JSON.stringify(error);
+      }
+    } else if (typeof error === "string") {
+      errorMessage = error;
+    }
+
+    return errorResponse(errorMessage, 500);
   }
 });

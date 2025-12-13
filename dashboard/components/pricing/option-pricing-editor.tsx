@@ -56,6 +56,7 @@ export default function OptionPricingEditor({
     error: customerError,
     upsertPricing: upsertCustomerPricing,
     deletePricing: deleteCustomerPricing,
+    refetch: refetchCustomerPricing,
   } = useOptionPricing(fieldConfig.id, {
     locationHierarchyId,
     locationId,
@@ -68,6 +69,7 @@ export default function OptionPricingEditor({
     error: workerError,
     upsertPricing: upsertWorkerPricing,
     deletePricing: deleteWorkerPricing,
+    refetch: refetchWorkerPricing,
   } = useOptionPricing(fieldConfig.id, {
     locationHierarchyId,
     locationId,
@@ -196,6 +198,8 @@ export default function OptionPricingEditor({
               pricingContext: "customer",
             }
           );
+          // Explicitly refetch to ensure UI updates
+          await refetchCustomerPricing();
         }
 
         // Save worker pricing if provided
@@ -207,6 +211,8 @@ export default function OptionPricingEditor({
             pricingContext: "worker",
             workerPaymentRate: workerPrice,
           });
+          // Explicitly refetch to ensure UI updates
+          await refetchWorkerPricing();
         }
 
         setEditingPrices((prev) => {
@@ -245,6 +251,12 @@ export default function OptionPricingEditor({
           pricingContext,
           ...(pricingContext === "worker" && { workerPaymentRate: price }),
         });
+        // Explicitly refetch to ensure UI updates
+        const refetch =
+          pricingContext === "customer"
+            ? refetchCustomerPricing
+            : refetchWorkerPricing;
+        await refetch();
         setEditingPrices((prev) => {
           const next = { ...prev };
           delete next[optionValue];
@@ -263,22 +275,34 @@ export default function OptionPricingEditor({
   };
 
   const handleSaveAll = async () => {
+    if (showBothContexts) {
+      // For showBothContexts, handleSave already handles saving both customer and worker
+      // This function is mainly for single context mode
+      return;
+    }
+
     const changesToSave: Array<{ optionValue: string; price: number }> = [];
 
     // Validate all changes
     for (const [optionValue, editing] of Object.entries(editingPrices)) {
-      if (!editing || editing.trim() === "") continue;
+      if (!editing) continue;
 
-      const customerPrice = parseFloat(editing);
-      if (isNaN(customerPrice) || customerPrice < 0) continue;
+      const priceValue =
+        pricingContext === "customer" ? editing.customer : editing.worker;
+      if (!priceValue || priceValue.trim() === "") continue;
+
+      const price = parseFloat(priceValue);
+      if (isNaN(price) || price < 0) continue;
 
       const pricingEntry = pricingMap[optionValue];
       const existingPrice =
-        pricingEntry?.record.customer_price.toString() || "";
+        pricingContext === "customer"
+          ? pricingEntry?.record.customer_price.toString() || ""
+          : pricingEntry?.record.worker_payment_rate?.toString() || "";
 
       // Only save if there's an actual change
-      if (editing !== existingPrice) {
-        changesToSave.push({ optionValue, price: customerPrice });
+      if (priceValue !== existingPrice) {
+        changesToSave.push({ optionValue, price });
       }
     }
 
@@ -296,6 +320,7 @@ export default function OptionPricingEditor({
             locationHierarchyId,
             expirationDate,
             pricingContext,
+            ...(pricingContext === "worker" && { workerPaymentRate: price }),
           })
         )
       );
@@ -310,21 +335,39 @@ export default function OptionPricingEditor({
   };
 
   const handleApplyBulkPrice = async () => {
-    const price = parseFloat(bulkPrice);
+    if (showBothContexts) {
+      // For showBothContexts, use handleApplyBulkPriceToAll instead
+      return;
+    }
+
+    const price = parseFloat(
+      pricingContext === "customer" ? bulkCustomerPrice : bulkWorkerPrice
+    );
     if (isNaN(price) || price < 0) return;
 
     // Add to editingPrices for unpriced options, then use save all
     const optionsWithoutPrice = options.filter(
       (opt) => pricingMap[opt]?.source !== scopeSource
     );
-    const newEditingPrices: Record<string, string> = {};
+    const newEditingPrices: Record<
+      string,
+      { customer?: string; worker?: string }
+    > = {};
 
     for (const optionValue of optionsWithoutPrice) {
-      newEditingPrices[optionValue] = price.toString();
+      newEditingPrices[optionValue] =
+        pricingContext === "customer"
+          ? { customer: price.toString() }
+          : { worker: price.toString() };
     }
 
     setEditingPrices((prev) => ({ ...prev, ...newEditingPrices }));
-    setBulkPrice("");
+
+    if (pricingContext === "customer") {
+      setBulkCustomerPrice("");
+    } else {
+      setBulkWorkerPrice("");
+    }
 
     // Use save all mechanism
     setSavingAll(true);
@@ -336,6 +379,7 @@ export default function OptionPricingEditor({
             locationHierarchyId,
             expirationDate,
             pricingContext,
+            ...(pricingContext === "worker" && { workerPaymentRate: price }),
           })
         )
       );
@@ -368,14 +412,15 @@ export default function OptionPricingEditor({
 
       setSavingAll(true);
       try {
-        await Promise.all(
-          options.map(async (optionValue) => {
-            if (
-              customerPrice !== null &&
-              !isNaN(customerPrice) &&
-              customerPrice >= 0
-            ) {
-              await upsertCustomerPricing(
+        // Save all customer pricing first (skip individual refetches to avoid race conditions)
+        if (
+          customerPrice !== null &&
+          !isNaN(customerPrice) &&
+          customerPrice >= 0
+        ) {
+          await Promise.all(
+            options.map((optionValue) =>
+              upsertCustomerPricing(
                 fieldConfig.id,
                 optionValue,
                 customerPrice,
@@ -384,29 +429,32 @@ export default function OptionPricingEditor({
                   locationHierarchyId,
                   expirationDate,
                   pricingContext: "customer",
+                  skipRefetch: true, // Skip individual refetches
                 }
-              );
-            }
-            if (
-              workerPrice !== null &&
-              !isNaN(workerPrice) &&
-              workerPrice >= 0
-            ) {
-              await upsertWorkerPricing(
-                fieldConfig.id,
-                optionValue,
-                workerPrice,
-                {
-                  locationId,
-                  locationHierarchyId,
-                  expirationDate,
-                  pricingContext: "worker",
-                  workerPaymentRate: workerPrice,
-                }
-              );
-            }
-          })
-        );
+              )
+            )
+          );
+          // Single refetch after all saves complete
+          await refetchCustomerPricing();
+        }
+
+        // Save all worker pricing
+        if (workerPrice !== null && !isNaN(workerPrice) && workerPrice >= 0) {
+          await Promise.all(
+            options.map((optionValue) =>
+              upsertWorkerPricing(fieldConfig.id, optionValue, workerPrice, {
+                locationId,
+                locationHierarchyId,
+                expirationDate,
+                pricingContext: "worker",
+                workerPaymentRate: workerPrice,
+                skipRefetch: true, // Skip individual refetches
+              })
+            )
+          );
+          // Single refetch after all saves complete
+          await refetchWorkerPricing();
+        }
       } catch (error) {
         console.error("Failed to apply bulk pricing", error);
       } finally {
@@ -463,10 +511,6 @@ export default function OptionPricingEditor({
       if (!editing) return false;
 
       if (showBothContexts) {
-        const customerPrice = editing.customer
-          ? parseFloat(editing.customer)
-          : null;
-        const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
         const customerEntry = customerPricingMap[optionValue];
         const workerEntry = workerPricingMap[optionValue];
         const existingCustomerPrice =
@@ -522,10 +566,8 @@ export default function OptionPricingEditor({
     );
   }
 
-  const equationPreview =
-    fieldConfig.field_type === "grouped_breakdown"
-      ? "Total = Σ (price_per_group × quantity_per_group)"
-      : "Total = Σ (price_per_group × quantity_per_group)";
+  // Create a more understandable equation
+  const equationPreview = `Total = Sum of (price for each option × quantity for that option)`;
 
   return (
     <div className="space-y-4">
@@ -739,11 +781,6 @@ export default function OptionPricingEditor({
                 : pricingContext === "customer"
                 ? customerEntry
                 : workerEntry;
-              const scopedPricing = showBothContexts
-                ? customerPricing
-                : pricingContext === "customer"
-                ? customerPricing
-                : workerPricing;
 
               const editing = editingPrices[optionValue];
               const currentCustomerPrice =
@@ -946,25 +983,28 @@ export default function OptionPricingEditor({
                     </>
                   )}
 
-                  {overrides.length > 0 && (
-                    <LocationOverridesMatrix
-                      rows={overrides}
-                      emptyMessage="No overrides for this option"
-                      onDelete={async (id) => {
-                        setDeletingIds((prev) => new Set(prev).add(id));
-                        try {
-                          await deletePricing(id);
-                        } finally {
-                          setDeletingIds((prev) => {
-                            const next = new Set(prev);
-                            next.delete(id);
-                            return next;
-                          });
-                        }
-                      }}
-                      deletingIds={deletingIds}
-                    />
-                  )}
+                  {/* Only show location overrides when organizational default is selected */}
+                  {!locationId &&
+                    !locationHierarchyId &&
+                    overrides.length > 0 && (
+                      <LocationOverridesMatrix
+                        rows={overrides}
+                        emptyMessage="No overrides for this option"
+                        onDelete={async (id) => {
+                          setDeletingIds((prev) => new Set(prev).add(id));
+                          try {
+                            await deletePricing(id);
+                          } finally {
+                            setDeletingIds((prev) => {
+                              const next = new Set(prev);
+                              next.delete(id);
+                              return next;
+                            });
+                          }
+                        }}
+                        deletingIds={deletingIds}
+                      />
+                    )}
                 </div>
               );
             })}

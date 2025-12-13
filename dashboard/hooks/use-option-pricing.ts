@@ -1,6 +1,7 @@
 "use client";
 
 import { PricingService } from "@/lib/services";
+import type { UpsertPricingRuleRequest } from "@/lib/services/pricing.service";
 import type { OptionPricing, PricingRule } from "@/lib/types";
 import { useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
@@ -28,6 +29,7 @@ interface UseOptionPricingResult {
       currency?: string;
       expirationDate?: string | null;
       pricingContext?: "customer" | "worker";
+      skipRefetch?: boolean;
     },
   ) => Promise<OptionPricing>;
   deletePricing: (id: string) => Promise<void>;
@@ -87,6 +89,7 @@ export function useOptionPricing(
       currency?: string;
       expirationDate?: string | null;
       pricingContext?: "customer" | "worker";
+      skipRefetch?: boolean;
     },
   ): Promise<OptionPricing> => {
     if (!organizationId) {
@@ -96,36 +99,56 @@ export function useOptionPricing(
     const targetLocationHierarchyId = options?.locationHierarchyId ??
       filters?.locationHierarchyId ?? null;
     const targetLocationId = options?.locationId ?? filters?.locationId ?? null;
+    const targetPricingContext = options?.pricingContext ||
+      filters?.pricingContext || "customer";
 
+    // Find existing rule matching field, option, location, AND pricing_context
+    // Customer and worker pricing are separate rules
     const existingPricing = optionPricing.find(
-      (pricing) =>
-        pricing.field_config_id === fieldConfigId &&
-        pricing.option_value === optionValue &&
-        (pricing.location_hierarchy_id || null) === targetLocationHierarchyId &&
-        (pricing.location_id || null) === targetLocationId,
+      (pricing) => {
+        const ruleContext = pricing.source_rule?.pricing_context || "customer"; // Default to 'customer' for backward compatibility
+        return (
+          pricing.field_config_id === fieldConfigId &&
+          pricing.option_value === optionValue &&
+          (pricing.location_hierarchy_id || null) ===
+            targetLocationHierarchyId &&
+          (pricing.location_id || null) === targetLocationId &&
+          ruleContext === targetPricingContext
+        );
+      },
     );
 
-    const pricing = await PricingService.upsertRule({
+    // Build the request object
+    const request: UpsertPricingRuleRequest = {
       id: existingPricing?.id,
       organization_id: organizationId,
       scope: "option",
       pricing_type: "fixed",
-      pricing_context: options?.pricingContext || filters?.pricingContext ||
-        "customer",
+      pricing_context: targetPricingContext,
       field_config_id: fieldConfigId,
       option_value: optionValue,
       base_price: customerPrice,
       currency: options?.currency || "USD",
       location_hierarchy_id: targetLocationHierarchyId,
       location_id: targetLocationId,
-      worker_payment_type: options?.workerPaymentRate
-        ? "fixed_rate"
-        : existingPricing?.worker_payment_type || null,
-      worker_payment_value: options?.workerPaymentRate ?? null,
       expires_at: options?.expirationDate || null,
-    });
+    };
 
-    await fetchOptionPricing();
+    // Only include worker_payment fields for customer pricing rules
+    // Worker pricing rules use base_price directly and cannot have worker_payment fields
+    if (targetPricingContext === "customer") {
+      request.worker_payment_type = options?.workerPaymentRate
+        ? "fixed_rate"
+        : existingPricing?.worker_payment_type || null;
+      request.worker_payment_value = options?.workerPaymentRate ?? null;
+    }
+
+    const pricing = await PricingService.upsertRule(request);
+
+    // Only refetch if not explicitly skipped (for bulk operations)
+    if (!options?.skipRefetch) {
+      await fetchOptionPricing();
+    }
     return transformOptionRule(pricing);
   };
 
@@ -143,6 +166,7 @@ export function useOptionPricing(
     filters?.locationHierarchyId,
     filters?.locationId,
     filters?.effectiveAt,
+    filters?.pricingContext,
   ]);
 
   return {
@@ -155,19 +179,28 @@ export function useOptionPricing(
   };
 }
 
-const transformOptionRule = (rule: PricingRule): OptionPricing => ({
-  id: rule.id,
-  organization_id: rule.organization_id,
-  field_config_id: rule.field_config_id || "",
-  option_value: rule.option_value || "",
-  customer_price: rule.base_price ?? 0,
-  worker_payment_rate: rule.worker_payment_value ?? null,
-  worker_payment_type: rule.worker_payment_type ?? null,
-  location_id: rule.location_id,
-  location_hierarchy_id: rule.location_hierarchy_id,
-  currency: rule.currency,
-  source_rule: rule,
-  field_config: rule.field_config,
-  location: rule.location,
-  location_node: rule.location_node,
-});
+const transformOptionRule = (rule: PricingRule): OptionPricing => {
+  const isWorkerContext = rule.pricing_context === "worker";
+  const basePrice = rule.base_price ?? 0;
+
+  return {
+    id: rule.id,
+    organization_id: rule.organization_id,
+    field_config_id: rule.field_config_id || "",
+    option_value: rule.option_value || "",
+    customer_price: basePrice,
+    // For worker context rules, worker_payment_rate comes from base_price
+    // For customer context rules, it comes from worker_payment_value field
+    worker_payment_rate: isWorkerContext
+      ? basePrice
+      : rule.worker_payment_value ?? null,
+    worker_payment_type: rule.worker_payment_type ?? null,
+    location_id: rule.location_id,
+    location_hierarchy_id: rule.location_hierarchy_id,
+    currency: rule.currency,
+    source_rule: rule,
+    field_config: rule.field_config,
+    location: rule.location,
+    location_node: rule.location_node,
+  };
+};
