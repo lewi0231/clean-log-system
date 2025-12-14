@@ -8,8 +8,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
@@ -116,8 +116,11 @@ export default function InvoicePreviewDialog({
           </DialogTitle>
         </VisuallyHidden>
         {loading && (
-          <div className="p-8">
-            <LoadingState message="Loading invoice details..." />
+          <div className="p-8 space-y-4">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-64 w-full" />
           </div>
         )}
 

@@ -1215,7 +1215,7 @@ export function VisualFormBuilder({
         </div>
 
         {/* Right Panel - Mobile Preview */}
-        <div className="hidden lg:block w-80 shrink-0 self-start sticky top-0">
+        <div className="hidden lg:block w-90 shrink-0 self-start sticky top-0">
           <Card className=" p-6">
             <MobileDevicePreview
               fields={fields}

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { DollarSign, Save, Trash2 } from "lucide-react";
@@ -124,7 +124,7 @@ export default function OptionPricingEditor({
   };
 
   if (loading) {
-    return <LoadingState message="Loading option pricing..." />;
+    return <TableSkeleton rows={5} columns={3} />;
   }
 
   if (error) {

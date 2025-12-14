@@ -4,7 +4,7 @@ import CompletedJobsList from "@/components/completed-jobs/completed-jobs-list";
 import CreateJobDialog from "@/components/completed-jobs/create-job-dialog";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import { CompletedJobsSkeleton } from "@/components/ui/skeleton-loaders";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
@@ -112,7 +112,7 @@ export default function CompletedJobsPage() {
   };
 
   if (orgLoading) {
-    return <LoadingState message="Loading jobs..." fullScreen />;
+    return <CompletedJobsSkeleton />;
   }
 
   if (orgError || !organizationId) {

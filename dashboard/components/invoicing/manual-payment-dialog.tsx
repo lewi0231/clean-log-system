@@ -18,7 +18,7 @@ import { log } from "@/lib/logger";
 import { PaymentService } from "@/lib/services/payment.service";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatCurrency } from "./payment-utils";
 
 interface ManualPaymentDialogProps {
@@ -60,13 +60,31 @@ export default function ManualPaymentDialog({
   const suggestedAmount =
     remainingBalance > 0 ? remainingBalance : invoiceTotal;
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setAmount("");
     setPaymentReference("");
     setPaymentDate(new Date().toISOString().split("T")[0]);
     setNotes("");
     setError(null);
-  };
+  }, []);
+
+  // Track previous open state to detect transitions
+  const prevOpenRef = useRef(open);
+
+  // Reset form when dialog closes or when it opens after being closed (handles rerender case)
+  useEffect(() => {
+    // Reset when dialog closes
+    if (!open && !submitting) {
+      resetForm();
+    }
+
+    // Reset when dialog opens after being closed (handles rerender case where component remounts)
+    if (open && !prevOpenRef.current && !submitting) {
+      resetForm();
+    }
+
+    prevOpenRef.current = open;
+  }, [open, submitting, resetForm]);
 
   const handleClose = (open: boolean) => {
     if (!open && !submitting) {
@@ -79,9 +97,10 @@ export default function ManualPaymentDialog({
     e.preventDefault();
     setError(null);
 
-    // Validation
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
+    // Validation - check for empty string or whitespace
+    const trimmedAmount = amount.trim();
+    const amountNum = parseFloat(trimmedAmount);
+    if (!trimmedAmount || isNaN(amountNum) || amountNum <= 0) {
       setError("Please enter a valid amount greater than 0");
       return;
     }
@@ -165,7 +184,6 @@ export default function ManualPaymentDialog({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder={suggestedAmount.toFixed(2)}
-              required
               disabled={submitting}
             />
             <p className="text-xs text-muted-foreground">
@@ -181,7 +199,6 @@ export default function ManualPaymentDialog({
               value={paymentReference}
               onChange={(e) => setPaymentReference(e.target.value)}
               placeholder="e.g., Bank transfer reference, cheque number"
-              required
               disabled={submitting}
             />
             <p className="text-xs text-muted-foreground">
@@ -197,7 +214,6 @@ export default function ManualPaymentDialog({
               value={paymentDate}
               onChange={(e) => setPaymentDate(e.target.value)}
               max={new Date().toISOString().split("T")[0]}
-              required
               disabled={submitting}
             />
           </div>

@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
 import {
   Select,
   SelectContent,
@@ -42,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Tooltip,
   TooltipContent,
@@ -107,6 +107,7 @@ export default function FieldPricingList({
     error: customerError,
     upsertPricing: upsertCustomerPricing,
     deletePricing: deleteCustomerPricing,
+    refetch: refetchCustomerPricing,
   } = useFieldPricing({
     locationHierarchyId,
     locationId,
@@ -120,6 +121,7 @@ export default function FieldPricingList({
     error: workerError,
     upsertPricing: upsertWorkerPricing,
     deletePricing: deleteWorkerPricing,
+    refetch: refetchWorkerPricing,
   } = useFieldPricing({
     locationHierarchyId,
     locationId,
@@ -237,10 +239,15 @@ export default function FieldPricingList({
 
     if (showBothContexts) {
       // Save both customer and worker pricing
-      const customerPrice = editing.customer
-        ? parseFloat(editing.customer)
-        : null;
-      const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
+      // Allow "0" as a valid price - check for undefined/null/empty, not falsy
+      const customerPrice =
+        editing.customer !== undefined && editing.customer.trim() !== ""
+          ? parseFloat(editing.customer)
+          : null;
+      const workerPrice =
+        editing.worker !== undefined && editing.worker.trim() !== ""
+          ? parseFloat(editing.worker)
+          : null;
 
       if (
         (customerPrice === null || isNaN(customerPrice) || customerPrice < 0) &&
@@ -260,6 +267,21 @@ export default function FieldPricingList({
           !isNaN(customerPrice) &&
           customerPrice >= 0
         ) {
+          const isLocationOverride = !!(locationId || locationHierarchyId);
+          const existingCustomerRule = customerEntry?.record;
+
+          console.log("[Pricing Debug] Saving customer pricing:", {
+            fieldConfigId: fieldConfig.id,
+            fieldName: fieldConfig.label,
+            price: customerPrice,
+            isLocationOverride,
+            locationId,
+            locationHierarchyId,
+            existingRuleId: existingCustomerRule?.id,
+            existingPrice: existingCustomerRule?.customer_price,
+            pricingContext: "customer",
+          });
+
           await upsertCustomerPricing(fieldConfig.id, customerPrice, {
             appliesToFieldType: fieldConfig.field_type,
             pricingType:
@@ -277,6 +299,21 @@ export default function FieldPricingList({
 
         // Save worker pricing if provided
         if (workerPrice !== null && !isNaN(workerPrice) && workerPrice >= 0) {
+          const isLocationOverride = !!(locationId || locationHierarchyId);
+          const existingWorkerRule = workerEntry?.record;
+
+          console.log("[Pricing Debug] Saving worker pricing:", {
+            fieldConfigId: fieldConfig.id,
+            fieldName: fieldConfig.label,
+            price: workerPrice,
+            isLocationOverride,
+            locationId,
+            locationHierarchyId,
+            existingRuleId: existingWorkerRule?.id,
+            existingPrice: existingWorkerRule?.customer_price,
+            pricingContext: "worker",
+          });
+
           await upsertWorkerPricing(fieldConfig.id, workerPrice, {
             appliesToFieldType: fieldConfig.field_type,
             pricingType:
@@ -323,6 +360,21 @@ export default function FieldPricingList({
       setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
       try {
         const pricingEntry = pricingMap[fieldConfig.id];
+        const existingRule = pricingEntry?.record;
+        const isLocationOverride = !!(locationId || locationHierarchyId);
+
+        console.log("[Pricing Debug] Saving pricing:", {
+          fieldConfigId: fieldConfig.id,
+          fieldName: fieldConfig.label,
+          price,
+          isLocationOverride,
+          locationId,
+          locationHierarchyId,
+          existingRuleId: existingRule?.id,
+          existingPrice: existingRule?.customer_price,
+          pricingContext,
+        });
+
         await upsertPricing(fieldConfig.id, price, {
           appliesToFieldType: fieldConfig.field_type,
           pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
@@ -444,7 +496,7 @@ export default function FieldPricingList({
   const loading = configsLoading || pricingLoading;
 
   if (loading) {
-    return <LoadingState message="Loading field pricing..." />;
+    return <TableSkeleton rows={5} columns={4} />;
   }
 
   if (pricingError) {
@@ -505,14 +557,15 @@ export default function FieldPricingList({
               ? workerPricing.worker_payment_value?.toString() || ""
               : "";
 
+          // Compare as numbers to handle "0" correctly
           const hasCustomerChanges =
             editing?.customer !== undefined &&
-            editing.customer !==
-              (customerPricing?.customer_price.toString() || "");
+            parseFloat(editing.customer || "0") !==
+              (customerPricing?.customer_price ?? 0);
           const hasWorkerChanges =
             editing?.worker !== undefined &&
-            editing.worker !==
-              (workerPricing?.worker_payment_value?.toString() || "");
+            parseFloat(editing.worker || "0") !==
+              (workerPricing?.worker_payment_value ?? 0);
           const hasChanges = showBothContexts
             ? hasCustomerChanges || hasWorkerChanges
             : pricingContext === "customer"
@@ -767,9 +820,11 @@ export default function FieldPricingList({
                               })()
                             : pricingContext === "customer"
                             ? !currentCustomerPrice ||
+                              currentCustomerPrice.trim() === "" ||
                               isNaN(parseFloat(currentCustomerPrice)) ||
                               parseFloat(currentCustomerPrice) < 0
                             : !currentWorkerPrice ||
+                              currentWorkerPrice.trim() === "" ||
                               isNaN(parseFloat(currentWorkerPrice)) ||
                               parseFloat(currentWorkerPrice) < 0)
                         }
@@ -823,7 +878,48 @@ export default function FieldPricingList({
                         onDelete={async (id) => {
                           setDeletingIds((prev) => new Set(prev).add(id));
                           try {
+                            console.log(
+                              "[Pricing Debug] Deleting location override:",
+                              {
+                                ruleId: id,
+                                fieldConfigId: fieldConfig.id,
+                                pricingContext,
+                                showBothContexts,
+                              }
+                            );
+
+                            // Delete the rule
                             await deletePricing(id);
+
+                            // Refetch both contexts to ensure UI updates immediately
+                            // This fixes the issue where delete doesn't update the UI until refresh
+                            if (showBothContexts) {
+                              await Promise.all([
+                                refetchCustomerPricing(),
+                                refetchWorkerPricing(),
+                              ]);
+                            } else {
+                              // Still refetch the current context to ensure immediate update
+                              if (pricingContext === "customer") {
+                                await refetchCustomerPricing();
+                              } else {
+                                await refetchWorkerPricing();
+                              }
+                            }
+
+                            console.log(
+                              "[Pricing Debug] Location override deleted and refetched"
+                            );
+                          } catch (error) {
+                            console.error(
+                              "[Pricing Debug] Failed to delete location override:",
+                              {
+                                error,
+                                ruleId: id,
+                                fieldConfigId: fieldConfig.id,
+                              }
+                            );
+                            throw error;
                           } finally {
                             setDeletingIds((prev) => {
                               const next = new Set(prev);

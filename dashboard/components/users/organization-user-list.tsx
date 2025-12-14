@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
   TableBody,
@@ -73,7 +74,7 @@ export default function OrganizationUserList({
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading users...</div>;
+    return <TableSkeleton rows={5} columns={4} />;
   }
 
   if (error) {

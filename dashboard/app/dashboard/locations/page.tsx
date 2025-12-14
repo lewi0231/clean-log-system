@@ -5,7 +5,10 @@ import LocationHierarchyManager from "@/components/locations/location-hierarchy-
 import LocationList from "@/components/locations/location-list";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  PageHeaderSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocations } from "@/hooks/use-locations";
 import useOrganization from "@/hooks/useOrganization";
@@ -73,7 +76,15 @@ export default function LocationsPage() {
   };
 
   if (orgLoading) {
-    return <LoadingState message="Loading locations..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-6">
+          <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+          <TableSkeleton rows={5} columns={6} />
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

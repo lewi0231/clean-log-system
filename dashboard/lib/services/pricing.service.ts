@@ -258,4 +258,86 @@ export class PricingService {
       throw err;
     }
   }
+
+  static async listHistory(
+    organizationId: string,
+    options?: {
+      dateFrom?: string;
+      dateTo?: string;
+    },
+  ): Promise<PricingHistoryEntry[]> {
+    try {
+      log.debug("PricingService: listing pricing history", {
+        organizationId,
+        dateFrom: options?.dateFrom,
+        dateTo: options?.dateTo,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "list-pricing-history",
+        {
+          body: {
+            organization_id: organizationId,
+            date_from: options?.dateFrom,
+            date_to: options?.dateTo,
+          },
+        },
+      );
+
+      if (error) {
+        const errorMessage = error instanceof Error
+          ? error.message
+          : typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : typeof error === "string"
+          ? error
+          : JSON.stringify(error);
+        throw new Error(`Edge function error: ${errorMessage}`);
+      }
+
+      if (!data) {
+        throw new Error("No data returned from edge function");
+      }
+
+      if (!data.success) {
+        const errorMessage = data.error || "Failed to list pricing history";
+        throw new Error(errorMessage);
+      }
+
+      if (!Array.isArray(data.pricing_history)) {
+        throw new Error(
+          "Invalid response format: pricing_history is not an array",
+        );
+      }
+
+      return data.pricing_history as PricingHistoryEntry[];
+    } catch (err) {
+      const errorMessage = err instanceof Error
+        ? err.message
+        : typeof err === "object" && err !== null && "message" in err
+        ? String(err.message)
+        : typeof err === "string"
+        ? err
+        : JSON.stringify(err);
+      log.error("PricingService: Failed to list pricing history", {
+        error: errorMessage,
+        errorObject: err,
+      });
+      throw new Error(errorMessage);
+    }
+  }
+}
+
+export interface PricingHistoryEntry {
+  id: string;
+  field_name: string;
+  option_value?: string;
+  location_name?: string;
+  old_price?: number;
+  new_price: number;
+  effective_at: string;
+  expires_at?: string;
+  changed_by?: string;
+  change_type: "created" | "updated" | "expired";
+  pricing_context?: "customer" | "worker";
 }

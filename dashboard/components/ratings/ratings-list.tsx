@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { RatingsSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
   TableBody,
@@ -70,7 +71,7 @@ export default function RatingsList({
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading ratings...</div>;
+    return <RatingsSkeleton />;
   }
 
   if (error) {

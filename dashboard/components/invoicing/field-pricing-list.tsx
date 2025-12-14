@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { useModeAwareLabels } from "@/hooks/use-mode-aware-labels";
@@ -182,7 +182,7 @@ export default function FieldPricingList() {
   const loading = configsLoading || pricingLoading;
 
   if (loading) {
-    return <LoadingState message="Loading field pricing..." />;
+    return <TableSkeleton rows={5} columns={4} />;
   }
 
   if (pricingError) {

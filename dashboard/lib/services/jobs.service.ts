@@ -137,33 +137,18 @@ export class JobsService {
       });
 
       if (error) {
-        // Log warning but return empty array instead of throwing
-        // This allows the feature to work even if migration hasn't been run
-        log.warn(
-          "JobsService: Error fetching job edit history (returning empty array)",
-          {
-            error: error.message || "Unknown error",
-            jobId: request.job_id,
-          },
-        );
-        return {
-          success: true,
-          edits: [],
-        };
+        log.error("JobsService: Error fetching job edit history", {
+          error: error.message || "Unknown error",
+          jobId: request.job_id,
+        });
+        throw error;
       }
 
       if (!data || !data.success) {
-        // Return empty array instead of throwing
-        log.warn(
-          "JobsService: No data returned from get-job-edits (returning empty array)",
-          {
-            jobId: request.job_id,
-          },
-        );
-        return {
-          success: true,
-          edits: [],
-        };
+        log.error("JobsService: No data returned from get-job-edits", {
+          jobId: request.job_id,
+        });
+        throw new Error("Failed to fetch job edit history");
       }
 
       log.info("JobsService: Job edit history fetched successfully", {
@@ -172,19 +157,11 @@ export class JobsService {
       });
       return data as GetJobEditsResponse;
     } catch (err) {
-      // Log error but return empty array instead of throwing
-      // This prevents errors from breaking the UI
-      log.warn(
-        "JobsService: Exception fetching job edit history (returning empty array)",
-        {
-          error: err instanceof Error ? err.message : "Unknown error",
-          jobId: request.job_id,
-        },
-      );
-      return {
-        success: true,
-        edits: [],
-      };
+      log.error("JobsService: Exception fetching job edit history", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        jobId: request.job_id,
+      });
+      throw err;
     }
   }
 }

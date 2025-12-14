@@ -125,6 +125,7 @@ export default function PaymentHistory({
 
   return (
     <div className="space-y-4">
+      <h3 className="text-lg font-semibold">Payment History</h3>
       <Table>
         <TableHeader>
           <TableRow>

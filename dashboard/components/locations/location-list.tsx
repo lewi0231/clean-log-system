@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
   TableBody,
@@ -96,7 +97,7 @@ export default function LocationList({
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading locations...</div>;
+    return <TableSkeleton rows={5} columns={9} />;
   }
 
   if (error) {

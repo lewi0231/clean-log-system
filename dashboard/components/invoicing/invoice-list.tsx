@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
   TableBody,
@@ -97,7 +98,22 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
   };
 
   if (loading) {
-    return <LoadingState message="Loading invoices..." />;
+    return (
+      <div className="space-y-4">
+        {/* Date filter skeletons */}
+        <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+        <TableSkeleton rows={5} columns={8} />
+      </div>
+    );
   }
 
   if (error) {

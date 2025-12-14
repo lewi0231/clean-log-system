@@ -88,12 +88,13 @@ export class PaymentService {
             let query = supabase
                 .from("payment")
                 .select("*")
-                .eq("organization_id", request.organization_id)
-                .order("created_at", { ascending: false });
+                .eq("organization_id", request.organization_id);
 
             if (request.invoice_id) {
                 query = query.eq("invoice_id", request.invoice_id);
             }
+
+            query = query.order("created_at", { ascending: false });
 
             const { data, error } = await query;
 

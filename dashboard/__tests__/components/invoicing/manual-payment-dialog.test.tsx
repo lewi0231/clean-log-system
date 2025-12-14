@@ -276,7 +276,7 @@ describe("ManualPaymentDialog", () => {
     });
   });
 
-  it("should reset form when dialog closes", () => {
+  it("should reset form when dialog closes", async () => {
     const onOpenChange = vi.fn();
 
     const { rerender } = render(
@@ -320,7 +320,12 @@ describe("ManualPaymentDialog", () => {
       />
     );
 
-    expect(screen.getByLabelText(/amount/i)).toHaveValue("");
+    // Wait for the dialog to be fully rendered and form to be reset
+    await waitFor(() => {
+      const amountInput = screen.getByLabelText(/amount/i);
+      expect(amountInput).toBeInTheDocument();
+      expect(amountInput).toHaveValue("");
+    });
   });
 
   it("should disable form when submitting", async () => {

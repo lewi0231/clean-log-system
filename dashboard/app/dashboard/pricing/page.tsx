@@ -21,7 +21,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  FormSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
@@ -44,7 +47,15 @@ export default function PricingPage() {
   }, [fieldConfigs]);
 
   if (orgLoading) {
-    return <LoadingState message="Loading pricing..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-6">
+          <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+          <FormSkeleton fields={6} />
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

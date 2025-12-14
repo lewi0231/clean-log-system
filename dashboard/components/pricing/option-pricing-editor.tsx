@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import {
@@ -543,7 +543,7 @@ export default function OptionPricingEditor({
   ).length;
 
   if (loading) {
-    return <LoadingState message="Loading option pricing..." />;
+    return <TableSkeleton rows={5} columns={3} />;
   }
 
   if (error) {

@@ -61,7 +61,11 @@ export function usePaymentLink(invoiceId: string | null): UsePaymentLinkResult {
             successUrl?: string,
             cancelUrl?: string,
         ): Promise<{ id: string; url: string; status: string }> => {
-            if (!organizationId) {
+            // Explicitly check for undefined, null, or empty string
+            if (
+                organizationId === undefined || organizationId === null ||
+                organizationId === ""
+            ) {
                 throw new Error("Organization ID is required");
             }
 

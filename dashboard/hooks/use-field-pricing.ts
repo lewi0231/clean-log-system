@@ -146,10 +146,55 @@ export function useFieldPricing(
       request.worker_payment_value = options?.workerPaymentValue ?? null;
     }
 
-    const pricing = await PricingService.upsertRule(request);
+    try {
+      const pricing = await PricingService.upsertRule(request);
+      await fetchFieldPricing();
+      return transformFieldPricing(pricing);
+    } catch (error) {
+      // If we get a unique constraint error and we don't have an existing rule ID,
+      // it might be because a rule was just deleted. Try to find and update it instead.
+      if (
+        !existingRule?.id &&
+        error instanceof Error &&
+        (error.message.includes("23505") ||
+          error.message.includes("already exists") ||
+          error.message.includes("unique constraint"))
+      ) {
+        console.log(
+          "[Pricing Debug] Unique constraint error, attempting to find existing rule:",
+          {
+            fieldConfigId,
+            locationId: targetLocationId,
+            locationHierarchyId: targetLocationHierarchyId,
+            pricingContext: targetPricingContext,
+          },
+        );
 
-    await fetchFieldPricing();
-    return transformFieldPricing(pricing);
+        // Refetch to see if a rule exists now
+        await fetchFieldPricing();
+        const updatedExistingRule = fieldPricing.find(
+          (rule) => {
+            const ruleContext = rule.source_rule?.pricing_context || "customer";
+            return (
+              rule.field_config_id === fieldConfigId &&
+              (rule.location_hierarchy_id || null) ===
+                targetLocationHierarchyId &&
+              (rule.location_id || null) === targetLocationId &&
+              ruleContext === targetPricingContext
+            );
+          },
+        );
+
+        if (updatedExistingRule) {
+          // Found it, update with the ID
+          request.id = updatedExistingRule.id;
+          const pricing = await PricingService.upsertRule(request);
+          await fetchFieldPricing();
+          return transformFieldPricing(pricing);
+        }
+      }
+      throw error;
+    }
   };
 
   const deletePricing = async (id: string): Promise<void> => {

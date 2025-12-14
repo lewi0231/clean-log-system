@@ -1,4 +1,5 @@
 import { serve } from "server";
+import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -50,6 +51,17 @@ serve(async (req) => {
 
     if (!validation.valid) {
       return errorResponse("ID is required", 400);
+    }
+
+    // Extract user from auth token for updated_by
+    // Note: updated_by is a UUID field (auth.users.id), not email
+    let userId: string | null = null;
+    const token = extractAuthToken(req);
+    if (token) {
+      const authUser = await getAuthUser(token);
+      if (authUser?.id) {
+        userId = authUser.id;
+      }
     }
 
     // Validate pricing_context if provided
@@ -143,7 +155,20 @@ serve(async (req) => {
     assignIfDefined("active", body.active);
     assignIfDefined("effective_at", body.effective_at);
     assignIfDefined("expires_at", body.expires_at ?? null);
-    assignIfDefined("updated_by", body.updated_by ?? null);
+    // Use userId from auth token if updated_by not explicitly provided
+    assignIfDefined("updated_by", body.updated_by ?? userId ?? null);
+
+    console.log("[Pricing Debug] Updating pricing rule:", {
+      ruleId: body.id,
+      organization_id: existingRule.organization_id,
+      updateData: Object.keys(updateData),
+      base_price: updateData.base_price,
+      location_id: updateData.location_id,
+      location_hierarchy_id: updateData.location_hierarchy_id,
+      pricing_context: updateData.pricing_context,
+      updated_by: updateData.updated_by,
+      userId,
+    });
 
     const { data: pricingRule, error: updateError } = await supabase
       .from("pricing_rule")
@@ -153,9 +178,34 @@ serve(async (req) => {
       .single();
 
     if (updateError) {
-      console.error("Database update error:", updateError);
+      console.error("[Pricing Debug] Error updating pricing rule:", {
+        error: updateError,
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        ruleId: body.id,
+        updateData,
+      });
+
+      // Check if it's a unique constraint violation
+      if (updateError.code === "23505") {
+        return errorResponse(
+          `A pricing rule already exists for this configuration. This may occur if you're trying to change the rule's scope in a way that conflicts with an existing rule. Details: ${
+            updateError.details || updateError.message
+          }`,
+          409,
+        );
+      }
+
       throw updateError;
     }
+
+    console.log("[Pricing Debug] Pricing rule updated successfully:", {
+      ruleId: pricingRule?.id,
+      scope: pricingRule?.scope,
+      pricing_context: pricingRule?.pricing_context,
+    });
 
     if (!pricingRule) {
       return errorResponse("Pricing rule not found", 404);

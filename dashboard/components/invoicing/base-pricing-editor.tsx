@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
 import {
   Select,
   SelectContent,
@@ -18,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
@@ -203,7 +203,7 @@ export default function BasePricingEditor({
   }, [selectedFieldConfig]);
 
   if (loading) {
-    return <LoadingState message="Loading base pricing..." />;
+    return <FormSkeleton fields={4} />;
   }
 
   if (error) {

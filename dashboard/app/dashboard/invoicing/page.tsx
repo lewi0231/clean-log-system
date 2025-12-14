@@ -5,7 +5,10 @@ import InvoiceList from "@/components/invoicing/invoice-list";
 import InvoicePreviewDialog from "@/components/invoicing/invoice-preview-dialog";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  PageHeaderSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import useOrganization from "@/hooks/useOrganization";
 import type { InvoiceWithJobs } from "@/lib/types";
 import { Plus } from "lucide-react";
@@ -35,7 +38,14 @@ export default function InvoicingPage() {
   };
 
   if (orgLoading) {
-    return <LoadingState message="Loading invoicing..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-4">
+          <TableSkeleton rows={5} columns={5} />
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

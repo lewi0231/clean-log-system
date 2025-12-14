@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
 import {
   Select,
   SelectContent,
@@ -33,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
 import type { LocationHierarchyNode } from "@/lib/types";
@@ -379,7 +379,12 @@ export default function LocationHierarchyManager() {
   }, [nodes, formData.type]);
 
   if (loading) {
-    return <LoadingState message="Loading location hierarchy..." />;
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   return (

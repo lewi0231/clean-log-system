@@ -2,7 +2,10 @@
 
 import { PricingScopeProvider } from "@/components/pricing/pricing-scope-context";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  PageHeaderSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PaymentHistoryList from "@/components/worker-payments/payment-history-list";
 import PaymentOverview from "@/components/worker-payments/payment-overview";
@@ -17,7 +20,15 @@ export default function WorkerPaymentsPage() {
   } = useOrganization();
 
   if (orgLoading) {
-    return <LoadingState message="Loading worker payments..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-6">
+          <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+          <TableSkeleton rows={5} columns={4} />
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

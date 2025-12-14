@@ -8,7 +8,10 @@
  */
 
 import { PricingService } from "@/lib/services/pricing.service";
-import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+import {
+    type CalculateWorkerPaymentsResponse,
+    WorkerPaymentService,
+} from "@/lib/services/worker-payment.service";
 import type { PricingRule } from "@/lib/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -120,7 +123,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -160,6 +163,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                             applied_rules: [
                                 {
                                     pricing_rule_id: "customer-rule-1",
+                                    scope: "field",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 100,
                                     metadata: {
                                         worker_payment_type: "percentage",
@@ -177,7 +186,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -218,6 +227,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                             applied_rules: [
                                 {
                                     pricing_rule_id: "customer-rule-1",
+                                    scope: "field",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 100,
                                     metadata: {
                                         worker_payment_type: "fixed_rate",
@@ -235,7 +250,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -277,6 +292,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                             applied_rules: [
                                 {
                                     pricing_rule_id: "worker-rule-1",
+                                    scope: "field",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 50,
                                     metadata: {
                                         pricing_context: "worker",
@@ -293,7 +314,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -343,6 +364,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                             applied_rules: [
                                 {
                                     pricing_rule_id: "worker-rule-1",
+                                    scope: "field",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 60,
                                     metadata: {
                                         pricing_context: "worker",
@@ -359,7 +386,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -411,7 +438,11 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                                 {
                                     pricing_rule_id: "customer-option-rule-1",
                                     scope: "option",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
                                     option_value: "option-1",
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 100,
                                     metadata: {
                                         worker_payment_type: "same_structure",
@@ -428,7 +459,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -466,6 +497,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                             applied_rules: [
                                 {
                                     pricing_rule_id: "customer-option-rule-1",
+                                    scope: "option",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
+                                    option_value: "option-1",
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 100,
                                     metadata: {
                                         worker_payment_type: "percentage",
@@ -483,7 +520,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -522,6 +559,11 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                                 {
                                     pricing_rule_id: "customer-base-rule-1",
                                     scope: "base",
+                                    pricing_type: "flat",
+                                    field_config_id: null,
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 50,
                                     metadata: {
                                         worker_payment_type: "fixed_rate",
@@ -539,7 +581,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -581,6 +623,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                             applied_rules: [
                                 {
                                     pricing_rule_id: "rule-1",
+                                    scope: "field",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-1",
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 100,
                                     metadata: {
                                         worker_payment_type: "percentage",
@@ -590,6 +638,12 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
                                 },
                                 {
                                     pricing_rule_id: "rule-2",
+                                    scope: "field",
+                                    pricing_type: "unit",
+                                    field_config_id: "field-2",
+                                    option_value: null,
+                                    location_hierarchy_id: null,
+                                    location_id: null,
                                     amount: 80,
                                     metadata: {
                                         worker_payment_type: "fixed_rate",
@@ -607,7 +661,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -649,7 +703,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -694,7 +748,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({
@@ -736,7 +790,7 @@ describe("Worker Payment Calculation Based on Pricing Rules", () => {
             };
 
             vi.mocked(WorkerPaymentService.calculatePayments).mockResolvedValue(
-                mockWorkerPaymentResponse as any,
+                mockWorkerPaymentResponse as CalculateWorkerPaymentsResponse,
             );
 
             const result = await WorkerPaymentService.calculatePayments({

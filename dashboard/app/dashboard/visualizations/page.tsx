@@ -2,7 +2,10 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  ChartSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import AreaChartComponent from "@/components/visualizations/area-chart";
 import BarChartComponent from "@/components/visualizations/bar-chart";
 import ChartConfigComponent from "@/components/visualizations/chart-config";
@@ -80,7 +83,27 @@ export default function VisualizationPage() {
   }, [chartConfig, fieldConfigs]);
 
   if (orgLoading || loading) {
-    return <LoadingState message="Loading visualizations..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-1">
+            <div className="space-y-4">
+              <div className="h-10 w-full bg-muted animate-pulse rounded-md" />
+              <div className="h-10 w-full bg-muted animate-pulse rounded-md" />
+              <div className="h-10 w-full bg-muted animate-pulse rounded-md" />
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <Card>
+              <CardContent className="pt-6">
+                <ChartSkeleton />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

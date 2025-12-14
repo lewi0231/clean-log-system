@@ -1,4 +1,5 @@
 import { serve } from "server";
+import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -55,6 +56,17 @@ serve(async (req) => {
 
     if (!validation.valid) {
       return errorResponse("Missing required fields", 400);
+    }
+
+    // Extract user from auth token for created_by/updated_by
+    // Note: created_by and updated_by are UUID fields (auth.users.id), not emails
+    let userId: string | null = null;
+    const token = extractAuthToken(req);
+    if (token) {
+      const authUser = await getAuthUser(token);
+      if (authUser?.id) {
+        userId = authUser.id;
+      }
     }
 
     const {
@@ -182,9 +194,22 @@ serve(async (req) => {
       active: active !== undefined ? active : true,
       effective_at: effective_at || new Date().toISOString(),
       expires_at: expires_at || null,
-      created_by: created_by || null,
-      updated_by: created_by || null,
+      created_by: created_by || userId || null,
+      updated_by: created_by || userId || null,
     };
+
+    console.log("[Pricing Debug] Creating pricing rule:", {
+      organization_id,
+      scope,
+      pricing_type,
+      pricing_context: pricing_context || "customer",
+      field_config_id,
+      location_id,
+      location_hierarchy_id,
+      base_price,
+      created_by: insertPayload.created_by,
+      userId,
+    });
 
     const { data: pricingRule, error: createError } = await supabase
       .from("pricing_rule")
@@ -212,7 +237,34 @@ serve(async (req) => {
       )
       .single();
 
-    if (createError) throw createError;
+    if (createError) {
+      console.error("[Pricing Debug] Error creating pricing rule:", {
+        error: createError,
+        code: createError.code,
+        message: createError.message,
+        details: createError.details,
+        hint: createError.hint,
+        insertPayload,
+      });
+
+      // Check if it's a unique constraint violation
+      if (createError.code === "23505") {
+        return errorResponse(
+          `A pricing rule already exists for this configuration. Please update the existing rule instead. Details: ${
+            createError.details || createError.message
+          }`,
+          409,
+        );
+      }
+
+      throw createError;
+    }
+
+    console.log("[Pricing Debug] Pricing rule created successfully:", {
+      ruleId: pricingRule?.id,
+      scope,
+      pricing_context: pricingRule?.pricing_context,
+    });
 
     if (conditions && conditions.length > 0) {
       const conditionPayload = conditions.map((condition) => ({

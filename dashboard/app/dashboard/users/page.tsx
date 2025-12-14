@@ -2,7 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  PageHeaderSkeleton,
+  TableSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OrganizationUserForm from "@/components/users/organization-user-form";
 import OrganizationUserList from "@/components/users/organization-user-list";
@@ -99,7 +102,15 @@ export default function UsersPage() {
   };
 
   if (orgLoading) {
-    return <LoadingState message="Loading users..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-6">
+          <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+          <TableSkeleton rows={5} columns={4} />
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

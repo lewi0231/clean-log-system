@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -20,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
@@ -184,7 +184,12 @@ export default function InvoiceTemplateSettings() {
   };
 
   if (configLoading || fieldConfigsLoading) {
-    return <LoadingState message="Loading invoice template settings..." />;
+    return (
+      <div>
+        <p>Loading invoice template settings...</p>
+        <FormSkeleton fields={6} />
+      </div>
+    );
   }
 
   if (configError) {

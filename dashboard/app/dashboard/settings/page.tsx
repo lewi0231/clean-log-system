@@ -21,6 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  FormSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useOrganization from "@/hooks/useOrganization";
@@ -55,6 +59,7 @@ export default function SettingsPage() {
     payment_provider: null,
     currency: "AUD",
     locale: "en-AU",
+    default_exclusive_group_label: null,
   });
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -95,6 +100,8 @@ export default function SettingsPage() {
           payment_provider: data.settings.payment_provider ?? null,
           currency: data.settings.currency ?? "AUD",
           locale: data.settings.locale ?? "en-AU",
+          default_exclusive_group_label:
+            data.settings.default_exclusive_group_label ?? null,
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
       }
@@ -450,9 +457,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleFeedbackEmailSendImmediatelyChange = async (
-    checked: boolean
-  ) => {
+  const handleFeedbackEmailSendImmediatelyChange = async (checked: boolean) => {
     if (!organizationId) return;
 
     try {
@@ -602,11 +607,13 @@ export default function SettingsPage() {
 
   if (orgLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading settings...</p>
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-6">
+          <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+          <FormSkeleton fields={6} />
         </div>
-      </div>
+      </>
     );
   }
 

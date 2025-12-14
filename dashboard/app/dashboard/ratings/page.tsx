@@ -2,7 +2,10 @@
 
 import RatingsList from "@/components/ratings/ratings-list";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  PageHeaderSkeleton,
+  RatingsSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { useFeedback } from "@/hooks/use-feedback";
 import useOrganization from "@/hooks/useOrganization";
 
@@ -15,7 +18,12 @@ export default function RatingsPage() {
   const { feedback, loading, error } = useFeedback();
 
   if (orgLoading) {
-    return <LoadingState message="Loading ratings..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <RatingsSkeleton />
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

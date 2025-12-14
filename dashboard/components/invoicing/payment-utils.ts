@@ -15,12 +15,25 @@ export function formatCurrency(amount: number, currency: string): string {
         NZD: "en-NZ",
     };
 
-    const locale = currencyLocaleMap[currency] || "en-AU";
-    return new Intl.NumberFormat(locale, {
+    // Default to AUD for unknown currencies
+    const normalizedCurrency = currencyLocaleMap[currency] ? currency : "AUD";
+    const locale = currencyLocaleMap[normalizedCurrency] || "en-AU";
+
+    const formatted = new Intl.NumberFormat(locale, {
         style: "currency",
-        currency: currency,
+        currency: normalizedCurrency,
         maximumFractionDigits: 2,
     }).format(isNaN(amount) ? 0 : amount);
+
+    // Normalize non-breaking spaces to regular spaces
+    let normalized = formatted.replace(/\u00A0/g, " ");
+
+    // For AUD, ensure we have the A$ prefix
+    if (normalizedCurrency === "AUD" && !normalized.startsWith("A$")) {
+        normalized = normalized.replace("$", "A$");
+    }
+
+    return normalized;
 }
 
 /**
@@ -29,7 +42,12 @@ export function formatCurrency(amount: number, currency: string): string {
 export function formatPaymentDate(dateString: string | null): string {
     if (!dateString) return "-";
     try {
-        return new Date(dateString).toLocaleDateString("en-AU", {
+        const date = new Date(dateString);
+        // Check if date is valid
+        if (isNaN(date.getTime())) {
+            return dateString;
+        }
+        return date.toLocaleDateString("en-AU", {
             year: "numeric",
             month: "short",
             day: "numeric",

@@ -3,7 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
-import { LoadingState } from "@/components/ui/loading-state";
+import {
+  CardSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/ui/skeleton-loaders";
 import { useLocations } from "@/hooks/use-locations";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
@@ -32,7 +35,16 @@ export default function Dashboard() {
   }, [workers, locations]);
 
   if (orgLoading || loading) {
-    return <LoadingState message="Loading dashboard..." fullScreen />;
+    return (
+      <>
+        <PageHeaderSkeleton />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      </>
+    );
   }
 
   if (orgError || !organizationId) {

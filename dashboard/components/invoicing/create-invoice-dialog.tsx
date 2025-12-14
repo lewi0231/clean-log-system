@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LoadingState } from "@/components/ui/loading-state";
+import { ListSkeleton } from "@/components/ui/skeleton-loaders";
 import { Textarea } from "@/components/ui/textarea";
 import { useInvoices } from "@/hooks/use-invoices";
 import { useJobs } from "@/hooks/use-jobs";
@@ -148,7 +148,7 @@ export default function CreateInvoiceDialog({
           <div className="space-y-3">
             <Label>Select Jobs</Label>
             {jobsLoading ? (
-              <LoadingState message="Loading jobs..." />
+              <ListSkeleton items={3} />
             ) : completedJobs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No completed jobs available

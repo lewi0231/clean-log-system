@@ -19,77 +19,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
-import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
-import { useLocations } from "@/hooks/use-locations";
-import useOrganization from "@/hooks/useOrganization";
+import { usePricingHistory } from "@/hooks/use-pricing-history";
+import type { PricingHistoryEntry } from "@/lib/services/pricing.service";
 import { ArrowUpDown, Calendar, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
 
-interface PricingHistoryEntry {
-  id: string;
-  field_name: string;
-  option_value?: string;
-  location_name?: string;
-  old_price?: number;
-  new_price: number;
-  effective_at: string;
-  expires_at?: string;
-  changed_by?: string;
-  change_type: "created" | "updated" | "expired";
-}
-
 export function PricingHistory() {
-  const { organizationId } = useOrganization();
-  const { fieldConfigs } = useFieldConfigs();
-  const { nodes } = useLocationHierarchy();
-  const { locations } = useLocations();
-
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [pricingContext, setPricingContext] = useState<
+    "all" | "customer" | "worker"
+  >("all");
   const [sortBy, setSortBy] = useState<"date" | "field">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Mock data for now - in a real implementation, this would come from an API
-  // that queries the pricing_rule_audit table
-  const historyEntries: PricingHistoryEntry[] = useMemo(() => {
-    // This is placeholder data - replace with actual API call
-    return [
-      {
-        id: "1",
-        field_name: "Service Hours",
-        location_name: "North Region",
-        old_price: 75.0,
-        new_price: 85.0,
-        effective_at: "2024-12-01T00:00:00Z",
-        changed_by: "admin@example.com",
-        change_type: "updated",
-      },
-      {
-        id: "2",
-        field_name: "Installation",
-        option_value: "Basic Installation",
-        location_name: "Downtown Depot",
-        old_price: 150.0,
-        new_price: 175.0,
-        effective_at: "2024-11-15T00:00:00Z",
-        changed_by: "manager@example.com",
-        change_type: "created",
-      },
-      {
-        id: "3",
-        field_name: "Parts Cost",
-        new_price: 25.0,
-        effective_at: "2024-11-01T00:00:00Z",
-        expires_at: "2024-12-31T23:59:59Z",
-        changed_by: "admin@example.com",
-        change_type: "created",
-      },
-    ];
-  }, []);
+  const { historyEntries, loading, error } = usePricingHistory({
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  });
 
   const filteredAndSortedEntries = useMemo(() => {
     let filtered = historyEntries;
+
+    // Filter by pricing context
+    if (pricingContext !== "all") {
+      filtered = filtered.filter(
+        (entry) => entry.pricing_context === pricingContext
+      );
+    }
 
     // Filter by date range
     if (dateFrom) {
@@ -124,7 +81,7 @@ export function PricingHistory() {
     });
 
     return filtered;
-  }, [historyEntries, dateFrom, dateTo, sortBy, sortOrder]);
+  }, [historyEntries, dateFrom, dateTo, pricingContext, sortBy, sortOrder]);
 
   const formatPrice = (price: number) => `$${price.toFixed(2)}`;
   const formatDate = (dateStr: string) => {
@@ -150,19 +107,78 @@ export function PricingHistory() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Pricing History</CardTitle>
+            <CardDescription>
+              View all pricing changes over time. Filter by date range and sort
+              by field or date.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-muted-foreground">
+              Loading pricing history...
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Pricing History</CardTitle>
+            <CardDescription>
+              View all pricing changes over time. Filter by date range and sort
+              by field or date.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-destructive">
+              Error loading pricing history: {error}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Pricing History</CardTitle>
           <CardDescription>
-            View all pricing changes over time. Filter by date range and sort by
-            field or date.
+            View all pricing changes over time. Filter by pricing context, date
+            range, and sort by field or date.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="space-y-2">
+              <Label htmlFor="pricing-context">Pricing Context</Label>
+              <select
+                id="pricing-context"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={pricingContext}
+                onChange={(e) =>
+                  setPricingContext(
+                    e.target.value as "all" | "customer" | "worker"
+                  )
+                }
+              >
+                <option value="all">All</option>
+                <option value="customer">Customer Pricing</option>
+                <option value="worker">Worker Pricing</option>
+              </select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="date-from">From Date</Label>
               <Input
@@ -186,6 +202,7 @@ export function PricingHistory() {
               onClick={() => {
                 setDateFrom("");
                 setDateTo("");
+                setPricingContext("all");
               }}
             >
               Clear Filters
@@ -237,6 +254,7 @@ export function PricingHistory() {
             <TableHeader>
               <TableRow>
                 <TableHead>Field</TableHead>
+                <TableHead>Context</TableHead>
                 <TableHead>Location</TableHead>
                 <TableHead>Price Change</TableHead>
                 <TableHead>Effective Date</TableHead>
@@ -249,7 +267,7 @@ export function PricingHistory() {
               {filteredAndSortedEntries.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center text-muted-foreground py-8"
                   >
                     No pricing history found for the selected filters.
@@ -265,6 +283,19 @@ export function PricingHistory() {
                           {entry.option_value}
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          entry.pricing_context === "worker"
+                            ? "secondary"
+                            : "default"
+                        }
+                      >
+                        {entry.pricing_context === "worker"
+                          ? "Worker"
+                          : "Customer"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       {entry.location_name ? (

@@ -678,6 +678,12 @@ verify_jwt = false
 import_map = "./functions/list-organization-users/deno.json"
 entrypoint = "./functions/list-organization-users/index.ts"
 
+[functions.list-pricing-history]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-pricing-history/deno.json"
+entrypoint = "./functions/list-pricing-history/index.ts"
+
 [functions.list-pricing-rules]
 enabled = true
 verify_jwt = false

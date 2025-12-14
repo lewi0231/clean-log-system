@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
   TableBody,
@@ -279,7 +280,7 @@ export default function CompletedJobsList({
   };
 
   if (loading) {
-    return <div className="text-center py-8">Loading jobs...</div>;
+    return <TableSkeleton rows={5} columns={6} />;
   }
 
   if (error) {
