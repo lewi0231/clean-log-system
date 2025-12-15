@@ -12,7 +12,6 @@ import {
 } from "@/components/pricing/pricing-scope-context";
 import { PricingScopeIndicator } from "@/components/pricing/pricing-scope-indicator";
 import ServiceTypePricingEditor from "@/components/pricing/service-type-pricing-editor";
-import { UnifiedInvoicePreview } from "@/components/pricing/unified-invoice-preview";
 import {
   Card,
   CardContent,
@@ -125,7 +124,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
 
           {effectiveDate && (
             <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="pt-6">
+              <CardContent className="">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5">
                     <CalendarRange className="h-5 w-5 text-primary" />
@@ -203,130 +202,124 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
             </Card>
           )}
 
-          <div className="grid gap-6 lg:grid-cols-[1fr_350px]">
-            <div className="space-y-6">
-              <Tabs defaultValue="field-pricing" className="space-y-6">
-                <TabsList className="w-full justify-start">
-                  <TabsTrigger value="field-pricing" disabled={isFixedPricing}>
-                    Field Pricing
-                  </TabsTrigger>
-                  <TabsTrigger value="option-pricing" disabled={isFixedPricing}>
-                    Option Pricing
-                  </TabsTrigger>
-                  <TabsTrigger value="base-pricing" disabled={isFixedPricing}>
-                    Base Pricing
-                  </TabsTrigger>
-                  <TabsTrigger value="service-type-pricing">
-                    Service-Type Pricing
-                  </TabsTrigger>
-                </TabsList>
+          <div className="space-y-6">
+            <Tabs defaultValue="field-pricing" className="space-y-6">
+              <TabsList className="w-full justify-start">
+                <TabsTrigger value="field-pricing" disabled={isFixedPricing}>
+                  Field Pricing
+                </TabsTrigger>
+                <TabsTrigger value="option-pricing" disabled={isFixedPricing}>
+                  Option Pricing
+                </TabsTrigger>
+                <TabsTrigger value="base-pricing" disabled={isFixedPricing}>
+                  Base Pricing
+                </TabsTrigger>
+                <TabsTrigger value="service-type-pricing">
+                  Service-Type Pricing
+                </TabsTrigger>
+              </TabsList>
 
-                <TabsContent value="field-pricing" className="space-y-6">
+              <TabsContent value="field-pricing" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Field Pricing</CardTitle>
+                    <CardDescription>
+                      Set prices for fields that collect quantities or counts.
+                      These prices are multiplied by the field value to
+                      calculate totals.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <FieldPricingList
+                      locationHierarchyId={locationNodeId}
+                      locationId={locationId}
+                      effectiveAt={effectiveDate}
+                      showBothContexts={true}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="option-pricing" className="space-y-6">
+                {optionPricingFields.length > 0 ? (
+                  <div className="space-y-6">
+                    {optionPricingFields.map((fieldConfig) => (
+                      <Card key={fieldConfig.id}>
+                        <CardHeader>
+                          <CardTitle>{fieldConfig.label}</CardTitle>
+                          <CardDescription>
+                            Set prices for each group (e.g., car makes, wipe
+                            types). Total = sum of (price_per_group ×
+                            quantity_per_group) for all selected options.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <OptionPricingEditor
+                            fieldConfig={fieldConfig}
+                            locationHierarchyId={locationNodeId}
+                            locationId={locationId}
+                            effectiveAt={effectiveDate}
+                            showBothContexts={true}
+                          />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Field Pricing</CardTitle>
+                      <CardTitle>No Grouped Breakdown Fields</CardTitle>
                       <CardDescription>
-                        Set prices for fields that collect quantities or counts.
-                        These prices are multiplied by the field value to
-                        calculate totals.
+                        Create grouped breakdown fields in Mobile Application to
+                        configure option pricing. Select fields are configured
+                        in the Service-Type Pricing tab.
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <FieldPricingList
-                        locationHierarchyId={locationNodeId}
-                        locationId={locationId}
-                        effectiveAt={effectiveDate}
-                        showBothContexts={true}
-                      />
-                    </CardContent>
                   </Card>
-                </TabsContent>
+                )}
+              </TabsContent>
 
-                <TabsContent value="option-pricing" className="space-y-6">
-                  {optionPricingFields.length > 0 ? (
-                    <div className="space-y-6">
-                      {optionPricingFields.map((fieldConfig) => (
-                        <Card key={fieldConfig.id}>
-                          <CardHeader>
-                            <CardTitle>{fieldConfig.label}</CardTitle>
-                            <CardDescription>
-                              Set prices for each group (e.g., car makes, wipe
-                              types). Total = sum of (price_per_group ×
-                              quantity_per_group) for all selected options.
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <OptionPricingEditor
-                              fieldConfig={fieldConfig}
-                              locationHierarchyId={locationNodeId}
-                              locationId={locationId}
-                              effectiveAt={effectiveDate}
-                              showBothContexts={true}
-                            />
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>No Grouped Breakdown Fields</CardTitle>
-                        <CardDescription>
-                          Create grouped breakdown fields in Mobile Application
-                          to configure option pricing. Select fields are
-                          configured in the Service-Type Pricing tab.
-                        </CardDescription>
-                      </CardHeader>
-                    </Card>
-                  )}
-                </TabsContent>
+              <TabsContent value="base-pricing" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Base Pricing</CardTitle>
+                    <CardDescription>
+                      Add fixed amounts or multiply the entire invoice. Can be a
+                      fixed adjustment or vary by job type (e.g., scale larger
+                      vehicles by 1.2x).
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BasePricingEditor
+                      locationHierarchyId={locationNodeId}
+                      locationId={locationId}
+                      effectiveAt={effectiveDate}
+                      showBothContexts={true}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                <TabsContent value="base-pricing" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Base Pricing</CardTitle>
-                      <CardDescription>
-                        Add fixed amounts or multiply the entire invoice. Can be
-                        a fixed adjustment or vary by job type (e.g., scale
-                        larger vehicles by 1.2x).
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <BasePricingEditor
-                        locationHierarchyId={locationNodeId}
-                        locationId={locationId}
-                        effectiveAt={effectiveDate}
-                        showBothContexts={true}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="service-type-pricing" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Service-Type Pricing</CardTitle>
-                      <CardDescription>
-                        Configure fixed prices for specific service type
-                        options. When enabled, these service types will use a
-                        fixed price and bypass all field-based calculations.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ServiceTypePricingEditor
-                        locationHierarchyId={locationNodeId}
-                        locationId={locationId}
-                        effectiveAt={effectiveDate}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            <div>
-              <UnifiedInvoicePreview />
-            </div>
+              <TabsContent value="service-type-pricing" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Service-Type Pricing</CardTitle>
+                    <CardDescription>
+                      Configure fixed prices for specific service type options.
+                      When enabled, these service types will use a fixed price
+                      and bypass all field-based calculations.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ServiceTypePricingEditor
+                      locationHierarchyId={locationNodeId}
+                      locationId={locationId}
+                      effectiveAt={effectiveDate}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         </TabsContent>
 

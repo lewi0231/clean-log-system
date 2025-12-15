@@ -258,11 +258,11 @@ export default function ServiceTypePricingEditor({
   return (
     <div className="space-y-6">
       {hasAnyFixedPricing && (
-        <Card className="border-blue-500/20 bg-blue-500/5">
+        <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
               <div className="mt-0.5">
-                <Info className="h-5 w-5 text-blue-500" />
+                <Info className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 space-y-2">
                 <p className="text-sm font-medium">

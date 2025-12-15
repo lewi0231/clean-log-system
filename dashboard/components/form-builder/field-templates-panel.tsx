@@ -32,11 +32,11 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  contact: "bg-blue-100 text-blue-700 border-blue-200",
-  vehicle: "bg-green-100 text-green-700 border-green-200",
-  service: "bg-purple-100 text-purple-700 border-purple-200",
-  measurement: "bg-orange-100 text-orange-700 border-orange-200",
-  general: "bg-gray-100 text-gray-700 border-gray-200",
+  contact: "bg-primary/10 text-primary border-primary/20",
+  vehicle: "bg-success/10 text-success border-success/20",
+  service: "bg-accent/10 text-accent border-accent/20",
+  measurement: "bg-warning/10 text-warning border-warning/20",
+  general: "bg-muted text-muted-foreground border-border",
 };
 
 export function FieldTemplatesPanel({

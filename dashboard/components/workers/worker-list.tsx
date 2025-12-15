@@ -146,8 +146,8 @@ export default function WorkerList({
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                         worker.active
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
+                          ? "bg-success/10 text-success"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {worker.active ? "Active" : "Inactive"}

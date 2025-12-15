@@ -25,17 +25,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <QueryProvider>
-          {/* Gradient background - fixed positioning behind all content */}
+          {/* Clean light background - subtle gradient for depth */}
           <div
             className="fixed inset-0 -z-10"
             style={{
               background:
-                "linear-gradient(135deg, #0a0e27 0%, #1a1f3a 25%, #0d1c2e 50%, #1a0f2e 75%, #0a0e27 100%)",
+                "linear-gradient(135deg, #F9FAFB 0%, #FFFFFF 50%, #F9FAFB 100%)",
             }}
           />
           <Nav />

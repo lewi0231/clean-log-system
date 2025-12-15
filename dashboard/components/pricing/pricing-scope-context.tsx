@@ -20,6 +20,8 @@ interface PricingScopeValue {
   setEffectiveDate: (date: string | null) => void;
   expirationDate: string | null;
   setExpirationDate: (date: string | null) => void;
+  pricingHistoryRefreshToken: number;
+  refreshPricingHistory: () => void;
 }
 
 const PricingScopeContext = createContext<PricingScopeValue | undefined>(
@@ -37,7 +39,7 @@ export function PricingScopeProvider({
   children,
   initialLocationNodeId = null,
   initialLocationId = null,
-  initialEffectiveDate = null,
+  initialEffectiveDate,
 }: PricingScopeProviderProps) {
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [locationNodeId, setLocationNodeId] = useState<string | null>(
@@ -46,10 +48,26 @@ export function PricingScopeProvider({
   const [locationId, setLocationId] = useState<string | null>(
     initialLocationId
   );
+  // Default effective date to today's date (YYYY-MM-DD format for HTML date input)
+  // Only default if initialEffectiveDate is not provided (undefined)
+  // If explicitly null, respect that (allows clearing the date)
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
   const [effectiveDate, setEffectiveDate] = useState<string | null>(
-    initialEffectiveDate
+    initialEffectiveDate !== undefined ? initialEffectiveDate : getTodayDate()
   );
   const [expirationDate, setExpirationDate] = useState<string | null>(null);
+  const [pricingHistoryRefreshToken, setPricingHistoryRefreshToken] =
+    useState(0);
+
+  const refreshPricingHistory = useCallback(() => {
+    setPricingHistoryRefreshToken((prev) => prev + 1);
+  }, []);
 
   const value = useMemo<PricingScopeValue>(
     () => ({
@@ -63,8 +81,18 @@ export function PricingScopeProvider({
       setEffectiveDate,
       expirationDate,
       setExpirationDate,
+      pricingHistoryRefreshToken,
+      refreshPricingHistory,
     }),
-    [selectedFieldId, locationNodeId, locationId, effectiveDate, expirationDate]
+    [
+      selectedFieldId,
+      locationNodeId,
+      locationId,
+      effectiveDate,
+      expirationDate,
+      pricingHistoryRefreshToken,
+      refreshPricingHistory,
+    ]
   );
 
   return (

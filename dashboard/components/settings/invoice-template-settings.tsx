@@ -815,11 +815,11 @@ export default function InvoiceTemplateSettings() {
 
       {/* Success Message */}
       {saveSuccess && (
-        <Card className="border-green-500 bg-green-50 dark:bg-green-950">
+        <Card className="border-success/20 bg-success/5">
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-              <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              <p className="text-sm font-semibold text-success">
                 Invoice template settings saved successfully!
               </p>
             </div>

@@ -19,6 +19,20 @@ interface UseFieldPricingOptions {
   pricingContext?: "customer" | "worker"; // Defaults to 'customer'
 }
 
+interface UpsertPricingOptions {
+  currency?: string;
+  locationId?: string | null;
+  locationHierarchyId?: string | null;
+  pricingType?: PricingType;
+  appliesToFieldType?: string;
+  workerPaymentType?: WorkerPaymentType | null;
+  workerPaymentValue?: number | null;
+  conditions?: UpsertPricingRuleRequest["conditions"];
+  expirationDate?: string | null;
+  pricingContext?: "customer" | "worker";
+  effectiveAt?: string | null; // Explicit effective date override
+}
+
 interface UseFieldPricingResult {
   fieldPricing: FieldPricing[];
   loading: boolean;
@@ -27,18 +41,7 @@ interface UseFieldPricingResult {
   upsertPricing: (
     fieldConfigId: string,
     customerPrice: number,
-    options?: {
-      currency?: string;
-      locationId?: string | null;
-      locationHierarchyId?: string | null;
-      pricingType?: PricingType;
-      appliesToFieldType?: string;
-      workerPaymentType?: WorkerPaymentType | null;
-      workerPaymentValue?: number | null;
-      conditions?: UpsertPricingRuleRequest["conditions"];
-      expirationDate?: string | null;
-      pricingContext?: "customer" | "worker";
-    },
+    options?: UpsertPricingOptions,
   ) => Promise<FieldPricing>;
   deletePricing: (id: string) => Promise<void>;
 }
@@ -87,18 +90,7 @@ export function useFieldPricing(
   const upsertPricing = async (
     fieldConfigId: string,
     customerPrice: number,
-    options?: {
-      currency?: string;
-      locationId?: string | null;
-      locationHierarchyId?: string | null;
-      pricingType?: PricingType;
-      appliesToFieldType?: string;
-      workerPaymentType?: WorkerPaymentType | null;
-      workerPaymentValue?: number | null;
-      conditions?: UpsertPricingRuleRequest["conditions"];
-      expirationDate?: string | null;
-      pricingContext?: "customer" | "worker";
-    },
+    options?: UpsertPricingOptions,
   ): Promise<FieldPricing> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
@@ -108,23 +100,55 @@ export function useFieldPricing(
     const targetLocationId = options?.locationId ?? null;
     const targetPricingContext = options?.pricingContext || "customer";
 
-    // Find existing rule matching field, location, AND pricing_context
-    // Customer and worker pricing are separate rules
-    const existingRule = fieldPricing.find(
-      (rule) => {
-        const ruleContext = rule.source_rule?.pricing_context || "customer"; // Default to 'customer' for backward compatibility
-        return (
-          rule.field_config_id === fieldConfigId &&
-          (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
-          (rule.location_id || null) === targetLocationId &&
-          ruleContext === targetPricingContext
-        );
-      },
-    );
+    // Pricing timeline model:
+    // - Multiple rules CAN exist for the same (field, location, context) with DIFFERENT effective_at dates
+    // - This allows scheduling price changes: e.g., $77 from Dec 12, $99 from Dec 15
+    // - The unique constraint includes effective_at to support this
+    // - When saving: match by field/location/context AND effective_at date
+    // - If match found: UPDATE that specific timeline point
+    // - If no match: CREATE a new timeline point
 
-    // Build the request object
+    // Determine the target effective date
+    // IMPORTANT: Don't use new Date() parsing for date-only strings as it causes timezone issues
+    // "2024-12-15" parsed as Date becomes LOCAL midnight, which in UTC+11 is Dec 14 13:00 UTC
+    let targetEffectiveAt: string;
+    let targetEffectiveDate: string; // YYYY-MM-DD for comparison
+
+    if (options?.effectiveAt) {
+      // Check if it's already a date-only string (YYYY-MM-DD)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(options.effectiveAt)) {
+        targetEffectiveDate = options.effectiveAt;
+        // Create a proper UTC timestamp for the start of that day
+        targetEffectiveAt = `${options.effectiveAt}T00:00:00.000Z`;
+      } else {
+        // It's a full timestamp - extract the date part
+        targetEffectiveAt = new Date(options.effectiveAt).toISOString();
+        targetEffectiveDate = targetEffectiveAt.split("T")[0];
+      }
+    } else {
+      // No date specified - use current timestamp
+      targetEffectiveAt = new Date().toISOString();
+      targetEffectiveDate = targetEffectiveAt.split("T")[0];
+    }
+
+    // Find existing rule matching field, location, context, AND effective date
+    const existingRule = fieldPricing.find((rule) => {
+      const ruleContext = rule.source_rule?.pricing_context || "customer";
+      const ruleEffectiveDate = rule.source_rule?.effective_at
+        ? new Date(rule.source_rule.effective_at).toISOString().split("T")[0]
+        : null;
+
+      return (
+        rule.field_config_id === fieldConfigId &&
+        (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
+        (rule.location_id || null) === targetLocationId &&
+        ruleContext === targetPricingContext &&
+        ruleEffectiveDate === targetEffectiveDate // Must match same effective date
+      );
+    });
+
     const request: UpsertPricingRuleRequest = {
-      id: existingRule?.id,
+      id: existingRule?.id, // If exists for this date, update; otherwise create new timeline point
       organization_id: organizationId,
       scope: "field",
       pricing_type: options?.pricingType || "unit",
@@ -137,6 +161,7 @@ export function useFieldPricing(
       location_id: targetLocationId,
       conditions: options?.conditions,
       expires_at: options?.expirationDate || null,
+      effective_at: targetEffectiveAt, // Use the target effective date for this timeline point
     };
 
     // Only include worker_payment fields for customer pricing rules
@@ -151,8 +176,8 @@ export function useFieldPricing(
       await fetchFieldPricing();
       return transformFieldPricing(pricing);
     } catch (error) {
-      // If we get a unique constraint error and we don't have an existing rule ID,
-      // it might be because a rule was just deleted. Try to find and update it instead.
+      // If we get a unique constraint error, a rule for this exact date may already exist
+      // Refetch and try to find it to update instead
       if (
         !existingRule?.id &&
         error instanceof Error &&
@@ -161,32 +186,38 @@ export function useFieldPricing(
           error.message.includes("unique constraint"))
       ) {
         console.log(
-          "[Pricing Debug] Unique constraint error, attempting to find existing rule:",
+          "[Pricing Debug] Unique constraint error, attempting to find existing rule for date:",
           {
             fieldConfigId,
             locationId: targetLocationId,
             locationHierarchyId: targetLocationHierarchyId,
             pricingContext: targetPricingContext,
+            effectiveDate: targetEffectiveDate,
           },
         );
 
         // Refetch to see if a rule exists now
         await fetchFieldPricing();
-        const updatedExistingRule = fieldPricing.find(
-          (rule) => {
-            const ruleContext = rule.source_rule?.pricing_context || "customer";
-            return (
-              rule.field_config_id === fieldConfigId &&
-              (rule.location_hierarchy_id || null) ===
-                targetLocationHierarchyId &&
-              (rule.location_id || null) === targetLocationId &&
-              ruleContext === targetPricingContext
-            );
-          },
-        );
+        const updatedExistingRule = fieldPricing.find((rule) => {
+          const ruleContext = rule.source_rule?.pricing_context || "customer";
+          const ruleEffectiveDate = rule.source_rule?.effective_at
+            ? new Date(rule.source_rule.effective_at).toISOString().split(
+              "T",
+            )[0]
+            : null;
+
+          return (
+            rule.field_config_id === fieldConfigId &&
+            (rule.location_hierarchy_id || null) ===
+              targetLocationHierarchyId &&
+            (rule.location_id || null) === targetLocationId &&
+            ruleContext === targetPricingContext &&
+            ruleEffectiveDate === targetEffectiveDate
+          );
+        });
 
         if (updatedExistingRule) {
-          // Found it, update with the ID
+          // Found it for this date, update with the ID
           request.id = updatedExistingRule.id;
           const pricing = await PricingService.upsertRule(request);
           await fetchFieldPricing();

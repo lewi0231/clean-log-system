@@ -449,14 +449,14 @@ export function MutuallyExclusiveGroupManager({
                       <p className="text-[11px] text-muted-foreground">
                         How the dropdown will appear in the mobile app
                       </p>
-                      <div className="rounded-lg border bg-linear-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4">
+                      <div className="rounded-lg border bg-muted/50 p-4">
                         <div className="space-y-3">
                           <div>
-                            <Label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5 block">
+                            <Label className="text-xs font-medium text-foreground mb-1.5 block">
                               {defaultExclusiveGroupLabel ||
                                 getGroupDisplayName(DEFAULT_EXCLUSIVE_GROUP)}
                             </Label>
-                            <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-950">
+                            <div className="border border-border rounded-lg overflow-hidden bg-card">
                               <MobilePreviewSelect
                                 clusters={defaultGroupClusters.map(
                                   (cluster) => ({

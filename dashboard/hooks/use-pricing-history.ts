@@ -8,6 +8,8 @@ import useOrganization from "./useOrganization";
 interface UsePricingHistoryOptions {
   dateFrom?: string;
   dateTo?: string;
+  pricingContext?: "customer" | "worker";
+  refreshToken?: string | number; // Token to trigger refetch when pricing changes
 }
 
 interface UsePricingHistoryResult {
@@ -40,6 +42,7 @@ export function usePricingHistory(
       const history = await PricingService.listHistory(organizationId, {
         dateFrom: options?.dateFrom,
         dateTo: options?.dateTo,
+        pricingContext: options?.pricingContext,
       });
 
       setHistoryEntries(history);
@@ -56,7 +59,13 @@ export function usePricingHistory(
   useEffect(() => {
     fetchHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, options?.dateFrom, options?.dateTo]);
+  }, [
+    organizationId,
+    options?.dateFrom,
+    options?.dateTo,
+    options?.pricingContext,
+    options?.refreshToken,
+  ]);
 
   return {
     historyEntries,

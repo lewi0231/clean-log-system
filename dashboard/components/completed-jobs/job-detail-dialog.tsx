@@ -366,14 +366,14 @@ export default function JobDetailDialog({
           <div className="space-y-6 py-4">
             {/* Warning banner for invoiced jobs */}
             {invoiceInfo && (
-              <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4">
+              <div className="rounded-md bg-warning/5 border border-warning/20 p-4">
                 <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+                  <AlertTriangle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
                   <div className="flex-1">
-                    <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                    <h4 className="text-sm font-semibold text-warning mb-1">
                       This job is included in an invoice
                     </h4>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    <p className="text-sm text-warning/80">
                       Invoice <strong>{invoiceInfo.invoice_number}</strong>{" "}
                       (Status: {invoiceInfo.status})
                     </p>

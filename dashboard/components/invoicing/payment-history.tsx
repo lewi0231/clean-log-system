@@ -43,10 +43,10 @@ export default function PaymentHistory({
         return <XCircle className="h-4 w-4 text-red-600" />;
       case "pending":
       case "processing":
-        return <Clock className="h-4 w-4 text-yellow-600" />;
+        return <Clock className="h-4 w-4 text-warning" />;
       case "refunded":
       case "partially_refunded":
-        return <RefreshCw className="h-4 w-4 text-blue-600" />;
+        return <RefreshCw className="h-4 w-4 text-primary" />;
       case "disputed":
         return <AlertCircle className="h-4 w-4 text-orange-600" />;
       default:

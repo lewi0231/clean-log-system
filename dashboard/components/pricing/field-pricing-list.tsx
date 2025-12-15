@@ -1,10 +1,6 @@
 "use client";
 
-import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
-import {
-  LocationOverridesMatrix,
-  type LocationOverrideRow,
-} from "@/components/pricing/location-overrides-matrix";
+import { FieldPricingCard } from "@/components/pricing/field-pricing-card";
 import {
   actionLabels,
   operatorLabels,
@@ -14,16 +10,10 @@ import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -42,46 +32,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
-import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import {
   buildScopedPricingMap,
   getPricingScopeSource,
   isEntryForScope,
 } from "@/lib/pricing-scope";
-import type { FieldPricing, PricingCondition, PricingType } from "@/lib/types";
+import { getLocationOverrides } from "@/lib/pricing-utils";
+import type { PricingCondition, PricingType } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig, FieldType } from "@clean-log/shared";
-import {
-  ChevronDown,
-  ChevronRight,
-  DollarSign,
-  Save,
-  Sparkles,
-} from "lucide-react";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 // Field types that support pricing (only number and boolean - select and grouped_breakdown use option pricing)
 const PRICING_SUPPORTED_TYPES: FieldType[] = ["number", "boolean"];
-
-// Helper to get equation preview for field type
-const getEquationPreview = (fieldType: FieldType): string => {
-  switch (fieldType) {
-    case "number":
-      return "Total = price_per_unit × quantity";
-    case "boolean":
-      return "Total = base_price (when field is true)";
-    default:
-      return "";
-  }
-};
 
 interface FieldPricingListProps {
   locationHierarchyId?: string | null;
@@ -130,10 +95,8 @@ export default function FieldPricingList({
     pricingContext: "worker",
   });
 
-  // Use the appropriate pricing based on showBothContexts
-  const fieldPricing = showBothContexts
-    ? [...customerPricing, ...workerPricing]
-    : customerPricing;
+  // Note: fieldPricing was previously used but is now replaced by
+  // customerPricing and workerPricing arrays used directly in getLocationOverrides
   const pricingLoading = showBothContexts
     ? customerLoading || workerLoading
     : customerLoading;
@@ -145,13 +108,8 @@ export default function FieldPricingList({
     : pricingContext === "customer"
     ? upsertCustomerPricing
     : upsertWorkerPricing;
-  const deletePricing = showBothContexts
-    ? deleteCustomerPricing
-    : pricingContext === "customer"
-    ? deleteCustomerPricing
-    : deleteWorkerPricing;
-  const { setSelectedFieldId, expirationDate } = usePricingScope();
-  const { formatCurrency } = useOrganizationCurrency();
+  const { setSelectedFieldId, expirationDate, refreshPricingHistory } =
+    usePricingScope();
 
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer?: string; worker?: string }>
@@ -293,8 +251,11 @@ export default function FieldPricingList({
                 serializeCondition
               ),
             expirationDate,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "customer",
           });
+          // Explicitly refetch customer pricing to ensure UI updates
+          await refetchCustomerPricing();
         }
 
         // Save worker pricing if provided
@@ -325,8 +286,11 @@ export default function FieldPricingList({
                 serializeCondition
               ),
             expirationDate,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "worker",
           });
+          // Explicitly refetch worker pricing to ensure UI updates
+          await refetchWorkerPricing();
         }
 
         setEditingPrices((prev) => {
@@ -335,6 +299,8 @@ export default function FieldPricingList({
           return next;
         });
         setSelectedFieldId(fieldConfig.id);
+        // Refresh pricing history after save
+        refreshPricingHistory();
       } catch (error) {
         console.error("Failed to save pricing", error);
       } finally {
@@ -385,6 +351,7 @@ export default function FieldPricingList({
               serializeCondition
             ),
           expirationDate,
+          effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
           pricingContext,
         });
         setEditingPrices((prev) => {
@@ -393,6 +360,8 @@ export default function FieldPricingList({
           return next;
         });
         setSelectedFieldId(fieldConfig.id);
+        // Refresh pricing history after save
+        refreshPricingHistory();
       } catch (error) {
         console.error("Failed to save pricing", error);
       } finally {
@@ -469,6 +438,7 @@ export default function FieldPricingList({
         locationHierarchyId,
         locationId,
         conditions: nextConditions,
+        effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
         pricingContext,
       });
       closeConditionalModal();
@@ -479,17 +449,6 @@ export default function FieldPricingList({
       );
     } finally {
       setRuleSaving(false);
-    }
-  };
-
-  const getFieldTypeDescription = (fieldConfig: FieldConfig): string => {
-    switch (fieldConfig.field_type) {
-      case "number":
-        return "Price per unit. Multiply by the quantity entered in the field.";
-      case "boolean":
-        return "Fixed price charged when this field is checked.";
-      default:
-        return "";
     }
   };
 
@@ -528,8 +487,8 @@ export default function FieldPricingList({
         {pricingFieldConfigs.map((fieldConfig) => {
           const customerEntry = customerPricingMap[fieldConfig.id];
           const workerEntry = workerPricingMap[fieldConfig.id];
-          const customerPricing = customerEntry?.record;
-          const workerPricing = workerEntry?.record;
+          const customerPricingRecord = customerEntry?.record;
+          const workerPricingRecord = workerEntry?.record;
 
           // For backward compatibility
           const pricingEntry = showBothContexts
@@ -538,34 +497,34 @@ export default function FieldPricingList({
             ? customerEntry
             : workerEntry;
           const scopedPricing = showBothContexts
-            ? customerPricing
+            ? customerPricingRecord
             : pricingContext === "customer"
-            ? customerPricing
-            : workerPricing;
+            ? customerPricingRecord
+            : workerPricingRecord;
 
           const editing = editingPrices[fieldConfig.id];
           const currentCustomerPrice =
             editing?.customer !== undefined
               ? editing.customer
-              : customerPricing
-              ? customerPricing.customer_price.toString()
+              : customerPricingRecord
+              ? customerPricingRecord.customer_price.toString()
               : "";
           const currentWorkerPrice =
             editing?.worker !== undefined
               ? editing.worker
-              : workerPricing
-              ? workerPricing.worker_payment_value?.toString() || ""
+              : workerPricingRecord
+              ? workerPricingRecord.worker_payment_value?.toString() || ""
               : "";
 
           // Compare as numbers to handle "0" correctly
           const hasCustomerChanges =
             editing?.customer !== undefined &&
             parseFloat(editing.customer || "0") !==
-              (customerPricing?.customer_price ?? 0);
+              (customerPricingRecord?.customer_price ?? 0);
           const hasWorkerChanges =
             editing?.worker !== undefined &&
             parseFloat(editing.worker || "0") !==
-              (workerPricing?.worker_payment_value ?? 0);
+              (workerPricingRecord?.worker_payment_value ?? 0);
           const hasChanges = showBothContexts
             ? hasCustomerChanges || hasWorkerChanges
             : pricingContext === "customer"
@@ -573,375 +532,132 @@ export default function FieldPricingList({
             : hasWorkerChanges;
 
           const isSaving = saving[fieldConfig.id] || false;
-          const overrides = getLocationOverrides(
-            fieldPricing,
+          // Get location overrides for both customer and worker contexts when showBothContexts is true
+          // When showBothContexts, we show customer overrides with customer price and worker payment
+          // We also show worker overrides separately with worker price
+          // CRITICAL: Filter by pricing_context to ensure worker rules don't appear in customer overrides
+          const customerOverrides = getLocationOverrides(
+            customerPricing.filter(
+              (p) =>
+                (p.source_rule?.pricing_context || "customer") === "customer"
+            ), // Defensive filter: ensure only customer context rules
             fieldConfig.id,
             locationId,
-            locationHierarchyId
+            locationHierarchyId,
+            "customer"
           );
-          const conditions = customerPricing?.source_rule?.conditions ?? [];
+          const workerOverrides = showBothContexts
+            ? getLocationOverrides(
+                workerPricing.filter(
+                  (p) => p.source_rule?.pricing_context === "worker"
+                ), // Defensive filter: ensure only worker context rules
+                fieldConfig.id,
+                locationId,
+                locationHierarchyId,
+                "worker"
+              )
+            : [];
+          // Combine overrides - customer first, then worker
+          const overrides = [...customerOverrides, ...workerOverrides];
+          const conditions =
+            customerPricingRecord?.source_rule?.conditions ?? [];
           const isExpanded = expandedCards[fieldConfig.id] ?? true;
           const hasScopedValue = isEntryForScope(pricingEntry, scopeSource);
-          const defaultPrice = scopedPricing?.customer_price ?? 0;
+
+          const handleDeleteOverride = async (id: string) => {
+            setDeletingIds((prev) => new Set(prev).add(id));
+            try {
+              // Find which context this override belongs to
+              const override = overrides.find((o) => o.id === id);
+              const overrideContext =
+                override?.pricingContext ||
+                (customerOverrides.some((o) => o.id === id)
+                  ? "customer"
+                  : "worker");
+
+              console.log("[Pricing Debug] Deleting location override:", {
+                ruleId: id,
+                fieldConfigId: fieldConfig.id,
+                overrideContext,
+                pricingContext,
+                showBothContexts,
+              });
+
+              // Use the correct delete function based on the override's context
+              if (overrideContext === "customer") {
+                await deleteCustomerPricing(id);
+              } else {
+                await deleteWorkerPricing(id);
+              }
+
+              // Refetch both contexts to ensure UI updates immediately
+              if (showBothContexts) {
+                await Promise.all([
+                  refetchCustomerPricing(),
+                  refetchWorkerPricing(),
+                ]);
+              } else {
+                if (overrideContext === "customer") {
+                  await refetchCustomerPricing();
+                } else {
+                  await refetchWorkerPricing();
+                }
+              }
+
+              // Refresh pricing history after delete
+              refreshPricingHistory();
+            } catch (error) {
+              console.error(
+                "[Pricing Debug] Failed to delete location override:",
+                {
+                  error,
+                  ruleId: id,
+                  fieldConfigId: fieldConfig.id,
+                }
+              );
+              throw error;
+            } finally {
+              setDeletingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              });
+            }
+          };
 
           return (
-            <Collapsible
+            <FieldPricingCard
               key={fieldConfig.id}
-              open={isExpanded}
-              onOpenChange={(open) =>
+              fieldConfig={fieldConfig}
+              customerPricingRecord={customerPricingRecord ?? null}
+              workerPricingRecord={workerPricingRecord ?? null}
+              pricingEntry={pricingEntry}
+              scopedPricing={scopedPricing ?? null}
+              currentCustomerPrice={currentCustomerPrice}
+              currentWorkerPrice={currentWorkerPrice}
+              hasChanges={hasChanges}
+              isSaving={isSaving}
+              overrides={overrides}
+              conditions={conditions}
+              isExpanded={isExpanded}
+              hasScopedValue={hasScopedValue}
+              showBothContexts={showBothContexts}
+              pricingContext={pricingContext}
+              locationId={locationId}
+              locationHierarchyId={locationHierarchyId}
+              fieldLabelLookup={fieldLabelLookup}
+              onExpandedChange={(expanded) =>
                 setExpandedCards((prev) => ({
                   ...prev,
-                  [fieldConfig.id]: open,
+                  [fieldConfig.id]: expanded,
                 }))
               }
-            >
-              <Card className="">
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <CardTitle className="text-base">
-                          {fieldConfig.label}
-                        </CardTitle>
-                        <span className="text-xs text-muted-foreground font-mono">
-                          ({fieldConfig.field_type})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {showBothContexts ? (
-                          <div className="flex items-center gap-3 text-xs">
-                            {customerPricing && (
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Customer:{" "}
-                                </span>
-                                <span className="font-medium text-primary">
-                                  {formatCurrency(
-                                    customerPricing.customer_price
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            {workerPricing && (
-                              <div>
-                                <span className="text-muted-foreground">
-                                  Worker:{" "}
-                                </span>
-                                <span className="font-medium text-primary">
-                                  {formatCurrency(
-                                    workerPricing.worker_payment_value || 0
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            {!customerPricing && !workerPricing && (
-                              <span className="text-muted-foreground">
-                                No prices set
-                              </span>
-                            )}
-                          </div>
-                        ) : scopedPricing ? (
-                          <span className="text-sm font-medium text-primary">
-                            {formatCurrency(
-                              pricingContext === "customer"
-                                ? scopedPricing.customer_price
-                                : scopedPricing.worker_payment_value || 0
-                            )}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            No price set
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {fieldConfig.description && (
-                      <CardDescription className="ml-6">
-                        {fieldConfig.description}
-                      </CardDescription>
-                    )}
-                  </CardHeader>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent>
-                  <CardContent className="pt-0 space-y-3">
-                    <div className="bg-muted/50 rounded-md p-2 text-sm">
-                      <span className="text-muted-foreground">Equation: </span>
-                      <span className="font-mono font-medium">
-                        {getEquationPreview(fieldConfig.field_type)}
-                      </span>
-                    </div>
-
-                    {showBothContexts ? (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor={`customer-price-${fieldConfig.id}`}
-                            className="text-sm"
-                          >
-                            Customer Price per Unit
-                          </Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              id={`customer-price-${fieldConfig.id}`}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={currentCustomerPrice}
-                              onChange={(e) =>
-                                handlePriceChange(
-                                  fieldConfig.id,
-                                  e.target.value,
-                                  "customer"
-                                )
-                              }
-                              className="pl-8"
-                              disabled={isSaving}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {getFieldTypeDescription(fieldConfig)}
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor={`worker-price-${fieldConfig.id}`}
-                            className="text-sm"
-                          >
-                            Worker Payment per Unit
-                          </Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              id={`worker-price-${fieldConfig.id}`}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={currentWorkerPrice}
-                              onChange={(e) =>
-                                handlePriceChange(
-                                  fieldConfig.id,
-                                  e.target.value,
-                                  "worker"
-                                )
-                              }
-                              className="pl-8"
-                              disabled={isSaving}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Payment rate for workers
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3 lg:grid-cols-[2fr_minmax(0,1fr)]">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor={`price-${fieldConfig.id}`}
-                            className="text-sm"
-                          >
-                            {pricingContext === "customer"
-                              ? "Price per Unit"
-                              : "Payment per Unit"}
-                          </Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              id={`price-${fieldConfig.id}`}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              value={
-                                pricingContext === "customer"
-                                  ? currentCustomerPrice
-                                  : currentWorkerPrice
-                              }
-                              onChange={(e) =>
-                                handlePriceChange(
-                                  fieldConfig.id,
-                                  e.target.value,
-                                  pricingContext
-                                )
-                              }
-                              className="pl-8"
-                              disabled={isSaving}
-                            />
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {getFieldTypeDescription(fieldConfig)}
-                          </p>
-                        </div>
-                        <FieldPricePreview
-                          fieldType={fieldConfig.field_type}
-                          price={
-                            parseFloat(
-                              pricingContext === "customer"
-                                ? currentCustomerPrice
-                                : currentWorkerPrice
-                            ) || defaultPrice
-                          }
-                          formatCurrency={formatCurrency}
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleSave(fieldConfig)}
-                        disabled={
-                          isSaving ||
-                          !hasChanges ||
-                          (showBothContexts
-                            ? // Allow saving if at least one valid price is provided
-                              (() => {
-                                const customerValid =
-                                  currentCustomerPrice &&
-                                  currentCustomerPrice.trim() !== "" &&
-                                  !isNaN(parseFloat(currentCustomerPrice)) &&
-                                  parseFloat(currentCustomerPrice) >= 0;
-                                const workerValid =
-                                  currentWorkerPrice &&
-                                  currentWorkerPrice.trim() !== "" &&
-                                  !isNaN(parseFloat(currentWorkerPrice)) &&
-                                  parseFloat(currentWorkerPrice) >= 0;
-                                // Disable if both are empty or both are invalid
-                                return !customerValid && !workerValid;
-                              })()
-                            : pricingContext === "customer"
-                            ? !currentCustomerPrice ||
-                              currentCustomerPrice.trim() === "" ||
-                              isNaN(parseFloat(currentCustomerPrice)) ||
-                              parseFloat(currentCustomerPrice) < 0
-                            : !currentWorkerPrice ||
-                              currentWorkerPrice.trim() === "" ||
-                              isNaN(parseFloat(currentWorkerPrice)) ||
-                              parseFloat(currentWorkerPrice) < 0)
-                        }
-                      >
-                        {isSaving ? (
-                          "Saving..."
-                        ) : hasScopedValue ? (
-                          "Update"
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Save
-                          </>
-                        )}
-                      </Button>
-                      {isPricingRulesEnabled() && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                disabled={!scopedPricing}
-                                onClick={() =>
-                                  openConditionalModal(fieldConfig)
-                                }
-                                className="gap-2"
-                              >
-                                <Sparkles className="h-4 w-4" />
-                                Add rule
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">
-                              <p>
-                                Click to create if/then adjustments for this
-                                price. Rules appear as chips below the price
-                                input.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </div>
-
-                    {/* Only show location overrides when organizational default is selected */}
-                    {!locationId && !locationHierarchyId && (
-                      <LocationOverridesMatrix
-                        rows={overrides}
-                        emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
-                        onDelete={async (id) => {
-                          setDeletingIds((prev) => new Set(prev).add(id));
-                          try {
-                            console.log(
-                              "[Pricing Debug] Deleting location override:",
-                              {
-                                ruleId: id,
-                                fieldConfigId: fieldConfig.id,
-                                pricingContext,
-                                showBothContexts,
-                              }
-                            );
-
-                            // Delete the rule
-                            await deletePricing(id);
-
-                            // Refetch both contexts to ensure UI updates immediately
-                            // This fixes the issue where delete doesn't update the UI until refresh
-                            if (showBothContexts) {
-                              await Promise.all([
-                                refetchCustomerPricing(),
-                                refetchWorkerPricing(),
-                              ]);
-                            } else {
-                              // Still refetch the current context to ensure immediate update
-                              if (pricingContext === "customer") {
-                                await refetchCustomerPricing();
-                              } else {
-                                await refetchWorkerPricing();
-                              }
-                            }
-
-                            console.log(
-                              "[Pricing Debug] Location override deleted and refetched"
-                            );
-                          } catch (error) {
-                            console.error(
-                              "[Pricing Debug] Failed to delete location override:",
-                              {
-                                error,
-                                ruleId: id,
-                                fieldConfigId: fieldConfig.id,
-                              }
-                            );
-                            throw error;
-                          } finally {
-                            setDeletingIds((prev) => {
-                              const next = new Set(prev);
-                              next.delete(id);
-                              return next;
-                            });
-                          }
-                        }}
-                        deletingIds={deletingIds}
-                      />
-                    )}
-
-                    {isPricingRulesEnabled() && (
-                      <ConditionalRuleChips
-                        conditions={conditions}
-                        fieldLabels={fieldLabelLookup}
-                      />
-                    )}
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
+              onPriceChange={handlePriceChange}
+              onSave={handleSave}
+              onDeleteOverride={handleDeleteOverride}
+              onOpenConditionalModal={openConditionalModal}
+              deletingIds={deletingIds}
+            />
           );
         })}
       </div>
@@ -969,34 +685,6 @@ interface ConditionalRuleForm {
   conditionValue: string;
   actionType: PricingCondition["action_type"];
   actionValue: string;
-}
-
-function FieldPricePreview({
-  fieldType,
-  price,
-  formatCurrency,
-}: {
-  fieldType: FieldType;
-  price: number;
-  formatCurrency: (value: number) => string;
-}) {
-  const quantity = fieldType === "number" ? 10 : 1;
-  const total =
-    fieldType === "number" ? Number(price) * quantity : Number(price);
-
-  return (
-    <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-      <p className="font-medium text-foreground">Quick preview</p>
-      <p className="font-mono">
-        {fieldType === "number"
-          ? `${quantity} × ${formatCurrency(price)}`
-          : `${formatCurrency(price)} when true`}
-      </p>
-      <p className="font-semibold text-foreground">
-        {formatCurrency(isNaN(total) ? 0 : total)}
-      </p>
-    </div>
-  );
 }
 
 function ConditionalRuleDialog({
@@ -1138,56 +826,3 @@ function ConditionalRuleDialog({
     </Dialog>
   );
 }
-
-function getLocationOverrides(
-  allPricing: FieldPricing[],
-  fieldConfigId: string,
-  currentLocationId: string | null = null,
-  currentLocationHierarchyId: string | null = null
-) {
-  const now = new Date().toISOString();
-
-  return allPricing
-    .filter(
-      (pricing) =>
-        pricing.field_config_id === fieldConfigId &&
-        (pricing.location_id || pricing.location_hierarchy_id) &&
-        // Exclude current scope to avoid showing it as an override
-        !(
-          (currentLocationId && pricing.location_id === currentLocationId) ||
-          (currentLocationHierarchyId &&
-            pricing.location_hierarchy_id === currentLocationHierarchyId) ||
-          (!currentLocationId &&
-            !currentLocationHierarchyId &&
-            !pricing.location_id &&
-            !pricing.location_hierarchy_id)
-        )
-    )
-    .map<LocationOverrideRow>((pricing) => {
-      const effectiveAt = pricing.source_rule?.effective_at;
-      const expiresAt = pricing.source_rule?.expires_at || null;
-      const isActive = effectiveAt
-        ? effectiveAt <= now && (!expiresAt || expiresAt > now)
-        : undefined;
-      const isFuture = effectiveAt ? effectiveAt > now : undefined;
-
-      return {
-        id: pricing.id,
-        scopeLabel:
-          pricing.location?.name ||
-          pricing.location_node?.name ||
-          pricing.location_id ||
-          pricing.location_hierarchy_id ||
-          "Custom scope",
-        scopeType: pricing.location ? "location" : "hierarchy",
-        price: pricing.customer_price,
-        workerPayment: pricing.worker_payment_value,
-        effectiveAt,
-        expiresAt,
-        isActive,
-        isFuture,
-      };
-    });
-}
-
-// formatCurrency is now provided via useOrganizationCurrency hook

@@ -39,11 +39,13 @@ export function PricingScopeIndicator({
           <strong className="font-medium">{scopeDisplayName}</strong>
           <span className="text-muted-foreground">•</span>
           <span className="text-muted-foreground">Applying to:</span>
-          <span className="font-medium">Field Pricing</span>
+          <span className="font-medium">Field</span>
           <span className="text-muted-foreground">,</span>
-          <span className="font-medium">Option Pricing</span>
+          <span className="font-medium">Option</span>
           <span className="text-muted-foreground">,</span>
-          <span className="font-medium">Base Pricing</span>
+          <span className="font-medium">Base</span>
+          <span className="text-muted-foreground">and</span>
+          <span className="font-medium">Service-Type Pricing</span>
         </div>
       </CardContent>
     </Card>

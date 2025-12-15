@@ -1,5 +1,6 @@
 "use client";
 
+import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,9 +34,13 @@ export function PricingHistory() {
   const [sortBy, setSortBy] = useState<"date" | "field">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  const { pricingHistoryRefreshToken } = usePricingScope();
+
   const { historyEntries, loading, error } = usePricingHistory({
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    pricingContext: pricingContext === "all" ? undefined : pricingContext,
+    refreshToken: pricingHistoryRefreshToken,
   });
 
   const filteredAndSortedEntries = useMemo(() => {
@@ -310,7 +315,8 @@ export function PricingHistory() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {entry.old_price ? (
+                      {entry.old_price !== undefined &&
+                      entry.old_price !== null ? (
                         <div className="text-sm">
                           <span className="text-muted-foreground line-through">
                             {formatPrice(entry.old_price)}

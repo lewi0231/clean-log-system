@@ -264,6 +264,7 @@ export class PricingService {
     options?: {
       dateFrom?: string;
       dateTo?: string;
+      pricingContext?: "customer" | "worker";
     },
   ): Promise<PricingHistoryEntry[]> {
     try {
@@ -271,6 +272,7 @@ export class PricingService {
         organizationId,
         dateFrom: options?.dateFrom,
         dateTo: options?.dateTo,
+        pricingContext: options?.pricingContext,
       });
 
       const { data, error } = await supabase.functions.invoke(
@@ -280,6 +282,7 @@ export class PricingService {
             organization_id: organizationId,
             date_from: options?.dateFrom,
             date_to: options?.dateTo,
+            pricing_context: options?.pricingContext,
           },
         },
       );

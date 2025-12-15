@@ -54,6 +54,7 @@ export interface LocationOverrideRow {
   expiresAt?: string | null;
   isActive?: boolean;
   isFuture?: boolean;
+  pricingContext?: "customer" | "worker"; // Track which context this override belongs to
 }
 
 interface LocationOverridesMatrixProps {
@@ -145,9 +146,19 @@ export function LocationOverridesMatrix({
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{row.formattedPrice}</TableCell>
                     <TableCell>
-                      {row.formattedWorker ? row.formattedWorker : "–"}
+                      {/* For worker context overrides, show "-" in customer price column */}
+                      {row.pricingContext === "worker"
+                        ? "–"
+                        : row.formattedPrice}
+                    </TableCell>
+                    <TableCell>
+                      {/* For worker context overrides, show the worker payment in worker rate column */}
+                      {row.pricingContext === "worker"
+                        ? row.formattedPrice
+                        : row.formattedWorker
+                        ? row.formattedWorker
+                        : "–"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {row.effectiveAt && (

@@ -111,8 +111,22 @@ serve(async (req) => {
     }
 
     if (effective_at) {
-      const effectiveDate = new Date(effective_at).toISOString();
-      // Filter for rules that are effective at or before the specified date
+      // Convert to full timestamp for filtering
+      // Date-only strings (YYYY-MM-DD) → end of that day in UTC
+      // Full timestamps → use as-is
+      let effectiveDate: string;
+
+      if (effective_at.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Date-only format: parse as UTC and set to end of day
+        // Important: new Date("YYYY-MM-DD") parses as LOCAL time, which causes timezone issues
+        // We want end of the specified UTC day to include all rules from that day
+        effectiveDate = `${effective_at}T23:59:59.999Z`;
+      } else {
+        // Full timestamp: normalize to ISO string
+        effectiveDate = new Date(effective_at).toISOString();
+      }
+
+      // Filter for rules that are effective at or before the specified date/time
       // and either haven't expired or expire after the effective date
       query = query
         .lte("effective_at", effectiveDate)

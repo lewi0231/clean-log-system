@@ -8,8 +8,8 @@ interface GlassCardProps {
 }
 
 /**
- * Glassmorphic card component with frosted glass effect
- * Uses backdrop blur and semi-transparent background for modern glass effect
+ * Card component with clean light theme styling
+ * Uses solid white background with subtle shadows for depth
  */
 export default function GlassCard({
   title,
@@ -19,7 +19,7 @@ export default function GlassCard({
   return (
     <div
       className={cn(
-        "bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-lg hover:bg-white/15 transition-all duration-300",
+        "bg-card border border-border rounded-lg card-shadow hover:card-shadow-hover transition-all duration-300",
         className
       )}
     >

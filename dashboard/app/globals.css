@@ -25,6 +25,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -45,41 +49,52 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.13 0.028 261.692);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.13 0.028 261.692);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.13 0.028 261.692);
-  --primary: oklch(0.21 0.034 264.665);
-  --primary-foreground: oklch(0.985 0.002 247.839);
-  --secondary: oklch(0.967 0.003 264.542);
-  --secondary-foreground: oklch(0.21 0.034 264.665);
-  --muted: oklch(0.967 0.003 264.542);
-  --muted-foreground: oklch(0.551 0.027 264.364);
-  --accent: oklch(0.967 0.003 264.542);
-  --accent-foreground: oklch(0.21 0.034 264.665);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.928 0.006 264.531);
-  --input: oklch(0.928 0.006 264.531);
-  --ring: oklch(0.707 0.022 261.325);
+  /* Clean & Professional Light Theme */
+  --background: oklch(0.98 0.002 264.542); /* #F9FAFB - Light gray background */
+  --foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Dark gray text */
+  --card: oklch(1 0 0); /* #FFFFFF - White cards */
+  --card-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Card text */
+  --popover: oklch(1 0 0); /* #FFFFFF - White popovers */
+  --popover-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Popover text */
+  --primary: oklch(0.55 0.18 264.542); /* #2563EB - Soft blue */
+  --primary-foreground: oklch(1 0 0); /* #FFFFFF - White text on primary */
+  --secondary: oklch(0.95 0.005 264.542); /* Light gray for secondary */
+  --secondary-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Dark text */
+  --muted: oklch(0.96 0.003 264.542); /* Very light gray for muted backgrounds */
+  --muted-foreground: oklch(0.45 0.01 264.542); /* #6B7280 - Medium gray text */
+  --accent: oklch(0.65 0.15 180); /* #14B8A6 - Teal accent */
+  --accent-foreground: oklch(1 0 0); /* #FFFFFF - White text */
+  --destructive: oklch(0.55 0.22 27.325); /* #EF4444 - Red for errors */
+  --border: oklch(0.92 0.006 264.531); /* #E5E7EB - Light border */
+  --input: oklch(0.98 0.002 264.542); /* #F9FAFB - Input background */
+  --ring: oklch(0.55 0.18 264.542); /* #2563EB - Primary blue for focus rings */
+  /* Success color for positive states */
+  --success: oklch(0.65 0.15 150); /* #10B981 - Green success */
+  --success-foreground: oklch(1 0 0); /* #FFFFFF - White text */
+  /* Warning color for caution states */
+  --warning: oklch(0.75 0.15 80); /* #F59E0B - Amber warning */
+  --warning-foreground: oklch(0.25 0.015 264.542); /* Dark text */
+  /* Chart colors - adjusted for light theme */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0.002 247.839);
-  --sidebar-foreground: oklch(0.13 0.028 261.692);
-  --sidebar-primary: oklch(0.21 0.034 264.665);
-  --sidebar-primary-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-accent: oklch(0.967 0.003 264.542);
-  --sidebar-accent-foreground: oklch(0.21 0.034 264.665);
-  --sidebar-border: oklch(0.928 0.006 264.531);
-  --sidebar-ring: oklch(0.707 0.022 261.325);
+  /* Sidebar - lighter, more approachable */
+  --sidebar: oklch(0.99 0.002 247.839); /* Off-white sidebar */
+  --sidebar-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Dark text */
+  --sidebar-primary: oklch(0.55 0.18 264.542); /* #2563EB - Soft blue */
+  --sidebar-primary-foreground: oklch(1 0 0); /* #FFFFFF - White text */
+  --sidebar-accent: oklch(0.96 0.003 264.542); /* Light gray accent */
+  --sidebar-accent-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Dark text */
+  --sidebar-border: oklch(0.92 0.006 264.531); /* #E5E7EB - Light border */
+  --sidebar-ring: oklch(0.55 0.18 264.542); /* #2563EB - Primary blue */
 }
 
+/* Dark mode removed - Clean & Professional style uses light theme only
+   If dark mode is needed in the future, uncomment and adjust colors below */
+/*
 .dark {
-  /* Improved contrast: pure white foreground for better readability */
   --foreground: oklch(1 0 0);
   --background: oklch(0.13 0.028 261.692);
   --card: oklch(0.21 0.034 264.665);
@@ -91,7 +106,6 @@
   --secondary: oklch(0.278 0.033 256.848);
   --secondary-foreground: oklch(1 0 0);
   --muted: oklch(0.278 0.033 256.848);
-  /* Improved muted text contrast: increased from 0.707 to 0.78 */
   --muted-foreground: oklch(0.78 0 0);
   --accent: oklch(0.278 0.033 256.848);
   --accent-foreground: oklch(1 0 0);
@@ -106,7 +120,6 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: oklch(0.21 0.034 264.665);
   --sidebar-foreground: oklch(1 0 0);
-  /* Cyan/purple accent color for sidebar primary */
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.278 0.033 256.848);
@@ -114,6 +127,7 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
 }
+*/
 
 @layer base {
   * {
@@ -125,8 +139,21 @@
 }
 
 @layer components {
-  /* Gradient text utility for accent text (cyan to blue gradient) */
+  /* Gradient text utility for accent text (blue gradient) */
   .gradient-text {
-    @apply bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent;
+  }
+  
+  /* Shadow system for cards and surfaces */
+  .card-shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  }
+  
+  .card-shadow-hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  }
+  
+  .focus-shadow {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
 }
