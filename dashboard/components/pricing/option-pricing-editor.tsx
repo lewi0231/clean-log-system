@@ -195,6 +195,7 @@ export default function OptionPricingEditor({
               locationId,
               locationHierarchyId,
               expirationDate,
+              effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
               pricingContext: "customer",
             }
           );
@@ -208,6 +209,7 @@ export default function OptionPricingEditor({
             locationId,
             locationHierarchyId,
             expirationDate,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "worker",
             workerPaymentRate: workerPrice,
           });
@@ -248,6 +250,7 @@ export default function OptionPricingEditor({
           locationId,
           locationHierarchyId,
           expirationDate,
+          effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
           pricingContext,
           ...(pricingContext === "worker" && { workerPaymentRate: price }),
         });

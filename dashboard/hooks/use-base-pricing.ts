@@ -28,6 +28,7 @@ interface UseBasePricingResult {
     location_id?: string | null;
     currency?: string;
     conditions?: UpsertPricingRuleRequest["conditions"];
+    effectiveAt?: string | null; // Explicit effective date for timeline support
     pricingContext?: "customer" | "worker";
   }) => Promise<BasePricing>;
   deletePricing: (id: string) => Promise<void>;
@@ -82,6 +83,7 @@ export function useBasePricing(
     location_id?: string | null;
     currency?: string;
     conditions?: UpsertPricingRuleRequest["conditions"];
+    effectiveAt?: string | null; // Explicit effective date for timeline support
     pricingContext?: "customer" | "worker";
   }): Promise<BasePricing> => {
     if (!organizationId) {
@@ -95,15 +97,38 @@ export function useBasePricing(
     const targetPricingContext = request.pricingContext ||
       filters?.pricingContext || "customer";
 
-    // Find existing rule matching location, job type (if applicable), AND pricing_context
-    // Customer and worker pricing are separate rules
+    // Determine the target effective date
+    // IMPORTANT: Don't use new Date() parsing for date-only strings as it causes timezone issues
+    let targetEffectiveAt: string;
+    let targetEffectiveDate: string; // YYYY-MM-DD for comparison
+
+    if (request.effectiveAt) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(request.effectiveAt)) {
+        targetEffectiveDate = request.effectiveAt;
+        targetEffectiveAt = `${request.effectiveAt}T00:00:00.000Z`;
+      } else {
+        targetEffectiveAt = new Date(request.effectiveAt).toISOString();
+        targetEffectiveDate = targetEffectiveAt.split("T")[0];
+      }
+    } else {
+      targetEffectiveAt = new Date().toISOString();
+      targetEffectiveDate = targetEffectiveAt.split("T")[0];
+    }
+
+    // Find existing rule matching location, job type (if applicable), context, AND effective date
     const existing = basePricing.find((pricing) => {
-      const ruleContext = pricing.source_rule?.pricing_context || "customer"; // Default to 'customer' for backward compatibility
+      const ruleContext = pricing.source_rule?.pricing_context || "customer";
+      const ruleEffectiveDate = pricing.source_rule?.effective_at
+        ? new Date(pricing.source_rule.effective_at).toISOString().split("T")[0]
+        : null;
       const matchesLocation =
         (pricing.location_hierarchy_id || null) === targetLocationHierarchyId &&
         (pricing.location_id || null) === targetLocationId;
 
-      if (!matchesLocation || ruleContext !== targetPricingContext) {
+      if (
+        !matchesLocation || ruleContext !== targetPricingContext ||
+        ruleEffectiveDate !== targetEffectiveDate
+      ) {
         return false;
       }
 
@@ -141,6 +166,7 @@ export function useBasePricing(
       location_id: request.location_id ?? targetLocationId,
       currency: request.currency || "USD",
       conditions: request.conditions,
+      effective_at: targetEffectiveAt, // Use the target effective date
     };
 
     // Only include worker_payment fields for customer pricing rules

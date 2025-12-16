@@ -70,6 +70,7 @@ interface LocationNode {
 }
 
 interface PricingData {
+  scope?: string; // e.g., "base", "field", "option", "global"
   pricing_type?: string;
   pricing_context?: string;
   percentage_rate?: number | null;
@@ -547,15 +548,30 @@ serve(async (req: Request) => {
         ? fieldConfigMap.get(fieldConfigId)
         : null;
 
-      const fieldName = fieldConfig?.label ||
-        fieldConfig?.name ||
-        fieldConfigFromMap?.label ||
-        fieldConfigFromMap?.name ||
-        newData?.field_config?.label ||
-        newData?.field_config?.name ||
-        oldData?.field_config?.label ||
-        oldData?.field_config?.name ||
-        "Unknown Field";
+      // Determine the scope for better fallback naming
+      const ruleScope = rule?.scope || newData?.scope || oldData?.scope;
+
+      // Determine field name with better fallbacks for different scopes
+      let fieldName: string;
+      if (fieldConfig?.label || fieldConfig?.name) {
+        fieldName = fieldConfig.label || fieldConfig.name || "Unknown Field";
+      } else if (fieldConfigFromMap?.label || fieldConfigFromMap?.name) {
+        fieldName = fieldConfigFromMap.label || fieldConfigFromMap.name ||
+          "Unknown Field";
+      } else if (newData?.field_config?.label || newData?.field_config?.name) {
+        fieldName = newData.field_config.label || newData.field_config.name ||
+          "Unknown Field";
+      } else if (oldData?.field_config?.label || oldData?.field_config?.name) {
+        fieldName = oldData.field_config.label || oldData.field_config.name ||
+          "Unknown Field";
+      } else if (ruleScope === "base") {
+        // Base pricing without a field_config - standalone base price
+        fieldName = "Base Price";
+      } else if (ruleScope === "global") {
+        fieldName = "Global Price";
+      } else {
+        fieldName = "Unknown Field";
+      }
 
       // Get location name - prefer from rule, fallback to location map, then data
       const location = rule?.location;
@@ -662,6 +678,7 @@ serve(async (req: Request) => {
           ? oldPrice ?? 0
           : 0,
         effective_at: effectiveAt,
+        changed_at: entry.changed_at, // When the change was actually made (vs when it takes effect)
         expires_at: expiresAt,
         changed_by: changedByEmail,
         change_type: changeType,

@@ -89,13 +89,11 @@ export function PricingHistory() {
   }, [historyEntries, dateFrom, dateTo, pricingContext, sortBy, sortOrder]);
 
   const formatPrice = (price: number) => `$${price.toFixed(2)}`;
-  const formatDate = (dateStr: string) => {
+  const formatDateOnly = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   };
 
@@ -331,9 +329,11 @@ export function PricingHistory() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell>{formatDate(entry.effective_at)}</TableCell>
+                    <TableCell>{formatDateOnly(entry.effective_at)}</TableCell>
                     <TableCell>
-                      {entry.expires_at ? formatDate(entry.expires_at) : "—"}
+                      {entry.expires_at
+                        ? formatDateOnly(entry.expires_at)
+                        : "—"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {entry.changed_by || "System"}

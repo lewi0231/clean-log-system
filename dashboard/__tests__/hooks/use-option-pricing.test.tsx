@@ -10,6 +10,12 @@ vi.mock("@/hooks/useOrganization", () => ({
   default: () => ({ organizationId: "org-1" }),
 }));
 
+// Helper to get today's date at midnight UTC for consistent effective_at matching
+const getTodayMidnightUTC = () => {
+  const today = new Date();
+  return `${today.toISOString().split("T")[0]}T00:00:00.000Z`;
+};
+
 const createMockPricingRule = (
   overrides?: Partial<PricingRule>
 ): PricingRule => ({
@@ -34,7 +40,7 @@ const createMockPricingRule = (
   worker_payment_value: null,
   priority: 0,
   active: true,
-  effective_at: "2024-01-01T00:00:00Z",
+  effective_at: getTodayMidnightUTC(), // Use today's date so rules match current date comparison
   expires_at: null,
   created_by: null,
   updated_by: null,

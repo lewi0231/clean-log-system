@@ -339,6 +339,7 @@ export interface PricingHistoryEntry {
   old_price?: number;
   new_price: number;
   effective_at: string;
+  changed_at?: string; // When the change was actually made (audit timestamp)
   expires_at?: string;
   changed_by?: string;
   change_type: "created" | "updated" | "expired";

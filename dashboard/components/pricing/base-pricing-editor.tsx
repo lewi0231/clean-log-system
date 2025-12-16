@@ -278,6 +278,7 @@ export default function BasePricingEditor({
           editingAdjustmentTypes["standalone"] ||
           standalonePricing.adjustment_type,
         conditions: nextConditions,
+        effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
         pricingContext,
       } as Parameters<typeof upsertPricing>[0];
       await upsertPricing(request);
@@ -357,6 +358,7 @@ export default function BasePricingEditor({
             adjustment_type: adjustmentType,
             conditions: existingConditions,
             location_id: locationId,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "customer",
           });
         }
@@ -370,6 +372,7 @@ export default function BasePricingEditor({
             adjustment_type: adjustmentType,
             conditions: existingConditions,
             location_id: locationId,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "worker",
           });
         }
@@ -431,6 +434,7 @@ export default function BasePricingEditor({
           adjustment_type: adjustmentType,
           conditions: existingConditions,
           location_id: locationId,
+          effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
           pricingContext,
         } as Parameters<typeof upsertPricing>[0];
         await upsertPricing(request);
@@ -514,6 +518,7 @@ export default function BasePricingEditor({
             customer_base_price: customerPrice,
             adjustment_type: adjustmentType,
             location_id: locationId,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "customer",
           });
         }
@@ -527,6 +532,7 @@ export default function BasePricingEditor({
             worker_base_payment: workerPrice,
             adjustment_type: adjustmentType,
             location_id: locationId,
+            effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "worker",
           });
         }
@@ -586,6 +592,7 @@ export default function BasePricingEditor({
           worker_base_payment: pricingContext === "worker" ? price : undefined,
           adjustment_type: adjustmentType,
           location_id: locationId,
+          effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
           pricingContext,
         });
         setEditingPrices((prev) => {

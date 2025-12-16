@@ -28,6 +28,7 @@ interface UseOptionPricingResult {
       locationHierarchyId?: string | null;
       currency?: string;
       expirationDate?: string | null;
+      effectiveAt?: string | null; // Explicit effective date for timeline support
       pricingContext?: "customer" | "worker";
       skipRefetch?: boolean;
     },
@@ -88,6 +89,7 @@ export function useOptionPricing(
       locationHierarchyId?: string | null;
       currency?: string;
       expirationDate?: string | null;
+      effectiveAt?: string | null; // Explicit effective date for timeline support
       pricingContext?: "customer" | "worker";
       skipRefetch?: boolean;
     },
@@ -102,18 +104,43 @@ export function useOptionPricing(
     const targetPricingContext = options?.pricingContext ||
       filters?.pricingContext || "customer";
 
-    // Find existing rule matching field, option, location, AND pricing_context
-    // Customer and worker pricing are separate rules
+    // Determine the target effective date
+    // IMPORTANT: Don't use new Date() parsing for date-only strings as it causes timezone issues
+    let targetEffectiveAt: string;
+    let targetEffectiveDate: string; // YYYY-MM-DD for comparison
+
+    if (options?.effectiveAt) {
+      // Check if it's already a date-only string (YYYY-MM-DD)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(options.effectiveAt)) {
+        targetEffectiveDate = options.effectiveAt;
+        targetEffectiveAt = `${options.effectiveAt}T00:00:00.000Z`;
+      } else {
+        targetEffectiveAt = new Date(options.effectiveAt).toISOString();
+        targetEffectiveDate = targetEffectiveAt.split("T")[0];
+      }
+    } else {
+      // No date specified - use current timestamp
+      targetEffectiveAt = new Date().toISOString();
+      targetEffectiveDate = targetEffectiveAt.split("T")[0];
+    }
+
+    // Find existing rule matching field, option, location, context, AND effective date
     const existingPricing = optionPricing.find(
       (pricing) => {
-        const ruleContext = pricing.source_rule?.pricing_context || "customer"; // Default to 'customer' for backward compatibility
+        const ruleContext = pricing.source_rule?.pricing_context || "customer";
+        const ruleEffectiveDate = pricing.source_rule?.effective_at
+          ? new Date(pricing.source_rule.effective_at).toISOString().split(
+            "T",
+          )[0]
+          : null;
         return (
           pricing.field_config_id === fieldConfigId &&
           pricing.option_value === optionValue &&
           (pricing.location_hierarchy_id || null) ===
             targetLocationHierarchyId &&
           (pricing.location_id || null) === targetLocationId &&
-          ruleContext === targetPricingContext
+          ruleContext === targetPricingContext &&
+          ruleEffectiveDate === targetEffectiveDate // Must match same effective date
         );
       },
     );
@@ -132,6 +159,7 @@ export function useOptionPricing(
       location_hierarchy_id: targetLocationHierarchyId,
       location_id: targetLocationId,
       expires_at: options?.expirationDate || null,
+      effective_at: targetEffectiveAt, // Use the target effective date
     };
 
     // Only include worker_payment fields for customer pricing rules

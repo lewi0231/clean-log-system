@@ -253,3 +253,4 @@ If issues arise:
 3. **Accessibility Modes**: High contrast mode for users with vision needs
 4. **Reduced Motion**: Respect user preferences for animations
 
+
