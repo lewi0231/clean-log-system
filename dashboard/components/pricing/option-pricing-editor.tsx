@@ -570,7 +570,7 @@ export default function OptionPricingEditor({
   }
 
   // Create a more understandable equation
-  const equationPreview = `Total = Sum of (price for each option × quantity for that option)`;
+  const equationPreview = `Total = Sum of (option price × option quantity)`;
 
   return (
     <div className="space-y-4">

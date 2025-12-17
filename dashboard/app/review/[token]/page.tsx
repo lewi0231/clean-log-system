@@ -10,6 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  getRatingDimensionDescription,
+  getRatingDimensionLabel,
+} from "@/lib/constants/rating-config";
 import { supabase } from "@/lib/supabase";
 import { CheckCircle2, Loader2, Star } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -28,6 +32,10 @@ interface JobDetails {
     name: string;
   }>;
   hasFeedback: boolean;
+  rating_config?: {
+    type: "single" | "three_dimensions" | "rater";
+    dimensions: string[];
+  };
 }
 
 export default function ReviewPage() {
@@ -39,7 +47,11 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [rating, setRating] = useState<number | null>(null);
+  const [ratings, setRatings] = useState<Record<string, number | null>>({});
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+  const [hoveredRatings, setHoveredRatings] = useState<
+    Record<string, number | null>
+  >({});
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -97,26 +109,67 @@ export default function ReviewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!rating) {
-      setError("Please select a rating");
-      return;
-    }
-
     if (!token) {
       setError("Invalid feedback link");
       return;
+    }
+
+    // Determine which rating system to use
+    const ratingConfig = jobDetails?.rating_config || {
+      type: "single" as const,
+      dimensions: ["overall"],
+    };
+
+    // Validate ratings based on configuration
+    if (ratingConfig.type === "single") {
+      if (!rating) {
+        setError("Please select a rating");
+        return;
+      }
+    } else {
+      // For multi-dimensional ratings, check all dimensions are rated
+      const missingDimensions = ratingConfig.dimensions.filter(
+        (dim) => !ratings[dim] || ratings[dim] === null
+      );
+      if (missingDimensions.length > 0) {
+        setError(
+          `Please rate all dimensions: ${missingDimensions
+            .map(getRatingDimensionLabel)
+            .join(", ")}`
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
     setError("");
 
     try {
+      // Build ratings object - always include overall for backward compatibility
+      const ratingsToSubmit: Record<string, number> = {};
+      if (ratingConfig.type === "single") {
+        ratingsToSubmit.overall = rating!;
+      } else {
+        // For multi-dimensional, use the ratings object
+        ratingConfig.dimensions.forEach((dim) => {
+          if (ratings[dim] !== null && ratings[dim] !== undefined) {
+            ratingsToSubmit[dim] = ratings[dim]!;
+          }
+        });
+        // Calculate overall as average for backward compatibility
+        const values = Object.values(ratingsToSubmit);
+        ratingsToSubmit.overall = Math.round(
+          values.reduce((sum, val) => sum + val, 0) / values.length
+        );
+      }
+
       const { data, error: submitError } = await supabase.functions.invoke(
         "submit-feedback",
         {
           body: {
             token,
-            rating,
+            rating: ratingsToSubmit.overall, // Keep for backward compatibility
+            ratings: ratingsToSubmit, // New multi-dimensional ratings
             comment: comment.trim() || null,
           },
         }
@@ -212,8 +265,6 @@ export default function ReviewPage() {
     return null;
   }
 
-  const displayRating = hoveredRating || rating || 0;
-
   return (
     <div className="min-h-screen w-full flex justify-center items-center px-4 py-8">
       <Card className="w-full max-w-2xl">
@@ -248,39 +299,120 @@ export default function ReviewPage() {
               </div>
             </div>
 
-            {/* Rating */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium">
-                How would you rate your experience?{" "}
-                <span className="text-destructive">*</span>
-              </label>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setRating(star)}
-                    onMouseEnter={() => setHoveredRating(star)}
-                    onMouseLeave={() => setHoveredRating(null)}
-                    className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
-                    aria-label={`Rate ${star} out of 5`}
-                  >
-                    <Star
-                      className={`h-10 w-10 transition-colors ${
-                        star <= displayRating
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "fill-gray-200 text-gray-200"
-                      }`}
-                    />
-                  </button>
-                ))}
-                {rating && (
-                  <span className="ml-2 text-sm font-medium text-muted-foreground">
-                    {rating}/5
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* Rating(s) */}
+            {(() => {
+              const ratingConfig = jobDetails?.rating_config || {
+                type: "single" as const,
+                dimensions: ["overall"],
+              };
+
+              if (ratingConfig.type === "single") {
+                const displayRating = hoveredRating || rating || 0;
+                return (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium">
+                      How would you rate your experience?{" "}
+                      <span className="text-destructive">*</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(star)}
+                          onMouseEnter={() => setHoveredRating(star)}
+                          onMouseLeave={() => setHoveredRating(null)}
+                          className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                          aria-label={`Rate ${star} out of 5`}
+                        >
+                          <Star
+                            className={`h-10 w-10 transition-colors ${
+                              star <= displayRating
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "fill-gray-200 text-gray-200"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                      {rating && (
+                        <span className="ml-2 text-sm font-medium text-muted-foreground">
+                          {rating}/5
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Multi-dimensional ratings
+              return (
+                <div className="space-y-6">
+                  {ratingConfig.dimensions.map((dimension) => {
+                    const currentRating = ratings[dimension] || null;
+                    const hovered = hoveredRatings[dimension] || null;
+                    const displayRating = hovered || currentRating || 0;
+
+                    return (
+                      <div key={dimension} className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium">
+                            {getRatingDimensionLabel(dimension)}{" "}
+                            <span className="text-destructive">*</span>
+                          </label>
+                          {getRatingDimensionDescription(dimension) && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {getRatingDimensionDescription(dimension)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => {
+                                setRatings((prev) => ({
+                                  ...prev,
+                                  [dimension]: star,
+                                }));
+                              }}
+                              onMouseEnter={() => {
+                                setHoveredRatings((prev) => ({
+                                  ...prev,
+                                  [dimension]: star,
+                                }));
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredRatings((prev) => {
+                                  const next = { ...prev };
+                                  delete next[dimension];
+                                  return next;
+                                });
+                              }}
+                              className="focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded"
+                              aria-label={`Rate ${dimension} ${star} out of 5`}
+                            >
+                              <Star
+                                className={`h-10 w-10 transition-colors ${
+                                  star <= displayRating
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "fill-gray-200 text-gray-200"
+                                }`}
+                              />
+                            </button>
+                          ))}
+                          {currentRating && (
+                            <span className="ml-2 text-sm font-medium text-muted-foreground">
+                              {currentRating}/5
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Comment */}
             <div className="space-y-2">
@@ -311,7 +443,14 @@ export default function ReviewPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={submitting || !rating}
+              disabled={
+                submitting ||
+                (jobDetails?.rating_config?.type === "single"
+                  ? !rating
+                  : jobDetails?.rating_config?.dimensions.some(
+                      (dim) => !ratings[dim]
+                    ) ?? true)
+              }
             >
               {submitting ? (
                 <>

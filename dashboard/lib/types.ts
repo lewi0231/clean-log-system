@@ -66,6 +66,13 @@ export type BusinessMode = "service_based" | "resource_tracking";
 
 export type SupportedCurrency = "AUD" | "USD" | "GBP" | "EUR" | "CAD" | "NZD";
 
+export type RatingConfigType = "single" | "three_dimensions" | "rater";
+
+export interface RatingConfig {
+  type: RatingConfigType;
+  dimensions: string[];
+}
+
 export interface OrganizationSettings {
   name: string;
   use_predefined_locations: boolean;
@@ -75,6 +82,7 @@ export interface OrganizationSettings {
   primary_contact_email: string | null;
   invoice_send_immediately: boolean;
   feedback_email_send_immediately: boolean;
+  rating_config: RatingConfig;
   stripe_account_id: string | null;
   payment_provider: string | null;
   currency: SupportedCurrency;
@@ -89,6 +97,9 @@ export interface Job {
   submission_data: Record<string, unknown> | null;
   completed_at: string;
   created_at: string;
+  feedback_token?: string | null;
+  feedback_email_sent?: boolean | null;
+  feedback_email_sent_at?: string | null;
   location: {
     id: string;
     name: string;
@@ -444,7 +455,8 @@ export interface InvoiceTemplateConfig {
 export interface Feedback {
   id: string;
   job_id: string;
-  rating: number; // 1-5
+  rating: number; // 1-5 (overall rating, kept for backward compatibility)
+  ratings?: Record<string, number> | null; // Dimension-based ratings: { "overall": 5, "quality": 4, ... }
   comment: string | null;
   submitted_at: string;
   job: {

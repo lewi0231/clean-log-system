@@ -21,6 +21,7 @@ interface UseJobsResult {
   createJob: (request: CreateJobRequest) => Promise<Job>;
   updateJob: (request: UpdateJobRequest) => Promise<Job>;
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
+  sendFeedbackEmail: (jobId: string) => Promise<void>;
 }
 
 async function fetchJobs(organizationId: string): Promise<Job[]> {
@@ -91,6 +92,19 @@ export function useJobs(): UseJobsResult {
     [],
   );
 
+  const sendFeedbackEmail = useCallback(
+    async (jobId: string): Promise<void> => {
+      await JobsService.sendFeedbackEmail(jobId);
+
+      // Invalidate and refetch jobs to get updated feedback status
+      await queryClient.invalidateQueries({
+        queryKey: jobsKey(organizationId),
+      });
+      await query.refetch();
+    },
+    [queryClient, organizationId, query],
+  );
+
   return {
     jobs: query.data ?? [],
     loading: query.isLoading,
@@ -99,5 +113,6 @@ export function useJobs(): UseJobsResult {
     createJob,
     updateJob,
     getJobEdits,
+    sendFeedbackEmail,
   };
 }

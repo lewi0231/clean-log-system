@@ -145,6 +145,55 @@ serve(async (req) => {
       );
     }
 
+    // Check if any of these jobs are already on an invoice
+    const { data: existingInvoiceJobs, error: existingError } = await supabase
+      .from("invoice_job")
+      .select(`
+        job_id,
+        invoice:invoice_id (
+          id,
+          invoice_number,
+          status
+        )
+      `)
+      .in("job_id", job_ids);
+
+    if (existingError) throw existingError;
+
+    if (existingInvoiceJobs && existingInvoiceJobs.length > 0) {
+      // Get the list of already-invoiced jobs with their invoice numbers
+      // Handle invoice - it might be an array or single object from Supabase
+      const invoicedJobsInfo = existingInvoiceJobs
+        .filter((ij) => ij.invoice !== null)
+        .map((ij) => {
+          const invoiceRaw = ij.invoice as unknown;
+          const invoice = Array.isArray(invoiceRaw)
+            ? invoiceRaw[0]
+            : invoiceRaw;
+          const invoiceObj = invoice as {
+            invoice_number?: string;
+            status?: string;
+          } | null;
+          return {
+            job_id: ij.job_id,
+            invoice_number: invoiceObj?.invoice_number || "",
+            status: invoiceObj?.status || "",
+          };
+        });
+
+      if (invoicedJobsInfo.length > 0) {
+        const invoiceNumbers = [
+          ...new Set(invoicedJobsInfo.map((i) => i.invoice_number)),
+        ];
+        return errorResponse(
+          `Cannot create invoice: ${invoicedJobsInfo.length} job(s) are already included in invoice(s): ${
+            invoiceNumbers.join(", ")
+          }. Each job can only be invoiced once.`,
+          400,
+        );
+      }
+    }
+
     // Calculate invoice totals by calling calculate-invoice function
     const { data: calculationData, error: calcError } = await supabase.functions
       .invoke("calculate-invoice", {

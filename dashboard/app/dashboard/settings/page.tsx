@@ -28,11 +28,16 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useOrganization from "@/hooks/useOrganization";
+import {
+  getRatingConfigPreset,
+  RATING_DIMENSION_LABELS,
+} from "@/lib/constants/rating-config";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   BusinessMode,
   OrganizationSettings,
+  RatingConfigType,
   SupportedCurrency,
 } from "@/lib/types";
 import { DollarSign, Package, Sparkles, Upload, X } from "lucide-react";
@@ -55,6 +60,7 @@ export default function SettingsPage() {
     primary_contact_email: null,
     invoice_send_immediately: false,
     feedback_email_send_immediately: false,
+    rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
     currency: "AUD",
@@ -96,6 +102,10 @@ export default function SettingsPage() {
             data.settings.invoice_send_immediately ?? false,
           feedback_email_send_immediately:
             data.settings.feedback_email_send_immediately ?? false,
+          rating_config: data.settings.rating_config ?? {
+            type: "single",
+            dimensions: ["overall"],
+          },
           stripe_account_id: data.settings.stripe_account_id ?? null,
           payment_provider: data.settings.payment_provider ?? null,
           currency: data.settings.currency ?? "AUD",
@@ -937,7 +947,7 @@ export default function SettingsPage() {
                 Configure how feedback request emails are sent to customers
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label htmlFor="feedback-email-send-immediately">
@@ -954,6 +964,151 @@ export default function SettingsPage() {
                   checked={settings.feedback_email_send_immediately}
                   onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
                 />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Rating Configuration</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose how customers rate your service. Based on industry
+                    best practices.
+                  </p>
+                </div>
+                <RadioGroup
+                  value={settings.rating_config.type}
+                  onValueChange={async (value) => {
+                    const newType = value as RatingConfigType;
+                    const newConfig = getRatingConfigPreset(newType);
+
+                    if (!organizationId) return;
+
+                    try {
+                      log.info("Settings: Updating rating configuration", {
+                        type: newType,
+                        dimensions: newConfig.dimensions,
+                      });
+
+                      const { data, error: updateError } =
+                        await supabase.functions.invoke(
+                          "update-organization-settings",
+                          {
+                            body: {
+                              organization_id: organizationId,
+                              rating_config: newConfig,
+                            },
+                          }
+                        );
+
+                      if (updateError) {
+                        throw updateError;
+                      }
+
+                      if (data?.settings) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          rating_config: data.settings.rating_config,
+                        }));
+                      }
+
+                      log.info(
+                        "Settings: Rating configuration updated successfully"
+                      );
+                    } catch (err) {
+                      log.error(
+                        "Settings: Failed to update rating configuration",
+                        {
+                          error:
+                            err instanceof Error
+                              ? err.message
+                              : "Unknown error",
+                        }
+                      );
+                      alert("Failed to update setting. Please try again.");
+                    }
+                  }}
+                >
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="single"
+                      id="rating-single"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-single"
+                        className="font-normal cursor-pointer"
+                      >
+                        Single Overall Rating
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Customers provide one overall satisfaction rating (1-5
+                        stars). Simple and quick.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions: Overall Satisfaction
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="three_dimensions"
+                      id="rating-three"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-three"
+                        className="font-normal cursor-pointer"
+                      >
+                        Three Dimensions
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Customers rate Service Quality, Communication, and Value
+                        for Money. Recommended for most service businesses.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions:{" "}
+                        {["quality", "communication", "value"]
+                          .map((d) => RATING_DIMENSION_LABELS[d])
+                          .join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="rater"
+                      id="rating-rater"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-rater"
+                        className="font-normal cursor-pointer"
+                      >
+                        Full RATER Framework
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Comprehensive 5-dimension rating system: Reliability,
+                        Assurance, Tangibles, Empathy, and Responsiveness. Best
+                        for detailed feedback analysis.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions:{" "}
+                        {[
+                          "reliability",
+                          "assurance",
+                          "tangibles",
+                          "empathy",
+                          "responsiveness",
+                        ]
+                          .map((d) => RATING_DIMENSION_LABELS[d])
+                          .join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                </RadioGroup>
               </div>
             </CardContent>
           </Card>

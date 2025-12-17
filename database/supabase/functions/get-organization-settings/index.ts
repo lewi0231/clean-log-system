@@ -22,12 +22,33 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
       )
       .eq("id", organization_id)
       .single();
 
     if (orgError) throw orgError;
+
+    // Parse rating_config with default fallback
+    let ratingConfig = {
+      type: "single" as const,
+      dimensions: ["overall"],
+    };
+    if (organization?.rating_config) {
+      try {
+        const parsed = typeof organization.rating_config === "string"
+          ? JSON.parse(organization.rating_config)
+          : organization.rating_config;
+        if (
+          parsed && typeof parsed === "object" && "type" in parsed &&
+          "dimensions" in parsed
+        ) {
+          ratingConfig = parsed;
+        }
+      } catch {
+        // Use default if parsing fails
+      }
+    }
 
     return jsonResponse({
       success: true,
@@ -43,6 +64,7 @@ serve(async (req) => {
           false,
         feedback_email_send_immediately:
           organization?.feedback_email_send_immediately ?? false,
+        rating_config: ratingConfig,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",

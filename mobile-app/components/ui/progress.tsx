@@ -50,7 +50,7 @@ function Progress({
         </View>
       )}
       {!showLabel && (
-        <View className="h-2 bg-gray-700 rounded-full overflow-hidden">
+        <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
           <Animated.View
             className="h-full bg-primary rounded-full"
             style={animatedStyle}

@@ -1,4 +1,5 @@
 import Nav from "@/components/nav";
+import { Toaster } from "@/components/ui/sonner";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <QueryProvider>
           {/* Clean light background - subtle gradient for depth */}
@@ -40,6 +42,7 @@ export default function RootLayout({
           />
           <Nav />
           {children}
+          <Toaster position="top-right" richColors />
         </QueryProvider>
       </body>
     </html>

@@ -43,6 +43,7 @@ import { getLocationOverrides } from "@/lib/pricing-utils";
 import type { PricingCondition, PricingType } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig, FieldType } from "@clean-log/shared";
+import Link from "next/link";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 // Field types that support pricing (only number and boolean - select and grouped_breakdown use option pricing)
@@ -472,9 +473,11 @@ export default function FieldPricingList({
         <CardHeader>
           <CardTitle>No Fields Available for Pricing</CardTitle>
           <CardDescription>
-            Create number or boolean field configurations in Mobile Application
-            to set pricing. Select and grouped breakdown fields use option
-            pricing instead.
+            Add number or boolean field configurations in the{" "}
+            <Link href="/dashboard/mobile-config" className="text-primary">
+              Mobile
+            </Link>{" "}
+            section.
           </CardDescription>
         </CardHeader>
       </Card>

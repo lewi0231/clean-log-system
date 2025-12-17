@@ -20,11 +20,39 @@ serve(async (req: Request) => {
       );
     }
 
-    const { token, rating, comment } = body;
+    const { token, rating, ratings: ratingsObj, comment } = body;
 
-    // Validate rating
+    // Validate rating (for backward compatibility)
     if (typeof rating !== "number" || rating < 1 || rating > 5) {
       return errorResponse("Rating must be a number between 1 and 5", 400);
+    }
+
+    // Validate ratings object if provided (for multi-dimensional ratings)
+    let validatedRatings: Record<string, number> | null = null;
+    if (ratingsObj !== undefined && ratingsObj !== null) {
+      if (typeof ratingsObj !== "object" || Array.isArray(ratingsObj)) {
+        return errorResponse(
+          "Ratings must be an object with dimension names as keys and ratings (1-5) as values",
+          400,
+        );
+      }
+      validatedRatings = {};
+      for (const [dimension, value] of Object.entries(ratingsObj)) {
+        if (typeof value !== "number" || value < 1 || value > 5) {
+          return errorResponse(
+            `Rating for "${dimension}" must be a number between 1 and 5`,
+            400,
+          );
+        }
+        validatedRatings[dimension] = value;
+      }
+      // Ensure overall is included
+      if (!validatedRatings.overall) {
+        validatedRatings.overall = rating; // Use the provided rating as overall
+      }
+    } else {
+      // For backward compatibility, create ratings object from single rating
+      validatedRatings = { overall: rating };
     }
 
     // Validate comment if provided
@@ -78,7 +106,8 @@ serve(async (req: Request) => {
       .from("feedback")
       .insert({
         job_id: job.id,
-        rating,
+        rating, // Keep for backward compatibility
+        ratings: validatedRatings, // Multi-dimensional ratings
         comment: comment || null,
       })
       .select()
@@ -98,6 +127,7 @@ serve(async (req: Request) => {
         id: feedback.id,
         job_id: feedback.job_id,
         rating: feedback.rating,
+        ratings: feedback.ratings,
         comment: feedback.comment,
         submitted_at: feedback.submitted_at,
       },

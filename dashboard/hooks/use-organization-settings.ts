@@ -37,6 +37,10 @@ async function fetchOrganizationSettings(
     invoice_send_immediately: data.settings.invoice_send_immediately ?? false,
     feedback_email_send_immediately:
       data.settings.feedback_email_send_immediately ?? false,
+    rating_config: data.settings.rating_config ?? {
+      type: "single",
+      dimensions: ["overall"],
+    },
     stripe_account_id: data.settings.stripe_account_id ?? null,
     payment_provider: data.settings.payment_provider ?? null,
     currency: data.settings.currency ?? "AUD",

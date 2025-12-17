@@ -22,11 +22,13 @@ import {
   Calculator,
   Calendar,
   Clock,
+  Mail,
   MapPin,
   Pencil,
   User,
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import EditJobDialog from "./edit-job-dialog";
 
 interface JobDetailDialogProps {
@@ -49,13 +51,14 @@ export default function JobDetailDialog({
 }: JobDetailDialogProps) {
   const { organizationId } = useOrganization();
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
-  const { getJobEdits } = useJobs();
+  const { getJobEdits, sendFeedbackEmail } = useJobs();
   const { calculatePayments } = useWorkerPayments();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCalculatePaymentDialogOpen, setIsCalculatePaymentDialogOpen] =
     useState(false);
   const [editHistory, setEditHistory] = useState<JobEdit[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [sendingFeedback, setSendingFeedback] = useState(false);
 
   // Calculate job status
   const jobStatus = useMemo(() => {
@@ -349,6 +352,37 @@ export default function JobDetailDialog({
                       Calculate Payment
                     </Button>
                   )}
+                  {!job.feedback_email_sent && (
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        if (!job.id) return;
+                        setSendingFeedback(true);
+                        try {
+                          await sendFeedbackEmail(job.id);
+                          toast.success("Feedback email sent successfully", {
+                            description:
+                              "The feedback request has been emailed to the customer.",
+                          });
+                          onEditSuccess?.();
+                        } catch (err) {
+                          console.error("Failed to send feedback email", err);
+                          toast.error("Failed to send feedback email", {
+                            description:
+                              err instanceof Error
+                                ? err.message
+                                : "Please try again.",
+                          });
+                        } finally {
+                          setSendingFeedback(false);
+                        }
+                      }}
+                      disabled={sendingFeedback}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {sendingFeedback ? "Sending..." : "Send Feedback Email"}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -429,6 +463,34 @@ export default function JobDetailDialog({
                   </div>
                   <div className="text-base">
                     {new Date(job.completed_at).toLocaleString()}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Feedback Status
+                  </div>
+                  <div className="text-base">
+                    {job.feedback_email_sent ? (
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="secondary">Feedback Email Sent</Badge>
+                        {job.feedback_email_sent_at && (
+                          <span className="text-xs text-muted-foreground">
+                            Sent on{" "}
+                            {new Date(
+                              job.feedback_email_sent_at
+                            ).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    ) : job.feedback_token ? (
+                      <Badge variant="outline">Feedback Pending</Badge>
+                    ) : (
+                      <span className="text-muted-foreground italic">
+                        No feedback token generated
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

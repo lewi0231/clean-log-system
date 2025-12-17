@@ -223,6 +223,28 @@ export default function CompletedJobsList({
     return key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
+  // Calculate feedback status
+  const getFeedbackStatus = (
+    job: Job
+  ): {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  } | null => {
+    if (job.feedback_email_sent) {
+      return {
+        label: "Feedback Sent",
+        variant: "secondary",
+      };
+    }
+    if (job.feedback_token) {
+      return {
+        label: "Feedback Pending",
+        variant: "outline",
+      };
+    }
+    return null;
+  };
+
   // Calculate job status from invoice data
   const getJobStatus = (
     job: Job
@@ -329,9 +351,19 @@ export default function CompletedJobsList({
                   onClick={() => setSelectedJob(job)}
                 >
                   <TableCell>
-                    <Badge variant={getJobStatus(job).variant}>
-                      {getJobStatus(job).label}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant={getJobStatus(job).variant}>
+                        {getJobStatus(job).label}
+                      </Badge>
+                      {getFeedbackStatus(job) && (
+                        <Badge
+                          variant={getFeedbackStatus(job)!.variant}
+                          className="text-xs"
+                        >
+                          {getFeedbackStatus(job)!.label}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {job.location ? job.location.name : "-"}

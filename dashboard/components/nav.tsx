@@ -1,6 +1,7 @@
 "use client";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -10,19 +11,25 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import useAuth from "@/hooks/useAuth";
-import { useIsScrollTop } from "@/hooks/useIsScrollTop";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { User } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Logo from "./logo";
 
 function Nav() {
-  const { isTop } = useIsScrollTop();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Don't show nav on public invoice pages (customer-facing)
+  const isPublicInvoicePage = pathname?.startsWith("/invoice/");
+
+  if (isPublicInvoicePage) {
+    return null;
+  }
 
   const handleSignOut = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -79,53 +86,51 @@ function Nav() {
   return (
     <nav
       className={cn(
-        "fixed h-20 flex justify-between px-20 py-10 items-center min-w-full bg-secondary -translate-y-20 transition-all duration-300 z-50",
-        isTop ? "translate-y-0 opacity-100" : "opacity-0"
+        "fixed top-0 left-0 right-0 h-16 flex justify-between items-center px-4 sm:px-6 lg:px-8",
+        "bg-card/95 backdrop-blur-sm border-b border-border",
+        "card-shadow z-50"
       )}
     >
-      <Link href="/">
+      <Link href="/" className="flex items-center">
         <Logo />
       </Link>
       {!user ? (
-        <div className={cn("flex gap-4", loading ? "hidden" : "")}>
-          <Link
-            href="/login"
-            className="bg-secondary rounded-lg text-secondary-foreground py-3 px-4 hover:opacity-50 transition-opacity"
-          >
-            Log in
-          </Link>
-          <Link
-            className="bg-primary rounded-lg text-primary-foreground py-3 px-4 hover:opacity-50 transition-opacity"
-            href="/signup"
-          >
-            Create account
-          </Link>
+        <div className={cn("flex gap-3", loading ? "hidden" : "")}>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/login">Log in</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/signup">Create account</Link>
+          </Button>
         </div>
       ) : (
-        <NavigationMenu>
+        <NavigationMenu viewport={false}>
           <NavigationMenuList>
             <NavigationMenuItem>
               <NavigationMenuTrigger className="h-auto rounded-full p-0 cursor-pointer hover:opacity-80 transition-opacity bg-transparent hover:bg-transparent focus:bg-transparent data-[state=open]:bg-transparent gap-1.5">
-                <Avatar className="h-10 w-10 rounded-full bg-primary/10 border-2 border-primary/20 shrink-0">
-                  <AvatarFallback className="rounded-full bg-primary/10 text-primary-foreground flex items-center justify-center h-full w-full">
+                <Avatar className="h-9 w-9 rounded-full bg-primary/10 border-2 border-primary/20 shrink-0">
+                  <AvatarFallback className="rounded-full bg-primary/10 text-primary flex items-center justify-center h-full w-full">
                     {user.email ? (
                       <span className="text-sm font-medium uppercase">
                         {user.email.charAt(0)}
                       </span>
                     ) : (
-                      <User className="h-5 w-5 text-primary-foreground" />
+                      <User className="h-4 w-4 text-primary" />
                     )}
                   </AvatarFallback>
                 </Avatar>
               </NavigationMenuTrigger>
-              <NavigationMenuContent className="min-w-[160px]">
-                <NavigationMenuLink href="/dashboard" className="block w-full">
+              <NavigationMenuContent className="min-w-[160px] bg-card border border-border rounded-lg card-shadow mt-2 right-0 left-auto">
+                <NavigationMenuLink
+                  href="/dashboard"
+                  className="block w-full px-4 py-2 text-sm rounded-md transition-colors"
+                >
                   Dashboard
                 </NavigationMenuLink>
                 <NavigationMenuLink
                   onClick={handleSignOut}
                   href="#"
-                  className="block w-full cursor-pointer"
+                  className="block w-full px-4 py-2 text-sm rounded-md transition-colors cursor-pointer"
                 >
                   Sign out
                 </NavigationMenuLink>

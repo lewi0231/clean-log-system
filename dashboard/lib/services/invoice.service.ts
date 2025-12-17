@@ -269,4 +269,42 @@ export class InvoiceService {
       throw err;
     }
   }
+
+  /**
+   * Resend an invoice - creates a new payment link and sends the email again
+   */
+  static async resendInvoice(invoiceId: string): Promise<InvoiceWithJobs> {
+    try {
+      log.debug("InvoiceService: Resending invoice", {
+        invoiceId,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "update-invoice-status",
+        {
+          body: {
+            invoice_id: invoiceId,
+            status: "sent",
+            resend: true, // Flag to force resend with new payment link
+          },
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || !data.success || !data.invoice) {
+        throw new Error("Failed to resend invoice");
+      }
+
+      log.info("InvoiceService: Invoice resent successfully");
+      return data.invoice as InvoiceWithJobs;
+    } catch (err) {
+      log.error("InvoiceService: Failed to resend invoice", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
+    }
+  }
 }

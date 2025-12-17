@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { getRatingDimensionLabel } from "@/lib/constants/rating-config";
 import type { Feedback } from "@/lib/types";
 import { Star } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -166,36 +167,66 @@ export default function RatingsList({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredFeedback.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>{renderStars(item.rating)}</TableCell>
-                      <TableCell>{item.job.location?.name || "-"}</TableCell>
-                      <TableCell>
-                        {item.job.workers.length > 0 ? (
-                          <div className="flex flex-col gap-1">
-                            {item.job.workers.map((worker) => (
-                              <span key={worker.id}>{worker.name}</span>
-                            ))}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(item.job.completed_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(item.submitted_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell className="max-w-md">
-                        {item.comment ? (
-                          <p className="text-sm line-clamp-2">{item.comment}</p>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredFeedback.map((item) => {
+                    // Check if this feedback has multi-dimensional ratings
+                    const hasMultiRatings =
+                      item.ratings &&
+                      typeof item.ratings === "object" &&
+                      Object.keys(item.ratings).length > 1;
+
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          {hasMultiRatings ? (
+                            <div className="space-y-2">
+                              {Object.entries(item.ratings || {}).map(
+                                ([dimension, rating]) => (
+                                  <div
+                                    key={dimension}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <span className="text-xs text-muted-foreground w-24 truncate">
+                                      {getRatingDimensionLabel(dimension)}:
+                                    </span>
+                                    {renderStars(rating as number)}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            renderStars(item.rating)
+                          )}
+                        </TableCell>
+                        <TableCell>{item.job.location?.name || "-"}</TableCell>
+                        <TableCell>
+                          {item.job.workers.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {item.job.workers.map((worker) => (
+                                <span key={worker.id}>{worker.name}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(item.job.completed_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {new Date(item.submitted_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="max-w-md">
+                          {item.comment ? (
+                            <p className="text-sm line-clamp-2">
+                              {item.comment}
+                            </p>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

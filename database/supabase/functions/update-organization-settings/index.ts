@@ -28,6 +28,7 @@ serve(async (req) => {
       primary_contact_email,
       invoice_send_immediately,
       feedback_email_send_immediately,
+      rating_config,
       stripe_account_id,
       payment_provider,
       currency,
@@ -148,16 +149,64 @@ serve(async (req) => {
           : default_exclusive_group_label;
     }
 
+    if (rating_config !== undefined) {
+      // Validate rating_config structure
+      if (typeof rating_config !== "object" || rating_config === null) {
+        return errorResponse(
+          "rating_config must be an object with 'type' and 'dimensions'",
+          400,
+        );
+      }
+      if (!("type" in rating_config) || !("dimensions" in rating_config)) {
+        return errorResponse(
+          "rating_config must have 'type' and 'dimensions' properties",
+          400,
+        );
+      }
+      const validTypes = ["single", "three_dimensions", "rater"];
+      if (!validTypes.includes(rating_config.type)) {
+        return errorResponse(
+          `rating_config.type must be one of: ${validTypes.join(", ")}`,
+          400,
+        );
+      }
+      if (!Array.isArray(rating_config.dimensions)) {
+        return errorResponse("rating_config.dimensions must be an array", 400);
+      }
+      updateData.rating_config = rating_config;
+    }
+
     const { data: organization, error: updateError } = await supabase
       .from("organization")
       .update(updateData)
       .eq("id", organization_id)
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
       )
       .single();
 
     if (updateError) throw updateError;
+
+    // Parse rating_config with default fallback
+    let ratingConfig = {
+      type: "single" as const,
+      dimensions: ["overall"],
+    };
+    if (organization?.rating_config) {
+      try {
+        const parsed = typeof organization.rating_config === "string"
+          ? JSON.parse(organization.rating_config)
+          : organization.rating_config;
+        if (
+          parsed && typeof parsed === "object" && "type" in parsed &&
+          "dimensions" in parsed
+        ) {
+          ratingConfig = parsed;
+        }
+      } catch {
+        // Use default if parsing fails
+      }
+    }
 
     return jsonResponse({
       success: true,
@@ -173,6 +222,7 @@ serve(async (req) => {
           false,
         feedback_email_send_immediately:
           organization?.feedback_email_send_immediately ?? false,
+        rating_config: ratingConfig,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",

@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,11 +14,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ListSkeleton } from "@/components/ui/skeleton-loaders";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useInvoices } from "@/hooks/use-invoices";
 import { useJobs } from "@/hooks/use-jobs";
 import useOrganization from "@/hooks/useOrganization";
+import type { Job } from "@/lib/types";
 import { format } from "date-fns";
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface CreateInvoiceDialogProps {
@@ -130,7 +138,31 @@ export default function CreateInvoiceDialog({
     }
   };
 
+  // Helper to check if a job is already invoiced
+  const getJobInvoiceStatus = (
+    job: Job
+  ): { isInvoiced: boolean; invoiceNumber?: string; status?: string } => {
+    const invoiceJobs =
+      job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
+    if (invoiceJobs.length === 0) {
+      return { isInvoiced: false };
+    }
+    const invoice = invoiceJobs[0]?.invoice;
+    return {
+      isInvoiced: true,
+      invoiceNumber: invoice?.invoice_number,
+      status: invoice?.status,
+    };
+  };
+
+  // Only show completed jobs, mark invoiced ones as disabled
   const completedJobs = jobs.filter((job) => job.completed_at);
+  const uninvoicedJobs = completedJobs.filter(
+    (job) => !getJobInvoiceStatus(job).isInvoiced
+  );
+  const invoicedJobs = completedJobs.filter(
+    (job) => getJobInvoiceStatus(job).isInvoiced
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -146,41 +178,102 @@ export default function CreateInvoiceDialog({
         <div className="space-y-6 py-4">
           {/* Job Selection */}
           <div className="space-y-3">
-            <Label>Select Jobs</Label>
+            <div className="flex items-center justify-between">
+              <Label>Select Jobs</Label>
+              {uninvoicedJobs.length > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {uninvoicedJobs.length} available, {invoicedJobs.length}{" "}
+                  already invoiced
+                </span>
+              )}
+            </div>
             {jobsLoading ? (
               <ListSkeleton items={3} />
             ) : completedJobs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No completed jobs available
               </p>
-            ) : (
-              <div className="border rounded-lg max-h-64 overflow-y-auto">
-                {completedJobs.map((job) => {
-                  const isSelected = selectedJobIds.has(job.id);
-                  return (
-                    <button
-                      key={job.id}
-                      type="button"
-                      onClick={() => toggleJobSelection(job.id)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left border-b last:border-b-0"
-                    >
-                      {isSelected ? (
-                        <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-                      ) : (
-                        <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm">
-                          {new Date(job.completed_at).toLocaleDateString()}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {job.location?.name || "No location"}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+            ) : uninvoicedJobs.length === 0 ? (
+              <div className="border rounded-lg p-4 text-center">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  All completed jobs have already been invoiced
+                </p>
               </div>
+            ) : (
+              <TooltipProvider>
+                <div className="border rounded-lg max-h-64 overflow-y-auto">
+                  {/* Show uninvoiced jobs first (selectable) */}
+                  {uninvoicedJobs.map((job) => {
+                    const isSelected = selectedJobIds.has(job.id);
+                    return (
+                      <button
+                        key={job.id}
+                        type="button"
+                        onClick={() => toggleJobSelection(job.id)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-muted/50 transition-colors text-left border-b last:border-b-0"
+                      >
+                        {isSelected ? (
+                          <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm">
+                            {new Date(job.completed_at).toLocaleDateString()}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {job.location?.name || "No location"}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {/* Show invoiced jobs at bottom (disabled with tooltip) */}
+                  {invoicedJobs.length > 0 && uninvoicedJobs.length > 0 && (
+                    <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground font-medium border-y">
+                      Already Invoiced
+                    </div>
+                  )}
+                  {invoicedJobs.map((job) => {
+                    const invoiceStatus = getJobInvoiceStatus(job);
+                    return (
+                      <Tooltip key={job.id}>
+                        <TooltipTrigger asChild>
+                          <div className="w-full flex items-center gap-3 p-3 text-left border-b last:border-b-0 opacity-50 cursor-not-allowed">
+                            <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">
+                                {new Date(
+                                  job.completed_at
+                                ).toLocaleDateString()}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {job.location?.name || "No location"}
+                              </div>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className="text-xs shrink-0"
+                            >
+                              {invoiceStatus.invoiceNumber}
+                            </Badge>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            Already included in invoice{" "}
+                            {invoiceStatus.invoiceNumber}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Status: {invoiceStatus.status}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </TooltipProvider>
             )}
           </div>
 

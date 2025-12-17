@@ -642,6 +642,12 @@ verify_jwt = false
 import_map = "./functions/list-feedback/deno.json"
 entrypoint = "./functions/list-feedback/index.ts"
 
+[functions.send-feedback-email]
+enabled = true
+verify_jwt = true
+import_map = "./functions/send-feedback-email/deno.json"
+entrypoint = "./functions/send-feedback-email/index.ts"
+
 [functions.list-form-sections]
 enabled = true
 verify_jwt = false

@@ -164,4 +164,41 @@ export class JobsService {
       throw err;
     }
   }
+
+  /**
+   * Send feedback request email for a job
+   */
+  static async sendFeedbackEmail(jobId: string): Promise<void> {
+    try {
+      log.debug("JobsService: Sending feedback email", {
+        jobId,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "send-feedback-email",
+        {
+          body: { job_id: jobId },
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || "Failed to send feedback email");
+      }
+
+      log.info("JobsService: Feedback email sent successfully", {
+        jobId,
+        emailId: data.emailId,
+      });
+    } catch (err) {
+      log.error("JobsService: Failed to send feedback email", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        jobId,
+      });
+      throw err;
+    }
+  }
 }

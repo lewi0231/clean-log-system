@@ -74,16 +74,8 @@ export default function DashboardSidebar() {
 
   return (
     <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col p-6 gap-8 fixed h-screen overflow-y-auto shadow-sm">
-      {/* Logo/Branding Section */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-          <ChartBar className="w-6 h-6 text-primary-foreground" strokeWidth={3} />
-        </div>
-        <div>
-          <h1 className="text-lg font-bold gradient-text">Clean Log</h1>
-          <p className="text-xs text-muted-foreground">Dashboard</p>
-        </div>
-      </div>
+      {/* Spacer to maintain spacing (logo removed) */}
+      <div className="h-[52px]" />
 
       {/* Navigation */}
       <nav className="flex-1 space-y-2">

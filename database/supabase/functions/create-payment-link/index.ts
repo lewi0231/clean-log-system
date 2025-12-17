@@ -117,7 +117,8 @@ serve(async (req) => {
         organization_id: organization_id,
       },
       customer_email: undefined, // Will be collected during checkout
-      expires_at: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days from now
+      // Stripe Checkout Sessions max expiry is 24 hours
+      expires_at: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
     });
 
     // Store payment link in database

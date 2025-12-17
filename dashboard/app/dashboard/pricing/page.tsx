@@ -224,9 +224,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                   <CardHeader>
                     <CardTitle>Field Pricing</CardTitle>
                     <CardDescription>
-                      Set prices for fields that collect quantities or counts.
-                      These prices are multiplied by the field value to
-                      calculate totals.
+                      Set prices for numerical or boolean fields.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -248,9 +246,8 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                         <CardHeader>
                           <CardTitle>{fieldConfig.label}</CardTitle>
                           <CardDescription>
-                            Set prices for each group (e.g., car makes, wipe
-                            types). Total = sum of (price_per_group ×
-                            quantity_per_group) for all selected options.
+                            Set prices for each option (e.g., Nissan: 10,
+                            Chairs_Cleaned: 15).
                           </CardDescription>
                         </CardHeader>
                         <CardContent>

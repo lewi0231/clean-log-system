@@ -44,6 +44,7 @@ serve(async (req) => {
         id,
         job_id,
         rating,
+        ratings,
         comment,
         submitted_at,
         job:job_id (
@@ -100,6 +101,7 @@ serve(async (req) => {
         id: item.id,
         job_id: item.job_id,
         rating: item.rating,
+        ratings: item.ratings,
         comment: item.comment,
         submitted_at: item.submitted_at,
         job: {

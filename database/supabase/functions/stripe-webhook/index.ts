@@ -1,7 +1,16 @@
 import { serve } from "server";
 import type Stripe from "stripe";
+import {
+  getOrganizationName,
+  sendPaymentConfirmationEmail,
+} from "../_utils/email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  getInvoiceEmailRecipients,
+  type InvoiceEmailRecipientConfig,
+  type JobContext,
+} from "../_utils/invoice-email.ts";
 import {
   createStripeClient,
   getStripeWebhookSecret,
@@ -30,16 +39,25 @@ serve(async (req) => {
     }
 
     // Verify webhook signature
+    // Note: In local development with `stripe listen`, use the webhook secret shown by the CLI
+    // In production, use the webhook secret from your Stripe Dashboard webhook endpoint
     let event: Stripe.Event;
     try {
       const webhookSecret = getStripeWebhookSecret();
       event = verifyWebhookSignature(body, signature, webhookSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
+      // In local development, if verification fails, it might be because:
+      // 1. Wrong webhook secret (should be from `stripe listen` output)
+      // 2. Event is being sent to remote endpoint (check Stripe Dashboard webhook settings)
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      console.error("Webhook verification error details:", {
+        error: errorMessage,
+        hint:
+          "For local dev: Use webhook secret from 'stripe listen' output. Disable remote webhook endpoints in Stripe Dashboard.",
+      });
       return errorResponse(
-        `Webhook signature verification failed: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
+        `Webhook signature verification failed: ${errorMessage}`,
         400,
       );
     }
@@ -195,6 +213,220 @@ serve(async (req) => {
                 invoice_id: invoiceId,
                 amount,
               });
+
+              // Send payment confirmation email
+              try {
+                // Fetch invoice with full details for email
+                const { data: invoiceForEmail } = await supabase
+                  .from("invoice")
+                  .select(
+                    `
+                    id,
+                    invoice_number,
+                    organization_id,
+                    currency,
+                    invoice_job:invoice_job (
+                      job:job_id (
+                        id,
+                        location_id,
+                        submission_data,
+                        location:location_id (
+                          id,
+                          email,
+                          contact_person,
+                          hierarchy_parent_id
+                        )
+                      )
+                    )
+                  `,
+                  )
+                  .eq("id", invoiceId)
+                  .single();
+
+                if (invoiceForEmail) {
+                  // Get invoice template config for email recipient configuration
+                  const { data: templateConfig } = await supabase
+                    .from("invoice_template_config")
+                    .select("email_recipient_config")
+                    .eq("organization_id", invoiceForEmail.organization_id)
+                    .single();
+
+                  const emailConfig: InvoiceEmailRecipientConfig =
+                    (templateConfig
+                      ?.email_recipient_config as InvoiceEmailRecipientConfig) ||
+                    {
+                      location_email_source: "location_email",
+                      form_field_email: null,
+                      default_email: null,
+                    };
+
+                  // Get field configs for form field email mapping
+                  const { data: fieldConfigs } = await supabase
+                    .from("organization_field_configs")
+                    .select("id, name")
+                    .eq("organization_id", invoiceForEmail.organization_id)
+                    .eq("active", true);
+
+                  const fieldConfigMap = new Map<string, { name: string }>(
+                    (fieldConfigs || []).map(
+                      (fc: { id: string; name: string }) => [
+                        fc.id,
+                        { name: fc.name },
+                      ],
+                    ),
+                  );
+
+                  // Build job contexts for email recipient determination
+                  const jobContexts: JobContext[] = [];
+                  if (
+                    invoiceForEmail.invoice_job &&
+                    Array.isArray(invoiceForEmail.invoice_job)
+                  ) {
+                    for (const invoiceJob of invoiceForEmail.invoice_job) {
+                      // Handle Supabase query result - job might be returned as array or object
+                      const jobRaw = invoiceJob.job as unknown;
+                      const job = Array.isArray(jobRaw) ? jobRaw[0] : jobRaw;
+
+                      if (job && typeof job === "object" && job !== null) {
+                        const jobObj = job as {
+                          id?: string;
+                          location_id?: string | null;
+                          submission_data?: Record<string, unknown> | null;
+                          location?:
+                            | {
+                              id?: string;
+                              email?: string | null;
+                              contact_person?: string | null;
+                              hierarchy_parent_id?: string | null;
+                            }
+                            | null
+                            | Array<{
+                              id?: string;
+                              email?: string | null;
+                              contact_person?: string | null;
+                              hierarchy_parent_id?: string | null;
+                            }>;
+                        };
+
+                        // Handle location - might be array or object
+                        const locationRaw = jobObj.location;
+                        const location = Array.isArray(locationRaw)
+                          ? locationRaw[0]
+                          : locationRaw;
+
+                        jobContexts.push({
+                          location_id: jobObj.location_id || null,
+                          location: location && typeof location === "object"
+                            ? {
+                              id: location.id || "",
+                              email: location.email || null,
+                              contact_person: location.contact_person || null,
+                              hierarchy_parent_id:
+                                location.hierarchy_parent_id || null,
+                            }
+                            : null,
+                          submission_data: jobObj.submission_data || null,
+                        });
+                      }
+                    }
+                  }
+
+                  // Get email recipients
+                  const emailRecipients = await getInvoiceEmailRecipients(
+                    supabase,
+                    jobContexts,
+                    emailConfig,
+                    fieldConfigMap,
+                  );
+
+                  if (emailRecipients.length > 0) {
+                    // Get organization name
+                    let organizationName: string;
+                    try {
+                      organizationName = await getOrganizationName(
+                        supabase,
+                        invoiceForEmail.organization_id,
+                      );
+                    } catch (err) {
+                      console.error(
+                        `Failed to get organization name for org ${invoiceForEmail.organization_id}:`,
+                        err,
+                      );
+                      organizationName = "Organization";
+                    }
+
+                    // Get payment method details from Stripe
+                    let paymentMethodDisplay = "Card";
+                    if (paymentIntent.payment_method) {
+                      const pmId = typeof paymentIntent.payment_method ===
+                          "string"
+                        ? paymentIntent.payment_method
+                        : paymentIntent.payment_method.id;
+                      try {
+                        const pm = await stripe.paymentMethods.retrieve(pmId);
+                        if (pm.type === "card" && pm.card) {
+                          const brand = pm.card.brand || "Card";
+                          const last4 = pm.card.last4 || "****";
+                          paymentMethodDisplay = `${
+                            brand.charAt(0).toUpperCase() + brand.slice(1)
+                          } ending in ${last4}`;
+                        } else if (pm.type === "us_bank_account") {
+                          paymentMethodDisplay = "Bank Account";
+                        } else if (pm.type === "link") {
+                          paymentMethodDisplay = "Link";
+                        }
+                      } catch (pmError) {
+                        console.warn(
+                          "Failed to retrieve payment method details:",
+                          pmError,
+                        );
+                      }
+                    }
+
+                    // Determine the base URL for the invoice view
+                    const baseUrl = Deno.env.get("NEXT_PUBLIC_APP_URL") ||
+                      "http://localhost:3000";
+                    const invoiceUrl = `${baseUrl}/invoice/${invoiceId}`;
+
+                    // Send payment confirmation email
+                    const emailResult = await sendPaymentConfirmationEmail({
+                      invoiceNumber: invoiceForEmail.invoice_number,
+                      organizationName,
+                      recipientEmails: emailRecipients,
+                      paymentAmount: amount,
+                      currency: currency,
+                      paymentMethod: paymentMethodDisplay,
+                      transactionId: paymentIntent.id,
+                      paymentDate: new Date().toISOString(),
+                      invoiceUrl: invoiceUrl,
+                    });
+
+                    if (emailResult.success) {
+                      console.log(
+                        `Payment confirmation email sent successfully for invoice ${invoiceForEmail.invoice_number} (Email ID: ${
+                          emailResult.emailId || "unknown"
+                        })`,
+                      );
+                    } else {
+                      console.error(
+                        `Failed to send payment confirmation email for invoice ${invoiceForEmail.invoice_number}:`,
+                        emailResult.error,
+                      );
+                      // Don't fail webhook processing if email fails
+                    }
+                  } else {
+                    console.warn(
+                      `No email recipients found for payment confirmation for invoice ${invoiceForEmail.invoice_number}`,
+                    );
+                  }
+                }
+              } catch (emailError) {
+                console.error(
+                  "Error sending payment confirmation email:",
+                  emailError,
+                );
+                // Don't fail webhook processing if email fails
+              }
             }
           }
         }

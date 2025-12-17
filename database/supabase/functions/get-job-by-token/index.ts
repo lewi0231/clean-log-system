@@ -31,12 +31,13 @@ serve(async (req: Request) => {
 
     const supabase = createServiceRoleClient();
 
-    // Fetch job by token with location and workers
+    // Fetch job by token with location, workers, and organization rating config
     const { data: job, error: jobError } = await supabase
       .from("job")
       .select(
         `
         id,
+        organization_id,
         completed_at,
         location:location_id (
           id,
@@ -48,6 +49,9 @@ serve(async (req: Request) => {
             id,
             name
           )
+        ),
+        organization:organization_id (
+          rating_config
         )
       `,
       )
@@ -79,6 +83,30 @@ serve(async (req: Request) => {
       ? job.location[0]
       : job.location;
 
+    // Parse rating_config with default fallback
+    let ratingConfig = {
+      type: "single" as const,
+      dimensions: ["overall"],
+    };
+    const orgData = Array.isArray(job.organization)
+      ? job.organization[0]
+      : job.organization;
+    if (orgData?.rating_config) {
+      try {
+        const parsed = typeof orgData.rating_config === "string"
+          ? JSON.parse(orgData.rating_config)
+          : orgData.rating_config;
+        if (
+          parsed && typeof parsed === "object" && "type" in parsed &&
+          "dimensions" in parsed
+        ) {
+          ratingConfig = parsed;
+        }
+      } catch {
+        // Use default if parsing fails
+      }
+    }
+
     return jsonResponse({
       success: true,
       job: {
@@ -87,6 +115,7 @@ serve(async (req: Request) => {
         location: location || null,
         workers: workers || [],
         hasFeedback: !!existingFeedback,
+        rating_config: ratingConfig,
       },
     });
   } catch (error) {

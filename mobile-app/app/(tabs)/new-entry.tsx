@@ -133,6 +133,7 @@ export default function NewEntryScreen() {
   const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | null>(
     null
   );
+  const okButtonPressedRef = useRef(false);
 
   // Time states
   const [startTime, setStartTime] = useState<Date | undefined>(undefined);
@@ -253,6 +254,16 @@ export default function NewEntryScreen() {
         setAlertOpen(true);
         return;
       }
+      // Validate start time is not after finish time
+      if (startTime && finishTime && startTime > finishTime) {
+        setAlertTitle("Invalid Time");
+        setAlertMessage(
+          "Start time cannot be after finish time. Please select a valid start time."
+        );
+        setAlertOnConfirm(null);
+        setAlertOpen(true);
+        return;
+      }
     } else if (currentStep > 0 && currentStep < totalSteps - 1) {
       // Validate section steps: Check if mutual exclusion groups have selections
       const sectionFields = organizedFields.get(currentSection?.id || "") || [];
@@ -312,16 +323,12 @@ export default function NewEntryScreen() {
       submissionData.location_id = selectedLocation;
     }
 
-    // Add start and finish times
+    // Add start and finish times as ISO datetime strings (matching dashboard format)
     if (startTime) {
-      const hours = startTime.getHours().toString().padStart(2, "0");
-      const minutes = startTime.getMinutes().toString().padStart(2, "0");
-      submissionData.start_time = `${hours}:${minutes}`;
+      submissionData.start_time = startTime.toISOString();
     }
     if (finishTime) {
-      const hours = finishTime.getHours().toString().padStart(2, "0");
-      const minutes = finishTime.getMinutes().toString().padStart(2, "0");
-      submissionData.finish_time = `${hours}:${minutes}`;
+      submissionData.finish_time = finishTime.toISOString();
     }
 
     if (!validateInputs(submissionData)) {
@@ -388,7 +395,10 @@ export default function NewEntryScreen() {
           setSelectedClusters({});
           setTouchedFields(new Set()); // Reset touched fields
           // Navigate back to home after alert is dismissed
-          router.replace("./");
+          // Use setTimeout to defer navigation to avoid React render warnings
+          setTimeout(() => {
+            router.replace("./");
+          }, 100);
         });
         setAlertOpen(true);
       }
@@ -1309,12 +1319,37 @@ export default function NewEntryScreen() {
       </SafeAreaView>
 
       {/* Alert Dialog */}
-      <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
+      <AlertDialog
+        open={alertOpen}
+        onOpenChange={(open) => {
+          setAlertOpen(open);
+          // Reset flag when dialog opens
+          if (open) {
+            okButtonPressedRef.current = false;
+          }
+          // Only execute callback when dialog is closed AND OK button was pressed
+          if (!open && alertOnConfirm && okButtonPressedRef.current) {
+            // Wait for dialog animation to complete before executing callback
+            setTimeout(() => {
+              alertOnConfirm();
+              // Clear the callback and reset flag after execution
+              setAlertOnConfirm(null);
+              okButtonPressedRef.current = false;
+            }, 200);
+          } else if (!open) {
+            // Clear callback and reset flag if dialog is closed without OK press
+            setAlertOnConfirm(null);
+            okButtonPressedRef.current = false;
+          }
+        }}
+      >
         <AlertDialogContent
           className="bg-secondary border-border"
           onInteractOutside={() => {
-            // Allow dismissing by clicking outside
+            // Allow dismissing by clicking outside, but don't execute callback
+            okButtonPressedRef.current = false;
             setAlertOpen(false);
+            setAlertOnConfirm(null);
           }}
         >
           <AlertDialogHeader>
@@ -1328,14 +1363,12 @@ export default function NewEntryScreen() {
           <AlertDialogFooter className="justify-center">
             <AlertDialogAction>
               <Pressable
-                onPress={() => {
+                onPress={(e) => {
+                  e.stopPropagation();
+                  // Mark that OK button was pressed before closing
+                  okButtonPressedRef.current = true;
+                  // Close the dialog - the onOpenChange handler will execute the callback
                   setAlertOpen(false);
-                  // Execute callback after alert closes to avoid render conflicts
-                  if (alertOnConfirm) {
-                    setTimeout(() => {
-                      alertOnConfirm();
-                    }, 0);
-                  }
                 }}
                 className="bg-primary active:bg-primary-600 px-6 py-3 rounded-lg"
               >
