@@ -6,7 +6,7 @@ import type {
 } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useJobs } from "./use-jobs";
 import useOrganization from "./useOrganization";
 
@@ -83,10 +83,14 @@ export function useWorkerPaymentHistory(): UseWorkerPaymentHistoryResult {
         enabled: !!organizationId,
         queryFn: () => loadPaymentHistory(organizationId),
         initialData: localHistory,
-        onSuccess: (data) => {
-            setLocalHistory(data);
-        },
     });
+
+    // Update local state when query data changes
+    React.useEffect(() => {
+        if (query.data) {
+            setLocalHistory(query.data);
+        }
+    }, [query.data]);
 
     const addPayment = useCallback(
         (

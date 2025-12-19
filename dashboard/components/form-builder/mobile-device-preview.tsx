@@ -382,19 +382,19 @@ export function MobileDevicePreview({
           </div>
         )}
 
-        {/* Add Brand section */}
+        {/* Add Option section */}
         {canAddMore && (
           <div className="space-y-2 border-2 border-dashed border-gray-300 rounded-xl p-4">
             <div>
               <label className="text-sm font-medium text-gray-900 mb-2 block">
-                Brand
+                Option
               </label>
               <Select
                 value={selectedBrand || undefined}
                 onValueChange={setSelectedBrand}
               >
                 <SelectTrigger className="rounded-xl h-12 bg-white border border-gray-200">
-                  <SelectValue placeholder="Select a brand" />
+                  <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableBrands.map((brand) => (

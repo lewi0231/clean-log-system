@@ -29,7 +29,7 @@ import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import type { InvoiceWithJobs } from "@/lib/types";
 import { format } from "date-fns";
-import { FileText, Mail, RefreshCw } from "lucide-react";
+import { CheckCircle2, FileText, Mail, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -49,7 +49,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
   const [invoiceToResend, setInvoiceToResend] =
     useState<InvoiceWithJobs | null>(null);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (invoice: InvoiceWithJobs) => {
     const variants: Record<
       string,
       "default" | "secondary" | "destructive" | "outline"
@@ -61,10 +61,18 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
       cancelled: "outline",
     };
 
+    const status = invoice.status;
+    const isPaid = invoice.paid_at !== null;
+
     return (
-      <Badge variant={variants[status] || "default"}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
+      <div className="flex items-center gap-2">
+        <Badge variant={variants[status] || "default"}>
+          {status.charAt(0).toUpperCase() + status.slice(1)}
+        </Badge>
+        {isPaid && (
+          <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Paid" />
+        )}
+      </div>
     );
   };
 
@@ -262,7 +270,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
                     <TableCell className="text-right font-medium">
                       ${invoice.total.toFixed(2)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                    <TableCell>{getStatusBadge(invoice)}</TableCell>
                     <TableCell>
                       {format(new Date(invoice.due_date), "MMM d, yyyy")}
                     </TableCell>

@@ -216,4 +216,50 @@ export class WorkerPaymentService {
             });
         });
     }
+
+    /**
+     * Save worker payment calculation to database
+     */
+    static async savePayment(
+        organizationId: string,
+        calculation: CalculateWorkerPaymentsResponse,
+        jobIds: string[],
+    ): Promise<{ success: boolean; batch_id: string }> {
+        try {
+            log.debug("WorkerPaymentService: Saving worker payment", {
+                organizationId,
+                jobCount: jobIds.length,
+            });
+
+            const { data, error } = await supabase.functions.invoke(
+                "save-worker-payment",
+                {
+                    body: {
+                        organization_id: organizationId,
+                        calculation: calculation.calculation,
+                        job_ids: jobIds,
+                    },
+                },
+            );
+
+            if (error) throw error;
+
+            if (!data || !data.success) {
+                throw new Error("Failed to save worker payment");
+            }
+
+            return {
+                success: true,
+                batch_id: data.batch_id,
+            };
+        } catch (err) {
+            log.error(
+                "WorkerPaymentService: Failed to save worker payment",
+                {
+                    error: err instanceof Error ? err.message : "Unknown error",
+                },
+            );
+            throw err;
+        }
+    }
 }

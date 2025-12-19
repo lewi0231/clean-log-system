@@ -122,6 +122,7 @@ export interface Job {
       paid_at: string | null;
     } | null;
   }>;
+  has_feedback?: boolean;
 }
 
 export type PricingType =

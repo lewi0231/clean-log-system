@@ -101,9 +101,20 @@ export default function JobDetailDialog({
       cancelled: "outline",
     };
 
+    // Map status to user-friendly label
+    const statusLabels: Record<InvoiceStatus, string> = {
+      draft: "Draft",
+      sent: "Invoice Sent",
+      paid: "Paid",
+      overdue: "Overdue",
+      cancelled: "Cancelled",
+    };
+
     return {
       status: invoice.status,
-      label: invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1),
+      label:
+        statusLabels[invoice.status] ||
+        invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1),
       variant: statusVariants[invoice.status] || "default",
     };
   }, [job]);

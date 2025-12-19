@@ -13,6 +13,7 @@ import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import useOrganization from "@/hooks/useOrganization";
+import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { Briefcase, Calculator, DollarSign, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import CalculatePaymentDialog from "./calculate-payment-dialog";
@@ -46,7 +47,17 @@ export default function PaymentOverview() {
 
     const result = await calculatePayments(jobIds);
     if (result?.calculation) {
-      addPayment(result, jobIds);
+      // Save to database via service
+      try {
+        await WorkerPaymentService.savePayment(organizationId, result, jobIds);
+        // Refresh payment history after saving
+        // The hook will refetch from database
+        addPayment(result, jobIds);
+      } catch (error) {
+        console.error("Failed to save payment:", error);
+        // Still add to local state for now, but log error
+        addPayment(result, jobIds);
+      }
     }
   };
 

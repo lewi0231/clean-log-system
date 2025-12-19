@@ -38,6 +38,9 @@ function createTestSupabaseClient(): SupabaseClient {
         );
     }
 
+    // Create service role client - matches Edge Functions pattern
+    // The service role key automatically bypasses RLS policies
+    // This is the same pattern used in database/supabase/functions/_utils/supabase.ts
     return createClient(supabaseUrl, serviceRoleKey, {
         auth: {
             autoRefreshToken: false,
@@ -199,13 +202,12 @@ export async function createTestJob(
     if (workerError) throw workerError;
     if (!worker) throw new Error("Failed to create test worker");
 
-    // Create job
+    // Create job (without worker_id - workers are linked via job_worker junction table)
     const { data: job, error: jobError } = await supabase
         .from("job")
         .insert({
             organization_id: organizationId,
             location_id: locationId,
-            worker_id: worker.id,
             submission_data: submissionData,
             completed_at: new Date().toISOString(),
         })
@@ -214,6 +216,16 @@ export async function createTestJob(
 
     if (jobError) throw jobError;
     if (!job) throw new Error("Failed to create test job");
+
+    // Link worker to job via job_worker junction table
+    const { error: jobWorkerError } = await supabase
+        .from("job_worker")
+        .insert({
+            job_id: job.id,
+            worker_id: worker.id,
+        });
+
+    if (jobWorkerError) throw jobWorkerError;
 
     return job.id;
 }
@@ -236,7 +248,15 @@ export async function cleanupTestDatabase(
             );
         }
 
-        // 2. Payment links (if exists)
+        // 2. Payments (if exists) - delete before payment links
+        if (testData.paymentId) {
+            await supabase
+                .from("payment")
+                .delete()
+                .eq("id", testData.paymentId);
+        }
+
+        // 3. Payment links (if exists)
         if (testData.paymentLinkId) {
             await supabase
                 .from("payment_link")
@@ -244,7 +264,7 @@ export async function cleanupTestDatabase(
                 .eq("id", testData.paymentLinkId);
         }
 
-        // 3. Invoices (if exists)
+        // 4. Invoices (if exists)
         if (testData.invoiceId) {
             // Delete invoice_job records first
             await supabase
@@ -265,12 +285,12 @@ export async function cleanupTestDatabase(
             );
         }
 
-        // 4. Jobs (if exists)
+        // 5. Jobs (if exists)
         if (testData.jobId) {
             await supabase.from("job").delete().eq("id", testData.jobId);
         }
 
-        // 5. Pricing rules (if exists)
+        // 6. Pricing rules (if exists)
         if (testData.pricingRuleIds && testData.pricingRuleIds.length > 0) {
             await supabase
                 .from("pricing_rule")
@@ -278,7 +298,7 @@ export async function cleanupTestDatabase(
                 .in("id", testData.pricingRuleIds);
         }
 
-        // 6. Field configs
+        // 7. Field configs
         if (testData.fieldConfigIds && testData.fieldConfigIds.length > 0) {
             await supabase
                 .from("organization_field_configs")
@@ -286,22 +306,22 @@ export async function cleanupTestDatabase(
                 .in("id", testData.fieldConfigIds);
         }
 
-        // 7. Invoice template config
+        // 8. Invoice template config
         await supabase
             .from("invoice_template_config")
             .delete()
             .eq("organization_id", testData.organizationId);
 
-        // 8. Organization settings
+        // 9. Organization settings
         await supabase
             .from("organization_settings")
             .delete()
             .eq("organization_id", testData.organizationId);
 
-        // 9. Location
+        // 10. Location
         await supabase.from("location").delete().eq("id", testData.locationId);
 
-        // 10. Organization (this will cascade delete related data)
+        // 11. Organization (this will cascade delete related data)
         await supabase
             .from("organization")
             .delete()

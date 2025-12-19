@@ -1,6 +1,5 @@
 "use client";
 
-import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import { AutoSaveInput } from "@/components/ui/auto-save-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,23 +24,25 @@ import {
   FormSkeleton,
   PageHeaderSkeleton,
 } from "@/components/ui/skeleton-loaders";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useOrganization from "@/hooks/useOrganization";
-import {
-  getRatingConfigPreset,
-  RATING_DIMENSION_LABELS,
-} from "@/lib/constants/rating-config";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   BusinessMode,
   OrganizationSettings,
-  RatingConfigType,
   SupportedCurrency,
 } from "@/lib/types";
-import { DollarSign, Package, Sparkles, Upload, X } from "lucide-react";
+import {
+  DollarSign,
+  ExternalLink,
+  Package,
+  Sparkles,
+  Upload,
+  X,
+} from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 export default function SettingsPage() {
@@ -129,38 +130,6 @@ export default function SettingsPage() {
       return url.replace(/http:\/\/kong:8000/, "http://127.0.0.1:54321");
     }
     return url;
-  };
-
-  const handleTogglePredefinedLocations = async (checked: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating predefined locations setting", { checked });
-
-      const { error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            use_predefined_locations: checked,
-          },
-        }
-      );
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      setSettings((prev) => ({
-        ...prev,
-        use_predefined_locations: checked,
-      }));
-      log.info("Settings: Predefined locations setting updated successfully");
-    } catch (err) {
-      log.error("Settings: Failed to update predefined locations setting", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-    }
   };
 
   const handleBusinessModeChange = async (mode: BusinessMode) => {
@@ -427,90 +396,6 @@ export default function SettingsPage() {
     log.info("Settings: Primary contact email updated successfully");
   };
 
-  const handleInvoiceSendImmediatelyChange = async (checked: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating invoice send immediately setting", {
-        checked,
-      });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            invoice_send_immediately: checked,
-          },
-        }
-      );
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
-          invoice_send_immediately: data.settings.invoice_send_immediately,
-        }));
-      }
-
-      log.info(
-        "Settings: Invoice send immediately setting updated successfully"
-      );
-    } catch (err) {
-      log.error("Settings: Failed to update invoice send immediately setting", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      alert("Failed to update setting. Please try again.");
-    }
-  };
-
-  const handleFeedbackEmailSendImmediatelyChange = async (checked: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating feedback email send immediately setting", {
-        checked,
-      });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            feedback_email_send_immediately: checked,
-          },
-        }
-      );
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
-          feedback_email_send_immediately:
-            data.settings.feedback_email_send_immediately,
-        }));
-      }
-
-      log.info(
-        "Settings: Feedback email send immediately setting updated successfully"
-      );
-    } catch (err) {
-      log.error(
-        "Settings: Failed to update feedback email send immediately setting",
-        {
-          error: err instanceof Error ? err.message : "Unknown error",
-        }
-      );
-      alert("Failed to update setting. Please try again.");
-    }
-  };
-
   const handleConnectStripe = async () => {
     // TODO: Implement Stripe OAuth connection
     // 1. Call edge function to initiate Stripe OAuth flow
@@ -644,7 +529,8 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-2">
-          Configure organization settings
+          Configure global organization settings. Feature-specific settings are
+          available on their respective pages.
         </p>
       </div>
 
@@ -652,9 +538,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
           <TabsTrigger value="business">Business Mode</TabsTrigger>
-          <TabsTrigger value="location">Location</TabsTrigger>
-          <TabsTrigger value="invoice">Invoice Template</TabsTrigger>
-          <TabsTrigger value="payment">Payment & Billing</TabsTrigger>
+          <TabsTrigger value="payment">Payment Providers</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organization" className="space-y-6">
@@ -873,242 +757,58 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="location" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Location Settings</CardTitle>
-              <CardDescription>
-                Control whether predefined locations appear in the mobile app
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <label
-                    htmlFor="predefined-locations"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Use Predefined Locations
-                  </label>
-                  <p className="text-sm text-muted-foreground">
-                    When enabled, your predefined locations will appear as
-                    select options in the mobile app. You can still configure
-                    custom fields in Mobile Application regardless of this
-                    setting.
-                  </p>
-                </div>
-                <Switch
-                  id="predefined-locations"
-                  checked={settings.use_predefined_locations}
-                  onCheckedChange={handleTogglePredefinedLocations}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="invoice" className="space-y-6">
-          <InvoiceTemplateSettings />
-        </TabsContent>
-
         <TabsContent value="payment" className="space-y-6">
+          {/* Contextual Settings Links */}
           <Card>
             <CardHeader>
-              <CardTitle>Invoice Sending</CardTitle>
+              <CardTitle>Feature-Specific Settings</CardTitle>
               <CardDescription>
-                Configure how invoices are sent to customers
+                Configure settings for specific features on their respective
+                pages
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="invoice-send-immediately">
-                    Send Invoices Immediately
-                  </Label>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Locations Settings</p>
                   <p className="text-sm text-muted-foreground">
-                    {settings.invoice_send_immediately
-                      ? "Invoices will be sent to customers immediately upon creation"
-                      : "Invoices will be created in draft status and require review before sending"}
+                    Configure mobile app location integration
                   </p>
                 </div>
-                <Switch
-                  id="invoice-send-immediately"
-                  checked={settings.invoice_send_immediately}
-                  onCheckedChange={handleInvoiceSendImmediatelyChange}
-                />
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/locations">
+                    Go to Locations
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Feedback Requests</CardTitle>
-              <CardDescription>
-                Configure how feedback request emails are sent to customers
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="feedback-email-send-immediately">
-                    Send Feedback Requests Immediately
-                  </Label>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Invoice Settings</p>
                   <p className="text-sm text-muted-foreground">
-                    {settings.feedback_email_send_immediately
-                      ? "Feedback request emails will be sent to customers immediately after a job is completed"
-                      : "Feedback request emails will require manual action to send"}
+                    Configure invoice templates and sending behavior
                   </p>
                 </div>
-                <Switch
-                  id="feedback-email-send-immediately"
-                  checked={settings.feedback_email_send_immediately}
-                  onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
-                />
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/invoicing">
+                    Go to Invoicing
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Rating Configuration</Label>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Feedback & Rating Settings</p>
                   <p className="text-sm text-muted-foreground">
-                    Choose how customers rate your service. Based on industry
-                    best practices.
+                    Configure feedback requests and rating system
                   </p>
                 </div>
-                <RadioGroup
-                  value={settings.rating_config.type}
-                  onValueChange={async (value) => {
-                    const newType = value as RatingConfigType;
-                    const newConfig = getRatingConfigPreset(newType);
-
-                    if (!organizationId) return;
-
-                    try {
-                      log.info("Settings: Updating rating configuration", {
-                        type: newType,
-                        dimensions: newConfig.dimensions,
-                      });
-
-                      const { data, error: updateError } =
-                        await supabase.functions.invoke(
-                          "update-organization-settings",
-                          {
-                            body: {
-                              organization_id: organizationId,
-                              rating_config: newConfig,
-                            },
-                          }
-                        );
-
-                      if (updateError) {
-                        throw updateError;
-                      }
-
-                      if (data?.settings) {
-                        setSettings((prev) => ({
-                          ...prev,
-                          rating_config: data.settings.rating_config,
-                        }));
-                      }
-
-                      log.info(
-                        "Settings: Rating configuration updated successfully"
-                      );
-                    } catch (err) {
-                      log.error(
-                        "Settings: Failed to update rating configuration",
-                        {
-                          error:
-                            err instanceof Error
-                              ? err.message
-                              : "Unknown error",
-                        }
-                      );
-                      alert("Failed to update setting. Please try again.");
-                    }
-                  }}
-                >
-                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
-                    <RadioGroupItem
-                      value="single"
-                      id="rating-single"
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="rating-single"
-                        className="font-normal cursor-pointer"
-                      >
-                        Single Overall Rating
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Customers provide one overall satisfaction rating (1-5
-                        stars). Simple and quick.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Dimensions: Overall Satisfaction
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
-                    <RadioGroupItem
-                      value="three_dimensions"
-                      id="rating-three"
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="rating-three"
-                        className="font-normal cursor-pointer"
-                      >
-                        Three Dimensions
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Customers rate Service Quality, Communication, and Value
-                        for Money. Recommended for most service businesses.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Dimensions:{" "}
-                        {["quality", "communication", "value"]
-                          .map((d) => RATING_DIMENSION_LABELS[d])
-                          .join(", ")}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
-                    <RadioGroupItem
-                      value="rater"
-                      id="rating-rater"
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label
-                        htmlFor="rating-rater"
-                        className="font-normal cursor-pointer"
-                      >
-                        Full RATER Framework
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Comprehensive 5-dimension rating system: Reliability,
-                        Assurance, Tangibles, Empathy, and Responsiveness. Best
-                        for detailed feedback analysis.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Dimensions:{" "}
-                        {[
-                          "reliability",
-                          "assurance",
-                          "tangibles",
-                          "empathy",
-                          "responsiveness",
-                        ]
-                          .map((d) => RATING_DIMENSION_LABELS[d])
-                          .join(", ")}
-                      </div>
-                    </div>
-                  </div>
-                </RadioGroup>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/ratings">
+                    Go to Ratings
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

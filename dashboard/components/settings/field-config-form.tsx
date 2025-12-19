@@ -669,7 +669,7 @@ export default function FieldConfigForm({
               )}
               <p className="text-xs text-muted-foreground">
                 {isGroupedBreakdownField
-                  ? "Separate multiple groups with commas (e.g., brand names)"
+                  ? "Separate multiple groups with commas (e.g., option names)"
                   : "Separate multiple options with commas"}
               </p>
             </div>
