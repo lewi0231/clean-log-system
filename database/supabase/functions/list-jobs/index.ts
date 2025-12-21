@@ -100,10 +100,26 @@ serve(async (req) => {
       }
     });
 
-    // Combine jobs with their workers
+    // Fetch feedback for all jobs to check if feedback has been received
+    const { data: feedbackData, error: feedbackError } = await supabase
+      .from("feedback")
+      .select("job_id")
+      .in("job_id", jobIds);
+
+    if (feedbackError) {
+      console.error("Error fetching feedback:", feedbackError);
+      // Don't fail the entire request if feedback fetch fails
+    }
+
+    const jobsWithFeedback = new Set(
+      feedbackData?.map((f) => f.job_id) || [],
+    );
+
+    // Combine jobs with their workers and feedback status
     const jobsWithWorkers = jobs?.map((job) => ({
       ...job,
       workers: workersByJobId.get(job.id) || [],
+      has_feedback: jobsWithFeedback.has(job.id),
     }));
 
     return jsonResponse({

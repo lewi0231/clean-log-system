@@ -171,6 +171,20 @@ serve(async (req) => {
       }
     }
 
+    // Fetch organization currency to use as default if currency not provided
+    const { data: organization, error: orgError } = await supabase
+      .from("organization")
+      .select("currency")
+      .eq("id", organization_id)
+      .single();
+
+    if (orgError) {
+      console.error("Error fetching organization currency:", orgError);
+      // Don't fail, just use USD as fallback
+    }
+
+    const defaultCurrency = organization?.currency || "USD";
+
     const insertPayload = {
       organization_id,
       scope,
@@ -181,7 +195,7 @@ serve(async (req) => {
       applies_to_field_type: applies_to_field_type || null,
       location_hierarchy_id: location_hierarchy_id || null,
       location_id: location_id || null,
-      currency: currency || "USD",
+      currency: currency || defaultCurrency,
       base_price: base_price ?? null,
       percentage_rate: percentage_rate ?? null,
       minimum_quantity: minimum_quantity ?? null,

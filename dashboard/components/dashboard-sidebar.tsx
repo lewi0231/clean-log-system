@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
+  // Setup & Configuration
   {
     name: "Users",
     href: "/dashboard/users",
@@ -33,19 +34,15 @@ const navigation = [
     icon: Smartphone,
   },
   {
-    name: "Completed Jobs",
-    href: "/dashboard/completed-jobs",
-    icon: Clipboard,
-  },
-  {
-    name: "Ratings",
-    href: "/dashboard/ratings",
-    icon: Star,
-  },
-  {
     name: "Pricing",
     href: "/dashboard/pricing",
     icon: DollarSign,
+  },
+  // Daily Operations
+  {
+    name: "Completed Jobs",
+    href: "/dashboard/completed-jobs",
+    icon: Clipboard,
   },
   {
     name: "Invoicing",
@@ -57,15 +54,22 @@ const navigation = [
     href: "/dashboard/worker-payments",
     icon: Wallet,
   },
+  // Analysis
   {
-    name: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
+    name: "Ratings",
+    href: "/dashboard/ratings",
+    icon: Star,
   },
   {
     name: "Visualizations",
     href: "/dashboard/visualizations",
     icon: ChartBar,
+  },
+  // System Settings
+  {
+    name: "Settings",
+    href: "/dashboard/settings",
+    icon: Settings,
   },
 ];
 

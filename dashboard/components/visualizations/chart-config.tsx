@@ -111,13 +111,13 @@ export default function ChartConfigComponent({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="brand">By Brand (Distribution)</SelectItem>
+                <SelectItem value="brand">By Option (Distribution)</SelectItem>
                 <SelectItem value="quantity">Quantity Over Time</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {config.groupedBreakdownMode === "brand"
-                ? "Shows distribution of quantities by brand"
+                ? "Shows distribution of quantities by option"
                 : "Shows total quantities grouped by selected dimension"}
             </p>
           </div>

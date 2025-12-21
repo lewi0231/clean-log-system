@@ -160,15 +160,15 @@ export function GroupedBreakdownField({
       >
         <ScrollView className="px-4 py-2" keyboardShouldPersistTaps="handled">
           <View className="space-y-4 ">
-            {/* Brand Select */}
+            {/* Option Select */}
             <View className="">
               <Text className="text-base font-semibold mb-2 text-foreground">
-                Brand
+                Option
               </Text>
               <Select
                 value={selectedBrand}
                 onValueChange={setSelectedBrand}
-                placeholder="Select a brand"
+                placeholder="Select an option"
                 size="medium"
               >
                 {availableBrands.map((brand) => (

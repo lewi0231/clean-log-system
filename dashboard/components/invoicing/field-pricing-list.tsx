@@ -146,7 +146,7 @@ export default function FieldPricingList() {
       case "select":
         return isServiceBased ? "Service Price" : "Option Cost";
       case "grouped_breakdown":
-        return isServiceBased ? "Service Price" : "Group/Brand Cost";
+        return isServiceBased ? "Service Price" : "Group/Option Cost";
       case "boolean":
         return isServiceBased
           ? "Fixed Price (when true)"
@@ -168,8 +168,8 @@ export default function FieldPricingList() {
           : "Cost for each selected option. Configure option-specific pricing in the Option Pricing section.";
       case "grouped_breakdown":
         return isServiceBased
-          ? "Price for each group/brand. Configure group-specific pricing in the Option Pricing section."
-          : "Cost for each group/brand. Configure group-specific pricing in the Option Pricing section.";
+          ? "Price for each group/option. Configure group-specific pricing in the Option Pricing section."
+          : "Cost for each group/option. Configure group-specific pricing in the Option Pricing section.";
       case "boolean":
         return isServiceBased
           ? "Fixed price charged when this field is true"
@@ -333,7 +333,7 @@ export default function FieldPricingList() {
                       <p className="text-sm text-muted-foreground mb-2">
                         {fieldConfig.field_type === "select"
                           ? "Options:"
-                          : "Groups/Brands:"}
+                          : "Groups/Options:"}
                       </p>
                       <div className="space-y-2">
                         {fieldConfig.options &&

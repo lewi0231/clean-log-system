@@ -205,7 +205,7 @@ export default function CalculatePaymentDialog({
               selectedJobIds.size === 0 || calculating || loading || !preview
             }
           >
-            {calculating ? "Calculating..." : "Calculate Payments"}
+            {calculating ? "Saving..." : "Save Payment"}
           </Button>
         </DialogFooter>
       </DialogContent>

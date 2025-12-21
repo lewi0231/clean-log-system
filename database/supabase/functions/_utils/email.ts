@@ -507,6 +507,30 @@ export async function sendInvoiceEmail(
   data: InvoiceEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  // Check if email sending should be skipped entirely (for integration tests)
+  // This prevents hitting Resend rate limits during testing
+  // Check this FIRST before any validation or processing
+  const skipEmailSendingEnv = Deno.env.get("SKIP_EMAIL_SENDING");
+  const skipEmailSending = skipEmailSendingEnv === "true";
+
+  // Debug logging to verify env var is being read
+  console.log("[SKIP EMAIL DEBUG] Checking SKIP_EMAIL_SENDING:", {
+    value: skipEmailSendingEnv,
+    willSkip: skipEmailSending,
+    allEnvKeys: Object.keys(Deno.env.toObject()).filter((k) =>
+      k.includes("SKIP") || k.includes("RESEND")
+    ),
+  });
+
+  if (skipEmailSending) {
+    console.log("[SKIP EMAIL] Email sending skipped for integration tests", {
+      invoiceNumber: data.invoiceNumber,
+      recipients: data.recipientEmails,
+    });
+    // Return success without actually sending
+    return { success: true, emailId: `mock-email-${Date.now()}` };
+  }
+
   // Validate configuration
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -851,6 +875,24 @@ export async function sendPaymentConfirmationEmail(
 
   // Check if test mode is enabled
   const testMode = isTestMode();
+
+  // Check if email sending should be skipped entirely (for integration tests)
+  // This prevents hitting Resend rate limits during testing
+  const skipEmailSendingEnv = Deno.env.get("SKIP_EMAIL_SENDING");
+  const skipEmailSending = skipEmailSendingEnv === "true";
+
+  if (skipEmailSending) {
+    console.log(
+      "[SKIP EMAIL] Payment confirmation email sending skipped for integration tests",
+      {
+        invoiceNumber: data.invoiceNumber,
+        transactionId: data.transactionId,
+        recipients: data.recipientEmails,
+      },
+    );
+    // Return success without actually sending
+    return { success: true, emailId: `mock-payment-email-${Date.now()}` };
+  }
 
   // Determine recipients and subject based on test mode
   // In test mode, redirect all recipients to test address

@@ -38,6 +38,9 @@ function createTestSupabaseClient(): SupabaseClient {
         );
     }
 
+    // Create service role client - matches Edge Functions pattern
+    // The service role key automatically bypasses RLS policies
+    // This is the same pattern used in database/supabase/functions/_utils/supabase.ts
     return createClient(supabaseUrl, serviceRoleKey, {
         auth: {
             autoRefreshToken: false,
@@ -199,13 +202,12 @@ export async function createTestJob(
     if (workerError) throw workerError;
     if (!worker) throw new Error("Failed to create test worker");
 
-    // Create job
+    // Create job (without worker_id - workers are linked via job_worker junction table)
     const { data: job, error: jobError } = await supabase
         .from("job")
         .insert({
             organization_id: organizationId,
             location_id: locationId,
-            worker_id: worker.id,
             submission_data: submissionData,
             completed_at: new Date().toISOString(),
         })
@@ -214,6 +216,16 @@ export async function createTestJob(
 
     if (jobError) throw jobError;
     if (!job) throw new Error("Failed to create test job");
+
+    // Link worker to job via job_worker junction table
+    const { error: jobWorkerError } = await supabase
+        .from("job_worker")
+        .insert({
+            job_id: job.id,
+            worker_id: worker.id,
+        });
+
+    if (jobWorkerError) throw jobWorkerError;
 
     return job.id;
 }
@@ -228,20 +240,20 @@ export async function cleanupTestDatabase(
 
     try {
         // Delete in reverse dependency order
-        // 1. Payments (if exists)
-        if (testData.paymentId) {
-            await supabase.from("payment").delete().eq(
-                "id",
-                testData.paymentId,
-            );
-        }
-
-        // 2. Payment links (if exists)
+        // 1. Payment links (if exists) - delete before payments
         if (testData.paymentLinkId) {
             await supabase
                 .from("payment_link")
                 .delete()
                 .eq("id", testData.paymentLinkId);
+        }
+
+        // 2. Payments (if exists)
+        if (testData.paymentId) {
+            await supabase.from("payment").delete().eq(
+                "id",
+                testData.paymentId,
+            );
         }
 
         // 3. Invoices (if exists)

@@ -60,7 +60,9 @@
   --primary-foreground: oklch(1 0 0); /* #FFFFFF - White text on primary */
   --secondary: oklch(0.95 0.005 264.542); /* Light gray for secondary */
   --secondary-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Dark text */
-  --muted: oklch(0.96 0.003 264.542); /* Very light gray for muted backgrounds */
+  --muted: oklch(
+    0.96 0.003 264.542
+  ); /* Very light gray for muted backgrounds */
   --muted-foreground: oklch(0.45 0.01 264.542); /* #6B7280 - Medium gray text */
   --accent: oklch(0.65 0.15 180); /* #14B8A6 - Teal accent */
   --accent-foreground: oklch(1 0 0); /* #FFFFFF - White text */
@@ -86,7 +88,9 @@
   --sidebar-primary: oklch(0.55 0.18 264.542); /* #2563EB - Soft blue */
   --sidebar-primary-foreground: oklch(1 0 0); /* #FFFFFF - White text */
   --sidebar-accent: oklch(0.96 0.003 264.542); /* Light gray accent */
-  --sidebar-accent-foreground: oklch(0.25 0.015 264.542); /* #1F2937 - Dark text */
+  --sidebar-accent-foreground: oklch(
+    0.25 0.015 264.542
+  ); /* #1F2937 - Dark text */
   --sidebar-border: oklch(0.92 0.006 264.531); /* #E5E7EB - Light border */
   --sidebar-ring: oklch(0.55 0.18 264.542); /* #2563EB - Primary blue */
 }
@@ -141,18 +145,19 @@
 @layer components {
   /* Gradient text utility for accent text (blue gradient) */
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent;
+    @apply bg-linear-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent;
   }
-  
+
   /* Shadow system for cards and surfaces */
   .card-shadow {
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   }
-  
+
   .card-shadow-hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
-  
+
   .focus-shadow {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }

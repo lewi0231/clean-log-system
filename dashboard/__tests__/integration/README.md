@@ -29,6 +29,7 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...  # Get from 'supabase status' command
 RESEND_API_KEY=re_...
 RESEND_FROM_DOMAIN=your-domain.com
 RESEND_TEST_MODE=true  # IMPORTANT: Set to true to prevent sending real emails
+SKIP_EMAIL_SENDING=true  # OPTIONAL: Skip actual email sending to avoid rate limits (emails are mocked)
 ```
 
 **Getting SUPABASE_SERVICE_ROLE_KEY:**
@@ -249,6 +250,7 @@ The `payment-flow.test.ts` is a comprehensive end-to-end integration test that v
    - `RESEND_API_KEY`
    - `RESEND_FROM_DOMAIN`
    - `RESEND_TEST_MODE=true` (critical - prevents sending real emails)
+   - `SKIP_EMAIL_SENDING=true` (recommended - skips actual email sending to avoid rate limits)
    - `NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321`
 
 3. **Test Mode Validation**

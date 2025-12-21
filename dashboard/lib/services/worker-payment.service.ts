@@ -49,12 +49,20 @@ export interface CalculateWorkerPaymentsResponse {
 
 export interface PaymentRecord {
     id: string;
+    batch_id?: string; // Database batch ID for status updates
     dateRange: { start: string; end: string };
     jobIds: string[];
     totalPayment: number;
     workerCount: number;
     calculation: CalculateWorkerPaymentsResponse;
     calculatedAt: string;
+    status?:
+        | "calculated"
+        | "approved"
+        | "processing"
+        | "paid"
+        | "failed"
+        | "cancelled"; // Payment batch status
 }
 
 export interface WorkerSummary {
@@ -215,5 +223,167 @@ export class WorkerPaymentService {
                 return job?.workers.some((w) => w.id === workerId);
             });
         });
+    }
+
+    /**
+     * Save worker payment calculation to database
+     */
+    static async savePayment(
+        organizationId: string,
+        calculation: CalculateWorkerPaymentsResponse,
+        jobIds: string[],
+    ): Promise<{ success: boolean; batch_id: string }> {
+        try {
+            log.debug("WorkerPaymentService: Saving worker payment", {
+                organizationId,
+                jobCount: jobIds.length,
+            });
+
+            const { data, error } = await supabase.functions.invoke(
+                "save-worker-payment",
+                {
+                    body: {
+                        organization_id: organizationId,
+                        calculation: calculation.calculation,
+                        job_ids: jobIds,
+                    },
+                },
+            );
+
+            if (error) throw error;
+
+            if (!data || !data.success) {
+                throw new Error("Failed to save worker payment");
+            }
+
+            return {
+                success: true,
+                batch_id: data.batch_id,
+            };
+        } catch (err) {
+            log.error(
+                "WorkerPaymentService: Failed to save worker payment",
+                {
+                    error: err instanceof Error ? err.message : "Unknown error",
+                },
+            );
+            throw err;
+        }
+    }
+
+    /**
+     * Update worker payment status (mark as paid, approved, etc.)
+     */
+    static async updatePaymentStatus(
+        organizationId: string,
+        params: {
+            paymentId?: string;
+            batchId?: string;
+            status:
+                | "calculated"
+                | "approved"
+                | "processing"
+                | "paid"
+                | "failed"
+                | "cancelled";
+            paymentMethod?:
+                | "bank_transfer"
+                | "cash"
+                | "check"
+                | "payroll_system"
+                | "other";
+            paymentReference?: string;
+            notes?: string;
+        },
+    ): Promise<{ success: boolean }> {
+        try {
+            log.debug("WorkerPaymentService: Updating payment status", {
+                organizationId,
+                ...params,
+            });
+
+            const { data, error } = await supabase.functions.invoke(
+                "update-worker-payment-status",
+                {
+                    body: {
+                        organization_id: organizationId,
+                        payment_id: params.paymentId,
+                        batch_id: params.batchId,
+                        status: params.status,
+                        payment_method: params.paymentMethod,
+                        payment_reference: params.paymentReference,
+                        notes: params.notes,
+                    },
+                },
+            );
+
+            if (error) throw error;
+
+            if (!data || !data.success) {
+                throw new Error("Failed to update payment status");
+            }
+
+            return {
+                success: true,
+            };
+        } catch (err) {
+            log.error(
+                "WorkerPaymentService: Failed to update payment status",
+                {
+                    error: err instanceof Error ? err.message : "Unknown error",
+                },
+            );
+            throw err;
+        }
+    }
+
+    /**
+     * List worker payment history from database
+     * Fetches payment batches with pagination support
+     */
+    static async listPayments(
+        organizationId: string,
+        options?: {
+            page?: number;
+            limit?: number;
+        },
+    ): Promise<{ payments: PaymentRecord[]; total: number; hasMore: boolean }> {
+        try {
+            log.debug("WorkerPaymentService: Listing worker payments", {
+                organizationId,
+                ...options,
+            });
+
+            const { data, error } = await supabase.functions.invoke(
+                "list-worker-payments",
+                {
+                    body: {
+                        organization_id: organizationId,
+                        page: options?.page ?? 1,
+                        limit: options?.limit ?? 50,
+                    },
+                },
+            );
+
+            if (error) throw error;
+
+            if (!data || !data.success) {
+                throw new Error("Failed to list worker payments");
+            }
+
+            return {
+                payments: data.batches as PaymentRecord[],
+                total: data.total ?? data.batches?.length ?? 0,
+                hasMore: data.hasMore ?? false,
+            };
+        } catch (err) {
+            log.error(
+                "WorkerPaymentService: Failed to list worker payments",
+                {
+                    error: err instanceof Error ? err.message : "Unknown error",
+                },
+            );
+            throw err;
+        }
     }
 }

@@ -190,7 +190,7 @@ export default function CompletedJobsList({
             "quantity" in item
         )
       ) {
-        // Format as "Brand: Quantity, Brand: Quantity"
+        // Format as "Option: Quantity, Option: Quantity"
         return value
           .map((item: { brand: string; quantity: number }) => {
             return `${item.brand}: ${item.quantity}`;
@@ -230,6 +230,14 @@ export default function CompletedJobsList({
     label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
   } | null => {
+    // If feedback has been received, show "Feedback Received"
+    if (job.has_feedback) {
+      return {
+        label: "Feedback Received",
+        variant: "secondary",
+      };
+    }
+    // If feedback email has been sent but not received yet, show "Feedback Sent"
     if (job.feedback_email_sent) {
       return {
         label: "Feedback Sent",
@@ -294,9 +302,20 @@ export default function CompletedJobsList({
       cancelled: "outline",
     };
 
+    // Map status to user-friendly label
+    const statusLabels: Record<InvoiceStatus, string> = {
+      draft: "Draft",
+      sent: "Invoice Sent",
+      paid: "Paid",
+      overdue: "Overdue",
+      cancelled: "Cancelled",
+    };
+
     return {
       status: invoice.status,
-      label: invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1),
+      label:
+        statusLabels[invoice.status] ||
+        invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1),
       variant: statusVariants[invoice.status] || "default",
     };
   };

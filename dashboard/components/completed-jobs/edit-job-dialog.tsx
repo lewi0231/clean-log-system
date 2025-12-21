@@ -248,16 +248,16 @@ function GroupedBreakdownField({
           <DialogHeader>
             <DialogTitle>Add {field.label}</DialogTitle>
             <DialogDescription>
-              Select a brand and enter the quantity
+              Select an option and enter the quantity
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Brand Select */}
+            {/* Option Select */}
             <div className="space-y-2">
-              <Label htmlFor="add-brand">Brand</Label>
+              <Label htmlFor="add-brand">Option</Label>
               <Select value={selectedBrand} onValueChange={setSelectedBrand}>
                 <SelectTrigger id="add-brand">
-                  <SelectValue placeholder="Select a brand" />
+                  <SelectValue placeholder="Select an option" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableBrands.map((brand: string) => (
