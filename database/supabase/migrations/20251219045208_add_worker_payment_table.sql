@@ -112,64 +112,24 @@ CREATE TRIGGER update_worker_payment_updated_at
 ALTER TABLE worker_payment_batch ENABLE ROW LEVEL SECURITY;
 ALTER TABLE worker_payment ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies: Organization users can only see their organization's payments
-CREATE POLICY "Organization users can view their worker payment batches"
+-- RLS Policies
+--
+-- NOTE: This codebase primarily accesses data through Edge Functions using the
+-- service role key (see createServiceRoleClient()), so we follow the existing
+-- security pattern used elsewhere: service_role can manage these tables.
+--
+-- The organization_user table is email-based (no user_id column), so policies
+-- that join on organization_user.user_id will fail at migration time.
+
+CREATE POLICY "Service role can manage worker_payment_batch"
   ON worker_payment_batch
-  FOR SELECT
-  USING (
-    organization_id IN (
-      SELECT organization_id FROM organization_user
-      WHERE user_id = auth.uid()
-    )
-  );
+  FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 
-CREATE POLICY "Organization users can insert their worker payment batches"
-  ON worker_payment_batch
-  FOR INSERT
-  WITH CHECK (
-    organization_id IN (
-      SELECT organization_id FROM organization_user
-      WHERE user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Organization users can update their worker payment batches"
-  ON worker_payment_batch
-  FOR UPDATE
-  USING (
-    organization_id IN (
-      SELECT organization_id FROM organization_user
-      WHERE user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Organization users can view their worker payments"
+CREATE POLICY "Service role can manage worker_payment"
   ON worker_payment
-  FOR SELECT
-  USING (
-    organization_id IN (
-      SELECT organization_id FROM organization_user
-      WHERE user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Organization users can insert their worker payments"
-  ON worker_payment
-  FOR INSERT
-  WITH CHECK (
-    organization_id IN (
-      SELECT organization_id FROM organization_user
-      WHERE user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Organization users can update their worker payments"
-  ON worker_payment
-  FOR UPDATE
-  USING (
-    organization_id IN (
-      SELECT organization_id FROM organization_user
-      WHERE user_id = auth.uid()
-    )
-  );
+  FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 

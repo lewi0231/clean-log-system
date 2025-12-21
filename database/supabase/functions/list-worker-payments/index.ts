@@ -1,14 +1,25 @@
 import { serve } from "server";
+import {
+  extractAuthToken,
+  getAuthUser,
+  verifyOrganizationMembership,
+} from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
+
+interface ListWorkerPaymentsRequest {
+  organization_id: string;
+  page?: number;
+  limit?: number;
+}
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const body = (await req.json()) as { organization_id: string };
+    const body = (await req.json()) as ListWorkerPaymentsRequest;
     const validation = validateRequiredFields(
       body as unknown as Record<string, unknown>,
       ["organization_id"],
@@ -18,11 +29,54 @@ serve(async (req: Request) => {
       return errorResponse("Organization ID is required", 400);
     }
 
-    const { organization_id } = body;
+    const { organization_id, page = 1, limit = 50 } = body;
+
+    // Validate pagination params
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 50)); // Cap at 100
+    const offset = (pageNum - 1) * limitNum;
+
+    // Get authenticated user for membership verification
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+    const token = extractAuthToken(req);
+    if (token) {
+      const authUser = await getAuthUser(token);
+      if (authUser?.id) {
+        userId = authUser.id;
+        userEmail = authUser.email ?? null;
+      }
+    }
 
     const supabase = createServiceRoleClient();
 
-    // Fetch payment batches with related payments
+    // Verify user belongs to this organization
+    if (userId || userEmail) {
+      const isMember = await verifyOrganizationMembership(
+        supabase,
+        organization_id,
+        userEmail,
+        userId,
+      );
+      if (!isMember) {
+        return errorResponse(
+          "You do not have permission to access this organization",
+          403,
+        );
+      }
+    }
+
+    // Get total count for pagination
+    const { count: totalCount, error: countError } = await supabase
+      .from("worker_payment_batch")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", organization_id);
+
+    if (countError) {
+      console.error("Error counting payment batches:", countError);
+    }
+
+    // Fetch payment batches with related payments (with pagination)
     const { data: batches, error: batchesError } = await supabase
       .from("worker_payment_batch")
       .select(
@@ -59,7 +113,8 @@ serve(async (req: Request) => {
       `,
       )
       .eq("organization_id", organization_id)
-      .order("calculated_at", { ascending: false });
+      .order("calculated_at", { ascending: false })
+      .range(offset, offset + limitNum - 1);
 
     if (batchesError) throw batchesError;
 
@@ -138,9 +193,16 @@ serve(async (req: Request) => {
       };
     });
 
+    const total = totalCount ?? formattedBatches.length;
+    const hasMore = offset + limitNum < total;
+
     return jsonResponse({
       success: true,
       batches: formattedBatches,
+      total,
+      page: pageNum,
+      limit: limitNum,
+      hasMore,
     });
   } catch (error) {
     console.error("List worker payments error:", error);

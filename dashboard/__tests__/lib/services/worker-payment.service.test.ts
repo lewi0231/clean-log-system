@@ -667,4 +667,317 @@ describe("WorkerPaymentService", () => {
             expect(filtered).toHaveLength(0);
         });
     });
+
+    describe("savePayment", () => {
+        it("should save worker payment successfully", async () => {
+            const mockResponse = {
+                success: true,
+                batch_id: "batch-123",
+                payment_count: 2,
+            };
+
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: mockResponse,
+                error: null,
+            });
+
+            const calculation: CalculateWorkerPaymentsResponse = {
+                success: true,
+                calculation: {
+                    total_worker_payment: 200,
+                    job_calculations: [
+                        {
+                            job_id: "job-1",
+                            line_items: [],
+                            applied_rules: [],
+                            subtotal: 200,
+                            total_adjustments: 0,
+                            total_worker_payment: 200,
+                        },
+                    ],
+                },
+            };
+
+            const result = await WorkerPaymentService.savePayment(
+                "org-1",
+                calculation,
+                ["job-1"],
+            );
+
+            expect(result.success).toBe(true);
+            expect(result.batch_id).toBe("batch-123");
+            expect(supabase.functions.invoke).toHaveBeenCalledWith(
+                "save-worker-payment",
+                {
+                    body: {
+                        organization_id: "org-1",
+                        calculation: calculation.calculation,
+                        job_ids: ["job-1"],
+                    },
+                },
+            );
+        });
+
+        it("should throw error when save fails", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: null,
+                error: { message: "Save failed" },
+            });
+
+            const calculation: CalculateWorkerPaymentsResponse = {
+                success: true,
+                calculation: {
+                    total_worker_payment: 100,
+                    job_calculations: [],
+                },
+            };
+
+            await expect(
+                WorkerPaymentService.savePayment("org-1", calculation, [
+                    "job-1",
+                ]),
+            ).rejects.toThrow();
+        });
+
+        it("should throw error when response is unsuccessful", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: { success: false },
+                error: null,
+            });
+
+            const calculation: CalculateWorkerPaymentsResponse = {
+                success: true,
+                calculation: {
+                    total_worker_payment: 100,
+                    job_calculations: [],
+                },
+            };
+
+            await expect(
+                WorkerPaymentService.savePayment("org-1", calculation, [
+                    "job-1",
+                ]),
+            ).rejects.toThrow("Failed to save worker payment");
+        });
+    });
+
+    describe("updatePaymentStatus", () => {
+        it("should update payment status to paid", async () => {
+            const mockResponse = {
+                success: true,
+                batch: { id: "batch-123", status: "completed" },
+            };
+
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: mockResponse,
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.updatePaymentStatus(
+                "org-1",
+                {
+                    batchId: "batch-123",
+                    status: "paid",
+                    paymentMethod: "bank_transfer",
+                    paymentReference: "TXN-001",
+                    notes: "Paid via bank",
+                },
+            );
+
+            expect(result.success).toBe(true);
+            expect(supabase.functions.invoke).toHaveBeenCalledWith(
+                "update-worker-payment-status",
+                {
+                    body: {
+                        organization_id: "org-1",
+                        payment_id: undefined,
+                        batch_id: "batch-123",
+                        status: "paid",
+                        payment_method: "bank_transfer",
+                        payment_reference: "TXN-001",
+                        notes: "Paid via bank",
+                    },
+                },
+            );
+        });
+
+        it("should update individual payment status", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: {
+                    success: true,
+                    payment: { id: "payment-1", status: "paid" },
+                },
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.updatePaymentStatus(
+                "org-1",
+                {
+                    paymentId: "payment-1",
+                    status: "paid",
+                    paymentMethod: "cash",
+                },
+            );
+
+            expect(result.success).toBe(true);
+            expect(supabase.functions.invoke).toHaveBeenCalledWith(
+                "update-worker-payment-status",
+                expect.objectContaining({
+                    body: expect.objectContaining({
+                        payment_id: "payment-1",
+                        status: "paid",
+                    }),
+                }),
+            );
+        });
+
+        it("should throw error when update fails", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: null,
+                error: { message: "Update failed" },
+            });
+
+            await expect(
+                WorkerPaymentService.updatePaymentStatus("org-1", {
+                    batchId: "batch-1",
+                    status: "paid",
+                }),
+            ).rejects.toThrow();
+        });
+
+        it("should handle status transitions: calculated to approved", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: { success: true, batch: { status: "approved" } },
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.updatePaymentStatus(
+                "org-1",
+                { batchId: "batch-1", status: "approved" },
+            );
+
+            expect(result.success).toBe(true);
+        });
+
+        it("should handle status transitions: approved to processing", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: { success: true, batch: { status: "processing" } },
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.updatePaymentStatus(
+                "org-1",
+                { batchId: "batch-1", status: "processing" },
+            );
+
+            expect(result.success).toBe(true);
+        });
+    });
+
+    describe("listPayments", () => {
+        it("should list worker payments successfully", async () => {
+            const mockBatches: PaymentRecord[] = [
+                {
+                    id: "batch-1",
+                    batch_id: "batch-1",
+                    dateRange: { start: "2024-01-01", end: "2024-01-31" },
+                    jobIds: ["job-1", "job-2"],
+                    totalPayment: 500,
+                    workerCount: 3,
+                    calculatedAt: "2024-01-15T10:00:00Z",
+                    status: "calculated",
+                    calculation: {
+                        success: true,
+                        calculation: {
+                            total_worker_payment: 500,
+                            job_calculations: [],
+                        },
+                    },
+                },
+            ];
+
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: {
+                    success: true,
+                    batches: mockBatches,
+                    total: 1,
+                    hasMore: false,
+                },
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.listPayments("org-1");
+
+            expect(result.payments).toHaveLength(1);
+            expect(result.total).toBe(1);
+            expect(result.hasMore).toBe(false);
+            expect(supabase.functions.invoke).toHaveBeenCalledWith(
+                "list-worker-payments",
+                {
+                    body: {
+                        organization_id: "org-1",
+                        page: 1,
+                        limit: 50,
+                    },
+                },
+            );
+        });
+
+        it("should support pagination", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: {
+                    success: true,
+                    batches: [],
+                    total: 100,
+                    hasMore: true,
+                },
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.listPayments("org-1", {
+                page: 2,
+                limit: 20,
+            });
+
+            expect(result.hasMore).toBe(true);
+            expect(supabase.functions.invoke).toHaveBeenCalledWith(
+                "list-worker-payments",
+                {
+                    body: {
+                        organization_id: "org-1",
+                        page: 2,
+                        limit: 20,
+                    },
+                },
+            );
+        });
+
+        it("should throw error when list fails", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: null,
+                error: { message: "List failed" },
+            });
+
+            await expect(
+                WorkerPaymentService.listPayments("org-1"),
+            ).rejects.toThrow();
+        });
+
+        it("should return empty array when no payments exist", async () => {
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: {
+                    success: true,
+                    batches: [],
+                    total: 0,
+                    hasMore: false,
+                },
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.listPayments("org-1");
+
+            expect(result.payments).toEqual([]);
+            expect(result.total).toBe(0);
+        });
+    });
 });

@@ -50,8 +50,9 @@ export default function PaymentOverview() {
       // Save to database via service
       try {
         await WorkerPaymentService.savePayment(organizationId, result, jobIds);
-        // Refresh payment history after saving
-        // The hook will refetch from database
+        // Payment saved to database with batch_id
+        // TODO: Update useWorkerPaymentHistory to fetch from database instead of localStorage
+        // For now, localStorage records won't have batch_id, but database records will
         addPayment(result, jobIds);
       } catch (error) {
         console.error("Failed to save payment:", error);

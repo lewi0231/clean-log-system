@@ -1,5 +1,9 @@
 import { serve } from "server";
-import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import {
+  extractAuthToken,
+  getAuthUser,
+  verifyOrganizationMembership,
+} from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -28,11 +32,7 @@ serve(async (req: Request) => {
     const body = (await req.json()) as SaveWorkerPaymentRequest;
     const validation = validateRequiredFields(
       body as unknown as Record<string, unknown>,
-      [
-        "organization_id",
-        "calculation",
-        "job_ids",
-      ],
+      ["organization_id", "calculation", "job_ids"],
     );
 
     if (!validation.valid) {
@@ -52,19 +52,21 @@ serve(async (req: Request) => {
       return errorResponse("calculation.job_calculations is required", 400);
     }
 
-    // Get authenticated user for created_by
+    // Get authenticated user for created_by and membership verification
     let userId: string | null = null;
+    let userEmail: string | null = null;
     const token = extractAuthToken(req);
     if (token) {
       const authUser = await getAuthUser(token);
       if (authUser?.id) {
         userId = authUser.id;
+        userEmail = authUser.email ?? null;
       }
     }
 
     const supabase = createServiceRoleClient();
 
-    // Verify organization exists and user has access
+    // Verify organization exists
     const { data: org, error: orgError } = await supabase
       .from("organization")
       .select("id")
@@ -75,19 +77,26 @@ serve(async (req: Request) => {
       return errorResponse("Organization not found", 404);
     }
 
-    // Get jobs to extract worker information
+    // Verify user belongs to this organization
+    if (userId || userEmail) {
+      const isMember = await verifyOrganizationMembership(
+        supabase,
+        organization_id,
+        userEmail,
+        userId,
+      );
+      if (!isMember) {
+        return errorResponse(
+          "You do not have permission to access this organization",
+          403,
+        );
+      }
+    }
+
+    // Verify jobs exist
     const { data: jobs, error: jobsError } = await supabase
       .from("job")
-      .select(
-        `
-        id,
-        job_worker:job_worker (
-          worker:worker_id (
-            id
-          )
-        )
-      `,
-      )
+      .select("id")
       .eq("organization_id", organization_id)
       .in("id", job_ids);
 
@@ -96,28 +105,38 @@ serve(async (req: Request) => {
       return errorResponse("No jobs found", 404);
     }
 
+    // Fetch job_worker relationships separately (same pattern as list-jobs)
+    const { data: jobWorkersData, error: jobWorkersError } = await supabase
+      .from("job_worker")
+      .select(
+        `
+        job_id,
+        worker:worker_id (
+          id
+        )
+      `,
+      )
+      .in("job_id", job_ids);
+
+    if (jobWorkersError) throw jobWorkersError;
+
     // Create a map of job_id to worker_ids
-    interface JobWorkerResult {
-      id: string;
-      job_worker?: Array<{
-        worker: { id: string } | Array<{ id: string }>;
-      }>;
+    interface JobWorkerQueryResult {
+      job_id: string;
+      worker: { id: string } | Array<{ id: string }> | null;
     }
 
     const jobWorkersMap = new Map<string, string[]>();
-    (jobs as JobWorkerResult[]).forEach((job) => {
-      const workerIds: string[] = [];
-      if (job.job_worker && Array.isArray(job.job_worker)) {
-        job.job_worker.forEach((jw) => {
-          if (jw.worker) {
-            const worker = Array.isArray(jw.worker) ? jw.worker[0] : jw.worker;
-            if (worker?.id) {
-              workerIds.push(worker.id);
-            }
-          }
-        });
+    (jobWorkersData || []).forEach((jw: JobWorkerQueryResult) => {
+      if (!jobWorkersMap.has(jw.job_id)) {
+        jobWorkersMap.set(jw.job_id, []);
       }
-      jobWorkersMap.set(job.id, workerIds);
+      if (jw.worker) {
+        const worker = Array.isArray(jw.worker) ? jw.worker[0] : jw.worker;
+        if (worker?.id) {
+          jobWorkersMap.get(jw.job_id)?.push(worker.id);
+        }
+      }
     });
 
     // Count unique workers
@@ -159,6 +178,21 @@ serve(async (req: Request) => {
 
     // Create individual worker payment records
     // For each job calculation, create a payment record for each worker on that job
+    //
+    // NOTE: Payment Split Assumption
+    // When multiple workers are assigned to a job, the total worker payment is
+    // split EQUALLY among all workers on that job.
+    //
+    // Example: Job pays $100 to workers, 2 workers assigned = $50 each
+    //
+    // This may not be appropriate for all business scenarios (e.g., different
+    // worker rates, different hours worked, different roles). Future enhancement
+    // could support configurable split strategies:
+    // - Equal split (current)
+    // - Per-worker rates from pricing rules
+    // - Custom split percentages per job
+    // - Hours-based proportional split
+    //
     const workerPayments = [];
     for (const jobCalc of calculation.job_calculations) {
       const workerIds = jobWorkersMap.get(jobCalc.job_id) || [];
@@ -168,7 +202,7 @@ serve(async (req: Request) => {
         continue;
       }
 
-      // Split payment equally among workers (or use different logic if needed)
+      // Split payment equally among workers
       const paymentPerWorker = jobCalc.total_worker_payment / workerIds.length;
 
       for (const workerId of workerIds) {
@@ -186,6 +220,7 @@ serve(async (req: Request) => {
             applied_rules: jobCalc.applied_rules,
             subtotal: jobCalc.subtotal,
             total_adjustments: jobCalc.total_adjustments,
+            split_among_workers: workerIds.length,
           },
         });
       }
@@ -196,7 +231,19 @@ serve(async (req: Request) => {
         .from("worker_payment")
         .insert(workerPayments);
 
-      if (paymentsError) throw paymentsError;
+      if (paymentsError) {
+        // Rollback: Delete the batch if payment inserts fail
+        // This prevents orphaned batch records without associated payments
+        console.error(
+          "Failed to insert worker payments, rolling back batch:",
+          paymentsError,
+        );
+        await supabase
+          .from("worker_payment_batch")
+          .delete()
+          .eq("id", batch.id);
+        throw paymentsError;
+      }
     }
 
     return jsonResponse({

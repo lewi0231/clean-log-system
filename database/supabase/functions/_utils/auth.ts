@@ -19,7 +19,7 @@ export function extractAuthToken(req: Request): string | null {
  * Get authenticated user from token
  */
 export async function getAuthUser(
-  token: string
+  token: string,
 ): Promise<{ id: string; email?: string } | null> {
   const supabaseAnon = createAnonClient();
   if (!supabaseAnon) {
@@ -49,7 +49,7 @@ export async function getAuthUser(
  */
 export async function getOrganizationIdFromAdmin(
   supabase: SupabaseClient,
-  email: string
+  email: string,
 ): Promise<string | null> {
   const { data: orgUser, error: orgUserError } = await supabase
     .from("organization_user")
@@ -69,7 +69,7 @@ export async function getOrganizationIdFromAdmin(
  */
 export async function getOrganizationIdFromWorker(
   supabase: SupabaseClient,
-  authUserId: string
+  authUserId: string,
 ): Promise<string | null> {
   const { data: worker, error: workerError } = await supabase
     .from("worker")
@@ -88,7 +88,7 @@ export async function getOrganizationIdFromWorker(
  * Get organization ID from user (tries both admin and worker strategies)
  */
 export async function getOrganizationIdFromUser(
-  req: Request
+  req: Request,
 ): Promise<string | null> {
   const supabase = createServiceRoleClient();
 
@@ -129,4 +129,45 @@ export async function getOrganizationIdFromUser(
   }
 
   return null;
+}
+
+/**
+ * Verify that a user (by email or auth_user_id) belongs to a specific organization
+ * Returns true if user is a member, false otherwise
+ */
+export async function verifyOrganizationMembership(
+  supabase: SupabaseClient,
+  organizationId: string,
+  userEmail?: string | null,
+  authUserId?: string | null,
+): Promise<boolean> {
+  // Try admin membership by email
+  if (userEmail) {
+    const { data: orgUser, error: orgUserError } = await supabase
+      .from("organization_user")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("email", userEmail)
+      .maybeSingle();
+
+    if (!orgUserError && orgUser) {
+      return true;
+    }
+  }
+
+  // Try worker membership by auth_user_id
+  if (authUserId) {
+    const { data: worker, error: workerError } = await supabase
+      .from("worker")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+
+    if (!workerError && worker) {
+      return true;
+    }
+  }
+
+  return false;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,19 +23,22 @@ import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
+import useOrganization from "@/hooks/useOrganization";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { format } from "date-fns";
-import { Calendar, Download } from "lucide-react";
+import { Calendar, CheckCircle2, Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import CalculatePaymentDialog from "./calculate-payment-dialog";
+import MarkPaymentPaidDialog from "./mark-payment-paid-dialog";
 import PaymentDetailDialog from "./payment-detail-dialog";
 
 export default function PaymentHistoryList() {
+  const { organizationId } = useOrganization();
   const { formatCurrency } = useOrganizationCurrency();
   const { jobs } = useJobs();
   const { calculatePayments } = useWorkerPayments();
-  const { paymentHistory, addPayment, filterByDateRange } =
+  const { paymentHistory, addPayment, filterByDateRange, invalidate } =
     useWorkerPaymentHistory();
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -43,6 +47,8 @@ export default function PaymentHistoryList() {
     null
   );
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [isMarkPaidDialogOpen, setIsMarkPaidDialogOpen] = useState(false);
 
   const handleCalculatePayments = async (jobIds: string[]) => {
     const result = await calculatePayments(jobIds);
@@ -136,6 +142,7 @@ export default function PaymentHistoryList() {
                     <TableHead>Jobs</TableHead>
                     <TableHead>Workers</TableHead>
                     <TableHead className="text-right">Total Payment</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Calculated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -157,6 +164,27 @@ export default function PaymentHistoryList() {
                         {formatCurrency(payment.totalPayment)}
                       </TableCell>
                       <TableCell>
+                        {payment.status ? (
+                          <Badge
+                            variant={
+                              payment.status === "paid"
+                                ? "default"
+                                : payment.status === "approved"
+                                ? "secondary"
+                                : "outline"
+                            }
+                          >
+                            {payment.status === "paid" && (
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                            )}
+                            {payment.status.charAt(0).toUpperCase() +
+                              payment.status.slice(1)}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">Calculated</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {format(
                           new Date(payment.calculatedAt),
                           "MMM d, yyyy HH:mm"
@@ -171,6 +199,19 @@ export default function PaymentHistoryList() {
                           >
                             View Details
                           </Button>
+                          {payment.batch_id &&
+                            (!payment.status || payment.status !== "paid") && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedBatchId(payment.batch_id!);
+                                  setIsMarkPaidDialogOpen(true);
+                                }}
+                              >
+                                Mark as Paid
+                              </Button>
+                            )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -200,6 +241,23 @@ export default function PaymentHistoryList() {
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           payment={selectedPayment}
+        />
+      )}
+
+      {selectedBatchId && (
+        <MarkPaymentPaidDialog
+          open={isMarkPaidDialogOpen}
+          onOpenChange={(open) => {
+            setIsMarkPaidDialogOpen(open);
+            if (!open) {
+              setSelectedBatchId(null);
+            }
+          }}
+          batchId={selectedBatchId}
+          onSuccess={() => {
+            // Invalidate cache to refresh payment history
+            invalidate();
+          }}
         />
       )}
     </>
