@@ -15,11 +15,12 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { formatZodErrors, loginSchema } from "@/lib/validations";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function Login() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -69,8 +70,11 @@ export default function Login() {
 
       setEmail("");
       setPassword("");
-      log.info("Login: Login process completed, redirecting to home");
-      router.push("/");
+
+      // Redirect to original destination or dashboard
+      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      log.info("Login: Login process completed, redirecting", { redirectTo });
+      router.push(redirectTo);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An unexpected error occurred";

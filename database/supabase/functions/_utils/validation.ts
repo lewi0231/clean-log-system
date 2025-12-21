@@ -1,12 +1,14 @@
 // Validation utilities for Edge Functions
 // Provides common validation helpers
+// Note: For new code, prefer using zod-schemas.ts with Zod validation
 
 /**
  * Validate that all required fields are present in an object
+ * @deprecated Prefer using Zod schemas from zod-schemas.ts
  */
 export function validateRequiredFields<T extends Record<string, unknown>>(
   data: T,
-  requiredFields: (keyof T)[]
+  requiredFields: (keyof T)[],
 ): { valid: boolean; missingFields?: string[] } {
   const missingFields: string[] = [];
 
@@ -30,6 +32,7 @@ export function validateRequiredFields<T extends Record<string, unknown>>(
 
 /**
  * Validate role value (admin or viewer)
+ * @deprecated Prefer using zod-schemas.ts roleSchema
  */
 export function validateRole(role: string): boolean {
   return role === "admin" || role === "viewer";
@@ -37,6 +40,7 @@ export function validateRole(role: string): boolean {
 
 /**
  * Validate business mode value
+ * @deprecated Prefer using zod-schemas.ts businessModeSchema
  */
 export function validateBusinessMode(businessMode: string): boolean {
   return (
@@ -46,6 +50,7 @@ export function validateBusinessMode(businessMode: string): boolean {
 
 /**
  * Validate that a value is a non-negative number
+ * @deprecated Prefer using zod-schemas.ts nonNegativeNumberSchema
  */
 export function validateNonNegativeNumber(value: unknown): value is number {
   return (

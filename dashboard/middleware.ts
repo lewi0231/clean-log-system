@@ -1,0 +1,189 @@
+import { createServerClient } from "@supabase/ssr";
+import { type NextRequest, NextResponse } from "next/server";
+
+/**
+ * Next.js Middleware
+ * Handles:
+ * - Authentication for dashboard routes
+ * - Security headers
+ * - Route protection
+ */
+
+export async function middleware(request: NextRequest) {
+    // Create Supabase client for middleware
+    let response = NextResponse.next({
+        request: {
+            headers: request.headers,
+        },
+    });
+
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() {
+                    return request.cookies.getAll();
+                },
+                setAll(
+                    cookiesToSet: Array<
+                        {
+                            name: string;
+                            value: string;
+                            options?: Partial<{
+                                httpOnly?: boolean;
+                                secure?: boolean;
+                                sameSite?: "strict" | "lax" | "none" | boolean;
+                                maxAge?: number;
+                                path?: string;
+                                domain?: string;
+                            }>;
+                        }
+                    >,
+                ) {
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        request.cookies.set({
+                            name,
+                            value,
+                            ...options,
+                        });
+                    });
+                    response = NextResponse.next({
+                        request: {
+                            headers: request.headers,
+                        },
+                    });
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        response.cookies.set({
+                            name,
+                            value,
+                            ...options,
+                        });
+                    });
+                },
+            },
+        },
+    );
+
+    // Check authentication for dashboard routes
+    const pathname = request.nextUrl.pathname;
+
+    // Public routes that don't require authentication
+    const publicRoutes = [
+        "/",
+        "/login",
+        "/signup",
+        "/review",
+        "/invoice",
+        "/worker/accept-invite",
+    ];
+
+    const isPublicRoute = publicRoutes.some((route) =>
+        pathname.startsWith(route)
+    );
+
+    // If it's a dashboard route, require authentication
+    if (pathname.startsWith("/dashboard") && !isPublicRoute) {
+        const {
+            data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+            // Redirect to login with return URL
+            const redirectUrl = new URL("/login", request.url);
+            redirectUrl.searchParams.set("redirect", pathname);
+            return NextResponse.redirect(redirectUrl);
+        }
+    }
+
+    // Add security headers
+    const securityHeaders = {
+        "X-DNS-Prefetch-Control": "on",
+        "Strict-Transport-Security":
+            "max-age=63072000; includeSubDomains; preload",
+        "X-Frame-Options": "SAMEORIGIN",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy":
+            "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    };
+
+    // Apply security headers
+    Object.entries(securityHeaders).forEach(([key, value]) => {
+        response.headers.set(key, value);
+    });
+
+    // Content Security Policy
+    // Dynamically include Supabase URL origin in CSP
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    let supabaseOrigin = "";
+    if (supabaseUrl) {
+        try {
+            const url = new URL(supabaseUrl);
+            supabaseOrigin = `${url.protocol}//${url.host}`;
+        } catch {
+            // If URL parsing fails, fall back to defaults
+        }
+    }
+
+    const isDevelopment = process.env.NODE_ENV === "development";
+    // Build connect-src directive
+    // Include Supabase origin, common localhost patterns for dev, and production patterns
+    const connectSrcParts = ["'self'"];
+
+    // Add Supabase origin if available
+    if (supabaseOrigin) {
+        connectSrcParts.push(supabaseOrigin);
+    }
+
+    // Add common localhost patterns for development
+    if (isDevelopment) {
+        connectSrcParts.push(
+            "http://localhost:54321",
+            "http://127.0.0.1:54321",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "ws://localhost:*",
+            "ws://127.0.0.1:*",
+        );
+    }
+
+    // Add production patterns
+    connectSrcParts.push(
+        "https://*.supabase.co",
+        "https://*.stripe.com",
+        "wss://*.supabase.co",
+    );
+
+    const connectSrc = connectSrcParts.join(" ");
+
+    const csp = [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-eval' needed for Next.js
+        "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind
+        "img-src 'self' data: https:",
+        "font-src 'self' data:",
+        `connect-src ${connectSrc}`,
+        "frame-src 'self' https://*.stripe.com",
+        "frame-ancestors 'self'",
+    ].join("; ");
+
+    response.headers.set("Content-Security-Policy", csp);
+
+    return response;
+}
+
+export const config = {
+    matcher: [
+        /*
+         * Match all request paths except for the ones starting with:
+         * - api (API routes)
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         * - public files (public folder)
+         */
+        "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    ],
+};

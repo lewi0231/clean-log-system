@@ -5,7 +5,8 @@
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
     "@std/assert": "jsr:@std/assert@1",
     "dotenv": "jsr:@std/dotenv",
-    "stripe": "npm:stripe@^18.0.0"
+    "stripe": "npm:stripe@^18.0.0",
+    "zod": "https://esm.sh/zod@3.23.8"
   },
   "compilerOptions": {
     "lib": ["deno.window"],
