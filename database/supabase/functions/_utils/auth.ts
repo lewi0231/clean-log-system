@@ -171,3 +171,47 @@ export async function verifyOrganizationMembership(
 
   return false;
 }
+
+/**
+ * Verify organization membership from a request
+ * Extracts auth token, gets user info, and verifies membership
+ * Returns user info if verified, null if not verified
+ * This is a convenience wrapper for common edge function patterns
+ */
+export async function verifyOrganizationMembershipFromRequest(
+  req: Request,
+  organizationId: string,
+  supabase: SupabaseClient,
+): Promise<{ userId: string | null; userEmail: string | null } | null> {
+  // Extract user from auth token
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+  const token = extractAuthToken(req);
+
+  if (token) {
+    const authUser = await getAuthUser(token);
+    if (authUser?.id) {
+      userId = authUser.id;
+      userEmail = authUser.email ?? null;
+    }
+  }
+
+  // If we have user info, verify membership
+  if (userId || userEmail) {
+    const isMember = await verifyOrganizationMembership(
+      supabase,
+      organizationId,
+      userEmail,
+      userId,
+    );
+
+    if (!isMember) {
+      return null;
+    }
+  } else {
+    // No auth token provided - return null to indicate verification failed
+    return null;
+  }
+
+  return { userId, userEmail };
+}

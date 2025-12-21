@@ -1,5 +1,5 @@
 import { serve } from "server";
-import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -58,16 +58,7 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    // Extract user from auth token for created_by/updated_by
-    // Note: created_by and updated_by are UUID fields (auth.users.id), not emails
-    let userId: string | null = null;
-    const token = extractAuthToken(req);
-    if (token) {
-      const authUser = await getAuthUser(token);
-      if (authUser?.id) {
-        userId = authUser.id;
-      }
-    }
+    const supabase = createServiceRoleClient();
 
     const {
       organization_id,
@@ -95,6 +86,23 @@ serve(async (req) => {
       created_by,
       conditions,
     } = body;
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
+
+    // Extract user from membership check for created_by/updated_by
+    // Note: created_by and updated_by are UUID fields (auth.users.id), not emails
+    const userId = membershipCheck.userId;
 
     if (scope === "field" && !field_config_id) {
       return errorResponse("field_config_id is required for field scope", 400);
@@ -129,8 +137,6 @@ serve(async (req) => {
         );
       }
     }
-
-    const supabase = createServiceRoleClient();
 
     if (field_config_id) {
       const { data: fieldConfig, error: fieldConfigError } = await supabase

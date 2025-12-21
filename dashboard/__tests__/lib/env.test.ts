@@ -20,7 +20,12 @@ describe("Environment Variable Validation", () => {
     });
 
     it("should throw error in development when required vars are missing", () => {
-        process.env.NODE_ENV = "development";
+        // Use Object.defineProperty to override read-only NODE_ENV for testing
+        Object.defineProperty(process.env, "NODE_ENV", {
+            value: "development",
+            writable: true,
+            configurable: true,
+        });
         delete process.env.NEXT_PUBLIC_SUPABASE_URL;
         delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -30,7 +35,12 @@ describe("Environment Variable Validation", () => {
     });
 
     it("should return defaults in production when vars are missing (graceful degradation)", () => {
-        process.env.NODE_ENV = "production";
+        // Use Object.defineProperty to override read-only NODE_ENV for testing
+        Object.defineProperty(process.env, "NODE_ENV", {
+            value: "production",
+            writable: true,
+            configurable: true,
+        });
         delete process.env.NEXT_PUBLIC_SUPABASE_URL;
         delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

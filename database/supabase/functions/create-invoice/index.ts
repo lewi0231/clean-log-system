@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -128,6 +129,19 @@ serve(async (req) => {
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Verify jobs exist and belong to organization
     const { data: jobs, error: jobsError } = await supabase

@@ -1,5 +1,9 @@
 import { serve } from "server";
-import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import {
+  extractAuthToken,
+  getAuthUser,
+  verifyOrganizationMembershipFromRequest,
+} from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -103,15 +107,40 @@ serve(async (req) => {
       return errorResponse("Pricing rule not found", 404);
     }
 
-    // If organization_id is provided, validate it matches
-    if (
-      body.organization_id &&
-      existingRule.organization_id !== body.organization_id
-    ) {
-      return errorResponse(
-        "Pricing rule does not belong to the specified organization",
-        403,
+    // If organization_id is provided, validate it matches and verify membership
+    if (body.organization_id) {
+      if (existingRule.organization_id !== body.organization_id) {
+        return errorResponse(
+          "Pricing rule does not belong to the specified organization",
+          403,
+        );
+      }
+
+      // Verify organization membership
+      const membershipCheck = await verifyOrganizationMembershipFromRequest(
+        req,
+        body.organization_id,
+        supabase,
       );
+      if (!membershipCheck) {
+        return errorResponse(
+          "You do not have permission to access this organization",
+          403,
+        );
+      }
+    } else {
+      // Even if organization_id is not provided, verify membership for the rule's organization
+      const membershipCheck = await verifyOrganizationMembershipFromRequest(
+        req,
+        existingRule.organization_id,
+        supabase,
+      );
+      if (!membershipCheck) {
+        return errorResponse(
+          "You do not have permission to access this organization",
+          403,
+        );
+      }
     }
 
     const updateData: Record<string, unknown> = {
