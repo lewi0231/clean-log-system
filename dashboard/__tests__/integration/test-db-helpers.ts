@@ -240,23 +240,7 @@ export async function cleanupTestDatabase(
 
     try {
         // Delete in reverse dependency order
-        // 1. Payments (if exists)
-        if (testData.paymentId) {
-            await supabase.from("payment").delete().eq(
-                "id",
-                testData.paymentId,
-            );
-        }
-
-        // 2. Payments (if exists) - delete before payment links
-        if (testData.paymentId) {
-            await supabase
-                .from("payment")
-                .delete()
-                .eq("id", testData.paymentId);
-        }
-
-        // 3. Payment links (if exists)
+        // 1. Payment links (if exists) - delete before payments
         if (testData.paymentLinkId) {
             await supabase
                 .from("payment_link")
@@ -264,7 +248,15 @@ export async function cleanupTestDatabase(
                 .eq("id", testData.paymentLinkId);
         }
 
-        // 4. Invoices (if exists)
+        // 2. Payments (if exists)
+        if (testData.paymentId) {
+            await supabase.from("payment").delete().eq(
+                "id",
+                testData.paymentId,
+            );
+        }
+
+        // 3. Invoices (if exists)
         if (testData.invoiceId) {
             // Delete invoice_job records first
             await supabase
@@ -285,12 +277,12 @@ export async function cleanupTestDatabase(
             );
         }
 
-        // 5. Jobs (if exists)
+        // 4. Jobs (if exists)
         if (testData.jobId) {
             await supabase.from("job").delete().eq("id", testData.jobId);
         }
 
-        // 6. Pricing rules (if exists)
+        // 5. Pricing rules (if exists)
         if (testData.pricingRuleIds && testData.pricingRuleIds.length > 0) {
             await supabase
                 .from("pricing_rule")
@@ -298,7 +290,7 @@ export async function cleanupTestDatabase(
                 .in("id", testData.pricingRuleIds);
         }
 
-        // 7. Field configs
+        // 6. Field configs
         if (testData.fieldConfigIds && testData.fieldConfigIds.length > 0) {
             await supabase
                 .from("organization_field_configs")
@@ -306,22 +298,22 @@ export async function cleanupTestDatabase(
                 .in("id", testData.fieldConfigIds);
         }
 
-        // 8. Invoice template config
+        // 7. Invoice template config
         await supabase
             .from("invoice_template_config")
             .delete()
             .eq("organization_id", testData.organizationId);
 
-        // 9. Organization settings
+        // 8. Organization settings
         await supabase
             .from("organization_settings")
             .delete()
             .eq("organization_id", testData.organizationId);
 
-        // 10. Location
+        // 9. Location
         await supabase.from("location").delete().eq("id", testData.locationId);
 
-        // 11. Organization (this will cascade delete related data)
+        // 10. Organization (this will cascade delete related data)
         await supabase
             .from("organization")
             .delete()
