@@ -1,11 +1,26 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  checkRateLimit,
+  RATE_LIMIT_CONFIGS,
+  rateLimitResponse,
+} from "../_utils/rate-limit.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // Rate limiting for public feedback submission
+  const rateLimitResult = await checkRateLimit(req, {
+    ...RATE_LIMIT_CONFIGS.moderate,
+    identifier: undefined, // Use IP address
+  });
+
+  if (!rateLimitResult.allowed) {
+    return rateLimitResponse(rateLimitResult);
+  }
 
   try {
     const body = await req.json();

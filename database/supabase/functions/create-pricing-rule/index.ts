@@ -1,20 +1,14 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  createPricingRuleSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 interface PricingConditionInput {
-  condition_field_config_id: string;
-  operator: string;
-  condition_value: string | number;
-  action_type: string;
-  action_value: number;
-  metadata?: Record<string, unknown>;
-  priority?: number;
-}
-
-interface CreatePricingRuleRequest {
   organization_id: string;
   scope: "field" | "option" | "base" | "global";
   pricing_type: "unit" | "fixed" | "tiered" | "percentage" | "conditional";
@@ -46,17 +40,20 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
-  try {
-    const body = (await req.json()) as CreatePricingRuleRequest;
-    const validation = validateRequiredFields(body, [
-      "organization_id",
-      "scope",
-      "pricing_type",
-    ]);
+  const logger = createLogger(req, { functionName: "create-pricing-rule" });
 
-    if (!validation.valid) {
-      return errorResponse("Missing required fields", 400);
+  try {
+    const rawBody = await req.json();
+
+    // Validate request body with Zod schema
+    const validation = validateRequest(createPricingRuleSchema, rawBody);
+    if (!validation.success) {
+      logger.warn("Invalid request body", { errors: validation.issues });
+      return errorResponse(validation.error, 400);
     }
+
+    // After success check, validation.data is properly typed
+    const body = validation.data;
 
     const supabase = createServiceRoleClient();
 
@@ -104,16 +101,9 @@ serve(async (req) => {
     // Note: created_by and updated_by are UUID fields (auth.users.id), not emails
     const userId = membershipCheck.userId;
 
-    if (scope === "field" && !field_config_id) {
-      return errorResponse("field_config_id is required for field scope", 400);
-    }
-
-    if (scope === "option" && (!field_config_id || !option_value)) {
-      return errorResponse(
-        "field_config_id and option_value are required for option scope",
-        400,
-      );
-    }
+    // Scope validation is now handled by Zod schema, but keeping for clarity
+    // The schema's refine() method ensures field_config_id is present for "field" scope
+    // and both field_config_id and option_value are present for "option" scope
 
     // Validate pricing_context
     if (
@@ -185,7 +175,9 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      console.error("Error fetching organization currency:", orgError);
+      logger.error("Error fetching organization currency", orgError, {
+        organization_id,
+      });
       // Don't fail, just use USD as fallback
     }
 
@@ -218,7 +210,7 @@ serve(async (req) => {
       updated_by: created_by || userId || null,
     };
 
-    console.log("[Pricing Debug] Creating pricing rule:", {
+    logger.debug("Creating pricing rule", {
       organization_id,
       scope,
       pricing_type,
@@ -258,13 +250,14 @@ serve(async (req) => {
       .single();
 
     if (createError) {
-      console.error("[Pricing Debug] Error creating pricing rule:", {
-        error: createError,
+      logger.error("Error creating pricing rule", createError, {
         code: createError.code,
         message: createError.message,
         details: createError.details,
         hint: createError.hint,
-        insertPayload,
+        organization_id,
+        scope,
+        pricing_type,
       });
 
       // Check if it's a unique constraint violation
@@ -280,14 +273,22 @@ serve(async (req) => {
       throw createError;
     }
 
-    console.log("[Pricing Debug] Pricing rule created successfully:", {
+    logger.info("Pricing rule created successfully", {
       ruleId: pricingRule?.id,
       scope,
       pricing_context: pricingRule?.pricing_context,
     });
 
     if (conditions && conditions.length > 0) {
-      const conditionPayload = conditions.map((condition) => ({
+      const conditionPayload = conditions.map((condition: {
+        condition_field_config_id: string;
+        operator: string;
+        condition_value: string | number;
+        action_type: string;
+        action_value: string | number;
+        metadata?: Record<string, unknown>;
+        priority?: number;
+      }) => ({
         pricing_rule_id: pricingRule.id,
         condition_field_config_id: condition.condition_field_config_id,
         operator: condition.operator,
@@ -314,7 +315,7 @@ serve(async (req) => {
       pricing_rule: pricingRule,
     });
   } catch (error) {
-    console.error("Create pricing rule error:", error);
+    logger.error("Create pricing rule error", error);
 
     // Extract error message from various error types
     let errorMessage = "Failed to create pricing rule";

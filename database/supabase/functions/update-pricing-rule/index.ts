@@ -5,6 +5,7 @@ import {
   verifyOrganizationMembershipFromRequest,
 } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -48,6 +49,8 @@ interface UpdatePricingRuleRequest {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "update-pricing-rule" });
 
   try {
     const body = (await req.json()) as UpdatePricingRuleRequest;
@@ -187,7 +190,7 @@ serve(async (req) => {
     // Use userId from auth token if updated_by not explicitly provided
     assignIfDefined("updated_by", body.updated_by ?? userId ?? null);
 
-    console.log("[Pricing Debug] Updating pricing rule:", {
+    logger.debug("Updating pricing rule", {
       ruleId: body.id,
       organization_id: existingRule.organization_id,
       updateData: Object.keys(updateData),
@@ -207,8 +210,7 @@ serve(async (req) => {
       .single();
 
     if (updateError) {
-      console.error("[Pricing Debug] Error updating pricing rule:", {
-        error: updateError,
+      logger.error("Error updating pricing rule", updateError, {
         code: updateError.code,
         message: updateError.message,
         details: updateError.details,
@@ -230,7 +232,7 @@ serve(async (req) => {
       throw updateError;
     }
 
-    console.log("[Pricing Debug] Pricing rule updated successfully:", {
+    logger.info("Pricing rule updated successfully", {
       ruleId: pricingRule?.id,
       scope: pricingRule?.scope,
       pricing_context: pricingRule?.pricing_context,
@@ -271,7 +273,7 @@ serve(async (req) => {
       pricing_rule: pricingRule,
     });
   } catch (error) {
-    console.error("Update pricing rule error:", error);
+    logger.error("Update pricing rule error", error);
 
     // Extract error message from various error types
     let errorMessage = "Failed to update pricing rule";

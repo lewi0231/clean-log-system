@@ -72,9 +72,11 @@ export function sanitizeLogData(
       // Mask sensitive fields
       if (maskFields.some((field) => lowerKey.includes(field))) {
         if (typeof value === "string" && value.length > maskLength) {
-          sanitized[key] = `${value.substring(0, 2)}***${value.substring(
-            value.length - 2,
-          )}`;
+          sanitized[key] = `${value.substring(0, 2)}***${
+            value.substring(
+              value.length - 2,
+            )
+          }`;
         } else {
           sanitized[key] = "***";
         }
@@ -136,15 +138,16 @@ class EdgeFunctionLogger {
    */
   info(message: string, data?: unknown): void {
     const sanitized = data ? sanitizeLogData(data) : undefined;
-    console.log(
-      JSON.stringify({
-        level: "info",
-        message,
-        ...this.context,
-        ...(sanitized && { data: sanitized }),
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    const logEntry: Record<string, unknown> = {
+      level: "info",
+      message,
+      ...(this.context as Record<string, unknown>),
+      timestamp: new Date().toISOString(),
+    };
+    if (sanitized) {
+      logEntry.data = sanitized;
+    }
+    console.log(JSON.stringify(logEntry));
   }
 
   /**
@@ -152,15 +155,16 @@ class EdgeFunctionLogger {
    */
   warn(message: string, data?: unknown): void {
     const sanitized = data ? sanitizeLogData(data) : undefined;
-    console.warn(
-      JSON.stringify({
-        level: "warn",
-        message,
-        ...this.context,
-        ...(sanitized && { data: sanitized }),
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    const logEntry: Record<string, unknown> = {
+      level: "warn",
+      message,
+      ...(this.context as Record<string, unknown>),
+      timestamp: new Date().toISOString(),
+    };
+    if (sanitized) {
+      logEntry.data = sanitized;
+    }
+    console.warn(JSON.stringify(logEntry));
   }
 
   /**
@@ -168,28 +172,29 @@ class EdgeFunctionLogger {
    */
   error(message: string, error?: Error | unknown, data?: unknown): void {
     const sanitized = data ? sanitizeLogData(data) : undefined;
-    const errorData = error instanceof Error
+    const errorData: Record<string, unknown> = error instanceof Error
       ? {
-          error: {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          },
-        }
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
+      }
       : error
-        ? { error: sanitizeLogData(error) }
-        : {};
+      ? { error: sanitizeLogData(error) }
+      : {};
 
-    console.error(
-      JSON.stringify({
-        level: "error",
-        message,
-        ...this.context,
-        ...errorData,
-        ...(sanitized && { data: sanitized }),
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    const logEntry: Record<string, unknown> = {
+      level: "error",
+      message,
+      ...(this.context as Record<string, unknown>),
+      ...errorData,
+      timestamp: new Date().toISOString(),
+    };
+    if (sanitized) {
+      logEntry.data = sanitized;
+    }
+    console.error(JSON.stringify(logEntry));
   }
 
   /**
@@ -198,15 +203,16 @@ class EdgeFunctionLogger {
   debug(message: string, data?: unknown): void {
     if (Deno.env.get("ENVIRONMENT") !== "production") {
       const sanitized = data ? sanitizeLogData(data) : undefined;
-      console.debug(
-        JSON.stringify({
-          level: "debug",
-          message,
-          ...this.context,
-          ...(sanitized && { data: sanitized }),
-          timestamp: new Date().toISOString(),
-        }),
-      );
+      const logEntry: Record<string, unknown> = {
+        level: "debug",
+        message,
+        ...(this.context as Record<string, unknown>),
+        timestamp: new Date().toISOString(),
+      };
+      if (sanitized) {
+        logEntry.data = sanitized;
+      }
+      console.debug(JSON.stringify(logEntry));
     }
   }
 }
@@ -236,4 +242,3 @@ export function createLoggerWithoutRequest(
 ): EdgeFunctionLogger {
   return new EdgeFunctionLogger(undefined, context);
 }
-

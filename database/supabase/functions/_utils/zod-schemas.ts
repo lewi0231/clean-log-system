@@ -210,3 +210,98 @@ export const commonSchemas = {
   isoDateString: isoDateStringSchema,
   percentage: percentageSchema,
 };
+
+/**
+ * Schema for creating a pricing rule
+ */
+export const createPricingRuleSchema = z.object({
+  organization_id: uuidSchema,
+  scope: pricingScopeSchema,
+  pricing_type: pricingTypeSchema,
+  pricing_context: pricingContextSchema.optional(),
+  field_config_id: uuidSchema.nullable().optional(),
+  option_value: z.string().nullable().optional(),
+  applies_to_field_type: z.string().nullable().optional(),
+  location_hierarchy_id: uuidSchema.nullable().optional(),
+  location_id: uuidSchema.nullable().optional(),
+  currency: currencyCodeSchema.optional(),
+  base_price: nonNegativeNumberSchema.nullable().optional(),
+  percentage_rate: percentageSchema.nullable().optional(),
+  minimum_quantity: nonNegativeNumberSchema.optional(),
+  maximum_quantity: nonNegativeNumberSchema.optional(),
+  tier_definition: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).optional(),
+  worker_payment_type: workerPaymentTypeSchema.nullable().optional(),
+  worker_payment_value: nonNegativeNumberSchema.nullable().optional(),
+  priority: z.number().int().min(0).optional(),
+  active: z.boolean().optional(),
+  effective_at: z.string().datetime().nullable().optional(),
+  expires_at: z.string().datetime().nullable().optional(),
+  created_by: uuidSchema.nullable().optional(),
+  conditions: z.array(z.object({
+    condition_field_config_id: uuidSchema,
+    operator: z.string(),
+    condition_value: z.union([z.string(), z.number()]),
+    action_type: z.string(),
+    action_value: z.union([z.string(), z.number()]),
+    metadata: z.record(z.any()).optional(),
+    priority: z.number().int().min(0).optional(),
+  })).optional(),
+}).refine(
+  (data) => {
+    // If scope is "field", field_config_id is required
+    if (data.scope === "field" && !data.field_config_id) {
+      return false;
+    }
+    // If scope is "option", both field_config_id and option_value are required
+    if (
+      data.scope === "option" && (!data.field_config_id || !data.option_value)
+    ) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message:
+      "field_config_id is required for field scope, and both field_config_id and option_value are required for option scope",
+  },
+);
+
+/**
+ * Schema for updating a pricing rule
+ */
+export const updatePricingRuleSchema = z.object({
+  id: uuidSchema,
+  organization_id: uuidSchema.optional(),
+  scope: pricingScopeSchema.optional(),
+  pricing_type: pricingTypeSchema.optional(),
+  pricing_context: pricingContextSchema.optional(),
+  field_config_id: uuidSchema.nullable().optional(),
+  option_value: z.string().nullable().optional(),
+  applies_to_field_type: z.string().nullable().optional(),
+  location_hierarchy_id: uuidSchema.nullable().optional(),
+  location_id: uuidSchema.nullable().optional(),
+  currency: currencyCodeSchema.optional(),
+  base_price: nonNegativeNumberSchema.nullable().optional(),
+  percentage_rate: percentageSchema.nullable().optional(),
+  minimum_quantity: nonNegativeNumberSchema.optional(),
+  maximum_quantity: nonNegativeNumberSchema.optional(),
+  tier_definition: z.record(z.any()).nullable().optional(),
+  metadata: z.record(z.any()).optional(),
+  worker_payment_type: workerPaymentTypeSchema.nullable().optional(),
+  worker_payment_value: nonNegativeNumberSchema.nullable().optional(),
+  priority: z.number().int().min(0).optional(),
+  active: z.boolean().optional(),
+  effective_at: z.string().datetime().nullable().optional(),
+  expires_at: z.string().datetime().nullable().optional(),
+  updated_by: uuidSchema.nullable().optional(),
+  conditions: z.array(z.object({
+    condition_field_config_id: uuidSchema,
+    operator: z.string(),
+    condition_value: z.union([z.string(), z.number()]),
+    action_type: z.string(),
+    action_value: z.union([z.string(), z.number()]),
+    metadata: z.record(z.any()).optional(),
+    priority: z.number().int().min(0).optional(),
+  })).optional(),
+});

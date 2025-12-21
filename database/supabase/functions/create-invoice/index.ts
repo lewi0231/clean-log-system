@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -106,6 +107,8 @@ async function generateInvoiceNumber(
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "create-invoice" });
 
   try {
     const body = await req.json();
@@ -233,9 +236,12 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      console.warn(
-        "Failed to fetch organization settings, defaulting to draft:",
-        orgError,
+      logger.warn(
+        "Failed to fetch organization settings, defaulting to draft",
+        {
+          organization_id,
+          error: orgError,
+        },
       );
     }
 
@@ -247,10 +253,10 @@ serve(async (req) => {
       .single();
 
     if (orgSettingsError) {
-      console.warn(
-        "Failed to fetch organization currency, defaulting to AUD:",
-        orgSettingsError,
-      );
+      logger.warn("Failed to fetch organization currency, defaulting to AUD", {
+        organization_id,
+        error: orgSettingsError,
+      });
     }
 
     const currency = orgSettings?.currency || "AUD";
@@ -401,7 +407,7 @@ serve(async (req) => {
       invoice: invoiceWithJobs,
     });
   } catch (error) {
-    console.error("Create invoice error:", error);
+    logger.error("Create invoice error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to create invoice",
     );
