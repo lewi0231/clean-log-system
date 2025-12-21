@@ -173,7 +173,7 @@ export function validateRequest<T>(
 
   const issues = result.error.issues;
   const errorMessages = issues
-    .map((issue) => {
+    .map((issue: z.ZodIssue) => {
       const path = issue.path.map(String).join(".");
       return path ? `${path}: ${issue.message}` : issue.message;
     })
@@ -304,4 +304,41 @@ export const updatePricingRuleSchema = z.object({
     metadata: z.record(z.any()).optional(),
     priority: z.number().int().min(0).optional(),
   })).optional(),
+});
+
+/**
+ * Schema for creating a payment link
+ */
+export const createPaymentLinkSchema = z.object({
+  invoice_id: uuidSchema,
+  organization_id: uuidSchema,
+  success_url: z.string().url().optional(),
+  cancel_url: z.string().url().optional(),
+});
+
+/**
+ * Schema for creating an invoice
+ */
+export const createInvoiceSchema = z.object({
+  organization_id: uuidSchema,
+  job_ids: z.array(uuidSchema).min(1, "At least one job ID is required"),
+  due_date: z.string().datetime("Invalid due date format"),
+  notes: z.string().optional(),
+});
+
+/**
+ * Schema for updating invoice status
+ */
+export const updateInvoiceStatusSchema = z.object({
+  invoice_id: uuidSchema,
+  status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]),
+  resend: z.boolean().optional(),
+});
+
+/**
+ * Schema for calculating invoice
+ */
+export const calculateInvoiceSchema = z.object({
+  organization_id: uuidSchema,
+  job_ids: z.array(uuidSchema).min(1, "At least one job ID is required"),
 });

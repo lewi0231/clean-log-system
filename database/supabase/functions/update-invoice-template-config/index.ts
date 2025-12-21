@@ -1,4 +1,5 @@
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import {
   DEFAULT_BILLING_ADDRESS_CONFIG,
@@ -36,6 +37,19 @@ serve(async (req) => {
     } = body;
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Validate all config updates before processing
     const updateData: Record<string, unknown> = {

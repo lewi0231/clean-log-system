@@ -1,5 +1,12 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import {
   checkRateLimit,
   RATE_LIMIT_CONFIGS,
@@ -17,6 +24,8 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "get-invoice-public" });
+
   // Rate limiting for public invoice access
   const rateLimitResult = await checkRateLimit(req, {
     ...RATE_LIMIT_CONFIGS.lenient,
@@ -24,6 +33,10 @@ serve(async (req) => {
   });
 
   if (!rateLimitResult.allowed) {
+    logger.warn("Rate limit exceeded", {
+      remaining: rateLimitResult.remaining,
+      retry_after: rateLimitResult.retryAfter,
+    });
     return rateLimitResponse(rateLimitResult);
   }
 
@@ -68,7 +81,9 @@ serve(async (req) => {
       .single();
 
     if (invoiceError) {
-      console.error("Invoice fetch error:", invoiceError);
+      logger.error("Invoice fetch error", invoiceError, {
+        invoice_id: invoice_id,
+      });
       return errorResponse("Invoice not found", 404);
     }
 
@@ -113,7 +128,10 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      console.error("Organization fetch error:", orgError);
+      logger.warn("Organization fetch error", {
+        organization_id: invoice.organization_id,
+        error: orgError,
+      });
     }
 
     // Fetch invoice template config
@@ -253,10 +271,12 @@ serve(async (req) => {
       organization: organization || null,
     });
   } catch (error) {
-    console.error("Get public invoice details error:", error);
-    return errorResponse(
-      error instanceof Error ? error.message : "Failed to get invoice details",
-      500,
+    logger.error("Get public invoice details error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to get invoice details",
     );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });

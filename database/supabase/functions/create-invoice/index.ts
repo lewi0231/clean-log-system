@@ -4,7 +4,7 @@ import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import { createInvoiceSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 interface AppliedRule {
   pricing_rule_id: string;
@@ -111,25 +111,24 @@ serve(async (req) => {
   const logger = createLogger(req, { functionName: "create-invoice" });
 
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, [
-      "organization_id",
-      "job_ids",
-      "due_date",
-    ]);
+    const rawBody = await req.json();
 
-    if (!validation.valid) {
-      return errorResponse(
-        "Organization ID, job IDs, and due date are required",
-        400,
-      );
+    // Validate request body with Zod schema
+    const validation = validateRequest(createInvoiceSchema, rawBody);
+    if (!validation.success) {
+      logger.warn("Invalid request body for invoice creation", {
+        errors: validation.issues,
+      });
+      return errorResponse(validation.error, 400);
     }
 
+    const body = validation.data as {
+      organization_id: string;
+      job_ids: string[];
+      due_date: string;
+      notes?: string;
+    };
     const { organization_id, job_ids, due_date, notes } = body;
-
-    if (!Array.isArray(job_ids) || job_ids.length === 0) {
-      return errorResponse("job_ids must be a non-empty array", 400);
-    }
 
     const supabase = createServiceRoleClient();
 

@@ -10,6 +10,7 @@ import {
   type InvoiceEmailRecipientConfig,
   type JobContext,
 } from "../_utils/invoice-email.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 interface LocationHierarchyNode {
@@ -28,14 +29,41 @@ interface Location {
 interface InvoiceJob {
   job?: {
     location_id?: string;
-  };
+  } | {
+    location_id?: string;
+  }[] | null;
 }
 
 interface DraftInvoice {
   id: string;
   invoice_number: string;
   organization_id: string;
-  invoice_job?: InvoiceJob[];
+  invoice_job?: InvoiceJob[] | null;
+}
+
+// Type for invoice with full details from Supabase query
+// Note: Supabase returns invoice_job with job as array or object depending on query structure
+interface InvoiceWithDetails {
+  id: string;
+  invoice_number: string;
+  total: number;
+  currency: string;
+  due_date: string;
+  invoice_job?:
+    | Array<{
+      job?: {
+        id: string;
+        location_id: string | null;
+        submission_data: unknown;
+        location?: {
+          id: string;
+          email: string | null;
+          contact_person: string | null;
+          hierarchy_parent_id: string | null;
+        } | null;
+      } | null;
+    }>
+    | null;
 }
 
 interface AutoSendConfig {
@@ -137,6 +165,8 @@ serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "auto-send-invoices" });
+
   try {
     const supabase = createServiceRoleClient();
     const now = new Date();
@@ -181,9 +211,12 @@ serve(async (req: Request) => {
           .eq("status", "draft");
 
         if (invoicesError) {
-          console.error(
-            `Error fetching invoices for org ${org.id}:`,
+          logger.error(
+            "Error fetching invoices for organization",
             invoicesError,
+            {
+              organization_id: org.id,
+            },
           );
           continue;
         }
@@ -228,16 +261,18 @@ serve(async (req: Request) => {
 
               // Filter invoices that belong to locations in the hierarchy nodes
               const hierarchyInvoices = draftInvoices.filter(
-                (invoice: DraftInvoice) => {
+                (invoice) => {
                   if (
                     !invoice.invoice_job || !Array.isArray(invoice.invoice_job)
                   ) {
                     return false;
                   }
                   return invoice.invoice_job.some(
-                    (ij: InvoiceJob) =>
-                      ij.job?.location_id &&
-                      locationIds.includes(ij.job.location_id),
+                    (ij) => {
+                      const job = Array.isArray(ij.job) ? ij.job[0] : ij.job;
+                      return job?.location_id &&
+                        locationIds.includes(job.location_id);
+                    },
                   );
                 },
               );
@@ -262,7 +297,7 @@ serve(async (req: Request) => {
           if (orgConfig && shouldRunAutoSend(orgConfig, now)) {
             // Get invoices not covered by hierarchy auto-send
             const orgLevelInvoices = draftInvoices.filter(
-              (invoice: DraftInvoice) => {
+              (invoice) => {
                 // Skip if already in invoicesToSend (covered by hierarchy)
                 if (invoicesToSend.some((inv) => inv.id === invoice.id)) {
                   return false;
@@ -271,9 +306,11 @@ serve(async (req: Request) => {
                 // If invoice has locations, only include if none are covered by hierarchy
                 if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
                   const hasHierarchyCoveredLocation = invoice.invoice_job.some(
-                    (ij: InvoiceJob) =>
-                      ij.job?.location_id &&
-                      hierarchyCoveredLocationIds.has(ij.job.location_id),
+                    (ij) => {
+                      const job = Array.isArray(ij.job) ? ij.job[0] : ij.job;
+                      return job?.location_id &&
+                        hierarchyCoveredLocationIds.has(job.location_id);
+                    },
                   );
                   return !hasHierarchyCoveredLocation;
                 }
@@ -317,39 +354,65 @@ serve(async (req: Request) => {
           ),
         );
 
+        // OPTIMIZATION: Fetch all invoice details in a single query instead of N+1
+        const invoiceIds = invoicesToSend.map((inv) => inv.id);
+        const { data: invoicesWithDetails, error: detailsError } =
+          await supabase
+            .from("invoice")
+            .select(
+              `
+            id,
+            invoice_number,
+            total,
+            currency,
+            due_date,
+            invoice_job:invoice_job (
+              job:job_id (
+                id,
+                location_id,
+                submission_data,
+                location:location_id (
+                  id,
+                  email,
+                  contact_person,
+                  hierarchy_parent_id
+                )
+              )
+            )
+          `,
+            )
+            .in("id", invoiceIds);
+
+        if (detailsError || !invoicesWithDetails) {
+          logger.error("Error fetching invoice details", detailsError, {
+            organization_id: org.id,
+            invoice_count: invoiceIds.length,
+          });
+          errors.push(
+            `Failed to fetch invoice details for ${invoiceIds.length} invoices`,
+          );
+          continue;
+        }
+
+        // Create a map for quick lookup
+        // Note: Supabase returns invoice_job with job as array or object, so we use type assertion
+        const invoiceDetailsMap = new Map<string, InvoiceWithDetails>(
+          invoicesWithDetails.map((inv) => [
+            inv.id,
+            inv as unknown as InvoiceWithDetails,
+          ]),
+        );
+
         // Send invoices
         for (const invoice of invoicesToSend) {
           try {
-            // Get invoice with full job details for email recipient determination
-            const { data: invoiceWithJobs, error: detailsError } =
-              await supabase
-                .from("invoice")
-                .select(
-                  `
-                id,
-                invoice_job:invoice_job (
-                  job:job_id (
-                    id,
-                    location_id,
-                    submission_data,
-                    location:location_id (
-                      id,
-                      email,
-                      contact_person,
-                      hierarchy_parent_id
-                    )
-                  )
-                )
-              `,
-                )
-                .eq("id", invoice.id)
-                .single();
-
-            if (detailsError || !invoiceWithJobs) {
-              console.error(
-                `Error fetching invoice details ${invoice.id}:`,
-                detailsError,
-              );
+            // Get invoice details from the pre-fetched map
+            const invoiceWithJobs = invoiceDetailsMap.get(invoice.id);
+            if (!invoiceWithJobs) {
+              logger.warn("Invoice details not found in pre-fetched data", {
+                invoice_id: invoice.id,
+                invoice_number: invoice.invoice_number,
+              });
               errors.push(
                 `Failed to fetch invoice details ${invoice.invoice_number}`,
               );
@@ -363,20 +426,25 @@ serve(async (req: Request) => {
               Array.isArray(invoiceWithJobs.invoice_job)
             ) {
               for (const invoiceJob of invoiceWithJobs.invoice_job) {
-                if (invoiceJob.job) {
+                const job = invoiceJob.job;
+                if (job) {
+                  // Handle location which can be array or object from Supabase
+                  const location = Array.isArray(job.location)
+                    ? job.location[0]
+                    : job.location;
+
                   jobContexts.push({
-                    location_id: invoiceJob.job.location_id || null,
-                    location: invoiceJob.job.location
+                    location_id: job.location_id || null,
+                    location: location
                       ? {
-                        id: invoiceJob.job.location.id,
-                        email: invoiceJob.job.location.email || null,
-                        contact_person:
-                          invoiceJob.job.location.contact_person || null,
-                        hierarchy_parent_id:
-                          invoiceJob.job.location.hierarchy_parent_id || null,
+                        id: location.id,
+                        email: location.email || null,
+                        contact_person: location.contact_person || null,
+                        hierarchy_parent_id: location.hierarchy_parent_id ||
+                          null,
                       }
                       : null,
-                    submission_data: (invoiceJob.job.submission_data as Record<
+                    submission_data: (job.submission_data as Record<
                       string,
                       unknown
                     >) || null,
@@ -395,9 +463,11 @@ serve(async (req: Request) => {
 
             // Skip if no valid email recipients
             if (emailRecipients.length === 0) {
-              console.warn(
-                `Skipping invoice ${invoice.invoice_number} for org ${org.id}: no valid email recipients found`,
-              );
+              logger.warn("Skipping invoice - no valid email recipients", {
+                invoice_id: invoice.id,
+                invoice_number: invoice.invoice_number,
+                organization_id: org.id,
+              });
               errors.push(
                 `Invoice ${invoice.invoice_number} has no valid email recipients`,
               );
@@ -409,29 +479,22 @@ serve(async (req: Request) => {
             try {
               organizationName = await getOrganizationName(supabase, org.id);
             } catch (err) {
-              console.error(
-                `Failed to get organization name for org ${org.id}:`,
-                err,
-              );
+              logger.error("Failed to get organization name", err, {
+                organization_id: org.id,
+                invoice_id: invoice.id,
+              });
               errors.push(
                 `Failed to get organization name for invoice ${invoice.invoice_number}`,
               );
               continue;
             }
 
-            // Get invoice totals for email
-            const { data: invoiceTotals, error: invoiceTotalsError } =
-              await supabase
-                .from("invoice")
-                .select("total, currency, due_date")
-                .eq("id", invoice.id)
-                .single();
-
-            if (invoiceTotalsError || !invoiceTotals) {
-              console.error(
-                `Failed to get invoice totals ${invoice.id}:`,
-                invoiceTotalsError,
-              );
+            // Invoice totals are already in invoiceWithJobs from the optimized query
+            if (!invoiceWithJobs.total || !invoiceWithJobs.due_date) {
+              logger.error("Invoice missing required fields", {
+                invoice_id: invoice.id,
+                invoice_number: invoice.invoice_number,
+              });
               errors.push(
                 `Failed to get invoice totals for ${invoice.invoice_number}`,
               );
@@ -443,18 +506,19 @@ serve(async (req: Request) => {
               invoiceNumber: invoice.invoice_number,
               organizationName,
               recipientEmails: emailRecipients,
-              total: invoiceTotals.total,
-              currency: invoiceTotals.currency || "AUD",
-              dueDate: invoiceTotals.due_date,
+              total: invoiceWithJobs.total,
+              currency: invoiceWithJobs.currency || "AUD",
+              dueDate: invoiceWithJobs.due_date,
             };
 
             const emailResult = await sendInvoiceEmail(emailData, false);
 
             if (!emailResult.success) {
-              console.error(
-                `Failed to send email for invoice ${invoice.invoice_number}:`,
-                emailResult.error,
-              );
+              logger.error("Failed to send invoice email", undefined, {
+                invoice_id: invoice.id,
+                invoice_number: invoice.invoice_number,
+                error: emailResult.error,
+              });
               errors.push(
                 `Failed to send email for invoice ${invoice.invoice_number}: ${emailResult.error}`,
               );
@@ -472,35 +536,43 @@ serve(async (req: Request) => {
               .eq("id", invoice.id);
 
             if (updateError) {
-              console.error(
-                `Error updating invoice ${invoice.id} after email send:`,
+              logger.error(
+                "Error updating invoice status after email send",
                 updateError,
+                {
+                  invoice_id: invoice.id,
+                  invoice_number: invoice.invoice_number,
+                },
               );
               errors.push(
                 `Failed to update invoice ${invoice.invoice_number} after email send: ${updateError.message}`,
               );
               // Email was sent but status update failed - log warning
-              console.warn(
-                `Email sent for invoice ${invoice.invoice_number} but status update failed`,
-              );
+              logger.warn("Email sent but status update failed", {
+                invoice_id: invoice.id,
+                invoice_number: invoice.invoice_number,
+              });
               continue;
             }
 
-            console.log(
-              `Auto-sent invoice ${invoice.invoice_number} for org ${org.id} to: ${
-                emailRecipients.join(", ")
-              } (Email ID: ${emailResult.emailId || "unknown"})`,
-            );
+            logger.info("Auto-sent invoice successfully", {
+              invoice_id: invoice.id,
+              invoice_number: invoice.invoice_number,
+              organization_id: org.id,
+              recipient_count: emailRecipients.length,
+              email_id: emailResult.emailId,
+            });
 
             totalSent++;
           } catch (err) {
+            logger.error("Error processing invoice", err, {
+              invoice_id: invoice.id,
+              invoice_number: invoice.invoice_number,
+              organization_id: org.id,
+            });
             const errorMsg = err instanceof Error
               ? err.message
               : "Unknown error";
-            console.error(
-              `Error processing invoice ${invoice.id}:`,
-              errorMsg,
-            );
             errors.push(
               `Failed to process invoice ${invoice.invoice_number}: ${errorMsg}`,
             );
@@ -508,12 +580,27 @@ serve(async (req: Request) => {
         }
 
         totalProcessed += invoicesToSend.length;
+        logger.info("Completed processing organization invoices", {
+          organization_id: org.id,
+          organization_name: org.name,
+          invoices_processed: invoicesToSend.length,
+          invoices_sent: totalSent,
+        });
       } catch (err) {
+        logger.error("Error processing organization", err, {
+          organization_id: org.id,
+          organization_name: org.name,
+        });
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        console.error(`Error processing org ${org.id}:`, errorMsg);
         errors.push(`Failed to process org ${org.name}: ${errorMsg}`);
       }
     }
+
+    logger.info("Auto-send invoices completed", {
+      total_processed: totalProcessed,
+      total_sent: totalSent,
+      error_count: errors.length,
+    });
 
     return jsonResponse({
       success: true,
@@ -523,7 +610,7 @@ serve(async (req: Request) => {
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
-    console.error("Auto-send invoices error:", error);
+    logger.error("Auto-send invoices error", error);
     return errorResponse(
       error instanceof Error ? error.message : "Failed to auto-send invoices",
       500,

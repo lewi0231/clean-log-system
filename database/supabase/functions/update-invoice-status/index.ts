@@ -5,19 +5,30 @@ import {
   sendInvoiceEmail,
 } from "../_utils/email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
 import {
   getInvoiceEmailRecipients,
   type InvoiceEmailRecipientConfig,
   type JobContext,
 } from "../_utils/invoice-email.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createStripeClient } from "../_utils/stripe.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  updateInvoiceStatusSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 /**
  * Create or get existing payment link for an invoice
  * @param forceNew - If true, always creates a new payment link (for resending)
+ * @param logger - Optional logger for structured logging
  */
 async function getOrCreatePaymentLink(
   supabase: ReturnType<typeof createServiceRoleClient>,
@@ -30,6 +41,7 @@ async function getOrCreatePaymentLink(
     payment_link_id?: string | null;
   },
   forceNew = false,
+  logger?: ReturnType<typeof createLogger>,
 ): Promise<string | null> {
   try {
     // Check if invoice already has a valid payment link (unless forcing new)
@@ -44,9 +56,11 @@ async function getOrCreatePaymentLink(
         // Check if not expired
         const expiresAt = new Date(existingLink.expires_at);
         if (expiresAt > new Date()) {
-          console.log(
-            `Using existing payment link for invoice ${invoice.invoice_number}`,
-          );
+          logger?.debug("Using existing payment link", {
+            invoice_id: invoice.id,
+            invoice_number: invoice.invoice_number,
+            payment_link_id: existingLink.id,
+          });
           return existingLink.checkout_url;
         }
       }
@@ -102,7 +116,10 @@ async function getOrCreatePaymentLink(
       .single();
 
     if (linkInsertError) {
-      console.error("Error creating payment link:", linkInsertError);
+      logger?.error("Error creating payment link", linkInsertError, {
+        invoice_id: invoice.id,
+        invoice_number: invoice.invoice_number,
+      });
       return null;
     }
 
@@ -112,12 +129,18 @@ async function getOrCreatePaymentLink(
       .update({ payment_link_id: paymentLink.id })
       .eq("id", invoice.id);
 
-    console.log(
-      `Created new payment link for invoice ${invoice.invoice_number}: ${session.url}`,
-    );
+    logger?.info("Created new payment link", {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      payment_link_id: paymentLink.id,
+      checkout_url: session.url,
+    });
     return session.url!;
   } catch (error) {
-    console.error("Error creating payment link:", error);
+    logger?.error("Error creating payment link", error, {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+    });
     // Don't fail the invoice send if payment link creation fails
     // The invoice can still be sent without a payment link
     return null;
@@ -131,24 +154,26 @@ serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "update-invoice-status" });
+
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, ["invoice_id", "status"]);
+    const rawBody = await req.json();
 
-    if (!validation.valid) {
-      return errorResponse("Invoice ID and status are required", 400);
+    // Validate request body with Zod schema
+    const validation = validateRequest(updateInvoiceStatusSchema, rawBody);
+    if (!validation.success) {
+      logger.warn("Invalid request body for invoice status update", {
+        errors: validation.issues,
+      });
+      return errorResponse(validation.error, 400);
     }
 
+    const body = validation.data as {
+      invoice_id: string;
+      status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+      resend?: boolean;
+    };
     const { invoice_id, status, resend = false } = body;
-
-    // Validate status
-    const validStatuses = ["draft", "sent", "paid", "overdue", "cancelled"];
-    if (!validStatuses.includes(status)) {
-      return errorResponse(
-        `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
-        400,
-      );
-    }
 
     const supabase = createServiceRoleClient();
     const now = new Date();
@@ -304,10 +329,10 @@ serve(async (req: Request) => {
           invoice.organization_id,
         );
       } catch (err) {
-        console.error(
-          `Failed to get organization name for org ${invoice.organization_id}:`,
-          err,
-        );
+        logger.error("Failed to get organization name", err, {
+          organization_id: invoice.organization_id,
+          invoice_id: invoice_id,
+        });
         return errorResponse("Failed to get organization details", 500);
       }
 
@@ -323,6 +348,7 @@ serve(async (req: Request) => {
           payment_link_id: invoice.payment_link_id,
         },
         resend, // Force new payment link if resending
+        logger,
       );
 
       // Determine the base URL for the invoice view
@@ -342,31 +368,33 @@ serve(async (req: Request) => {
         paymentLinkUrl: paymentLinkUrl || undefined,
       };
 
-      console.log("Sending invoice email:", {
-        invoiceId: invoice_id,
-        invoiceNumber: invoice.invoice_number,
-        recipients: emailRecipients,
-        hasPaymentLink: !!paymentLinkUrl,
+      logger.info("Sending invoice email", {
+        invoice_id: invoice_id,
+        invoice_number: invoice.invoice_number,
+        recipient_count: emailRecipients.length,
+        has_payment_link: !!paymentLinkUrl,
       });
 
       const emailResult = await sendInvoiceEmail(emailData, false);
 
       if (!emailResult.success) {
-        console.error(
-          `Failed to send email for invoice ${invoice.invoice_number}:`,
-          emailResult.error,
-        );
+        logger.error("Failed to send invoice email", undefined, {
+          invoice_id: invoice_id,
+          invoice_number: invoice.invoice_number,
+          error: emailResult.error,
+        });
         return errorResponse(
           `Failed to send invoice email: ${emailResult.error}`,
           500,
         );
       }
 
-      console.log(
-        `Invoice email sent successfully for ${invoice.invoice_number} (Email ID: ${
-          emailResult.emailId || "unknown"
-        })`,
-      );
+      logger.info("Invoice email sent successfully", {
+        invoice_id: invoice_id,
+        invoice_number: invoice.invoice_number,
+        email_id: emailResult.emailId,
+        recipient_count: emailRecipients.length,
+      });
 
       // Only update status after successful email send
       const { data: updatedInvoice, error: updateError } = await supabase
@@ -414,12 +442,12 @@ serve(async (req: Request) => {
       invoice: invoice,
     });
   } catch (error) {
-    console.error("Update invoice status error:", error);
-    return errorResponse(
-      error instanceof Error
-        ? error.message
-        : "Failed to update invoice status",
-      500,
+    logger.error("Update invoice status error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to update invoice status",
     );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });

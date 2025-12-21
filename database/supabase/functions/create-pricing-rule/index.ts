@@ -52,11 +52,24 @@ serve(async (req) => {
       return errorResponse(validation.error, 400);
     }
 
-    // After success check, validation.data is properly typed
-    const body = validation.data;
+    // TypeScript type narrowing: after success check, validation.data is properly typed
+    // Type assertion needed because TypeScript doesn't always narrow discriminated unions correctly in Deno
+    // We know it's safe because we checked validation.success above
+    // Import the type from zod-schemas to avoid needing zod import here
+    type CreatePricingRuleInput = Parameters<
+      typeof validateRequest<typeof createPricingRuleSchema>
+    >[1] extends infer T ? T extends { success: true; data: infer D } ? D
+      : never
+      : never;
+
+    // Use type assertion - we know validation.success is true at this point
+    const body = validation.data as ReturnType<
+      typeof createPricingRuleSchema.parse
+    >;
 
     const supabase = createServiceRoleClient();
 
+    // Extract fields from validated body
     const {
       organization_id,
       scope,
