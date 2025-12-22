@@ -11,6 +11,7 @@ import {
   type InvoiceEmailRecipientConfig,
   type JobContext,
 } from "../_utils/invoice-email.ts";
+import { createLogger } from "../_utils/logger.ts";
 import {
   createStripeClient,
   getStripeWebhookSecret,
@@ -29,6 +30,11 @@ serve(async (req) => {
     return errorResponse("Method not allowed", 405);
   }
 
+  // Declare variables in outer scope for error handling
+  let event: Stripe.Event | undefined;
+  const supabase = createServiceRoleClient();
+  const logger = createLogger(req, { functionName: "stripe-webhook" });
+
   try {
     // Get raw body for signature verification
     const body = await req.text();
@@ -41,18 +47,12 @@ serve(async (req) => {
     // Verify webhook signature
     // Note: In local development with `stripe listen`, use the webhook secret shown by the CLI
     // In production, use the webhook secret from your Stripe Dashboard webhook endpoint
-    let event: Stripe.Event;
     try {
       const webhookSecret = getStripeWebhookSecret();
       event = verifyWebhookSignature(body, signature, webhookSecret);
     } catch (err) {
-      console.error("Webhook signature verification failed:", err);
-      // In local development, if verification fails, it might be because:
-      // 1. Wrong webhook secret (should be from `stripe listen` output)
-      // 2. Event is being sent to remote endpoint (check Stripe Dashboard webhook settings)
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      console.error("Webhook verification error details:", {
-        error: errorMessage,
+      logger.error("Webhook signature verification failed", err, {
         hint:
           "For local dev: Use webhook secret from 'stripe listen' output. Disable remote webhook endpoints in Stripe Dashboard.",
       });
@@ -62,13 +62,53 @@ serve(async (req) => {
       );
     }
 
-    const supabase = createServiceRoleClient();
     const stripe = createStripeClient();
 
-    console.log(`Processing Stripe webhook event: ${event.type}`, {
+    logger.info(`Processing Stripe webhook event: ${event.type}`, {
       event_id: event.id,
       type: event.type,
     });
+
+    // Check if this event has already been processed (idempotency protection)
+    const { data: existingEvent, error: checkError } = await supabase
+      .from("webhook_event")
+      .select("id, status, processed_at")
+      .eq("event_id", event.id)
+      .maybeSingle();
+
+    if (checkError) {
+      logger.error("Error checking webhook event idempotency", checkError);
+      // Continue processing - don't fail on check error
+    } else if (existingEvent) {
+      logger.info(`Webhook event ${event.id} already processed`, {
+        status: existingEvent.status,
+        processed_at: existingEvent.processed_at,
+      });
+      // Return success to prevent Stripe from retrying
+      return jsonResponse({
+        received: true,
+        message: "Event already processed",
+        event_id: event.id,
+      });
+    }
+
+    // Record that we're processing this event
+    const { error: insertError } = await supabase
+      .from("webhook_event")
+      .insert({
+        event_id: event.id,
+        event_type: event.type,
+        status: "processed",
+        metadata: {
+          livemode: event.livemode,
+          api_version: event.api_version,
+        },
+      });
+
+    if (insertError) {
+      logger.error("Error recording webhook event", insertError);
+      // Continue processing - don't fail on insert error
+    }
 
     // Handle different event types
     switch (event.type) {
@@ -78,7 +118,13 @@ serve(async (req) => {
         // Get invoice_id from metadata
         const invoiceId = session.metadata?.invoice_id;
         if (!invoiceId) {
-          console.error("No invoice_id in checkout session metadata");
+          logger.error(
+            "No invoice_id in checkout session metadata",
+            undefined,
+            {
+              session_id: session.id,
+            },
+          );
           break;
         }
 
@@ -208,7 +254,7 @@ serve(async (req) => {
                 console.error("Error updating invoice:", invoiceUpdateError);
               }
 
-              console.log("Payment processed successfully", {
+              logger.info("Payment processed successfully", {
                 payment_id: payment.id,
                 invoice_id: invoiceId,
                 amount,
@@ -474,7 +520,7 @@ serve(async (req) => {
             .eq("id", existingPayment.id);
         }
 
-        console.log("Payment failed", {
+        logger.warn("Payment failed", {
           payment_intent_id: paymentIntent.id,
           error: paymentIntent.last_payment_error,
         });
@@ -547,7 +593,7 @@ serve(async (req) => {
           })
           .eq("stripe_charge_id", dispute.charge as string);
 
-        console.log("Payment disputed", {
+        logger.warn("Payment disputed", {
           dispute_id: dispute.id,
           charge_id: dispute.charge,
         });
@@ -555,16 +601,51 @@ serve(async (req) => {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        logger.warn(`Unhandled event type: ${event.type}`, {
+          event_id: event.id,
+        });
     }
+
+    // Mark event as successfully processed (if we inserted it earlier)
+    // Note: If insert failed earlier, this update will also fail silently
+    await supabase
+      .from("webhook_event")
+      .update({
+        status: "processed",
+        processed_at: new Date().toISOString(),
+      })
+      .eq("event_id", event.id)
+      .then(({ error }) => {
+        if (error) {
+          console.error("Error updating webhook event status:", error);
+        }
+      });
 
     // Always return 200 to acknowledge receipt
     return jsonResponse({ received: true });
   } catch (error) {
-    console.error("Webhook processing error:", error);
-    return errorResponse(
-      error instanceof Error ? error.message : "Webhook processing failed",
-      500,
-    );
+    logger.error("Webhook processing error", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Webhook processing failed";
+
+    // Mark event as failed (if we inserted it earlier)
+    // Note: event may not be available if error occurred before signature verification
+    try {
+      if (event?.id) {
+        await supabase
+          .from("webhook_event")
+          .update({
+            status: "failed",
+            error_message: errorMessage,
+          })
+          .eq("event_id", event.id);
+      }
+    } catch (updateError) {
+      console.error("Error updating webhook event status:", updateError);
+      // Don't fail the response if we can't update the status
+    }
+
+    return errorResponse(errorMessage, 500);
   }
 });

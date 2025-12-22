@@ -4,13 +4,24 @@ import {
   getAuthUser,
   verifyOrganizationMembership,
 } from "../_utils/auth.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, {
+    functionName: "update-worker-payment-status",
+  });
 
   try {
     const body = (await req.json()) as {
@@ -29,6 +40,9 @@ serve(async (req: Request) => {
     );
 
     if (!validation.valid) {
+      logger.warn("Missing required fields for worker payment status update", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Organization ID and status are required", 400);
     }
 
@@ -170,6 +184,12 @@ serve(async (req: Request) => {
         }
       }
 
+      logger.info("Worker payment status updated successfully", {
+        payment_id,
+        organization_id,
+        new_status: status,
+      });
+
       return jsonResponse({
         success: true,
         payment,
@@ -208,19 +228,27 @@ serve(async (req: Request) => {
 
       if (batchError) throw batchError;
 
+      logger.info("Worker payment batch status updated successfully", {
+        batch_id,
+        organization_id,
+        new_status: status,
+      });
+
       return jsonResponse({
         success: true,
         batch,
       });
     }
 
+    logger.warn("Invalid request - neither payment_id nor batch_id provided", {
+      organization_id,
+    });
     return errorResponse("Invalid request", 400);
   } catch (error) {
-    console.error("Update worker payment status error:", error);
+    logger.error("Update worker payment status error", error);
     return errorResponse(
-      error instanceof Error
-        ? error.message
-        : "Failed to update worker payment status",
+      extractErrorMessage(error, "Failed to update worker payment status"),
+      getErrorStatusCode(error),
     );
   }
 });

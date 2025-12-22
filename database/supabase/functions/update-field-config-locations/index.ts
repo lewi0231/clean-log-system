@@ -1,5 +1,13 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -7,11 +15,18 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, {
+    functionName: "update-field-config-locations",
+  });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, ["field_config_id"]);
 
     if (!validation.valid) {
+      logger.warn("Missing required field for field config location update", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Field config ID is required", 400);
     }
 
@@ -19,6 +34,10 @@ serve(async (req) => {
 
     // Validate location_ids is an array if provided
     if (location_ids !== undefined && !Array.isArray(location_ids)) {
+      logger.warn("Invalid location_ids format", {
+        field_config_id,
+        location_ids_type: typeof location_ids,
+      });
       return errorResponse("location_ids must be an array", 400);
     }
 
@@ -32,7 +51,28 @@ serve(async (req) => {
       .single();
 
     if (fieldConfigError || !fieldConfig) {
+      logger.warn("Field config not found for location update", {
+        error: fieldConfigError,
+        field_config_id,
+      });
       return errorResponse("Field config not found", 404);
+    }
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      fieldConfig.organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to update field config locations", {
+        field_config_id,
+        organization_id: fieldConfig.organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to update this field config",
+        403,
+      );
     }
 
     // Delete all existing location restrictions for this field config
@@ -87,17 +127,22 @@ serve(async (req) => {
 
     if (fetchError) throw fetchError;
 
+    logger.info("Field config locations updated successfully", {
+      field_config_id,
+      organization_id: fieldConfig.organization_id,
+      location_count: locationRestrictions?.length || 0,
+    });
+
     return jsonResponse({
       success: true,
       location_ids: locationRestrictions?.map((lr) => lr.location_id) ||
         [],
     });
   } catch (error) {
-    console.error("Update field config locations error:", error);
+    logger.error("Update field config locations error", error);
     return errorResponse(
-      error instanceof Error
-        ? error.message
-        : "Failed to update location restrictions",
+      extractErrorMessage(error, "Failed to update location restrictions"),
+      getErrorStatusCode(error),
     );
   }
 });

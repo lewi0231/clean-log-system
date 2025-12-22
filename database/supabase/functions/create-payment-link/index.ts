@@ -1,16 +1,20 @@
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createStripeClient } from "../_utils/stripe.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
-
-interface CreatePaymentLinkRequest extends Record<string, unknown> {
-  invoice_id: string;
-  organization_id: string;
-  success_url?: string;
-  cancel_url?: string;
-}
+import {
+  createPaymentLinkSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
   // Load environment variables for local development
@@ -19,28 +23,46 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "create-payment-link" });
+
   try {
     if (req.method !== "POST") {
       return errorResponse("Method not allowed", 405);
     }
 
-    const body = await req.json() as CreatePaymentLinkRequest;
-    const validation = validateRequiredFields(body, [
-      "invoice_id",
-      "organization_id",
-    ]);
+    const rawBody = await req.json();
 
-    if (!validation.valid) {
-      const missingFields = validation.missingFields?.join(", ") || "unknown";
-      return errorResponse(
-        `Missing required fields: ${missingFields}`,
-        400,
-      );
+    // Validate request body with Zod schema
+    const validation = validateRequest(createPaymentLinkSchema, rawBody);
+    if (!validation.success) {
+      logger.warn("Invalid request body for payment link creation", {
+        errors: validation.issues,
+      });
+      return errorResponse(validation.error, 400);
     }
 
-    const { invoice_id, organization_id, success_url, cancel_url } = body;
+    const body = validation.data;
+    const { invoice_id, organization_id, success_url, cancel_url } = body as {
+      invoice_id: string;
+      organization_id: string;
+      success_url?: string;
+      cancel_url?: string;
+    };
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Fetch invoice details
     const { data: invoice, error: invoiceError } = await supabase
@@ -137,7 +159,10 @@ serve(async (req) => {
       .single();
 
     if (linkInsertError) {
-      console.error("Error creating payment link:", linkInsertError);
+      logger.error("Error creating payment link", linkInsertError, {
+        invoice_id,
+        organization_id,
+      });
       throw linkInsertError;
     }
 
@@ -148,9 +173,19 @@ serve(async (req) => {
       .eq("id", invoice_id);
 
     if (invoiceUpdateError) {
-      console.error("Error updating invoice:", invoiceUpdateError);
+      logger.warn("Error updating invoice with payment link", {
+        invoice_id,
+        payment_link_id: paymentLink.id,
+        error: invoiceUpdateError,
+      });
       // Don't fail the request, but log the error
     }
+
+    logger.info("Payment link created successfully", {
+      invoice_id,
+      organization_id,
+      payment_link_id: paymentLink.id,
+    });
 
     return jsonResponse({
       success: true,
@@ -162,10 +197,12 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Create payment link error:", error);
-    return errorResponse(
-      error instanceof Error ? error.message : "Failed to create payment link",
-      500,
+    logger.error("Create payment link error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to create payment link",
     );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });

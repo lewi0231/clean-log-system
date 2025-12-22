@@ -6,34 +6,32 @@ import {
   getFeedbackEmailRecipient,
   sendFeedbackRequestEmail,
 } from "../_utils/feedback-email.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
 import type {
   InvoiceEmailRecipientConfig,
   JobContext,
 } from "../_utils/invoice-email.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
-  console.log("📥 Send Feedback Email: Request received", {
-    method: req.method,
-    url: req.url,
-    hasAuthHeader: !!req.headers.get("authorization"),
-  });
-
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "send-feedback-email" });
 
   try {
     // Get auth token from headers
     const token = extractAuthToken(req);
 
-    console.log("🔐 Send Feedback Email: Authentication check", {
-      hasToken: !!token,
-      tokenLength: token?.length || 0,
-    });
-
     if (!token) {
-      console.error("❌ Send Feedback Email: No authentication token provided");
+      logger.warn("No authentication token provided");
       return errorResponse("Authentication required", 401);
     }
 
@@ -43,50 +41,36 @@ serve(async (req) => {
     const authUser = await getAuthUser(token);
 
     if (!authUser) {
-      console.error(
-        "❌ Send Feedback Email: User not found after token verification",
-      );
+      logger.error("User not found after token verification", undefined);
       return errorResponse("User not found", 401);
     }
 
     const authUserId = authUser.id;
-    console.log("✅ Send Feedback Email: Token verified", {
-      userId: authUserId,
-      email: authUser.email,
+    logger.debug("Token verified", {
+      user_id: authUserId,
+      user_email: authUser.email,
     });
 
     // Parse request body
-    console.log("📦 Send Feedback Email: Parsing request body");
     let body;
     try {
       body = await req.json();
-      console.log("📦 Send Feedback Email: Request body parsed", {
-        hasJobId: !!body.job_id,
-        jobId: body.job_id,
-      });
     } catch (parseError) {
-      console.error("❌ Send Feedback Email: Failed to parse request body", {
-        error: parseError instanceof Error
-          ? parseError.message
-          : String(parseError),
-      });
+      logger.error("Failed to parse request body", parseError);
       return errorResponse("Invalid request body", 400);
     }
 
     const { job_id } = body;
 
     if (!job_id || typeof job_id !== "string") {
-      console.error("❌ Send Feedback Email: Invalid job_id", {
-        jobId: job_id,
+      logger.warn("Invalid job_id", {
+        job_id: job_id,
         type: typeof job_id,
       });
       return errorResponse("job_id is required", 400);
     }
 
     // Fetch job with organization and location details
-    console.log("📋 Send Feedback Email: Fetching job", {
-      jobId: job_id,
-    });
     const { data: job, error: jobError } = await supabaseAdmin
       .from("job")
       .select(
@@ -112,17 +96,16 @@ serve(async (req) => {
       .single();
 
     if (jobError || !job) {
-      console.error("❌ Send Feedback Email: Job not found", {
-        error: jobError?.message,
-        jobId: job_id,
+      logger.error("Job not found", jobError, {
+        job_id: job_id,
       });
       return errorResponse("Job not found", 404);
     }
 
-    console.log("✅ Send Feedback Email: Job found", {
-      jobId: job.id,
-      organizationId: job.organization_id,
-      hasLocation: !!job.location,
+    logger.debug("Job found", {
+      job_id: job.id,
+      organization_id: job.organization_id,
+      has_location: !!job.location,
     });
 
     // Verify user has access to this job's organization
@@ -135,27 +118,20 @@ serve(async (req) => {
       .maybeSingle();
 
     if (orgUserError) {
-      console.error(
-        "❌ Send Feedback Email: Error checking organization access",
-        {
-          error: orgUserError.message,
-        },
-      );
+      logger.error("Error checking organization access", orgUserError, {
+        user_id: authUserId,
+        organization_id: job.organization_id,
+      });
       throw orgUserError;
     }
 
     if (!orgUser) {
-      console.error(
-        "❌ Send Feedback Email: User does not have access to this organization",
-        {
-          userId: authUserId,
-          organizationId: job.organization_id,
-        },
-      );
+      logger.warn("User does not have access to this organization", {
+        user_id: authUserId,
+        organization_id: job.organization_id,
+      });
       return errorResponse("Access denied", 403);
     }
-
-    console.log("✅ Send Feedback Email: Organization access verified");
 
     // Fetch organization settings
     const { data: orgSettings, error: orgSettingsError } = await supabaseAdmin
@@ -165,8 +141,8 @@ serve(async (req) => {
       .single();
 
     if (orgSettingsError) {
-      console.error("❌ Send Feedback Email: Error fetching organization", {
-        error: orgSettingsError.message,
+      logger.error("Error fetching organization", orgSettingsError, {
+        organization_id: job.organization_id,
       });
       throw orgSettingsError;
     }
@@ -175,8 +151,8 @@ serve(async (req) => {
     let feedbackToken = job.feedback_token;
     if (!feedbackToken) {
       feedbackToken = generateFeedbackToken();
-      console.log("🔑 Send Feedback Email: Generated new feedback token", {
-        tokenLength: feedbackToken.length,
+      logger.debug("Generated new feedback token", {
+        job_id: job.id,
       });
 
       // Update job with token
@@ -186,13 +162,15 @@ serve(async (req) => {
         .eq("id", job.id);
 
       if (updateTokenError) {
-        console.error("❌ Send Feedback Email: Error updating job with token", {
-          error: updateTokenError.message,
+        logger.error("Error updating job with token", updateTokenError, {
+          job_id: job.id,
         });
         throw updateTokenError;
       }
     } else {
-      console.log("🔑 Send Feedback Email: Using existing feedback token");
+      logger.debug("Using existing feedback token", {
+        job_id: job.id,
+      });
     }
 
     // Fetch invoice template config for email recipient configuration
@@ -252,21 +230,19 @@ serve(async (req) => {
     );
 
     if (!recipientEmail) {
-      console.warn(
-        "⚠️ Send Feedback Email: No feedback email recipient found",
-        {
-          jobId: job.id,
-          locationId: job.location_id,
-        },
-      );
+      logger.warn("No feedback email recipient found", {
+        job_id: job.id,
+        location_id: job.location_id,
+      });
       return errorResponse(
         "No email recipient found. Please configure location email, form field email, or default email.",
         400,
       );
     }
 
-    console.log("📧 Send Feedback Email: Found feedback email recipient", {
-      email: recipientEmail,
+    logger.debug("Found feedback email recipient", {
+      recipient_email: recipientEmail,
+      job_id: job.id,
     });
 
     // Get recipient name (from location contact_person or default)
@@ -291,8 +267,10 @@ serve(async (req) => {
     );
 
     if (emailResult.success) {
-      console.log("✅ Send Feedback Email: Feedback email sent successfully", {
-        emailId: emailResult.emailId,
+      logger.info("Feedback email sent successfully", {
+        email_id: emailResult.emailId,
+        job_id: job.id,
+        recipient_email: recipientEmail,
       });
 
       // Update job with email tracking
@@ -306,12 +284,10 @@ serve(async (req) => {
         .eq("id", job.id);
 
       if (updateError) {
-        console.error(
-          "❌ Send Feedback Email: Error updating job with feedback email tracking",
-          {
-            error: updateError.message,
-          },
-        );
+        logger.warn("Error updating job with feedback email tracking", {
+          job_id: job.id,
+          error: updateError,
+        });
         // Email was sent, so this is non-critical - still return success
       }
 
@@ -324,7 +300,9 @@ serve(async (req) => {
         200,
       );
     } else {
-      console.error("❌ Send Feedback Email: Failed to send feedback email", {
+      logger.error("Failed to send feedback email", undefined, {
+        job_id: job.id,
+        recipient_email: recipientEmail,
         error: emailResult.error,
       });
       return errorResponse(
@@ -333,18 +311,12 @@ serve(async (req) => {
       );
     }
   } catch (error) {
-    const errorLog: Record<string, unknown> = {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : typeof error,
-    };
-
-    console.error("❌ Send Feedback Email: Unhandled error", errorLog);
-
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Failed to send feedback email";
-
-    return errorResponse(errorMessage, 500);
+    logger.error("Send feedback email error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to send feedback email",
+    );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });

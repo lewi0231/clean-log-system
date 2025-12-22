@@ -1,5 +1,13 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
   validateNonNegativeNumber,
@@ -10,18 +18,26 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "upsert-base-pricing" });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, ["organization_id"]);
 
     if (!validation.valid) {
+      logger.warn("Missing required field for base pricing upsert", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Organization ID is required", 400);
     }
 
     if (body.customer_base_price === undefined) {
+      logger.warn("Missing customer_base_price for base pricing upsert", {
+        organization_id: body.organization_id,
+      });
       return errorResponse(
         "Organization ID and customer base price are required",
-        400
+        400,
       );
     }
 
@@ -44,7 +60,7 @@ serve(async (req) => {
     ) {
       return errorResponse(
         "Must specify either job_type_field_config_id (field-based) or standalone_base_price (standalone), but not both",
-        400
+        400,
       );
     }
 
@@ -53,7 +69,7 @@ serve(async (req) => {
     if (validAdjustmentType !== "add" && validAdjustmentType !== "multiply") {
       return errorResponse(
         "adjustment_type must be either 'add' or 'multiply'",
-        400
+        400,
       );
     }
 
@@ -70,7 +86,7 @@ serve(async (req) => {
       ) {
         return errorResponse(
           "Customer base price (multiplier) must be greater than 0",
-          400
+          400,
         );
       }
     }
@@ -84,6 +100,22 @@ serve(async (req) => {
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to upsert base pricing", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Verify field config exists if field-based
     if (job_type_field_config_id) {
@@ -101,7 +133,7 @@ serve(async (req) => {
       if (fieldConfig.field_type !== "select") {
         return errorResponse(
           "Field-based base pricing can only use select fields",
-          400
+          400,
         );
       }
 
@@ -110,7 +142,7 @@ serve(async (req) => {
       if (!options || !options.includes(job_type_value)) {
         return errorResponse(
           `Job type value "${job_type_value}" not found in field config options`,
-          400
+          400,
         );
       }
     }
@@ -191,14 +223,22 @@ serve(async (req) => {
       basePricing = inserted;
     }
 
+    logger.info("Base pricing upserted successfully", {
+      base_pricing_id: basePricing?.id,
+      organization_id,
+      job_type_field_config_id: job_type_field_config_id || null,
+      location_id: location_id || null,
+    });
+
     return jsonResponse({
       success: true,
       base_pricing: basePricing,
     });
   } catch (error) {
-    console.error("Upsert base pricing error:", error);
+    logger.error("Upsert base pricing error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to upsert base pricing"
+      extractErrorMessage(error, "Failed to upsert base pricing"),
+      getErrorStatusCode(error),
     );
   }
 });

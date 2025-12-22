@@ -1,5 +1,13 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
   validateNonNegativeNumber,
@@ -10,6 +18,8 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "upsert-field-pricing" });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
@@ -18,9 +28,13 @@ serve(async (req) => {
     ]);
 
     if (!validation.valid || body.customer_price === undefined) {
+      logger.warn("Missing required fields for field pricing upsert", {
+        missingFields: validation.missingFields,
+        has_customer_price: body.customer_price !== undefined,
+      });
       return errorResponse(
         "Organization ID, field config ID, and customer price are required",
-        400
+        400,
       );
     }
 
@@ -51,7 +65,7 @@ serve(async (req) => {
       ) {
         return errorResponse(
           "Worker payment percentage must be between 0 and 100",
-          400
+          400,
         );
       }
     }
@@ -63,11 +77,27 @@ serve(async (req) => {
     ) {
       return errorResponse(
         "Worker payment fixed rate must be non-negative",
-        400
+        400,
       );
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to upsert field pricing", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Verify field config exists
     const { data: fieldConfig, error: fieldConfigError } = await supabase
@@ -96,8 +126,8 @@ serve(async (req) => {
     }
 
     // Set applies_to_field_type from field config if not provided
-    const finalAppliesToFieldType =
-      applies_to_field_type || fieldConfig.field_type;
+    const finalAppliesToFieldType = applies_to_field_type ||
+      fieldConfig.field_type;
 
     // Build upsert data
     const upsertData: Record<string, unknown> = {
@@ -156,14 +186,22 @@ serve(async (req) => {
       fieldPricing = inserted;
     }
 
+    logger.info("Field pricing upserted successfully", {
+      field_pricing_id: fieldPricing?.id,
+      organization_id,
+      field_config_id,
+      location_id: location_id || null,
+    });
+
     return jsonResponse({
       success: true,
       field_pricing: fieldPricing,
     });
   } catch (error) {
-    console.error("Upsert field pricing error:", error);
+    logger.error("Upsert field pricing error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to upsert field pricing"
+      extractErrorMessage(error, "Failed to upsert field pricing"),
+      getErrorStatusCode(error),
     );
   }
 });

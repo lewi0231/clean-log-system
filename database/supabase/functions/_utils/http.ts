@@ -23,7 +23,7 @@ export function handleCors(req: Request): Response | null {
 export function jsonResponse(
   data: unknown,
   status = 200,
-  additionalHeaders?: HeadersInit
+  additionalHeaders?: HeadersInit,
 ): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -41,7 +41,7 @@ export function jsonResponse(
 export function errorResponse(
   error: string | Error,
   status = 500,
-  additionalHeaders?: HeadersInit
+  additionalHeaders?: HeadersInit,
 ): Response {
   const errorMessage = error instanceof Error ? error.message : error;
 
@@ -49,11 +49,65 @@ export function errorResponse(
 }
 
 /**
+ * Determine HTTP status code from error
+ */
+export function getErrorStatusCode(error: unknown): number {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    if (
+      message.includes("authentication") ||
+      message.includes("user not found") ||
+      message.includes("unauthorized")
+    ) {
+      return 401;
+    }
+    if (message.includes("not found") || message.includes("does not exist")) {
+      return 404;
+    }
+    if (
+      message.includes("required") ||
+      message.includes("invalid") ||
+      message.includes("missing")
+    ) {
+      return 400;
+    }
+    if (
+      message.includes("does not match") ||
+      message.includes("permission") ||
+      message.includes("forbidden")
+    ) {
+      return 403;
+    }
+    if (message.includes("conflict") || message.includes("already exists")) {
+      return 409;
+    }
+  }
+  return 500;
+}
+
+/**
+ * Extract error message from various error types
+ */
+export function extractErrorMessage(
+  error: unknown,
+  defaultMessage = "Internal server error",
+): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return defaultMessage;
+}
+
+/**
  * Wrap a handler function with automatic error handling and CORS
+ * @deprecated Prefer using structured logger and manual error handling for better control
  */
 export async function withCorsAndErrorHandling(
   req: Request,
-  handler: (req: Request) => Promise<Response>
+  handler: (req: Request) => Promise<Response>,
 ): Promise<Response> {
   // Handle CORS preflight
   const corsResponse = handleCors(req);
@@ -64,9 +118,10 @@ export async function withCorsAndErrorHandling(
   try {
     return await handler(req);
   } catch (error) {
+    // Note: This should use structured logger, but keeping for backward compatibility
     console.error("Handler error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Internal server error";
-    return errorResponse(errorMessage, 500);
+    const errorMessage = extractErrorMessage(error);
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 }

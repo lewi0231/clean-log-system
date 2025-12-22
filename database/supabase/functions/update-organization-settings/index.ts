@@ -1,4 +1,5 @@
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
@@ -37,6 +38,19 @@ serve(async (req) => {
     } = body;
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     const updateData: Record<string, unknown> = {};
 

@@ -1,15 +1,18 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req: Request) => {
-  console.log("📥 Update Job: Request received", {
-    method: req.method,
-    url: req.url,
-    hasAuthHeader: !!req.headers.get("authorization"),
-  });
+  const logger = createLogger(req, { functionName: "update-job" });
 
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -19,7 +22,7 @@ serve(async (req: Request) => {
     const token = extractAuthToken(req);
 
     if (!token) {
-      console.error("❌ Update Job: No authentication token provided");
+      logger.warn("No authentication token provided for job update");
       return errorResponse("Authentication required", 401);
     }
 
@@ -29,14 +32,12 @@ serve(async (req: Request) => {
     const authUser = await getAuthUser(token);
 
     if (!authUser || !authUser.email) {
-      console.error(
-        "❌ Update Job: User not found after token verification",
-      );
+      logger.warn("User not found after token verification");
       return errorResponse("User not found", 401);
     }
 
     const userEmail = authUser.email;
-    console.log("✅ Update Job: Token verified", {
+    logger.debug("Token verified for job update", {
       userId: authUser.id,
       email: userEmail,
     });
@@ -49,14 +50,14 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (orgUserError) {
-      console.error("❌ Update Job: Error fetching organization user", {
-        error: orgUserError.message,
+      logger.error("Error fetching organization user", orgUserError, {
+        user_email: userEmail,
       });
       throw orgUserError;
     }
 
     if (!orgUser) {
-      console.error("❌ Update Job: Organization user not found", {
+      logger.warn("Organization user not found", {
         email: userEmail,
       });
       return errorResponse("Organization user not found", 404);
@@ -64,7 +65,7 @@ serve(async (req: Request) => {
 
     // Check if user is admin
     if (orgUser.role !== "admin") {
-      console.error("❌ Update Job: User is not an admin", {
+      logger.warn("User is not an admin attempting to update job", {
         email: userEmail,
         role: orgUser.role,
       });
@@ -72,7 +73,7 @@ serve(async (req: Request) => {
     }
 
     const organizationId = orgUser.organization_id;
-    console.log("✅ Update Job: Admin user found", {
+    logger.debug("Admin user verified for job update", {
       organizationId,
       role: orgUser.role,
     });
@@ -81,7 +82,7 @@ serve(async (req: Request) => {
     let body;
     try {
       body = await req.json();
-      console.log("📦 Update Job: Request body parsed", {
+      logger.debug("Request body parsed for job update", {
         hasJobId: !!body.id,
         hasSubmissionData: !!body.submission_data,
         hasWorkerIds: !!body.worker_ids,
@@ -89,17 +90,16 @@ serve(async (req: Request) => {
         hasCompletedAt: !!body.completed_at,
       });
     } catch (parseError) {
-      console.error("❌ Update Job: Failed to parse request body", {
-        error: parseError instanceof Error
-          ? parseError.message
-          : String(parseError),
-      });
+      logger.error("Failed to parse request body", parseError);
       return errorResponse("Invalid request body", 400);
     }
 
     // Validate required fields
     const validation = validateRequiredFields(body, ["id"]);
     if (!validation.valid) {
+      logger.warn("Missing required field for job update", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Job ID is required", 400);
     }
 
@@ -130,10 +130,10 @@ serve(async (req: Request) => {
       .single();
 
     if (jobError || !existingJob) {
-      console.error("❌ Update Job: Job not found or access denied", {
+      logger.warn("Job not found or access denied", {
+        error: jobError,
         jobId,
         organizationId,
-        error: jobError?.message,
       });
       return errorResponse(
         "Job not found or does not belong to your organization",
@@ -141,7 +141,7 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log("✅ Update Job: Job found", {
+    logger.debug("Job found for update", {
       jobId: existingJob.id,
     });
 
@@ -153,12 +153,9 @@ serve(async (req: Request) => {
       .single();
 
     if (orgError) {
-      console.error(
-        "❌ Update Job: Error fetching organization settings",
-        {
-          error: orgError.message,
-        },
-      );
+      logger.error("Error fetching organization settings", orgError, {
+        organizationId,
+      });
       throw orgError;
     }
 
@@ -205,8 +202,9 @@ serve(async (req: Request) => {
           .maybeSingle();
 
         if (locationError) {
-          console.error("❌ Update Job: Error validating location", {
-            error: locationError.message,
+          logger.error("Error validating location", locationError, {
+            location_id: normalizedLocationId,
+            organizationId,
           });
           throw locationError;
         }
@@ -231,7 +229,7 @@ serve(async (req: Request) => {
 
     // Update the job if there are fields to update
     if (Object.keys(updateData).length > 0) {
-      console.log("💾 Update Job: Updating job", {
+      logger.debug("Updating job", {
         jobId,
         updateFields: Object.keys(updateData),
       });
@@ -244,15 +242,17 @@ serve(async (req: Request) => {
         .single();
 
       if (updateError) {
-        console.error("❌ Update Job: Error updating job", {
-          error: updateError.message,
-          code: updateError.code,
+        logger.error("Error updating job", updateError, {
+          jobId,
+          organizationId,
+          updateFields: Object.keys(updateData),
         });
         throw updateError;
       }
 
-      console.log("✅ Update Job: Job updated successfully", {
+      logger.info("Job updated successfully", {
         jobId: updatedJob.id,
+        organizationId,
       });
     }
 
@@ -274,8 +274,10 @@ serve(async (req: Request) => {
           .in("id", normalizedWorkerIds);
 
         if (workersError) {
-          console.error("❌ Update Job: Error validating workers", {
-            error: workersError.message,
+          logger.error("Error validating workers", workersError, {
+            jobId,
+            organizationId,
+            worker_count: normalizedWorkerIds.length,
           });
           throw workersError;
         }
@@ -295,10 +297,12 @@ serve(async (req: Request) => {
         .eq("job_id", jobId);
 
       if (deleteError) {
-        console.error(
-          "❌ Update Job: Error deleting existing job_worker entries",
+        logger.error(
+          "Error deleting existing job_worker entries",
+          deleteError,
           {
-            error: deleteError.message,
+            jobId,
+            organizationId,
           },
         );
         throw deleteError;
@@ -318,21 +322,17 @@ serve(async (req: Request) => {
           .insert(jobWorkerEntries);
 
         if (jobWorkerError) {
-          console.error(
-            "❌ Update Job: Error creating job_worker entries",
-            {
-              error: jobWorkerError.message,
-            },
-          );
+          logger.error("Error creating job_worker entries", jobWorkerError, {
+            jobId,
+            organizationId,
+            worker_count: normalizedWorkerIds.length,
+          });
           throw jobWorkerError;
         }
 
-        console.log(
-          "✅ Update Job: Job_worker entries updated successfully",
-          {
-            count: normalizedWorkerIds.length,
-          },
-        );
+        logger.info("Job_worker entries updated successfully", {
+          count: normalizedWorkerIds.length,
+        });
       }
     }
 
@@ -361,8 +361,9 @@ serve(async (req: Request) => {
       .single();
 
     if (fetchError) {
-      console.error("❌ Update Job: Error fetching updated job", {
-        error: fetchError.message,
+      logger.error("Error fetching updated job", fetchError, {
+        jobId,
+        organizationId,
       });
       throw fetchError;
     }
@@ -383,8 +384,9 @@ serve(async (req: Request) => {
       .eq("job_id", jobId);
 
     if (workersFetchError) {
-      console.error("❌ Update Job: Error fetching workers", {
-        error: workersFetchError.message,
+      logger.error("Error fetching workers", workersFetchError, {
+        jobId,
+        organizationId,
       });
       throw workersFetchError;
     }
@@ -445,12 +447,13 @@ serve(async (req: Request) => {
 
         if (auditError) {
           // Log error but don't fail the update
-          console.error("⚠️ Update Job: Failed to log audit trail", {
-            error: auditError.message,
+          logger.warn("Failed to log audit trail", {
+            error: auditError,
             jobId,
+            organizationId,
           });
         } else {
-          console.log("✅ Update Job: Audit trail logged", {
+          logger.debug("Audit trail logged", {
             jobId,
             changedFields,
             editedBy: userEmail,
@@ -458,16 +461,18 @@ serve(async (req: Request) => {
         }
       } catch (auditErr) {
         // Log error but don't fail the update
-        console.error("⚠️ Update Job: Error logging audit trail", {
-          error: auditErr instanceof Error
-            ? auditErr.message
-            : String(auditErr),
+        logger.warn("Error logging audit trail", {
+          error: auditErr,
+          jobId,
+          organizationId,
         });
       }
     }
 
-    console.log("✅ Update Job: Request completed successfully", {
+    logger.info("Job update completed successfully", {
       jobId: finalJob.id,
+      organizationId,
+      changedFields: hasChanges ? Object.keys(updateData) : [],
     });
 
     return jsonResponse({
@@ -478,34 +483,11 @@ serve(async (req: Request) => {
       },
     });
   } catch (error) {
-    console.error("❌ Update Job: Unhandled error", {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logger.error("Update job error", error);
 
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Failed to update job";
-
-    let statusCode = 500;
-    if (error instanceof Error) {
-      if (
-        error.message.includes("Authentication") ||
-        error.message.includes("User not found")
-      ) {
-        statusCode = 401;
-      } else if (error.message.includes("not found")) {
-        statusCode = 404;
-      } else if (
-        error.message.includes("required") ||
-        error.message.includes("invalid")
-      ) {
-        statusCode = 400;
-      } else if (error.message.includes("does not match")) {
-        statusCode = 403;
-      }
-    }
-
-    return errorResponse(errorMessage, statusCode);
+    return errorResponse(
+      extractErrorMessage(error, "Failed to update job"),
+      getErrorStatusCode(error),
+    );
   }
 });

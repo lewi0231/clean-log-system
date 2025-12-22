@@ -1,8 +1,10 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import { createInvoiceSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 interface AppliedRule {
   pricing_rule_id: string;
@@ -106,28 +108,42 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
-  try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, [
-      "organization_id",
-      "job_ids",
-      "due_date",
-    ]);
+  const logger = createLogger(req, { functionName: "create-invoice" });
 
-    if (!validation.valid) {
-      return errorResponse(
-        "Organization ID, job IDs, and due date are required",
-        400,
-      );
+  try {
+    const rawBody = await req.json();
+
+    // Validate request body with Zod schema
+    const validation = validateRequest(createInvoiceSchema, rawBody);
+    if (!validation.success) {
+      logger.warn("Invalid request body for invoice creation", {
+        errors: validation.issues,
+      });
+      return errorResponse(validation.error, 400);
     }
 
+    const body = validation.data as {
+      organization_id: string;
+      job_ids: string[];
+      due_date: string;
+      notes?: string;
+    };
     const { organization_id, job_ids, due_date, notes } = body;
 
-    if (!Array.isArray(job_ids) || job_ids.length === 0) {
-      return errorResponse("job_ids must be a non-empty array", 400);
-    }
-
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Verify jobs exist and belong to organization
     const { data: jobs, error: jobsError } = await supabase
@@ -219,9 +235,12 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      console.warn(
-        "Failed to fetch organization settings, defaulting to draft:",
-        orgError,
+      logger.warn(
+        "Failed to fetch organization settings, defaulting to draft",
+        {
+          organization_id,
+          error: orgError,
+        },
       );
     }
 
@@ -233,10 +252,10 @@ serve(async (req) => {
       .single();
 
     if (orgSettingsError) {
-      console.warn(
-        "Failed to fetch organization currency, defaulting to AUD:",
-        orgSettingsError,
-      );
+      logger.warn("Failed to fetch organization currency, defaulting to AUD", {
+        organization_id,
+        error: orgSettingsError,
+      });
     }
 
     const currency = orgSettings?.currency || "AUD";
@@ -387,7 +406,7 @@ serve(async (req) => {
       invoice: invoiceWithJobs,
     });
   } catch (error) {
-    console.error("Create invoice error:", error);
+    logger.error("Create invoice error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to create invoice",
     );

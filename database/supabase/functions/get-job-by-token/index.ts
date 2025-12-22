@@ -1,11 +1,39 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
+import {
+  checkRateLimit,
+  RATE_LIMIT_CONFIGS,
+  rateLimitResponse,
+} from "../_utils/rate-limit.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "get-job-by-token" });
+
+  // Rate limiting for public job access
+  const rateLimitResult = await checkRateLimit(req, {
+    ...RATE_LIMIT_CONFIGS.lenient,
+    identifier: undefined, // Use IP address
+  });
+
+  if (!rateLimitResult.allowed) {
+    logger.warn("Rate limit exceeded", {
+      remaining: rateLimitResult.remaining,
+      retry_after: rateLimitResult.retryAfter,
+    });
+    return rateLimitResponse(rateLimitResult);
+  }
 
   try {
     // Allow GET requests with token in query params or POST with body
@@ -59,7 +87,10 @@ serve(async (req: Request) => {
       .single();
 
     if (jobError || !job) {
-      console.error("Get job by token error:", jobError);
+      logger.warn("Job not found by token", {
+        has_token: !!token,
+        error: jobError,
+      });
       return errorResponse("Invalid or expired feedback link", 404);
     }
 
@@ -119,9 +150,12 @@ serve(async (req: Request) => {
       },
     });
   } catch (error) {
-    console.error("Get job by token error:", error);
-    return errorResponse(
-      error instanceof Error ? error.message : "Failed to get job details",
+    logger.error("Get job by token error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to get job details",
     );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });

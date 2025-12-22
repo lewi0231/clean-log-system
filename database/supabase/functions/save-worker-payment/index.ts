@@ -4,7 +4,14 @@ import {
   getAuthUser,
   verifyOrganizationMembership,
 } from "../_utils/auth.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -28,6 +35,8 @@ serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "save-worker-payment" });
+
   try {
     const body = (await req.json()) as SaveWorkerPaymentRequest;
     const validation = validateRequiredFields(
@@ -36,6 +45,9 @@ serve(async (req: Request) => {
     );
 
     if (!validation.valid) {
+      logger.warn("Missing required fields for worker payment save", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Missing required fields", 400);
     }
 
@@ -153,7 +165,10 @@ serve(async (req: Request) => {
       .single();
 
     if (orgCurrencyError) {
-      console.error("Error fetching organization currency:", orgCurrencyError);
+      logger.warn("Error fetching organization currency", {
+        error: orgCurrencyError,
+        organization_id,
+      });
     }
 
     const currency = organization?.currency || "AUD";
@@ -234,9 +249,13 @@ serve(async (req: Request) => {
       if (paymentsError) {
         // Rollback: Delete the batch if payment inserts fail
         // This prevents orphaned batch records without associated payments
-        console.error(
-          "Failed to insert worker payments, rolling back batch:",
+        logger.error(
+          "Failed to insert worker payments, rolling back batch",
           paymentsError,
+          {
+            batch_id: batch.id,
+            payment_count: workerPayments.length,
+          },
         );
         await supabase
           .from("worker_payment_batch")
@@ -246,15 +265,26 @@ serve(async (req: Request) => {
       }
     }
 
+    logger.info("Worker payment saved successfully", {
+      batch_id: batch.id,
+      organization_id,
+      payment_count: workerPayments.length,
+      job_count: job_ids.length,
+      worker_count: uniqueWorkers.size,
+      total_payment: calculation.total_worker_payment,
+      currency,
+    });
+
     return jsonResponse({
       success: true,
       batch_id: batch.id,
       payment_count: workerPayments.length,
     });
   } catch (error) {
-    console.error("Save worker payment error:", error);
+    logger.error("Save worker payment error", error);
     return errorResponse(
-      error instanceof Error ? error.message : "Failed to save worker payment",
+      extractErrorMessage(error, "Failed to save worker payment"),
+      getErrorStatusCode(error),
     );
   }
 });

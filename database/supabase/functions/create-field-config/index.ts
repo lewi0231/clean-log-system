@@ -1,11 +1,21 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "create-field-config" });
 
   try {
     const body = await req.json();
@@ -17,6 +27,9 @@ serve(async (req) => {
     ]);
 
     if (!validation.valid) {
+      logger.warn("Missing required fields for field config creation", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Missing required fields", 400);
     }
 
@@ -38,11 +51,32 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to create field config", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
+
     // Validate group/cluster consistency
     if (group_cluster && !mutually_exclusive_group) {
+      logger.warn("Invalid group/cluster configuration", {
+        organization_id,
+        has_group_cluster: !!group_cluster,
+        has_mutually_exclusive_group: !!mutually_exclusive_group,
+      });
       return errorResponse(
         "Group cluster requires a mutually exclusive group to be set",
-        400
+        400,
       );
     }
 
@@ -84,16 +118,31 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (createError) throw createError;
+    if (createError) {
+      logger.error("Error creating field config", createError, {
+        organization_id,
+        name,
+        field_type,
+      });
+      throw createError;
+    }
+
+    logger.info("Field config created successfully", {
+      field_config_id: fieldConfig?.id,
+      organization_id,
+      name,
+      field_type,
+    });
 
     return jsonResponse({
       success: true,
       field_config: fieldConfig,
     });
   } catch (error) {
-    console.error("Create field config error:", error);
+    logger.error("Create field config error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to create field config"
+      extractErrorMessage(error, "Failed to create field config"),
+      getErrorStatusCode(error),
     );
   }
 });

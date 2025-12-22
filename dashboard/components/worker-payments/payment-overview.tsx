@@ -51,7 +51,7 @@ export default function PaymentOverview() {
       try {
         await WorkerPaymentService.savePayment(organizationId, result, jobIds);
         // Payment saved to database with batch_id
-        // TODO: Update useWorkerPaymentHistory to fetch from database instead of localStorage
+        // Payment history is now fetched from database via useWorkerPaymentHistory hook
         // For now, localStorage records won't have batch_id, but database records will
         addPayment(result, jobIds);
       } catch (error) {

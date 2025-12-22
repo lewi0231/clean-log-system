@@ -1,5 +1,13 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
   validateBusinessMode,
@@ -112,6 +120,10 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, {
+    functionName: "apply-field-config-template",
+  });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
@@ -120,22 +132,42 @@ serve(async (req) => {
     ]);
 
     if (!validation.valid) {
+      logger.warn("Missing required fields for template application", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse(
         "Organization ID and business mode are required",
-        400
+        400,
       );
     }
 
     const { organization_id, business_mode, reset_existing } = body;
 
     if (!validateBusinessMode(business_mode)) {
+      logger.warn("Invalid business_mode provided", { business_mode });
       return errorResponse(
         "Invalid business_mode. Must be 'service_based' or 'resource_tracking'",
-        400
+        400,
       );
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to apply field config template", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Check if organization already has field configs
     const { data: existingConfigs, error: checkError } = await supabase
@@ -151,7 +183,7 @@ serve(async (req) => {
     if (existingConfigs && existingConfigs.length > 0 && !reset_existing) {
       return errorResponse(
         "Organization already has field configurations. Set 'reset_existing: true' to replace existing fields with template.",
-        400
+        400,
       );
     }
 
@@ -260,15 +292,25 @@ serve(async (req) => {
 
     if (fetchError) throw fetchError;
 
+    logger.info("Field config template applied successfully", {
+      organization_id,
+      business_mode,
+      reset_existing: reset_existing || false,
+      field_config_count: createdConfigs?.length || 0,
+      updated_count: fieldsToUpdate.length,
+      inserted_count: fieldsToInsert.length,
+    });
+
     return jsonResponse({
       success: true,
       field_configs: createdConfigs,
       count: createdConfigs?.length || 0,
     });
   } catch (error) {
-    console.error("Apply template error:", error);
+    logger.error("Apply template error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to apply field config template"
+      extractErrorMessage(error, "Failed to apply field config template"),
+      getErrorStatusCode(error),
     );
   }
 });

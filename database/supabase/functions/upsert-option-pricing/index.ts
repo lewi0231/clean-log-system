@@ -1,6 +1,14 @@
 import { serve } from "server";
 import { z } from "zod";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 // Zod schema for request validation
@@ -20,13 +28,17 @@ const upsertOptionPricingSchema = z.object({
     .nullable(),
   // location_id can be a valid UUID string, null, undefined, or the string "null"
   // We normalize it before UUID validation
-  location_id: z.preprocess((val) => {
-    // Normalize: convert string "null", empty string, undefined to null
-    if (val === null || val === undefined || val === "null" || val === "") {
-      return null;
-    }
-    return val;
-  }, z.union([z.string().uuid("Location ID must be a valid UUID"), z.null()]).optional()),
+  location_id: z.preprocess(
+    (val) => {
+      // Normalize: convert string "null", empty string, undefined to null
+      if (val === null || val === undefined || val === "null" || val === "") {
+        return null;
+      }
+      return val;
+    },
+    z.union([z.string().uuid("Location ID must be a valid UUID"), z.null()])
+      .optional(),
+  ),
   currency: z.string().default("USD").optional(),
 });
 
@@ -34,7 +46,7 @@ const upsertOptionPricingSchema = z.object({
  * Normalize location_id - convert string "null", undefined, empty string to null
  */
 function normalizeLocationId(
-  locationId: string | null | undefined
+  locationId: string | null | undefined,
 ): string | null {
   if (
     locationId === null ||
@@ -51,6 +63,8 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "upsert-option-pricing" });
+
   try {
     const body = await req.json();
 
@@ -58,6 +72,9 @@ serve(async (req) => {
     const validationResult = upsertOptionPricingSchema.safeParse(body);
 
     if (!validationResult.success) {
+      logger.warn("Invalid request body for option pricing upsert", {
+        errors: validationResult.error.errors,
+      });
       const errors = validationResult.error.errors
         .map((e) => `${e.path.join(".")}: ${e.message}`)
         .join(", ");
@@ -79,6 +96,22 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to upsert option pricing", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
+
     // Verify field config exists and is select or grouped_breakdown
     const { data: fieldConfig, error: fieldConfigError } = await supabase
       .from("organization_field_configs")
@@ -97,7 +130,7 @@ serve(async (req) => {
     ) {
       return errorResponse(
         "Option pricing can only be set for select or grouped_breakdown fields",
-        400
+        400,
       );
     }
 
@@ -106,7 +139,7 @@ serve(async (req) => {
     if (!options || !options.includes(option_value)) {
       return errorResponse(
         `Option "${option_value}" not found in field config options`,
-        400
+        400,
       );
     }
 
@@ -139,8 +172,8 @@ serve(async (req) => {
       checkQuery = checkQuery.eq("location_id", location_id);
     }
 
-    const { data: existingPricing, error: checkError } =
-      await checkQuery.maybeSingle();
+    const { data: existingPricing, error: checkError } = await checkQuery
+      .maybeSingle();
 
     if (checkError && checkError.code !== "PGRST116") {
       throw checkError;
@@ -185,14 +218,23 @@ serve(async (req) => {
       optionPricing = inserted;
     }
 
+    logger.info("Option pricing upserted successfully", {
+      option_pricing_id: optionPricing?.id,
+      organization_id,
+      field_config_id,
+      option_value,
+      location_id: location_id || null,
+    });
+
     return jsonResponse({
       success: true,
       option_pricing: optionPricing,
     });
   } catch (error) {
-    console.error("Upsert option pricing error:", error);
+    logger.error("Upsert option pricing error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to upsert option pricing"
+      extractErrorMessage(error, "Failed to upsert option pricing"),
+      getErrorStatusCode(error),
     );
   }
 });

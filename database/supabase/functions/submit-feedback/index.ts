@@ -1,11 +1,39 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
+import {
+  checkRateLimit,
+  RATE_LIMIT_CONFIGS,
+  rateLimitResponse,
+} from "../_utils/rate-limit.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "submit-feedback" });
+
+  // Rate limiting for public feedback submission
+  const rateLimitResult = await checkRateLimit(req, {
+    ...RATE_LIMIT_CONFIGS.moderate,
+    identifier: undefined, // Use IP address
+  });
+
+  if (!rateLimitResult.allowed) {
+    logger.warn("Rate limit exceeded", {
+      remaining: rateLimitResult.remaining,
+      retry_after: rateLimitResult.retryAfter,
+    });
+    return rateLimitResponse(rateLimitResult);
+  }
 
   try {
     const body = await req.json();
@@ -75,7 +103,10 @@ serve(async (req: Request) => {
       .single();
 
     if (jobError || !job) {
-      console.error("Submit feedback: Job not found", jobError);
+      logger.warn("Job not found by token", {
+        has_token: !!token,
+        error: jobError,
+      });
       return errorResponse("Invalid or expired feedback link", 404);
     }
 
@@ -87,10 +118,9 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (checkError) {
-      console.error(
-        "Submit feedback: Error checking existing feedback",
-        checkError,
-      );
+      logger.error("Error checking existing feedback", checkError, {
+        job_id: job.id,
+      });
       return errorResponse("Failed to check existing feedback", 500);
     }
 
@@ -114,7 +144,9 @@ serve(async (req: Request) => {
       .single();
 
     if (insertError) {
-      console.error("Submit feedback: Error inserting feedback", insertError);
+      logger.error("Error inserting feedback", insertError, {
+        job_id: job.id,
+      });
       return errorResponse(
         insertError.message || "Failed to submit feedback",
         500,
@@ -133,9 +165,12 @@ serve(async (req: Request) => {
       },
     });
   } catch (error) {
-    console.error("Submit feedback error:", error);
-    return errorResponse(
-      error instanceof Error ? error.message : "Failed to submit feedback",
+    logger.error("Submit feedback error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to submit feedback",
     );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });

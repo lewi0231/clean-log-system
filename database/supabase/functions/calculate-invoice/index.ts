@@ -1,5 +1,13 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -128,6 +136,8 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "calculate-invoice" });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
@@ -146,6 +156,19 @@ serve(async (req) => {
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Query jobs first without location join to avoid PostgREST reverse relationship issues
     const { data: jobsRaw, error: jobsError } = await supabase
@@ -332,10 +355,13 @@ serve(async (req) => {
       calculation: aggregated,
     });
   } catch (error) {
-    console.error("Calculate invoice error:", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to calculate invoice",
+    logger.error("Calculate invoice error", error);
+    const errorMessage = extractErrorMessage(
+      error,
+      "Failed to calculate invoice",
     );
+    const statusCode = getErrorStatusCode(error);
+    return errorResponse(errorMessage, statusCode);
   }
 });
 
