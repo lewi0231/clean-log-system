@@ -17,6 +17,13 @@ type Env = z.infer<typeof envSchema>;
 let validatedEnv: Env | null = null;
 
 /**
+ * Clear the cached environment (for testing purposes)
+ */
+export function clearEnvCache(): void {
+    validatedEnv = null;
+}
+
+/**
  * Get validated environment variables
  * Throws error in development if required vars are missing
  * Returns validated env object

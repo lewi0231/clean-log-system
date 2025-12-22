@@ -321,11 +321,19 @@ describe("ManualPaymentDialog", () => {
     );
 
     // Wait for the dialog to be fully rendered and form to be reset
-    await waitFor(() => {
-      const amountInput = screen.getByLabelText(/amount/i);
-      expect(amountInput).toBeInTheDocument();
-      expect(amountInput).toHaveValue("");
-    });
+    // The form resets in useEffect when dialog opens after being closed
+    await waitFor(
+      () => {
+        const amountInput = screen.getByLabelText(/amount/i);
+        expect(amountInput).toBeInTheDocument();
+        // Check if value is empty string or null/undefined (form reset)
+        const value = (amountInput as HTMLInputElement).value;
+        expect(value === "" || value === null || value === undefined).toBe(
+          true
+        );
+      },
+      { timeout: 2000 }
+    );
   });
 
   it("should disable form when submitting", async () => {

@@ -13,6 +13,26 @@ export default defineConfig({
     globals: true,
     setupFiles: "./vitest.setup.ts",
     pool: "forks",
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      exclude: [
+        "node_modules/",
+        "**/*.test.{ts,tsx}",
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.config.{ts,js,mjs}",
+        "**/vitest.setup.ts",
+        "**/middleware.ts",
+        "**/next-env.d.ts",
+      ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 75,
+        statements: 80,
+      },
+    },
   },
   resolve: {
     alias: {

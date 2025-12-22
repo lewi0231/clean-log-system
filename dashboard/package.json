@@ -15,6 +15,8 @@
     "test:unit": "vitest --exclude **/integration/**",
     "test:integration": "vitest integration",
     "test:integration:run": "vitest run integration",
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:watch": "vitest --coverage",
     "stripe:webhook:listen": "stripe listen --forward-to http://localhost:54321/functions/v1/stripe-webhook",
     "test:integration:with-webhook": "bash scripts/test-integration-with-webhook.sh"
   },
@@ -68,6 +70,7 @@
     "@types/react-dom": "^19",
     "@types/stripe": "^8.0.417",
     "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^4.0.16",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "jsdom": "24.1.3",

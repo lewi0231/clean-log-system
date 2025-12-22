@@ -66,8 +66,12 @@ function determineInvoicesToSend(
         return false;
       }
 
-      // If invoice has locations, only include if none are covered by hierarchy
-      if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
+      // Only exclude hierarchy-covered locations if hierarchy is actually running
+      // If hierarchy is disabled, org-level should handle all invoices
+      if (
+        hierarchyShouldRun && invoice.invoice_job &&
+        Array.isArray(invoice.invoice_job)
+      ) {
         const hasHierarchyCoveredLocation = invoice.invoice_job.some(
           (ij) =>
             ij.job?.location_id &&
@@ -76,7 +80,7 @@ function determineInvoicesToSend(
         return !hasHierarchyCoveredLocation;
       }
 
-      // Invoice with no locations or no location hierarchy coverage
+      // Invoice with no locations, no location hierarchy coverage, or hierarchy not running
       return true;
     });
 

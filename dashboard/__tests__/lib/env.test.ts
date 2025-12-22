@@ -1,4 +1,9 @@
-import { getEnv, getSupabaseAnonKey, getSupabaseUrl } from "@/lib/env";
+import {
+    clearEnvCache,
+    getEnv,
+    getSupabaseAnonKey,
+    getSupabaseUrl,
+} from "@/lib/env";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Environment Variable Validation", () => {
@@ -7,6 +12,8 @@ describe("Environment Variable Validation", () => {
     beforeEach(() => {
         vi.resetModules();
         process.env = { ...originalEnv };
+        // Clear the env cache before each test
+        clearEnvCache();
     });
 
     it("should return validated environment variables when all required vars are present", () => {
@@ -20,6 +27,8 @@ describe("Environment Variable Validation", () => {
     });
 
     it("should throw error in development when required vars are missing", () => {
+        // Clear cache first
+        clearEnvCache();
         // Use Object.defineProperty to override read-only NODE_ENV for testing
         Object.defineProperty(process.env, "NODE_ENV", {
             value: "development",
@@ -35,6 +44,8 @@ describe("Environment Variable Validation", () => {
     });
 
     it("should return defaults in production when vars are missing (graceful degradation)", () => {
+        // Clear cache first
+        clearEnvCache();
         // Use Object.defineProperty to override read-only NODE_ENV for testing
         Object.defineProperty(process.env, "NODE_ENV", {
             value: "production",
@@ -51,6 +62,8 @@ describe("Environment Variable Validation", () => {
     });
 
     it("should validate URL format for Supabase URL", () => {
+        // Clear cache first
+        clearEnvCache();
         process.env.NEXT_PUBLIC_SUPABASE_URL = "not-a-valid-url";
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
 
@@ -66,6 +79,8 @@ describe("Environment Variable Validation", () => {
     });
 
     it("should return Supabase anon key via helper function", () => {
+        // Clear cache first
+        clearEnvCache();
         process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-key";
 

@@ -79,7 +79,7 @@ export class LocationHierarchyService {
 
       if (error) throw error;
 
-      if (!data || !data.success) {
+      if (!data || !data.success || !data.node) {
         throw new Error("Failed to create location hierarchy node");
       }
 
@@ -109,7 +109,7 @@ export class LocationHierarchyService {
 
       if (error) throw error;
 
-      if (!data || !data.success) {
+      if (!data || !data.success || !data.node) {
         throw new Error("Failed to update location hierarchy node");
       }
 
