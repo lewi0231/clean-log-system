@@ -69,8 +69,8 @@ export async function middleware(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
 
     // Public routes that don't require authentication
-    const publicRoutes = [
-        "/",
+    // Note: "/" is handled separately as exact match only
+    const publicRoutePrefixes = [
         "/login",
         "/signup",
         "/review",
@@ -78,9 +78,11 @@ export async function middleware(request: NextRequest) {
         "/worker/accept-invite",
     ];
 
-    const isPublicRoute = publicRoutes.some((route) =>
-        pathname.startsWith(route)
-    );
+    // Check if route is public
+    // Root route "/" is public only as exact match
+    // Other routes use prefix matching
+    const isPublicRoute = pathname === "/" ||
+        publicRoutePrefixes.some((route) => pathname.startsWith(route));
 
     // If it's a dashboard route, require authentication
     if (pathname.startsWith("/dashboard") && !isPublicRoute) {

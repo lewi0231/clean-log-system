@@ -78,7 +78,7 @@ serve(async (req) => {
     });
 
     // Fetch organization settings to check if predefined locations are required
-    console.log("🏢 Create Job: Fetching organization settings", {
+    logger.debug("Fetching organization settings", {
       organizationId,
     });
     const { data: organization, error: orgError } = await supabaseAdmin
