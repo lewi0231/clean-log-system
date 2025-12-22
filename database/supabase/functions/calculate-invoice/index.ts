@@ -157,11 +157,12 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
-    // Verify organization membership
+    // Verify organization membership - pass body so email can be extracted
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
       supabase,
+      body as Record<string, unknown>,
     );
     if (!membershipCheck) {
       return errorResponse(

@@ -45,6 +45,12 @@ function createWrapper() {
 describe("usePaymentLink", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset the mock to default behavior
+    mockUseOrganization.mockReturnValue({
+      organizationId: "org-1",
+      loading: false,
+      error: null,
+    });
   });
 
   it("should fetch existing payment link on mount", async () => {
@@ -154,7 +160,8 @@ describe("usePaymentLink", () => {
   });
 
   it("should throw error when organizationId is missing", async () => {
-    mockUseOrganization.mockReturnValueOnce({
+    // Set mock to return undefined organizationId
+    mockUseOrganization.mockReturnValue({
       organizationId: undefined as unknown as string,
       loading: false,
       error: null,
@@ -168,6 +175,7 @@ describe("usePaymentLink", () => {
       expect(result.current.loading).toBe(false);
     });
 
+    // The createPaymentLink function should throw when organizationId is undefined
     await expect(result.current.createPaymentLink("invoice-1")).rejects.toThrow(
       "Organization ID is required"
     );

@@ -15,11 +15,10 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { formatZodErrors, loginSchema } from "@/lib/validations";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function Login() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,9 +71,10 @@ export default function Login() {
       setPassword("");
 
       // Redirect to original destination or dashboard
+      // Use window.location for full page reload to ensure middleware sees the session
       const redirectTo = searchParams.get("redirect") || "/dashboard";
       log.info("Login: Login process completed, redirecting", { redirectTo });
-      router.push(redirectTo);
+      window.location.href = redirectTo;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An unexpected error occurred";

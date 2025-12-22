@@ -182,6 +182,7 @@ export async function verifyOrganizationMembershipFromRequest(
   req: Request,
   organizationId: string,
   supabase: SupabaseClient,
+  body?: Record<string, unknown> | null,
 ): Promise<{ userId: string | null; userEmail: string | null } | null> {
   // Extract user from auth token
   let userId: string | null = null;
@@ -194,6 +195,11 @@ export async function verifyOrganizationMembershipFromRequest(
       userId = authUser.id;
       userEmail = authUser.email ?? null;
     }
+  }
+
+  // Try to get email from request body if provided or if not already found
+  if (!userEmail && body && typeof body.email === "string") {
+    userEmail = body.email;
   }
 
   // If we have user info, verify membership

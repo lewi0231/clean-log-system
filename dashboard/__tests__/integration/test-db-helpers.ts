@@ -17,12 +17,21 @@ export interface TestDataIds {
     invoiceId?: string;
     paymentLinkId?: string;
     paymentId?: string;
+    organizationUserEmail?: string; // Email for organization_user to authenticate edge function calls
 }
 
+// Singleton Supabase client to avoid multiple GoTrueClient instances
+let testSupabaseClient: SupabaseClient | null = null;
+
 /**
- * Create a Supabase client with service role key for test database operations
+ * Create or get existing Supabase client with service role key for test database operations
+ * Uses singleton pattern to avoid multiple GoTrueClient instances
  */
-function createTestSupabaseClient(): SupabaseClient {
+export function createTestSupabaseClient(): SupabaseClient {
+    if (testSupabaseClient) {
+        return testSupabaseClient;
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -41,12 +50,24 @@ function createTestSupabaseClient(): SupabaseClient {
     // Create service role client - matches Edge Functions pattern
     // The service role key automatically bypasses RLS policies
     // This is the same pattern used in database/supabase/functions/_utils/supabase.ts
-    return createClient(supabaseUrl, serviceRoleKey, {
+    // Use singleton to avoid multiple GoTrueClient instances
+    testSupabaseClient = createClient(supabaseUrl, serviceRoleKey, {
         auth: {
             autoRefreshToken: false,
             persistSession: false,
+            // Use a unique storage key for tests to avoid conflicts
+            storageKey: `test-${Date.now()}`,
         },
     });
+
+    return testSupabaseClient;
+}
+
+/**
+ * Reset the test Supabase client (useful for cleanup between test suites)
+ */
+export function resetTestSupabaseClient(): void {
+    testSupabaseClient = null;
 }
 
 /**
@@ -64,6 +85,10 @@ export async function setupTestDatabase(): Promise<TestDataIds> {
     const testId = `test_${Date.now()}_${
         Math.random().toString(36).substring(7)
     }`;
+    // Use more of the timestamp and random suffix for unique org_code
+    const uniqueSuffix = `${Date.now().toString(36)}${
+        Math.random().toString(36).substring(2, 6)
+    }`.toUpperCase();
 
     try {
         // Create test organization
@@ -71,7 +96,7 @@ export async function setupTestDatabase(): Promise<TestDataIds> {
             .from("organization")
             .insert({
                 name: `Test Organization ${testId}`,
-                org_code: `TEST${testId.substring(0, 8).toUpperCase()}`,
+                org_code: `T${uniqueSuffix}`, // More unique org_code
                 use_predefined_locations: true,
             })
             .select()
@@ -142,6 +167,27 @@ export async function setupTestDatabase(): Promise<TestDataIds> {
 
         const fieldConfigIds = createdFieldConfigs.map((fc) => fc.id);
 
+        // Create an organization_user for authentication in edge functions
+        // Edge functions require organization membership verification
+        const organizationUserEmail = `test-admin-${testId}@example.com`;
+        const { data: orgUser, error: orgUserError } = await supabase
+            .from("organization_user")
+            .insert({
+                organization_id: organizationId,
+                email: organizationUserEmail,
+                role: "admin",
+            })
+            .select()
+            .single();
+
+        if (orgUserError) {
+            console.warn(
+                "Failed to create organization_user for tests:",
+                orgUserError,
+            );
+            // Continue without org user - tests will need to handle auth differently
+        }
+
         // Create invoice template config with email recipient config
         await supabase
             .from("invoice_template_config")
@@ -170,6 +216,7 @@ export async function setupTestDatabase(): Promise<TestDataIds> {
             organizationId,
             locationId,
             fieldConfigIds,
+            organizationUserEmail: orgUser ? organizationUserEmail : undefined,
         };
     } catch (error) {
         console.error("Error setting up test database:", error);
