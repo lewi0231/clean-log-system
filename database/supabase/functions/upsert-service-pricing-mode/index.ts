@@ -1,4 +1,5 @@
 import { serve } from "server";
+// Use fully qualified URL to avoid import map resolution issues
 import { z } from "zod";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import {

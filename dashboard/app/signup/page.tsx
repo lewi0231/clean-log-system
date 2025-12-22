@@ -114,8 +114,9 @@ export default function SignUp() {
       setOrganisation("");
       setErrors({});
 
-      log.info("SignUp: Signup process completed, redirecting to home");
-      router.push("/");
+      log.info("SignUp: Signup process completed, redirecting to dashboard");
+      // Use window.location for full page reload to ensure middleware sees the session
+      window.location.href = "/dashboard";
     } catch (error) {
       // Errors are already set in validateInput via setErrors
       if (error instanceof Error && error.message !== "Validation failed") {

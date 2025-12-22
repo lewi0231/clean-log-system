@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 import { getSupabaseAnonKey, getSupabaseUrl } from "./env";
 
 // Use validated environment variables
@@ -7,4 +7,6 @@ import { getSupabaseAnonKey, getSupabaseUrl } from "./env";
 const supabaseUrl = getSupabaseUrl();
 const supabaseAnonKey = getSupabaseAnonKey();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Use createBrowserClient from @supabase/ssr for proper cookie-based session handling
+// This ensures the session is stored in cookies and accessible by the middleware
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);

@@ -3,7 +3,8 @@
  * Provides reusable validation schemas for common data types
  */
 
-import { z } from "zod";
+// Use fully qualified URL to avoid import map resolution issues across function boundaries
+import { z } from "https://esm.sh/zod@3.23.8";
 
 /**
  * UUID validation schema
@@ -324,6 +325,7 @@ export const createInvoiceSchema = z.object({
   job_ids: z.array(uuidSchema).min(1, "At least one job ID is required"),
   due_date: z.string().datetime("Invalid due date format"),
   notes: z.string().optional(),
+  email: emailSchema.optional(), // Optional email for organization membership verification
 });
 
 /**

@@ -127,16 +127,18 @@ serve(async (req) => {
       job_ids: string[];
       due_date: string;
       notes?: string;
+      email?: string;
     };
     const { organization_id, job_ids, due_date, notes } = body;
 
     const supabase = createServiceRoleClient();
 
-    // Verify organization membership
+    // Verify organization membership - pass body (with email from validation) so email can be extracted
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
       supabase,
+      body as Record<string, unknown>,
     );
     if (!membershipCheck) {
       return errorResponse(
@@ -211,11 +213,13 @@ serve(async (req) => {
     }
 
     // Calculate invoice totals by calling calculate-invoice function
+    // IMPORTANT: Pass email for nested function auth (service role key doesn't carry user context)
     const { data: calculationData, error: calcError } = await supabase.functions
       .invoke("calculate-invoice", {
         body: {
           organization_id,
           job_ids,
+          email: body.email, // Pass email for membership verification in nested call
         },
       });
 

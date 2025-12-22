@@ -84,13 +84,38 @@ export async function middleware(request: NextRequest) {
     const isPublicRoute = pathname === "/" ||
         publicRoutePrefixes.some((route) => pathname.startsWith(route));
 
+    // Get session to check authentication status
+    const {
+        data: { session },
+    } = await supabase.auth.getSession();
+
+    // #region agent log - Debug middleware auth
+    console.log("[MIDDLEWARE DEBUG]", {
+        pathname,
+        hasSession: !!session,
+        sessionUserId: session?.user?.id,
+        sessionUserEmail: session?.user?.email,
+        isPublicRoute,
+        cookies: request.cookies.getAll().map((c) => c.name),
+        hypothesisId: "MIDDLEWARE",
+    });
+    // #endregion
+
+    // If user is authenticated and trying to access login/signup, redirect to dashboard
+    if (session && (pathname === "/login" || pathname === "/signup")) {
+        console.log(
+            "[MIDDLEWARE DEBUG] Redirecting authenticated user from login/signup to dashboard",
+        );
+        const redirectUrl = new URL("/dashboard", request.url);
+        return NextResponse.redirect(redirectUrl);
+    }
+
     // If it's a dashboard route, require authentication
     if (pathname.startsWith("/dashboard") && !isPublicRoute) {
-        const {
-            data: { session },
-        } = await supabase.auth.getSession();
-
         if (!session) {
+            console.log(
+                "[MIDDLEWARE DEBUG] No session for dashboard route, redirecting to login",
+            );
             // Redirect to login with return URL
             const redirectUrl = new URL("/login", request.url);
             redirectUrl.searchParams.set("redirect", pathname);
