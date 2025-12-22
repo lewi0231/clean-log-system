@@ -1,5 +1,4 @@
 import { serve } from "server";
-import type Stripe from "stripe";
 import {
   getOrganizationName,
   sendPaymentConfirmationEmail,
@@ -12,6 +11,7 @@ import {
   type JobContext,
 } from "../_utils/invoice-email.ts";
 import { createLogger } from "../_utils/logger.ts";
+import type { Stripe } from "../_utils/stripe.ts";
 import {
   createStripeClient,
   getStripeWebhookSecret,

@@ -1,9 +1,13 @@
+// deno-lint-ignore-file no-import-prefix
 /**
  * Shared Zod validation schemas for Edge Functions
  * Provides reusable validation schemas for common data types
  */
 
 // Use fully qualified URL to avoid import map resolution issues across function boundaries
+// This is necessary because _utils files are shared across functions with different deno.json configs
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - Inline dependency is intentional for cross-function compatibility
 import { z } from "https://esm.sh/zod@3.23.8";
 
 /**

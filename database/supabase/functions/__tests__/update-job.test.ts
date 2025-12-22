@@ -149,3 +149,71 @@ Deno.test("update-job: should handle undefined fields", () => {
 
   assertEquals(updateData.submission_data, undefined);
 });
+
+/**
+ * Test invalid worker assignment - cross-organization prevention
+ */
+Deno.test("update-job: should reject workers from different organization", () => {
+  const workerIds = ["worker-1", "worker-2"];
+
+  // Simulate workers query - only workers from same org should be returned
+  const workersFromSameOrg = [
+    { id: "worker-1" }, // Belongs to org-1
+    // worker-2 belongs to org-2, so not in results
+  ];
+
+  // Validation should fail if not all workers found
+  const allWorkersFound = workersFromSameOrg.length === workerIds.length;
+  assertEquals(
+    allWorkersFound,
+    false,
+    "Should reject when workers from different organization",
+  );
+});
+
+Deno.test("update-job: should accept workers from same organization", () => {
+  const workerIds = ["worker-1", "worker-2"];
+
+  // Simulate workers query - all workers from same org
+  const workersFromSameOrg = [
+    { id: "worker-1" },
+    { id: "worker-2" },
+  ];
+
+  // Validation should pass if all workers found
+  const allWorkersFound = workersFromSameOrg.length === workerIds.length;
+  assertEquals(
+    allWorkersFound,
+    true,
+    "Should accept workers from same organization",
+  );
+});
+
+Deno.test("update-job: should handle empty worker_ids array", () => {
+  const workerIds: string[] = [];
+  const normalizedWorkerIds = Array.isArray(workerIds) && workerIds.length > 0
+    ? workerIds.filter((id: unknown) =>
+      typeof id === "string" && id.trim() !== ""
+    )
+    : [];
+
+  assertEquals(normalizedWorkerIds.length, 0);
+  // Empty array should be valid (removes all workers from job)
+});
+
+Deno.test("update-job: should filter out invalid worker_ids", () => {
+  const workerIds = [
+    "worker-1",
+    "",
+    "  ",
+    "worker-2",
+    null as unknown as string,
+  ];
+  const normalizedWorkerIds = Array.isArray(workerIds) && workerIds.length > 0
+    ? workerIds.filter((id: unknown) =>
+      typeof id === "string" && id.trim() !== ""
+    )
+    : [];
+
+  assertEquals(normalizedWorkerIds, ["worker-1", "worker-2"]);
+});

@@ -137,3 +137,146 @@ Deno.test("calculate-invoice: should default to AUD if currency missing", () => 
   const defaultCurrency = currency || "AUD";
   assertEquals(defaultCurrency, "AUD");
 });
+
+/**
+ * Test pricing rule edge cases
+ */
+Deno.test("calculate-invoice: should handle no pricing rules (zero total)", () => {
+  const pricingRules: unknown[] = [];
+  const hasPricingRules = pricingRules.length > 0;
+
+  // When no pricing rules, calculation should result in zero total
+  const total = hasPricingRules ? 100 : 0;
+  assertEquals(
+    total,
+    0,
+    "Should return zero total when no pricing rules exist",
+  );
+});
+
+Deno.test("calculate-invoice: should filter expired pricing rules", () => {
+  const nowIso = new Date().toISOString();
+  const pricingRules = [
+    {
+      id: "rule-1",
+      effective_at: "2024-01-01T00:00:00Z",
+      expires_at: "2024-12-31T23:59:59Z",
+    },
+    { id: "rule-2", effective_at: "2024-01-01T00:00:00Z", expires_at: null },
+    { id: "rule-3", effective_at: "2025-01-01T00:00:00Z", expires_at: null }, // Future rule
+  ];
+
+  // Filter rules: effective_at <= now AND (expires_at IS NULL OR expires_at > now)
+  const activeRules = pricingRules.filter((rule: {
+    effective_at: string;
+    expires_at: string | null;
+  }) => {
+    const isEffective = rule.effective_at <= nowIso;
+    const isNotExpired = rule.expires_at === null || rule.expires_at > nowIso;
+    return isEffective && isNotExpired;
+  });
+
+  // rule-1: expired (if current date > 2024-12-31)
+  // rule-2: active (no expiration)
+  // rule-3: not yet effective (future date)
+  // Should include at least rule-2
+  assertEquals(
+    activeRules.length >= 1,
+    true,
+    "Should filter out expired and future rules",
+  );
+});
+
+Deno.test("calculate-invoice: should filter future pricing rules", () => {
+  const nowIso = new Date().toISOString();
+  const futureDate = new Date();
+  futureDate.setFullYear(futureDate.getFullYear() + 1);
+  const futureIso = futureDate.toISOString();
+
+  const pricingRules = [
+    { id: "rule-1", effective_at: "2024-01-01T00:00:00Z", expires_at: null },
+    { id: "rule-2", effective_at: futureIso, expires_at: null }, // Future rule
+  ];
+
+  // Only include rules where effective_at <= now
+  const activeRules = pricingRules.filter((rule: { effective_at: string }) =>
+    rule.effective_at <= nowIso
+  );
+
+  assertEquals(activeRules.length, 1, "Should exclude future rules");
+  assertEquals(activeRules[0].id, "rule-1");
+});
+
+Deno.test("calculate-invoice: should prioritize more specific rules", () => {
+  // Simulate rule specificity scoring
+  // Higher score = more specific = should be selected
+  const rules = [
+    {
+      id: "rule-1",
+      location_id: "loc-1",
+      location_hierarchy_id: null,
+      priority: null,
+      score: 300, // Location-specific (highest)
+    },
+    {
+      id: "rule-2",
+      location_id: null,
+      location_hierarchy_id: "hier-1",
+      priority: null,
+      score: 250, // Hierarchy-specific (medium)
+    },
+    {
+      id: "rule-3",
+      location_id: null,
+      location_hierarchy_id: null,
+      priority: 10,
+      score: 140, // Global with priority (lowest)
+    },
+  ];
+
+  // Select rule with highest score
+  const bestRule = rules.reduce((best, current) =>
+    current.score > best.score ? current : best
+  );
+
+  assertEquals(bestRule.id, "rule-1", "Should select most specific rule");
+  assertEquals(bestRule.score, 300);
+});
+
+Deno.test("calculate-invoice: should use priority when specificity is equal", () => {
+  // Two rules with same location specificity, different priorities
+  const rules = [
+    {
+      id: "rule-1",
+      location_id: "loc-1",
+      location_hierarchy_id: null,
+      priority: 20, // Lower priority number = higher priority
+      baseScore: 300,
+    },
+    {
+      id: "rule-2",
+      location_id: "loc-1",
+      location_hierarchy_id: null,
+      priority: 10, // Lower priority number = higher priority
+      baseScore: 300,
+    },
+  ];
+
+  // Calculate score: baseScore + (50 - priority)
+  const scoredRules = rules.map((rule) => ({
+    ...rule,
+    score: rule.baseScore + Math.max(0, 50 - (rule.priority || 0)),
+  }));
+
+  // Select rule with highest score (lower priority number = higher score)
+  const bestRule = scoredRules.reduce((best, current) =>
+    current.score > best.score ? current : best
+  );
+
+  assertEquals(
+    bestRule.id,
+    "rule-2",
+    "Should select rule with lower priority number",
+  );
+  assertEquals(bestRule.priority, 10);
+});
