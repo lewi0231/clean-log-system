@@ -54,7 +54,8 @@ serve(async (req) => {
       .single();
 
     if (existingError || !existingLocation) {
-      logger.warn("Location not found for update", existingError, {
+      logger.warn("Location not found for update", {
+        error: existingError,
         location_id: id,
       });
       return errorResponse("Location not found", 404);

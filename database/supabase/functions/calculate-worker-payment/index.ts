@@ -1,5 +1,13 @@
 import { serve } from "server";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -122,6 +130,10 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, {
+    functionName: "calculate-worker-payment",
+  });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
@@ -130,16 +142,41 @@ serve(async (req) => {
     ]);
 
     if (!validation.valid) {
+      logger.warn("Missing required fields for worker payment calculation", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Organization ID and job IDs are required", 400);
     }
 
     const { organization_id, job_ids } = body;
 
     if (!Array.isArray(job_ids) || job_ids.length === 0) {
+      logger.warn("Invalid job_ids array for worker payment calculation", {
+        organization_id,
+        job_ids_type: typeof job_ids,
+        is_array: Array.isArray(job_ids),
+        length: Array.isArray(job_ids) ? job_ids.length : 0,
+      });
       return errorResponse("job_ids must be a non-empty array", 400);
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to calculate worker payment", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     const { data: jobsRaw, error: jobsError } = await supabase
       .from("job")
@@ -296,14 +333,22 @@ serve(async (req) => {
       job_calculations: calculations,
     };
 
+    logger.info("Worker payment calculated successfully", {
+      organization_id,
+      job_count: job_ids.length,
+      calculation_count: calculations.length,
+      total_worker_payment: aggregated.total_worker_payment,
+    });
+
     return jsonResponse({
       success: true,
       calculation: aggregated,
     });
   } catch (error) {
-    console.error("Calculate worker payment error:", error);
+    logger.error("Calculate worker payment error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to calculate worker payment",
+      extractErrorMessage(error, "Failed to calculate worker payment"),
+      getErrorStatusCode(error),
     );
   }
 });

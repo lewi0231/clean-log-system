@@ -42,7 +42,8 @@ serve(async (req) => {
       .single();
 
     if (fetchError || !userToDelete) {
-      logger.warn("Organization user not found for deletion", fetchError, {
+      logger.warn("Organization user not found for deletion", {
+        error: fetchError,
         organization_user_id: id,
       });
       return errorResponse("Organization user not found", 404);

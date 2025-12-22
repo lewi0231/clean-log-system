@@ -1,10 +1,18 @@
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import {
   getOrganizationName,
   sendWorkerInvitationEmail,
 } from "../_utils/email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -15,6 +23,10 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, {
+    functionName: "resend-worker-invitation",
+  });
+
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
@@ -23,12 +35,32 @@ serve(async (req) => {
     ]);
 
     if (!validation.valid) {
+      logger.warn("Missing required fields for worker invitation resend", {
+        missingFields: validation.missingFields,
+      });
       return errorResponse("Worker ID and Organization ID are required", 400);
     }
 
     const { worker_id, organization_id } = body;
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to resend worker invitation", {
+        organization_id,
+        worker_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Fetch worker details
     const { data: worker, error: workerError } = await supabase
@@ -56,7 +88,10 @@ serve(async (req) => {
       .maybeSingle();
 
     if (inviteCheckError) {
-      console.error("Error checking existing invitation:", inviteCheckError);
+      logger.error("Error checking existing invitation", inviteCheckError, {
+        worker_id,
+        organization_id,
+      });
     }
 
     let invitationToken: string;
@@ -118,12 +153,24 @@ serve(async (req) => {
         organizationName: orgName,
         invitationToken,
       },
-      true // throw on error
+      true, // throw on error
     );
 
     if (!emailResult.success) {
       throw new Error(emailResult.error || "Failed to send invitation email");
     }
+
+    logger.info("Worker invitation resent successfully", {
+      worker_id,
+      organization_id,
+      invitation_token: invitationToken,
+      expires_at: expiresAt.toISOString(),
+      reused_existing: !!(
+        existingInvitation &&
+        !existingInvitation.accepted_at &&
+        new Date(existingInvitation.expires_at) > new Date()
+      ),
+    });
 
     return jsonResponse({
       success: true,
@@ -134,9 +181,10 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Resend worker invitation error:", error);
+    logger.error("Resend worker invitation error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to resend invitation"
+      extractErrorMessage(error, "Failed to resend invitation"),
+      getErrorStatusCode(error),
     );
   }
 });

@@ -54,7 +54,8 @@ serve(async (req) => {
       .single();
 
     if (fetchError || !existingFieldConfig) {
-      logger.warn("Field config not found for update", fetchError, {
+      logger.warn("Field config not found for update", {
+        error: fetchError,
         field_config_id: id,
       });
       return errorResponse("Field config not found", 404);

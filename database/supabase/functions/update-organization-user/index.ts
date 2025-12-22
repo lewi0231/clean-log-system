@@ -60,7 +60,8 @@ serve(async (req) => {
       .single();
 
     if (fetchError || !existingUser) {
-      logger.warn("Organization user not found for update", fetchError, {
+      logger.warn("Organization user not found for update", {
+        error: fetchError,
         organization_user_id: id,
       });
       return errorResponse("Organization user not found", 404);

@@ -6,19 +6,22 @@ import {
   getFeedbackEmailRecipient,
   sendFeedbackRequestEmail,
 } from "../_utils/feedback-email.ts";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
 import type {
   InvoiceEmailRecipientConfig,
   JobContext,
 } from "../_utils/invoice-email.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
-  console.log("📥 Create Job: Request received", {
-    method: req.method,
-    url: req.url,
-    hasAuthHeader: !!req.headers.get("authorization"),
-  });
+  const logger = createLogger(req, { functionName: "create-job" });
 
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -27,13 +30,8 @@ serve(async (req) => {
     // Get auth token from headers
     const token = extractAuthToken(req);
 
-    console.log("🔐 Create Job: Authentication check", {
-      hasToken: !!token,
-      tokenLength: token?.length || 0,
-    });
-
     if (!token) {
-      console.error("❌ Create Job: No authentication token provided");
+      logger.warn("No authentication token provided for job creation");
       return errorResponse("Authentication required", 401);
     }
 
@@ -43,20 +41,17 @@ serve(async (req) => {
     const authUser = await getAuthUser(token);
 
     if (!authUser) {
-      console.error("❌ Create Job: User not found after token verification");
+      logger.warn("User not found after token verification");
       return errorResponse("User not found", 401);
     }
 
     const authUserId = authUser.id;
-    console.log("✅ Create Job: Token verified", {
+    logger.debug("Token verified for job creation", {
       userId: authUserId,
       email: authUser.email,
     });
 
     // Get organization_id from worker table
-    console.log("👷 Create Job: Fetching worker by auth_user_id", {
-      authUserId,
-    });
     const { data: worker, error: workerError } = await supabaseAdmin
       .from("worker")
       .select("organization_id")
@@ -64,23 +59,21 @@ serve(async (req) => {
       .maybeSingle();
 
     if (workerError) {
-      console.error("❌ Create Job: Error fetching worker", {
-        error: workerError.message,
-        code: workerError.code,
-        details: workerError.details,
+      logger.error("Error fetching worker", workerError, {
+        authUserId,
       });
       throw workerError;
     }
 
     if (!worker) {
-      console.error("❌ Create Job: Worker not found", {
+      logger.warn("Worker not found", {
         authUserId,
       });
       return errorResponse("Worker not found", 404);
     }
 
     const organizationId = worker.organization_id;
-    console.log("✅ Create Job: Worker found", {
+    logger.debug("Worker found for job creation", {
       organizationId,
     });
 
@@ -95,26 +88,23 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      console.error("❌ Create Job: Error fetching organization settings", {
-        error: orgError.message,
-        code: orgError.code,
-        details: orgError.details,
+      logger.error("Error fetching organization settings", orgError, {
+        organizationId,
       });
       throw orgError;
     }
 
     const usePredefinedLocations = organization?.use_predefined_locations ??
       true;
-    console.log("✅ Create Job: Organization settings fetched", {
+    logger.debug("Organization settings fetched", {
       usePredefinedLocations,
     });
 
     // Parse request body
-    console.log("📦 Create Job: Parsing request body");
     let body;
     try {
       body = await req.json();
-      console.log("📦 Create Job: Request body parsed", {
+      logger.debug("Request body parsed for job creation", {
         hasSubmissionData: !!body.submissionData,
         submissionDataKeys: body.submissionData
           ? Object.keys(body.submissionData)
@@ -126,18 +116,14 @@ serve(async (req) => {
         hasLocationId: !!body.submissionData?.location_id,
       });
     } catch (parseError) {
-      console.error("❌ Create Job: Failed to parse request body", {
-        error: parseError instanceof Error
-          ? parseError.message
-          : String(parseError),
-      });
+      logger.error("Failed to parse request body", parseError);
       return errorResponse("Invalid request body", 400);
     }
 
     const { submissionData } = body;
 
     if (!submissionData || typeof submissionData !== "object") {
-      console.error("❌ Create Job: Invalid submissionData", {
+      logger.warn("Invalid submissionData for job creation", {
         hasSubmissionData: !!submissionData,
         type: typeof submissionData,
       });
@@ -148,9 +134,8 @@ serve(async (req) => {
     const colleagueIds: string[] | undefined = submissionData.colleague_ids;
     const locationId: string | undefined = submissionData.location_id;
 
-    console.log("📋 Create Job: Extracted data", {
+    logger.debug("Extracted data from submission", {
       colleagueIdsCount: Array.isArray(colleagueIds) ? colleagueIds.length : 0,
-      colleagueIds,
       locationId,
       fieldCount: Object.keys(submissionData).length,
     });
@@ -166,7 +151,7 @@ serve(async (req) => {
       ? fieldData
       : null;
 
-    console.log("📋 Create Job: Processed submission data", {
+    logger.debug("Processed submission data", {
       submissionDataKeys: Object.keys(fieldData),
       submissionDataJsonbSize: submissionDataJsonb
         ? JSON.stringify(submissionDataJsonb).length
@@ -178,7 +163,7 @@ serve(async (req) => {
       ? locationId
       : null;
 
-    console.log("📍 Create Job: Location normalization", {
+    logger.debug("Location normalization", {
       originalLocationId: locationId,
       normalizedLocationId,
       usePredefinedLocations,
@@ -186,7 +171,7 @@ serve(async (req) => {
 
     // Check if location_id is required based on organization settings
     if (usePredefinedLocations && !normalizedLocationId) {
-      console.error("❌ Create Job: Location ID is required", {
+      logger.warn("Location ID is required but not provided", {
         usePredefinedLocations,
         hasLocationId: !!normalizedLocationId,
       });
@@ -198,7 +183,7 @@ serve(async (req) => {
 
     // Validate location_id if provided (or required)
     if (normalizedLocationId) {
-      console.log("📍 Create Job: Validating location", {
+      logger.debug("Validating location", {
         locationId: normalizedLocationId,
         organizationId,
       });
@@ -210,16 +195,15 @@ serve(async (req) => {
         .maybeSingle();
 
       if (locationError) {
-        console.error("❌ Create Job: Error validating location", {
-          error: locationError.message,
-          code: locationError.code,
-          details: locationError.details,
+        logger.error("Error validating location", locationError, {
+          locationId: normalizedLocationId,
+          organizationId,
         });
         throw locationError;
       }
 
       if (!location) {
-        console.error("❌ Create Job: Location not found", {
+        logger.warn("Location not found", {
           locationId: normalizedLocationId,
           organizationId,
         });
@@ -228,7 +212,7 @@ serve(async (req) => {
           400,
         );
       }
-      console.log("✅ Create Job: Location validated", {
+      logger.debug("Location validated", {
         locationId: location.id,
       });
     }
@@ -239,7 +223,7 @@ serve(async (req) => {
       Array.isArray(colleagueIds) &&
       colleagueIds.length > 0
     ) {
-      console.log("👥 Create Job: Validating colleagues", {
+      logger.debug("Validating colleagues", {
         colleagueIds,
         organizationId,
       });
@@ -250,17 +234,16 @@ serve(async (req) => {
         .in("id", colleagueIds);
 
       if (colleaguesError) {
-        console.error("❌ Create Job: Error validating colleagues", {
-          error: colleaguesError.message,
-          code: colleaguesError.code,
-          details: colleaguesError.details,
+        logger.error("Error validating colleagues", colleaguesError, {
+          colleagueIds,
+          organizationId,
         });
         throw colleaguesError;
       }
 
       // Check if all colleague_ids were found and belong to the organization
       if (!colleagues || colleagues.length !== colleagueIds.length) {
-        console.error("❌ Create Job: Not all colleagues found", {
+        logger.warn("Not all colleagues found", {
           requestedCount: colleagueIds.length,
           foundCount: colleagues?.length || 0,
           requestedIds: colleagueIds,
@@ -271,7 +254,7 @@ serve(async (req) => {
           400,
         );
       }
-      console.log("✅ Create Job: All colleagues validated", {
+      logger.debug("All colleagues validated", {
         count: colleagues.length,
       });
     }
@@ -283,7 +266,7 @@ serve(async (req) => {
       submission_data: submissionDataJsonb,
       completed_at: new Date().toISOString(),
     };
-    console.log("💾 Create Job: Inserting job", {
+    logger.debug("Inserting job", {
       organizationId,
       locationId: normalizedLocationId,
       hasSubmissionData: !!submissionDataJsonb,
@@ -297,16 +280,14 @@ serve(async (req) => {
       .single();
 
     if (jobError) {
-      console.error("❌ Create Job: Error creating job", {
-        error: jobError.message,
-        code: jobError.code,
-        details: jobError.details,
-        hint: jobError.hint,
+      logger.error("Error creating job", jobError, {
+        organizationId,
+        locationId: normalizedLocationId,
       });
       throw jobError;
     }
 
-    console.log("✅ Create Job: Job created successfully", {
+    logger.info("Job created successfully", {
       jobId: job.id,
       organizationId: job.organization_id,
     });
@@ -322,10 +303,9 @@ serve(async (req) => {
         worker_id: workerId,
       }));
 
-      console.log("👥 Create Job: Creating job_worker entries", {
+      logger.debug("Creating job_worker entries", {
         jobId: job.id,
         entriesCount: jobWorkerEntries.length,
-        entries: jobWorkerEntries,
       });
 
       const { error: jobWorkerError } = await supabaseAdmin
@@ -333,20 +313,22 @@ serve(async (req) => {
         .insert(jobWorkerEntries);
 
       if (jobWorkerError) {
-        console.error("❌ Create Job: Error creating job_worker entries", {
-          error: jobWorkerError.message,
-          code: jobWorkerError.code,
-          details: jobWorkerError.details,
-          hint: jobWorkerError.hint,
+        logger.error("Error creating job_worker entries", jobWorkerError, {
+          jobId: job.id,
+          organizationId,
+          entriesCount: jobWorkerEntries.length,
         });
         throw jobWorkerError;
       }
-      console.log("✅ Create Job: Job_worker entries created successfully");
+      logger.debug("Job_worker entries created successfully", {
+        jobId: job.id,
+        count: jobWorkerEntries.length,
+      });
     }
 
     // Handle feedback email sending if enabled
     try {
-      console.log("📧 Create Job: Checking feedback email settings", {
+      logger.debug("Checking feedback email settings", {
         organizationId,
       });
 
@@ -358,19 +340,17 @@ serve(async (req) => {
         .single();
 
       if (orgSettingsError) {
-        console.error(
-          "❌ Create Job: Error fetching organization settings for feedback email",
-          {
-            error: orgSettingsError.message,
-          },
-        );
+        logger.warn("Error fetching organization settings for feedback email", {
+          error: orgSettingsError,
+          organizationId,
+        });
         // Don't fail job creation if we can't check settings
       } else if (orgSettings?.feedback_email_send_immediately) {
-        console.log("📧 Create Job: Feedback email sending is enabled");
+        logger.debug("Feedback email sending is enabled");
 
         // Generate feedback token
         const feedbackToken = generateFeedbackToken();
-        console.log("🔑 Create Job: Generated feedback token", {
+        logger.debug("Generated feedback token", {
           tokenLength: feedbackToken.length,
         });
 
@@ -424,10 +404,11 @@ serve(async (req) => {
             .single();
 
         if (jobLocationError || !jobWithLocation) {
-          console.error(
-            "❌ Create Job: Error fetching job with location for feedback email",
+          logger.error(
+            "Error fetching job with location for feedback email",
+            jobLocationError,
             {
-              error: jobLocationError?.message,
+              jobId: job.id,
             },
           );
           // Still update job with token for manual sending later
@@ -469,8 +450,9 @@ serve(async (req) => {
           );
 
           if (recipientEmail) {
-            console.log("📧 Create Job: Found feedback email recipient", {
+            logger.debug("Found feedback email recipient", {
               email: recipientEmail,
+              jobId: job.id,
             });
 
             // Get recipient name (from location contact_person or default)
@@ -495,8 +477,10 @@ serve(async (req) => {
             );
 
             if (emailResult.success) {
-              console.log("✅ Create Job: Feedback email sent successfully", {
+              logger.info("Feedback email sent successfully", {
                 emailId: emailResult.emailId,
+                jobId: job.id,
+                recipientEmail,
               });
 
               // Update job with token and email tracking
@@ -510,21 +494,17 @@ serve(async (req) => {
                 .eq("id", job.id);
 
               if (updateError) {
-                console.error(
-                  "❌ Create Job: Error updating job with feedback email tracking",
-                  {
-                    error: updateError.message,
-                  },
-                );
+                logger.warn("Error updating job with feedback email tracking", {
+                  error: updateError,
+                  jobId: job.id,
+                });
                 // Job was created and email was sent, so this is non-critical
               }
             } else {
-              console.error(
-                "❌ Create Job: Failed to send feedback email",
-                {
-                  error: emailResult.error,
-                },
-              );
+              logger.error("Failed to send feedback email", emailResult.error, {
+                jobId: job.id,
+                recipientEmail,
+              });
               // Still update job with token for manual sending later
               await supabaseAdmin
                 .from("job")
@@ -532,13 +512,10 @@ serve(async (req) => {
                 .eq("id", job.id);
             }
           } else {
-            console.warn(
-              "⚠️ Create Job: No feedback email recipient found for job",
-              {
-                jobId: job.id,
-                locationId: jobWithLocation.location_id,
-              },
-            );
+            logger.warn("No feedback email recipient found for job", {
+              jobId: job.id,
+              locationId: jobWithLocation.location_id,
+            });
             // Still update job with token for manual sending later
             await supabaseAdmin
               .from("job")
@@ -547,23 +524,21 @@ serve(async (req) => {
           }
         }
       } else {
-        console.log("📧 Create Job: Feedback email sending is disabled");
+        logger.debug("Feedback email sending is disabled", {
+          organizationId,
+        });
       }
     } catch (feedbackError) {
       // Log error but don't fail job creation
-      console.error(
-        "❌ Create Job: Error in feedback email sending process",
-        {
-          error: feedbackError instanceof Error
-            ? feedbackError.message
-            : String(feedbackError),
-        },
-      );
+      logger.error("Error in feedback email sending process", feedbackError, {
+        jobId: job.id,
+        organizationId,
+      });
     }
 
-    console.log("✅ Create Job: Request completed successfully", {
+    logger.info("Job creation completed successfully", {
       jobId: job.id,
-      status: 201,
+      organizationId,
     });
 
     return jsonResponse(
@@ -580,51 +555,11 @@ serve(async (req) => {
       201,
     );
   } catch (error) {
-    const errorLog: Record<string, unknown> = {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      name: error instanceof Error ? error.name : typeof error,
-    };
+    logger.error("Create job error", error);
 
-    // Log additional properties if available
-    if (error instanceof Error) {
-      if ("code" in error) {
-        errorLog.code = (error as { code?: unknown }).code;
-      }
-      if ("details" in error) {
-        errorLog.details = (error as { details?: unknown }).details;
-      }
-    }
-
-    console.error("❌ Create Job: Unhandled error", errorLog);
-
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Failed to create job";
-
-    // Determine appropriate status code
-    let statusCode = 500;
-    if (error instanceof Error) {
-      if (
-        error.message.includes("Authentication") ||
-        error.message.includes("User not found")
-      ) {
-        statusCode = 401;
-      } else if (error.message.includes("not found")) {
-        statusCode = 404;
-      } else if (
-        error.message.includes("required") ||
-        error.message.includes("invalid")
-      ) {
-        statusCode = 400;
-      }
-    }
-
-    console.error("❌ Create Job: Returning error response", {
-      statusCode,
-      errorMessage,
-    });
-
-    return errorResponse(errorMessage, statusCode);
+    return errorResponse(
+      extractErrorMessage(error, "Failed to create job"),
+      getErrorStatusCode(error),
+    );
   }
 });

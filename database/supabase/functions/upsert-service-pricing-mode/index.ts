@@ -1,6 +1,14 @@
 import { serve } from "server";
 import { z } from "zod";
-import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  errorResponse,
+  extractErrorMessage,
+  getErrorStatusCode,
+  handleCors,
+  jsonResponse,
+} from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 // Zod schema for request validation
@@ -62,6 +70,10 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, {
+    functionName: "upsert-service-pricing-mode",
+  });
+
   try {
     const body = await req.json();
 
@@ -69,6 +81,9 @@ serve(async (req) => {
     const validationResult = upsertServicePricingModeSchema.safeParse(body);
 
     if (!validationResult.success) {
+      logger.warn("Invalid request body for service pricing mode upsert", {
+        errors: validationResult.error.errors,
+      });
       const errors = validationResult.error.errors
         .map((e) => `${e.path.join(".")}: ${e.message}`)
         .join(", ");
@@ -111,6 +126,22 @@ serve(async (req) => {
     }
 
     const supabase = createServiceRoleClient();
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      organization_id,
+      supabase,
+    );
+    if (!membershipCheck) {
+      logger.warn("Unauthorized attempt to upsert service pricing mode", {
+        organization_id,
+      });
+      return errorResponse(
+        "You do not have permission to access this organization",
+        403,
+      );
+    }
 
     // Verify field config exists and is select type
     const { data: fieldConfig, error: fieldConfigError } = await supabase
@@ -220,14 +251,24 @@ serve(async (req) => {
       servicePricingMode = inserted;
     }
 
+    logger.info("Service pricing mode upserted successfully", {
+      service_pricing_mode_id: servicePricingMode?.id,
+      organization_id,
+      service_type_field_config_id,
+      service_type_value,
+      pricing_mode,
+      location_id: location_id || null,
+    });
+
     return jsonResponse({
       success: true,
       service_pricing_mode: servicePricingMode,
     });
   } catch (error) {
-    console.error("Upsert service pricing mode error:", error);
+    logger.error("Upsert service pricing mode error", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to upsert service pricing mode",
+      extractErrorMessage(error, "Failed to upsert service pricing mode"),
+      getErrorStatusCode(error),
     );
   }
 });
