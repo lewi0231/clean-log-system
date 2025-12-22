@@ -120,7 +120,7 @@ function TreeNode({
         {hasChildren ? (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-0.5 hover:bg-muted rounded"
+            className="p-0.5 hover:bg-muted rounded cursor-pointer"
           >
             {expanded ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -145,7 +145,7 @@ function TreeNode({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 cursor-pointer"
               onClick={() => onAddChild(node.id, node.type as NodeType)}
               title="Add child"
             >
@@ -155,7 +155,7 @@ function TreeNode({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7"
+            className="h-7 w-7 cursor-pointer"
             onClick={() => onEdit(node)}
             title="Edit"
           >
@@ -164,7 +164,7 @@ function TreeNode({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive"
+            className="h-7 w-7 text-destructive hover:text-destructive cursor-pointer"
             onClick={() => onDelete(node)}
             title="Delete"
           >
@@ -400,7 +400,10 @@ export default function LocationHierarchyManager() {
                 pricing rules.
               </CardDescription>
             </div>
-            <Button onClick={() => handleOpenCreate()}>
+            <Button
+              onClick={() => handleOpenCreate()}
+              className="cursor-pointer"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add Node
             </Button>
@@ -420,7 +423,11 @@ export default function LocationHierarchyManager() {
                 No location hierarchy defined yet. Create your first node to get
                 started.
               </p>
-              <Button variant="outline" onClick={() => handleOpenCreate()}>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenCreate()}
+                className="cursor-pointer"
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Create Company
               </Button>
@@ -441,7 +448,7 @@ export default function LocationHierarchyManager() {
           )}
 
           <Collapsible className="mt-4">
-            <CollapsibleTrigger className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+            <CollapsibleTrigger className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer">
               <ChevronRight className="h-4 w-4" />
               How does location hierarchy work?
             </CollapsibleTrigger>
@@ -583,6 +590,7 @@ export default function LocationHierarchyManager() {
                       autoSend: { ...prev.autoSend, enabled: checked },
                     }))
                   }
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
                 />
               </div>
 
@@ -702,6 +710,7 @@ export default function LocationHierarchyManager() {
               variant="outline"
               onClick={() => setDialogOpen(false)}
               disabled={saving}
+              className="cursor-pointer"
             >
               Cancel
             </Button>
@@ -712,6 +721,7 @@ export default function LocationHierarchyManager() {
                 !formData.name.trim() ||
                 (formData.type !== "company" && !formData.parent_id)
               }
+              className="cursor-pointer"
             >
               {saving ? "Saving..." : editingNode ? "Save Changes" : "Create"}
             </Button>
@@ -734,6 +744,7 @@ export default function LocationHierarchyManager() {
               variant="outline"
               onClick={() => setDeleteDialogOpen(false)}
               disabled={deleting}
+              className="cursor-pointer"
             >
               Cancel
             </Button>
@@ -741,6 +752,7 @@ export default function LocationHierarchyManager() {
               variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
+              className="cursor-pointer"
             >
               {deleting ? "Deleting..." : "Delete"}
             </Button>

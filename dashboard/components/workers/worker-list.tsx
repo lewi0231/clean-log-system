@@ -19,6 +19,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { log } from "@/lib/logger";
 import { Worker } from "@/lib/types";
 import { Mail, Pencil, Trash2 } from "lucide-react";
@@ -32,7 +38,13 @@ interface WorkerListProps {
   onDeleteWorker: (workerId: string) => Promise<void>;
   onUpdateWorker: (
     workerId: string,
-    workerData: { name: string; email: string; phone: string; active?: boolean }
+    workerData: {
+      first_name: string;
+      last_name: string;
+      email: string;
+      phone: string;
+      active?: boolean;
+    }
   ) => Promise<void>;
   onResendInvitation?: (workerId: string) => Promise<void>;
   organizationId?: string | null;
@@ -91,7 +103,8 @@ export default function WorkerList({
 
   const handleFormSuccess = async (
     workerData: {
-      name: string;
+      first_name: string;
+      last_name: string;
       email: string;
       phone: string;
       active?: boolean;
@@ -121,10 +134,10 @@ export default function WorkerList({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Status</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -139,52 +152,88 @@ export default function WorkerList({
             ) : (
               workers.map((worker) => (
                 <TableRow key={worker.id}>
-                  <TableCell className="font-medium">{worker.name}</TableCell>
+                  <TableCell>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium cursor-default ${
+                              worker.active
+                                ? "bg-success/10 text-success"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {worker.active ? "Active" : "Inactive"}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {worker.active
+                            ? "This user is able to submit new jobs"
+                            : "An email has been sent to complete the signup process"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {worker.first_name && worker.last_name
+                      ? `${worker.first_name} ${worker.last_name}`
+                      : worker.name || "N/A"}
+                  </TableCell>
                   <TableCell>{worker.email || "-"}</TableCell>
                   <TableCell>{worker.phone || "-"}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        worker.active
-                          ? "bg-success/10 text-success"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {worker.active ? "Active" : "Inactive"}
-                    </span>
-                  </TableCell>
                   <TableCell>
                     {new Date(worker.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {!worker.active &&
-                        !worker.auth_user_id &&
-                        onResendInvitation && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setResendingWorker(worker)}
-                            title="Resend invitation email"
-                          >
-                            <Mail className="h-4 w-4 cursor-pointer" />
-                          </Button>
-                        )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(worker)}
-                      >
-                        <Pencil className="h-4 w-4 cursor-pointer" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeletingWorker(worker)}
-                      >
-                        <Trash2 className="cursor-pointer h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                    <TooltipProvider>
+                      <div className="flex justify-end gap-2">
+                        {!worker.active &&
+                          !worker.auth_user_id &&
+                          onResendInvitation && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setResendingWorker(worker)}
+                                  className="cursor-pointer"
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Resend invitation email
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(worker)}
+                              className="cursor-pointer"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit worker</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingWorker(worker)}
+                              className="cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete worker</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
                   </TableCell>
                 </TableRow>
               ))

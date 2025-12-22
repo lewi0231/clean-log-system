@@ -12,6 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { ErrorState } from "@/components/ui/error-state";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,13 +25,19 @@ import {
 } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Smartphone } from "lucide-react";
+import { ChevronDown, ChevronRight, Info, Plus, Settings } from "lucide-react";
 import { useState } from "react";
 
 export default function LocationsPage() {
@@ -46,6 +57,7 @@ export default function LocationsPage() {
   const { settings, loading: settingsLoading } = useOrganizationSettings();
   const queryClient = useQueryClient();
   const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
+  const [locationSettingsOpen, setLocationSettingsOpen] = useState(false);
 
   const handleTogglePredefinedLocations = async (checked: boolean) => {
     if (!organizationId) return;
@@ -163,60 +175,89 @@ export default function LocationsPage() {
         </TabsList>
 
         <TabsContent value="locations" className="space-y-6">
-          {/* Mobile App Integration Settings */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Smartphone className="h-4 w-4 text-muted-foreground" />
-                <CardTitle>Mobile App Integration</CardTitle>
-              </div>
-              <CardDescription>
-                Control how locations appear in the mobile app for workers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5 flex-1">
-                  <Label
-                    htmlFor="predefined-locations"
-                    className="text-sm font-medium leading-none"
-                  >
-                    Use Predefined Locations
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    When enabled, your predefined locations will appear as
-                    select options in the mobile app. Workers can choose from
-                    your locations when completing jobs. You can still configure
-                    custom fields in Mobile Application regardless of this
-                    setting.
-                  </p>
-                </div>
-                <Switch
-                  id="predefined-locations"
-                  checked={settings?.use_predefined_locations ?? true}
-                  onCheckedChange={handleTogglePredefinedLocations}
-                  disabled={settingsLoading}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="p-4 bg-muted rounded-lg space-y-2">
-            <p className="text-sm text-muted-foreground">
-              <strong>Customer Locations</strong> are the sites where your
-              workers complete jobs. They appear in the mobile app when
-              &quot;Use Predefined Locations&quot; is enabled.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              <strong>Tip:</strong> Assign locations to a region (from the
-              Location Hierarchy tab) to apply regional pricing rules
-              automatically.
-            </p>
-          </div>
+          {/* Location Settings */}
+          <Collapsible
+            open={locationSettingsOpen}
+            onOpenChange={setLocationSettingsOpen}
+            className="mb-6"
+          >
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Settings className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <CardTitle>Location Settings</CardTitle>
+                        <CardDescription className="mt-1">
+                          Configure how locations appear in the mobile app
+                        </CardDescription>
+                      </div>
+                    </div>
+                    {locationSettingsOpen ? (
+                      <ChevronDown className="w-4 h-4" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4" />
+                    )}
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent>
+                  <div className="flex items-center justify-between gap-8">
+                    <div className="space-y-2 flex-1">
+                      <Label
+                        htmlFor="predefined-locations"
+                        className="text-sm font-medium leading-none"
+                      >
+                        Customer Locations
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        When enabled, your Customer Locations will appear as
+                        selectable options in the mobile app. Workers can choose
+                        from your locations when completing jobs. You can still
+                        configure custom fields in Mobile Application regardless
+                        of this setting.
+                      </p>
+                    </div>
+                    <Switch
+                      id="predefined-locations"
+                      checked={settings?.use_predefined_locations ?? true}
+                      onCheckedChange={handleTogglePredefinedLocations}
+                      disabled={settingsLoading}
+                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                    />
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
 
           <div className="flex items-center justify-between">
-            <div className="flex-1" />
-            <Button onClick={() => setIsLocationFormOpen(true)}>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    <Info className="h-4 w-4" />
+                    <span>Location pricing tip</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs">
+                  <p>
+                    Assign locations to a region or company (from the Location
+                    Hierarchy tab) to apply regional pricing rules
+                    automatically.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Button
+              onClick={() => setIsLocationFormOpen(true)}
+              className="cursor-pointer"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add Location
             </Button>

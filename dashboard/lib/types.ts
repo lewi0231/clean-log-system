@@ -25,9 +25,13 @@ export interface ChartConfig {
 
 export interface Worker {
   id: string;
-  name: string;
+  name: string; // Computed from first_name + last_name, kept for backward compatibility
+  first_name: string | null;
+  last_name: string | null;
   email: string;
   phone: string | null;
+  address: string | null;
+  abn: string | null;
   auth_user_id: string | null;
   active: boolean;
   created_at: string;

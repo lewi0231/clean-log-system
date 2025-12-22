@@ -28,17 +28,45 @@ serve(async (req) => {
       return errorResponse("Worker ID is required", 400);
     }
 
-    const { id, name, email, phone, active } = body;
+    const { id, first_name, last_name, email, phone, active } = body;
+
+    const supabase = createServiceRoleClient();
+
+    // Fetch worker to get organization_id and verify it exists
+    const { data: existingWorker, error: fetchError } = await supabase
+      .from("worker")
+      .select("id, organization_id, first_name, last_name")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !existingWorker) {
+      logger.warn("Worker not found for update", {
+        worker_id: id,
+        errors: fetchError,
+      });
+      return errorResponse("Worker not found", 404);
+    }
 
     // Build update object with only provided fields
     const updateData: {
       name?: string;
+      first_name?: string;
+      last_name?: string;
       email?: string;
       phone?: string;
       active?: boolean;
     } = {};
 
-    if (name !== undefined) updateData.name = name;
+    if (first_name !== undefined) updateData.first_name = first_name;
+    if (last_name !== undefined) updateData.last_name = last_name;
+
+    // Update name field for backward compatibility if first_name or last_name changed
+    if (first_name !== undefined || last_name !== undefined) {
+      const updatedFirstName = first_name ?? existingWorker?.first_name ?? "";
+      const updatedLastName = last_name ?? existingWorker?.last_name ?? "";
+      updateData.name = `${updatedFirstName} ${updatedLastName}`.trim();
+    }
+
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (active !== undefined) updateData.active = active;
@@ -46,22 +74,6 @@ serve(async (req) => {
     if (Object.keys(updateData).length === 0) {
       logger.warn("No fields provided for worker update", { worker_id: id });
       return errorResponse("At least one field must be provided", 400);
-    }
-
-    const supabase = createServiceRoleClient();
-
-    // Fetch worker to get organization_id and verify it exists
-    const { data: existingWorker, error: fetchError } = await supabase
-      .from("worker")
-      .select("id, organization_id")
-      .eq("id", id)
-      .single();
-
-    if (fetchError || !existingWorker) {
-      logger.warn("Worker not found for update", fetchError, {
-        worker_id: id,
-      });
-      return errorResponse("Worker not found", 404);
     }
 
     // Verify organization membership

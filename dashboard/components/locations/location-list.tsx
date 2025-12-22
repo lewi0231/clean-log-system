@@ -189,6 +189,7 @@ export default function LocationList({
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(location)}
+                        className="cursor-pointer"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -196,6 +197,7 @@ export default function LocationList({
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeletingLocation(location)}
+                        className="cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -237,10 +239,12 @@ export default function LocationList({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
             >
               Delete
             </AlertDialogAction>

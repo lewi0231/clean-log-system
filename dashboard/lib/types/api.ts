@@ -13,14 +13,16 @@ export interface ListWorkersAndLocationsResponse {
 
 export interface CreateWorkerRequest {
   organization_id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   phone: string;
 }
 
 export interface UpdateWorkerRequest {
   id: string;
-  name?: string;
+  first_name?: string;
+  last_name?: string;
   email?: string;
   phone?: string;
   active?: boolean;

@@ -24,10 +24,11 @@ function Nav() {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Don't show nav on public invoice pages (customer-facing)
+  // Don't show nav on public invoice pages (customer-facing) or worker routes
   const isPublicInvoicePage = pathname?.startsWith("/invoice/");
+  const isWorkerRoute = pathname?.startsWith("/worker/");
 
-  if (isPublicInvoicePage) {
+  if (isPublicInvoicePage || isWorkerRoute) {
     return null;
   }
 

@@ -13,16 +13,18 @@ serve(async (req) => {
       const validation = validateRequiredFields(body, [
         "invitation_token",
         "password",
+        "address",
+        "abn",
       ]);
 
       if (!validation.valid) {
         return errorResponse(
-          "Missing required fields: invitation_token and password",
-          400
+          "Missing required fields: invitation_token, password, address, and abn",
+          400,
         );
       }
 
-      const { invitation_token, password } = body;
+      const { invitation_token, password, address, abn } = body;
 
       const supabase = createServiceRoleClient();
 
@@ -46,8 +48,8 @@ serve(async (req) => {
       }
 
       // Step 2: Create Supabase Auth user
-      const { data: authData, error: authError } =
-        await supabase.auth.admin.createUser({
+      const { data: authData, error: authError } = await supabase.auth.admin
+        .createUser({
           email: invitation.worker_email,
           password: password,
           email_confirm: true, // Auto-confirm via email link
@@ -62,12 +64,14 @@ serve(async (req) => {
         return errorResponse(`Auth error: ${authError.message}`, 400);
       }
 
-      // Step 3: Update worker with auth_user_id and set active to true
+      // Step 3: Update worker with auth_user_id, address, abn, and set active to true
       // Worker becomes active once they accept invitation and create password
       const { error: updateError } = await supabase
         .from("worker")
         .update({
           auth_user_id: authData.user.id,
+          address: address,
+          abn: abn,
           active: true,
         })
         .eq("id", invitation.worker.id);
@@ -102,7 +106,7 @@ serve(async (req) => {
     } catch (error) {
       console.error("Accept invitation error:", error);
       return errorResponse(
-        error instanceof Error ? error : "Failed to accept invitation"
+        error instanceof Error ? error : "Failed to accept invitation",
       );
     }
   }

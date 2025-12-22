@@ -13,12 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { z } from "zod";
 
-const PasswordSchema = z.object({
+const WorkerSignupSchema = z.object({
   password: z
     .string()
     .min(6, "Password must be at least 6 characters")
@@ -35,36 +35,40 @@ const PasswordSchema = z.object({
       (password) => /[0-9]/.test(password),
       "Password must contain at least one number"
     ),
+  address: z.string().min(1, "Address is required"),
+  abn: z.string().min(1, "ABN is required"),
 });
 
 function AcceptInvitePage() {
   const params = useParams();
   const token = params.token as string;
   const [password, setPassword] = useState("");
+  const [address, setAddress] = useState("");
+  const [abn, setAbn] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [fetchingInvitation, setFetchingInvitation] = useState(true);
   const [workerEmail, setWorkerEmail] = useState<string | null>(null);
 
   const router = useRouter();
 
   const validate = () => {
-    log.debug("Accept Invite: Validating worker password");
+    log.debug("Accept Invite: Validating worker signup form");
 
-    const result = PasswordSchema.safeParse({ password });
+    const result = WorkerSignupSchema.safeParse({ password, address, abn });
 
     if (!result.success) {
-      const passwordError = result.error.issues[0].message;
+      const firstError = result.error.issues[0];
+      const errorMessage = firstError.message;
 
       log.warn("Accept Invite: Form validation failed", {
-        errors: passwordError,
+        errors: result.error.issues,
       });
-      setError(passwordError);
+      setError(errorMessage);
       throw new Error("Validation failed");
     }
 
-    log.debug("Accept Invite: Password validation success");
+    log.debug("Accept Invite: Form validation success");
     setError("");
     return result.data;
   };
@@ -119,7 +123,7 @@ function AcceptInvitePage() {
       setLoading(true);
       setError("");
 
-      const validatedPassword = validate();
+      const validatedData = validate();
       log.debug("Accept Invite: Calling accept-worker-invitation", {
         token,
       });
@@ -129,7 +133,9 @@ function AcceptInvitePage() {
         {
           body: {
             invitation_token: token,
-            password: validatedPassword.password,
+            password: validatedData.password,
+            address: validatedData.address,
+            abn: validatedData.abn,
           },
         }
       );
@@ -152,11 +158,9 @@ function AcceptInvitePage() {
       }
 
       log.info("Accept Invite: Worker invitation accepted", data);
-      setSuccess(true);
 
-      // TODO - ultimately will be a redirect to download the phone application.
-      // for now redirect to home.
-      router.push("/");
+      // Redirect to success page
+      router.push("/worker/signup-success");
     } catch (error) {
       if (error instanceof Error) {
         log.error("Accept Invite: Failed", { error: error.message });
@@ -187,29 +191,6 @@ function AcceptInvitePage() {
     );
   }
 
-  if (success) {
-    return (
-      <div className="h-screen w-full flex justify-center items-center px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <div className="flex justify-center mb-4">
-              <CheckCircle2 className="h-12 w-12 text-primary" />
-            </div>
-            <CardTitle className="text-center">Welcome!</CardTitle>
-            <CardDescription className="text-center">
-              Your account has been created successfully.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-center text-muted-foreground">
-              Redirecting to mobile application...
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen w-full flex justify-center items-center px-4">
       <Card className="w-full max-w-md">
@@ -218,7 +199,7 @@ function AcceptInvitePage() {
           <CardDescription>
             {workerEmail
               ? `Creating account for ${workerEmail}`
-              : "Create a password to complete your account setup"}
+              : "Complete your account setup by providing the required information"}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleAccept}>
@@ -244,8 +225,44 @@ function AcceptInvitePage() {
                 You&apos;ll use this to log into CleanLog mobile app that
                 you&apos;ll install later.
               </p>
-              {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                name="address"
+                type="text"
+                value={address}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  if (error) {
+                    setError("");
+                  }
+                }}
+                placeholder="123 Main St, City, State 12345"
+                aria-invalid={!!error}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="abn">ABN (Australian Business Number)</Label>
+              <Input
+                id="abn"
+                name="abn"
+                type="text"
+                value={abn}
+                onChange={(e) => {
+                  setAbn(e.target.value);
+                  if (error) {
+                    setError("");
+                  }
+                }}
+                placeholder="11 222 333 444"
+                aria-invalid={!!error}
+                required
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button

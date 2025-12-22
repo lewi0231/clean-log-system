@@ -28,7 +28,8 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const validation = validateRequiredFields(body, [
-      "name",
+      "first_name",
+      "last_name",
       "email",
       "phone",
       "organization_id",
@@ -41,7 +42,10 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    const { name, email, phone, organization_id } = body;
+    const { first_name, last_name, email, phone, organization_id } = body;
+
+    // Compute name from first_name + last_name for backward compatibility
+    const name = `${first_name} ${last_name}`.trim();
 
     const supabase = createServiceRoleClient();
 
@@ -67,7 +71,9 @@ serve(async (req) => {
       .from("worker")
       .insert({
         organization_id,
-        name,
+        name, // Keep for backward compatibility
+        first_name,
+        last_name,
         email,
         phone,
         active: false,
@@ -103,7 +109,7 @@ serve(async (req) => {
     // Send invitation email (don't throw on error - worker and invitation are already created)
     await sendWorkerInvitationEmail(
       {
-        workerName: name,
+        workerName: name, // Use computed name for email
         workerEmail: email,
         organizationName: orgName,
         invitationToken,

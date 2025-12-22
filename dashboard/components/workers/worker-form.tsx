@@ -22,7 +22,8 @@ interface WorkerFormProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: (
     workerData: {
-      name: string;
+      first_name: string;
+      last_name: string;
       email: string;
       phone: string;
       active?: boolean;
@@ -38,13 +39,15 @@ export default function WorkerForm({
   onSuccess,
   worker,
 }: WorkerFormProps) {
-  const [name, setName] = useState(worker?.name || "");
+  const [firstName, setFirstName] = useState(worker?.first_name || "");
+  const [lastName, setLastName] = useState(worker?.last_name || "");
   const [email, setEmail] = useState(worker?.email || "");
   const [phone, setPhone] = useState(worker?.phone || "");
   const [active, setActive] = useState(worker?.active ?? false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
-    name?: string;
+    first_name?: string;
+    last_name?: string;
     email?: string;
     phone?: string;
   }>({});
@@ -55,21 +58,28 @@ export default function WorkerForm({
     log.debug("WorkerForm: Validating form input");
 
     const result = workerSchema.safeParse({
-      name,
+      first_name: firstName,
+      last_name: lastName,
       email,
       phone,
     });
 
     if (!result.success) {
       const fieldErrors: {
-        name?: string;
+        first_name?: string;
+        last_name?: string;
         email?: string;
         phone?: string;
       } = {};
 
       result.error.issues.forEach((issue) => {
         const path = issue.path[0] as string;
-        if (path === "name" || path === "email" || path === "phone") {
+        if (
+          path === "first_name" ||
+          path === "last_name" ||
+          path === "email" ||
+          path === "phone"
+        ) {
           fieldErrors[path] = issue.message;
         }
       });
@@ -103,7 +113,8 @@ export default function WorkerForm({
       });
 
       // Reset form
-      setName("");
+      setFirstName("");
+      setLastName("");
       setEmail("");
       setPhone("");
       setActive(false);
@@ -122,7 +133,16 @@ export default function WorkerForm({
         setErrors({
           email: error.message.includes("email") ? error.message : undefined,
           phone: error.message.includes("phone") ? error.message : undefined,
-          name: error.message.includes("name") ? error.message : undefined,
+          first_name:
+            error.message.includes("first name") ||
+            error.message.includes("first_name")
+              ? error.message
+              : undefined,
+          last_name:
+            error.message.includes("last name") ||
+            error.message.includes("last_name")
+              ? error.message
+              : undefined,
         });
       }
     } finally {
@@ -133,7 +153,8 @@ export default function WorkerForm({
   // Reset form when dialog opens/closes or worker changes
   useEffect(() => {
     if (open) {
-      setName(worker?.name || "");
+      setFirstName(worker?.first_name || "");
+      setLastName(worker?.last_name || "");
       setEmail(worker?.email || "");
       setPhone(worker?.phone || "");
       setActive(worker?.active ?? false);
@@ -154,24 +175,45 @@ export default function WorkerForm({
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="first_name">First Name</Label>
             <Input
-              id="name"
-              name="name"
+              id="first_name"
+              name="first_name"
               type="text"
-              value={name}
+              value={firstName}
               onChange={(e) => {
-                setName(e.target.value);
-                if (errors.name) {
-                  setErrors((prev) => ({ ...prev, name: undefined }));
+                setFirstName(e.target.value);
+                if (errors.first_name) {
+                  setErrors((prev) => ({ ...prev, first_name: undefined }));
                 }
               }}
-              placeholder="John Doe"
-              aria-invalid={!!errors.name}
+              placeholder="John"
+              aria-invalid={!!errors.first_name}
               required
             />
-            {errors.name && (
-              <p className="text-sm text-destructive">{errors.name}</p>
+            {errors.first_name && (
+              <p className="text-sm text-destructive">{errors.first_name}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="last_name">Last Name</Label>
+            <Input
+              id="last_name"
+              name="last_name"
+              type="text"
+              value={lastName}
+              onChange={(e) => {
+                setLastName(e.target.value);
+                if (errors.last_name) {
+                  setErrors((prev) => ({ ...prev, last_name: undefined }));
+                }
+              }}
+              placeholder="Doe"
+              aria-invalid={!!errors.last_name}
+              required
+            />
+            {errors.last_name && (
+              <p className="text-sm text-destructive">{errors.last_name}</p>
             )}
           </div>
           <div className="space-y-2">

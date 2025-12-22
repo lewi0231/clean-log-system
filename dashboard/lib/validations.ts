@@ -1,12 +1,21 @@
 import { z } from "zod";
 
 export const workerSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email format"),
   phone: z.string().min(1, "Phone number is required"),
 });
 
 export type WorkerFormData = z.infer<typeof workerSchema>;
+
+// Schema for worker signup (address and ABN required)
+export const workerSignupSchema = z.object({
+  address: z.string().min(1, "Address is required"),
+  abn: z.string().min(1, "ABN is required"),
+});
+
+export type WorkerSignupFormData = z.infer<typeof workerSignupSchema>;
 
 export const locationSchema = z
   .object({

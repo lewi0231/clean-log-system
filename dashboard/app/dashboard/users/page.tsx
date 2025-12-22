@@ -15,6 +15,7 @@ import { useOrganizationUsers } from "@/hooks/use-organization-users";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 export default function UsersPage() {
@@ -44,7 +45,8 @@ export default function UsersPage() {
   const [isOrgUserFormOpen, setIsOrgUserFormOpen] = useState(false);
 
   const handleAddWorker = async (workerData: {
-    name: string;
+    first_name: string;
+    last_name: string;
     email: string;
     phone: string;
   }) => {
@@ -58,7 +60,8 @@ export default function UsersPage() {
   const handleUpdateWorker = async (
     workerId: string,
     workerData: {
-      name: string;
+      first_name: string;
+      last_name: string;
       email: string;
       phone: string;
       active?: boolean;
@@ -159,6 +162,19 @@ export default function UsersPage() {
         </TabsContent>
 
         <TabsContent value="workers" className="space-y-4">
+          <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              Workers complete jobs via our mobile application. Which you can
+              configure{" "}
+              <Link
+                href="/dashboard/mobile-config"
+                className="text-primary hover:underline font-medium"
+              >
+                here
+              </Link>
+              .
+            </p>
+          </div>
           <div className="flex items-center justify-between mb-6">
             <div className="flex-1" />
             <Button
