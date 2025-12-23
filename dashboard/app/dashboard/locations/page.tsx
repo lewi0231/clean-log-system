@@ -38,7 +38,9 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Info, Plus, Settings } from "lucide-react";
-import { useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 
 export default function LocationsPage() {
   const {
@@ -56,8 +58,15 @@ export default function LocationsPage() {
   } = useLocations();
   const { settings, loading: settingsLoading } = useOrganizationSettings();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
   const [locationSettingsOpen, setLocationSettingsOpen] = useState(false);
+
+  // Get initial tab from URL params, default to "locations"
+  const initialTab = useMemo(() => {
+    const tab = searchParams.get("tab");
+    return tab === "hierarchy" ? "hierarchy" : "locations";
+  }, [searchParams]);
 
   const handleTogglePredefinedLocations = async (checked: boolean) => {
     if (!organizationId) return;
@@ -121,6 +130,7 @@ export default function LocationsPage() {
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      active?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -168,7 +178,7 @@ export default function LocationsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="locations" className="space-y-6">
+      <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="locations">Customer Locations</TabsTrigger>
           <TabsTrigger value="hierarchy">Location Hierarchy</TabsTrigger>
@@ -245,11 +255,20 @@ export default function LocationsPage() {
                     <span>Location pricing tip</span>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-xs">
-                  <p>
-                    Assign locations to a region or company (from the Location
-                    Hierarchy tab) to apply regional pricing rules
-                    automatically.
+                <TooltipContent
+                  side="right"
+                  className="max-w-xs bg-popover text-popover-foreground border border-border"
+                >
+                  <p className="text-popover-foreground">
+                    Assign locations to a region or company (from the{" "}
+                    <Link
+                      href="/dashboard/locations?tab=hierarchy"
+                      className="text-primary hover:underline font-medium"
+                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                    >
+                      Location Hierarchy
+                    </Link>{" "}
+                    tab) to apply regional pricing rules automatically.
                   </p>
                 </TooltipContent>
               </Tooltip>

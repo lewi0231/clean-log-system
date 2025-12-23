@@ -32,9 +32,11 @@ import { supabase } from "@/lib/supabase";
 import type { InvoiceWithJobs } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Plus, Settings } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function InvoicingPage() {
+  const searchParams = useSearchParams();
   const {
     organizationId,
     loading: orgLoading,
@@ -55,7 +57,7 @@ export default function InvoicingPage() {
         checked,
       });
 
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const { error: updateError } = await supabase.functions.invoke(
         "update-organization-settings",
         {
           body: {
@@ -196,7 +198,10 @@ export default function InvoicingPage() {
         </Card>
       </Collapsible>
 
-      <InvoiceList onInvoiceClick={handleInvoiceClick} />
+      <InvoiceList
+        onInvoiceClick={handleInvoiceClick}
+        statusFilter={searchParams.get("status") || undefined}
+      />
 
       <CreateInvoiceDialog
         open={createDialogOpen}

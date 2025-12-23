@@ -170,7 +170,13 @@ serve(async (req: Request) => {
 
     const body = validation.data as {
       invoice_id: string;
-      status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+      status:
+        | "draft"
+        | "pending_review"
+        | "sent"
+        | "paid"
+        | "overdue"
+        | "cancelled";
       resend?: boolean;
     };
     const { invoice_id, status, resend = false } = body;

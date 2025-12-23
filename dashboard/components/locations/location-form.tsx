@@ -2,11 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -16,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -24,14 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
-import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { log } from "@/lib/logger";
 import type { LocationHierarchyNode } from "@/lib/types";
 import { locationSchema } from "@/lib/validations";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, ChevronRight, Info } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Info } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
 interface LocationFormProps {
@@ -45,6 +46,7 @@ interface LocationFormProps {
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      active?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -59,6 +61,7 @@ interface LocationFormProps {
     address: string | null;
     contact_person: string | null;
     phone: string | null;
+    active?: boolean;
     hierarchy_parent_id?: string | null;
     pricing_mode?: "field_based" | "fixed_price";
     fixed_customer_price?: number | null;
@@ -74,8 +77,6 @@ export default function LocationForm({
   location,
 }: LocationFormProps) {
   const { nodes: hierarchyNodes } = useLocationHierarchy();
-  const { currency: orgCurrency } = useOrganizationCurrency();
-  const [pricingSectionOpen, setPricingSectionOpen] = useState(false);
 
   type LocationFormValues = {
     name: string;
@@ -84,6 +85,7 @@ export default function LocationForm({
     contact_person: string;
     phone?: string;
     hierarchy_parent_id?: string | null;
+    active?: boolean;
     pricing_mode?: "field_based" | "fixed_price";
     fixed_customer_price?: number;
     fixed_worker_payment?: number;
@@ -98,12 +100,13 @@ export default function LocationForm({
       contact_person: location?.contact_person || "",
       phone: location?.phone || "",
       hierarchy_parent_id: location?.hierarchy_parent_id || null,
-      pricing_mode: location?.pricing_mode || "field_based",
-      fixed_customer_price: location?.fixed_customer_price ?? undefined,
-      fixed_worker_payment: location?.fixed_worker_payment ?? undefined,
-      fixed_price_currency: location?.fixed_price_currency || orgCurrency,
+      active: location?.active ?? true, // Default to active for new locations
+      pricing_mode: "field_based", // Always default to field-based
+      fixed_customer_price: undefined,
+      fixed_worker_payment: undefined,
+      fixed_price_currency: undefined,
     }),
-    [location, orgCurrency]
+    [location]
   );
 
   const form = useForm<LocationFormValues>({
@@ -121,20 +124,15 @@ export default function LocationForm({
     control,
   } = form;
 
-  const pricingMode = useWatch({
-    control,
-    name: "pricing_mode",
-    defaultValue: defaultValues.pricing_mode,
-  });
-
   const hierarchyParentId = useWatch({
     control,
     name: "hierarchy_parent_id",
   });
 
-  const fixedPriceCurrency = useWatch({
+  const activeStatus = useWatch({
     control,
-    name: "fixed_price_currency",
+    name: "active",
+    defaultValue: defaultValues.active,
   });
 
   // Build a flat list with indentation for display
@@ -165,22 +163,7 @@ export default function LocationForm({
       locationId: location?.id,
     });
 
-    const pricingData: {
-      pricing_mode?: "field_based" | "fixed_price";
-      fixed_customer_price?: number | null;
-      fixed_worker_payment?: number | null;
-      fixed_price_currency?: string | null;
-    } = {
-      pricing_mode: values.pricing_mode,
-    };
-
-    if (values.pricing_mode === "fixed_price") {
-      pricingData.fixed_customer_price = values.fixed_customer_price ?? null;
-      pricingData.fixed_worker_payment = values.fixed_worker_payment ?? null;
-      pricingData.fixed_price_currency =
-        values.fixed_price_currency ?? orgCurrency;
-    }
-
+    // Always use field_based pricing mode
     await onSuccess(
       {
         name: values.name,
@@ -189,7 +172,11 @@ export default function LocationForm({
         contact_person: values.contact_person,
         phone: values.phone || undefined,
         hierarchy_parent_id: values.hierarchy_parent_id ?? null,
-        ...pricingData,
+        active: values.active ?? true,
+        pricing_mode: "field_based",
+        fixed_customer_price: null,
+        fixed_worker_payment: null,
+        fixed_price_currency: null,
       },
       location?.id
     );
@@ -202,18 +189,8 @@ export default function LocationForm({
   useEffect(() => {
     if (open) {
       reset(defaultValues);
-      // Open pricing section if location has fixed pricing
-      if (defaultValues.pricing_mode === "fixed_price") {
-        setPricingSectionOpen(true);
-      } else {
-        setPricingSectionOpen(false);
-      }
     }
   }, [open, defaultValues, reset]);
-
-  useEffect(() => {
-    setPricingSectionOpen(pricingMode === "fixed_price");
-  }, [pricingMode]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -345,158 +322,100 @@ export default function LocationForm({
             ) : (
               <p className="text-xs text-muted-foreground p-2 bg-muted rounded">
                 No regions or companies defined yet. Create them in the{" "}
-                <strong>Location Hierarchy</strong> tab to enable regional
-                pricing for this location.
+                <Link
+                  href="/dashboard/locations?tab=hierarchy"
+                  className="font-medium text-primary hover:underline"
+                >
+                  Location Hierarchy
+                </Link>{" "}
+                tab to enable regional pricing for this location.
               </p>
             )}
           </div>
 
-          <Collapsible
-            open={pricingSectionOpen}
-            onOpenChange={setPricingSectionOpen}
-          >
-            <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border p-3 text-left hover:bg-accent">
-              <div className="flex items-center gap-2">
-                {pricingSectionOpen ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-                <Label className="text-base font-medium cursor-pointer">
-                  Pricing Configuration
+          {/* Active Status - Only show in edit mode */}
+          {isEditMode && (
+            <div className="flex items-center justify-between gap-8 rounded-lg border p-4">
+              <div className="space-y-0.5 flex-1">
+                <Label htmlFor="active" className="text-sm font-medium">
+                  Active Status
                 </Label>
+                <p className="text-xs text-muted-foreground">
+                  Inactive locations won&apos;t appear as options in the mobile
+                  app but will remain in the location list.
+                </p>
               </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-4 pt-4">
-              <div className="space-y-3">
-                <Label>Pricing Mode</Label>
-                <RadioGroup
-                  value={pricingMode}
-                  onValueChange={(value) =>
-                    setValue(
-                      "pricing_mode",
-                      value as "field_based" | "fixed_price"
-                    )
-                  }
+              <Switch
+                id="active"
+                checked={activeStatus ?? true}
+                onCheckedChange={(checked) => setValue("active", checked)}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+              />
+            </div>
+          )}
+
+          {/* Pricing Information */}
+          <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg border border-muted">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="mt-0.5 cursor-pointer"
+                    aria-label="Pricing information"
+                  >
+                    <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="right"
+                  className="max-w-sm bg-popover text-popover-foreground border border-border"
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="field_based" id="field_based" />
-                    <Label
-                      htmlFor="field_based"
-                      className="font-normal cursor-pointer"
-                    >
-                      Field-Based Pricing
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Prices calculated from field configs and pricing rules
-                  </p>
-                  <div className="flex items-center space-x-2 mt-2">
-                    <RadioGroupItem value="fixed_price" id="fixed_price" />
-                    <Label
-                      htmlFor="fixed_price"
-                      className="font-normal cursor-pointer"
-                    >
-                      Fixed Price
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Use a fixed price regardless of field data (field data still
-                    collected)
-                  </p>
-                </RadioGroup>
-              </div>
-
-              {pricingMode === "fixed_price" && (
-                <div className="space-y-4 border-t pt-4">
-                  <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-                    <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">
-                      Field config data will still be collected for operational
-                      purposes, but pricing will use the fixed amounts below.
+                  <div className="space-y-2">
+                    <p className="font-medium text-popover-foreground">
+                      Pricing Configuration
+                    </p>
+                    <p className="text-sm text-popover-foreground">
+                      This location uses <strong>field-based pricing</strong>.
+                      Prices are calculated from your field configurations and
+                      pricing rules set in the{" "}
+                      <Link
+                        href="/dashboard/pricing"
+                        className="text-primary hover:underline font-medium"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      >
+                        Pricing page
+                      </Link>
+                      .
+                    </p>
+                    <p className="text-sm text-popover-foreground/90">
+                      You can set location-specific pricing rules by selecting
+                      this location in the Pricing page&apos;s scope selector.
+                    </p>
+                    <p className="text-xs text-popover-foreground/80 pt-2 border-t border-border">
+                      Fixed pricing per location may be available in a future
+                      update.
                     </p>
                   </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <div className="flex-1 space-y-1">
+              <p className="text-sm font-medium">Pricing</p>
+              <p className="text-xs text-muted-foreground">
+                This location uses field-based pricing. Configure pricing rules
+                in the{" "}
+                <Link
+                  href="/dashboard/pricing"
+                  className="font-medium text-primary hover:underline"
+                >
+                  Pricing page
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="fixed_customer_price">
-                      Fixed Customer Price{" "}
-                      <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="fixed_customer_price"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      aria-invalid={!!errors.fixed_customer_price}
-                      placeholder="0.00"
-                      required
-                      {...register("fixed_customer_price", {
-                        setValueAs: (val) =>
-                          val === "" || val === null
-                            ? undefined
-                            : parseFloat(val),
-                      })}
-                    />
-                    {errors.fixed_customer_price && (
-                      <p className="text-sm text-destructive">
-                        {errors.fixed_customer_price.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="fixed_worker_payment">
-                      Fixed Worker Payment (Optional)
-                    </Label>
-                    <Input
-                      id="fixed_worker_payment"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      {...register("fixed_worker_payment", {
-                        setValueAs: (val) =>
-                          val === "" || val === null
-                            ? undefined
-                            : parseFloat(val),
-                      })}
-                      placeholder="0.00"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Amount paid to workers for jobs at this location
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="fixed_price_currency">Currency</Label>
-                    <Select
-                      value={fixedPriceCurrency || orgCurrency || undefined}
-                      onValueChange={(value) =>
-                        setValue("fixed_price_currency", value)
-                      }
-                    >
-                      <SelectTrigger id="fixed_price_currency">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="USD">USD - US Dollar</SelectItem>
-                        <SelectItem value="AUD">
-                          AUD - Australian Dollar
-                        </SelectItem>
-                        <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                        <SelectItem value="EUR">EUR - Euro</SelectItem>
-                        <SelectItem value="CAD">
-                          CAD - Canadian Dollar
-                        </SelectItem>
-                        <SelectItem value="NZD">
-                          NZD - New Zealand Dollar
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-            </CollapsibleContent>
-          </Collapsible>
           <DialogFooter>
             <Button
               type="button"

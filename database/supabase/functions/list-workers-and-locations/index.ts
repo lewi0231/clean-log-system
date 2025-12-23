@@ -28,14 +28,21 @@ serve(async (req) => {
 
       supabase
         .from("location")
-        .select("*")
+        .select(`
+          *,
+          hierarchy_parent:hierarchy_parent_id (
+            id,
+            name,
+            type
+          )
+        `)
         .eq("organization_id", organization_id)
         .order("created_at", { ascending: false }),
     ]);
 
     if (workersResult.error && locationsResult.error) {
       throw new Error(
-        `Failed to fetch workers and locations: ${workersResult.error.message}, ${locationsResult.error.message}`
+        `Failed to fetch workers and locations: ${workersResult.error.message}, ${locationsResult.error.message}`,
       );
     }
 
@@ -55,7 +62,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("List workers and locations error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to list workers and locations"
+      error instanceof Error ? error : "Failed to list workers and locations",
     );
   }
 });

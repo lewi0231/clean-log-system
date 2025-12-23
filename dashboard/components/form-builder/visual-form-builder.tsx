@@ -45,6 +45,8 @@ import {
   AlignLeft,
   Calendar,
   CheckSquare,
+  ChevronDown,
+  ChevronRight,
   Clock,
   GripVertical,
   Hash,
@@ -60,7 +62,6 @@ import {
 } from "lucide-react";
 import { ConditionalLogicEditor } from "./conditional-logic-editor";
 import { FieldConfigDialog } from "./field-config-dialog";
-import { FieldTemplatesPanel } from "./field-templates-panel";
 import { MobileDevicePreview } from "./mobile-device-preview";
 import { SectionEditor } from "./section-editor";
 
@@ -135,6 +136,9 @@ export function VisualFormBuilder({
   createdClusters = [],
 }: VisualFormBuilderProps) {
   const [draggedField, setDraggedField] = useState<string | null>(null);
+  const [draggedSectionField, setDraggedSectionField] = useState<string | null>(
+    null
+  );
   const [fieldOrder, setFieldOrder] = useState<string[]>(() =>
     fields.map((f) => f.id)
   );
@@ -412,14 +416,55 @@ export function VisualFormBuilder({
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <div className="mb-4">
-        <h2 className="text-xl font-semibold">Form Builder</h2>
-        <p className="text-sm text-muted-foreground">
-          Drag and drop to reorder fields, click settings to configure
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Fields only appear in the mobile preview when they are assigned to a
-          section.
-        </p>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold">Form Builder</h2>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Form builder help"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-sm">
+                <div className="space-y-2">
+                  <p className="font-medium text-sm text-slate-50">
+                    How the mobile app works
+                  </p>
+                  <p className="text-xs text-slate-200">
+                    The mobile app always starts with required fields:
+                    colleagues (if any), locations (if customer locations are
+                    enabled), and start/finish times. Additional job information
+                    is collected through sections you create here, with each
+                    section appearing as a separate screen in the mobile app.
+                  </p>
+                  <p className="font-medium text-sm mt-3 text-slate-50">
+                    Drag and drop to reorder fields
+                  </p>
+                  <p className="text-xs text-slate-200">
+                    Fields only appear in the mobile preview when they are
+                    assigned to a section.
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start min-h-screen">
@@ -431,26 +476,96 @@ export function VisualFormBuilder({
               <CardTitle className="text-sm font-semibold">Add Field</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="grid grid-cols-5 gap-2">
-                {FIELD_TYPES.map(({ type, icon: Icon, label }) => (
-                  <Button
-                    key={type}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenFieldDialog(type)}
-                    disabled={isAddingField}
-                    className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="text-[10px]">{label}</span>
-                  </Button>
-                ))}
-              </div>
+              <TooltipProvider>
+                <div className="grid grid-cols-5 gap-2">
+                  {FIELD_TYPES.map(({ type, icon: Icon, label }) => {
+                    const fieldTypeDescriptions: Record<
+                      FieldType,
+                      { description: string; example: string }
+                    > = {
+                      text: {
+                        description: "Single-line text input",
+                        example: "e.g., Customer name, Vehicle model",
+                      },
+                      number: {
+                        description:
+                          "Numeric input for quantities or measurements",
+                        example: "e.g., Number of items, Distance in miles",
+                      },
+                      email: {
+                        description: "Email address input with validation",
+                        example: "e.g., customer@example.com",
+                      },
+                      phone: {
+                        description: "Phone number input",
+                        example: "e.g., (555) 123-4567",
+                      },
+                      select: {
+                        description: "Dropdown menu with predefined options",
+                        example: "e.g., Service type: Basic, Premium, Deluxe",
+                      },
+                      textarea: {
+                        description: "Multi-line text input for longer content",
+                        example: "e.g., Notes, Comments, Description",
+                      },
+                      date: {
+                        description: "Date picker for selecting a date",
+                        example: "e.g., Appointment date, Due date",
+                      },
+                      time: {
+                        description: "Time picker for selecting a time",
+                        example: "e.g., Start time, End time",
+                      },
+                      boolean: {
+                        description: "Checkbox for yes/no or true/false values",
+                        example: "e.g., Completed, Verified, Approved",
+                      },
+                      grouped_breakdown: {
+                        description:
+                          "Grouped breakdown for itemized lists with quantities",
+                        example: "e.g., Services performed with quantities",
+                      },
+                    };
+
+                    const typeInfo = fieldTypeDescriptions[type];
+
+                    return (
+                      <Tooltip key={type}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenFieldDialog(type)}
+                            disabled={isAddingField}
+                            className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
+                          >
+                            <Icon className="w-4 h-4" />
+                            <span className="text-[10px]">{label}</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <div className="space-y-1">
+                            <p className="font-medium text-xs text-slate-50">
+                              {label}
+                            </p>
+                            <p className="text-xs text-slate-200">
+                              {typeInfo.description}
+                            </p>
+                            <p className="text-xs text-slate-300 italic">
+                              {typeInfo.example}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </TooltipProvider>
             </CardContent>
           </Card>
 
-          {/* Templates Panel */}
-          <FieldTemplatesPanel onApplyTemplate={handleApplyTemplate} />
+          {/* Templates Panel - Hidden for now until we have more data */}
+          {/* <FieldTemplatesPanel onApplyTemplate={handleApplyTemplate} /> */}
 
           {/* Sections Editor */}
           <Card className="shrink-0">
@@ -462,13 +577,20 @@ export function VisualFormBuilder({
                 onUpdateSection={onUpdateSection}
                 onDeleteSection={onDeleteSection}
                 onReorderSections={onReorderSections}
-                draggedFieldId={draggedField}
+                draggedFieldId={draggedField || draggedSectionField}
                 onDropFieldToSection={async (sectionId, fieldId) => {
                   await onUpdateField(fieldId, { section_id: sectionId });
                   setDraggedField(null);
+                  setDraggedSectionField(null);
                 }}
                 onRemoveFieldFromSection={async (fieldId) => {
                   await onUpdateField(fieldId, { section_id: null });
+                }}
+                onSectionFieldDragStart={(fieldId) => {
+                  setDraggedSectionField(fieldId);
+                }}
+                onSectionFieldDragEnd={() => {
+                  setDraggedSectionField(null);
                 }}
                 onUpdateField={onUpdateField}
                 onReorderFields={onReorderFields}
@@ -496,27 +618,150 @@ export function VisualFormBuilder({
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-2" align="end">
-                      <div className="grid grid-cols-2 gap-2">
-                        {FIELD_TYPES.map(({ type, icon: Icon, label }) => (
-                          <Button
-                            key={type}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenFieldDialog(type)}
-                            disabled={isAddingField}
-                            className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
-                          >
-                            <Icon className="w-4 h-4" />
-                            <span className="text-[10px]">{label}</span>
-                          </Button>
-                        ))}
-                      </div>
+                      <TooltipProvider>
+                        <div className="grid grid-cols-2 gap-2">
+                          {FIELD_TYPES.map(({ type, icon: Icon, label }) => {
+                            const fieldTypeDescriptions: Record<
+                              FieldType,
+                              { description: string; example: string }
+                            > = {
+                              text: {
+                                description: "Single-line text input",
+                                example: "e.g., Customer name, Vehicle model",
+                              },
+                              number: {
+                                description:
+                                  "Numeric input for quantities or measurements",
+                                example:
+                                  "e.g., Number of items, Distance in miles",
+                              },
+                              email: {
+                                description:
+                                  "Email address input with validation",
+                                example: "e.g., customer@example.com",
+                              },
+                              phone: {
+                                description: "Phone number input",
+                                example: "e.g., (555) 123-4567",
+                              },
+                              select: {
+                                description:
+                                  "Dropdown menu with predefined options",
+                                example:
+                                  "e.g., Service type: Basic, Premium, Deluxe",
+                              },
+                              textarea: {
+                                description:
+                                  "Multi-line text input for longer content",
+                                example: "e.g., Notes, Comments, Description",
+                              },
+                              date: {
+                                description: "Date picker for selecting a date",
+                                example: "e.g., Appointment date, Due date",
+                              },
+                              time: {
+                                description: "Time picker for selecting a time",
+                                example: "e.g., Start time, End time",
+                              },
+                              boolean: {
+                                description:
+                                  "Checkbox for yes/no or true/false values",
+                                example: "e.g., Completed, Verified, Approved",
+                              },
+                              grouped_breakdown: {
+                                description:
+                                  "Grouped breakdown for itemized lists with quantities",
+                                example:
+                                  "e.g., Services performed with quantities",
+                              },
+                            };
+
+                            const typeInfo = fieldTypeDescriptions[type];
+
+                            return (
+                              <Tooltip key={type}>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenFieldDialog(type)}
+                                    disabled={isAddingField}
+                                    className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
+                                  >
+                                    <Icon className="w-4 h-4" />
+                                    <span className="text-[10px]">{label}</span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="right"
+                                  className="max-w-xs"
+                                >
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-xs">
+                                      {label}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {typeInfo.description}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground italic">
+                                      {typeInfo.example}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </div>
+                      </TooltipProvider>
                     </PopoverContent>
                   </Popover>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent
+              className="pt-0 transition-colors"
+              onDragOver={(e) => {
+                // Allow dropping fields from sections into Form Fields area
+                if (draggedSectionField) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.currentTarget.classList.add(
+                    "border-2",
+                    "border-primary/50",
+                    "bg-primary/5",
+                    "rounded-lg"
+                  );
+                }
+              }}
+              onDragLeave={(e) => {
+                // Remove highlight when leaving drop zone
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  e.currentTarget.classList.remove(
+                    "border-2",
+                    "border-primary/50",
+                    "bg-primary/5",
+                    "rounded-lg"
+                  );
+                }
+              }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove(
+                  "border-2",
+                  "border-primary/50",
+                  "bg-primary/5",
+                  "rounded-lg"
+                );
+                // If dropping a field from a section, remove it from the section
+                if (draggedSectionField) {
+                  await onUpdateField(draggedSectionField, {
+                    section_id: null,
+                  });
+                  setDraggedSectionField(null);
+                }
+              }}
+            >
               <TooltipProvider>
                 <div className="space-y-2">
                   {fieldsNotInSections.length === 0 ? (
@@ -1007,13 +1252,13 @@ export function VisualFormBuilder({
                                             {advancedSectionsOpen.get(
                                               field.id
                                             ) ? (
-                                              <Layers className="w-3 h-3 rotate-180" />
+                                              <ChevronDown className="w-3 h-3" />
                                             ) : (
-                                              <Layers className="w-3 h-3" />
+                                              <ChevronRight className="w-3 h-3" />
                                             )}
                                           </Button>
                                         </CollapsibleTrigger>
-                                        <CollapsibleContent className="space-y-4 pt-2">
+                                        <CollapsibleContent className="space-y-4 pt-2 pl-4 border-l-2 border-muted bg-muted/20 rounded-r-md">
                                           {/* Mutually Exclusive Cluster */}
                                           <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
                                             <Label className="text-xs">

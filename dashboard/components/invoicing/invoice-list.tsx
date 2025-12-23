@@ -29,25 +29,47 @@ import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import type { InvoiceWithJobs } from "@/lib/types";
 import { format } from "date-fns";
-import { CheckCircle2, FileText, Mail, RefreshCw } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  FileText,
+  Mail,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 interface InvoiceListProps {
   onInvoiceClick?: (invoice: InvoiceWithJobs) => void;
+  statusFilter?: string;
 }
 
-export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
+export default function InvoiceList({
+  onInvoiceClick,
+  statusFilter,
+}: InvoiceListProps) {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const { invoices, loading, error, refetch } = useInvoices(
     startDate || undefined,
     endDate || undefined
   );
+
+  // Filter invoices by status if statusFilter is provided
+  const filteredInvoices = statusFilter
+    ? invoices.filter((invoice) => invoice.status === statusFilter)
+    : invoices;
   const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
   const [invoiceToResend, setInvoiceToResend] =
     useState<InvoiceWithJobs | null>(null);
+  const [approvingInvoiceId, setApprovingInvoiceId] = useState<string | null>(
+    null
+  );
+  const [rejectingInvoiceId, setRejectingInvoiceId] = useState<string | null>(
+    null
+  );
 
   const getStatusBadge = (invoice: InvoiceWithJobs) => {
     const variants: Record<
@@ -55,6 +77,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
       "default" | "secondary" | "destructive" | "outline"
     > = {
       draft: "outline",
+      pending_review: "secondary",
       sent: "default",
       paid: "secondary",
       overdue: "destructive",
@@ -64,11 +87,15 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
     const status = invoice.status;
     const isPaid = invoice.paid_at !== null;
 
+    // Format status display
+    const statusDisplay =
+      status === "pending_review"
+        ? "Pending Review"
+        : status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
+
     return (
       <div className="flex items-center gap-2">
-        <Badge variant={variants[status] || "default"}>
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Badge>
+        <Badge variant={variants[status] || "default"}>{statusDisplay}</Badge>
         {isPaid && (
           <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Paid" />
         )}
@@ -161,6 +188,66 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
     }
   };
 
+  const handleApproveInvoice = async (
+    e: React.MouseEvent,
+    invoiceId: string
+  ) => {
+    e.stopPropagation();
+    try {
+      setApprovingInvoiceId(invoiceId);
+      log.info("Approving invoice", { invoiceId });
+
+      // Approve: Change status from pending_review to draft (ready to send)
+      await InvoiceService.updateStatus(invoiceId, "draft");
+
+      await refetch();
+
+      log.info("Invoice approved successfully");
+      toast.success("Invoice approved", {
+        description: "Invoice is now ready to send.",
+      });
+    } catch (err) {
+      log.error("Failed to approve invoice", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      toast.error("Failed to approve invoice", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setApprovingInvoiceId(null);
+    }
+  };
+
+  const handleRejectInvoice = async (
+    e: React.MouseEvent,
+    invoiceId: string
+  ) => {
+    e.stopPropagation();
+    try {
+      setRejectingInvoiceId(invoiceId);
+      log.info("Rejecting invoice", { invoiceId });
+
+      // Reject: Change status to cancelled
+      await InvoiceService.updateStatus(invoiceId, "cancelled");
+
+      await refetch();
+
+      log.info("Invoice rejected successfully");
+      toast.success("Invoice rejected", {
+        description: "Invoice has been cancelled.",
+      });
+    } catch (err) {
+      log.error("Failed to reject invoice", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      toast.error("Failed to reject invoice", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setRejectingInvoiceId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -223,7 +310,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
         </div>
 
         {/* Invoice Table */}
-        {invoices.length === 0 ? (
+        {filteredInvoices.length === 0 ? (
           <div className="text-center py-12 border rounded-lg">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
             <p className="text-muted-foreground">No invoices found</p>
@@ -249,7 +336,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {invoices.map((invoice) => (
+                {filteredInvoices.map((invoice) => (
                   <TableRow
                     key={invoice.id}
                     className={
@@ -276,12 +363,51 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
+                        {invoice.status === "pending_review" && (
+                          <>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={(e) =>
+                                handleApproveInvoice(e, invoice.id)
+                              }
+                              disabled={
+                                approvingInvoiceId === invoice.id ||
+                                rejectingInvoiceId === invoice.id
+                              }
+                              className="cursor-pointer"
+                            >
+                              <Check className="mr-1 h-3 w-3" />
+                              {approvingInvoiceId === invoice.id
+                                ? "Approving..."
+                                : "Approve"}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={(e) =>
+                                handleRejectInvoice(e, invoice.id)
+                              }
+                              disabled={
+                                approvingInvoiceId === invoice.id ||
+                                rejectingInvoiceId === invoice.id
+                              }
+                              className="cursor-pointer"
+                            >
+                              <X className="mr-1 h-3 w-3" />
+                              {rejectingInvoiceId === invoice.id
+                                ? "Rejecting..."
+                                : "Reject"}
+                            </Button>
+                          </>
+                        )}
                         {invoice.status === "draft" && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={(e) => handleSendInvoice(e, invoice.id)}
                             disabled={sendingInvoiceId === invoice.id}
+                            className="cursor-pointer"
                           >
                             <Mail className="mr-1 h-3 w-3" />
                             {sendingInvoiceId === invoice.id
@@ -295,6 +421,7 @@ export default function InvoiceList({ onInvoiceClick }: InvoiceListProps) {
                             size="sm"
                             onClick={(e) => openResendDialog(e, invoice)}
                             disabled={sendingInvoiceId === invoice.id}
+                            className="cursor-pointer"
                           >
                             <RefreshCw className="mr-1 h-3 w-3" />
                             {sendingInvoiceId === invoice.id

@@ -24,6 +24,8 @@ export const locationSchema = z
     address: z.string().min(1, "Address is required"),
     contact_person: z.string().min(1, "Contact person is required"),
     phone: z.string().optional(),
+    hierarchy_parent_id: z.string().uuid().nullable().optional(),
+    active: z.boolean().optional(),
     pricing_mode: z.enum(["field_based", "fixed_price"]).optional(),
     fixed_customer_price: z.number().nonnegative().optional(),
     fixed_worker_payment: z.number().nonnegative().optional(),

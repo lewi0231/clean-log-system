@@ -341,7 +341,13 @@ export interface LocationHierarchyNode {
   } | null;
 }
 
-export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "cancelled";
+export type InvoiceStatus =
+  | "draft"
+  | "pending_review"
+  | "sent"
+  | "paid"
+  | "overdue"
+  | "cancelled";
 
 export interface Invoice {
   id: string;

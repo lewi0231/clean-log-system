@@ -10,7 +10,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
@@ -21,9 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { Location } from "@/lib/types";
-import { DollarSign, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import LocationForm from "./location-form";
 
@@ -41,6 +39,7 @@ interface LocationListProps {
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      active?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -56,7 +55,6 @@ export default function LocationList({
   onDeleteLocation,
   onUpdateLocation,
 }: LocationListProps) {
-  const { formatCurrency } = useOrganizationCurrency();
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(
@@ -82,6 +80,7 @@ export default function LocationList({
       contact_person: string;
       phone?: string;
       hierarchy_parent_id?: string | null;
+      active?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -113,8 +112,7 @@ export default function LocationList({
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Region</TableHead>
-              <TableHead>Pricing</TableHead>
+              <TableHead>Region / Company</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Address</TableHead>
               <TableHead>Contact Person</TableHead>
@@ -126,7 +124,7 @@ export default function LocationList({
           <TableBody>
             {locations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   No locations found. Add your first location to get started.
                 </TableCell>
               </TableRow>
@@ -136,37 +134,19 @@ export default function LocationList({
                   <TableCell className="font-medium">{location.name}</TableCell>
                   <TableCell>
                     {location.hierarchy_parent ? (
-                      <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
-                        {location.hierarchy_parent.name}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
+                          {location.hierarchy_parent.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {location.hierarchy_parent.type}
+                        </span>
+                      </div>
                     ) : (
                       <span className="text-muted-foreground text-xs">
                         Org default
                       </span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <Badge
-                        variant={
-                          location.pricing_mode === "fixed_price"
-                            ? "default"
-                            : "outline"
-                        }
-                        className="w-fit"
-                      >
-                        {location.pricing_mode === "fixed_price"
-                          ? "Fixed Price"
-                          : "Field-Based"}
-                      </Badge>
-                      {location.pricing_mode === "fixed_price" &&
-                        location.fixed_customer_price && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <DollarSign className="h-3 w-3" />
-                            {formatCurrency(location.fixed_customer_price)}
-                          </div>
-                        )}
-                    </div>
                   </TableCell>
                   <TableCell>{location.email}</TableCell>
                   <TableCell>{location.address || "-"}</TableCell>

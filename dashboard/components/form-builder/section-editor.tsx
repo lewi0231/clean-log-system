@@ -85,6 +85,8 @@ interface SectionEditorProps {
     updates: Partial<FieldConfig>
   ) => void | Promise<void>;
   onReorderFields?: (fieldIds: string[]) => Promise<void>;
+  onSectionFieldDragStart?: (fieldId: string) => void;
+  onSectionFieldDragEnd?: () => void;
   createdClusters?: string[];
 }
 
@@ -127,6 +129,8 @@ export function SectionEditor({
   onRemoveFieldFromSection,
   onUpdateField,
   onReorderFields,
+  onSectionFieldDragStart,
+  onSectionFieldDragEnd,
   createdClusters = [],
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -538,6 +542,7 @@ export function SectionEditor({
   // Section field drag handlers
   const handleSectionFieldDragStart = (sectionId: string, fieldId: string) => {
     setDraggedSectionField(fieldId);
+    onSectionFieldDragStart?.(fieldId);
   };
 
   const handleSectionFieldDragOver = (
@@ -615,6 +620,7 @@ export function SectionEditor({
       onUpdateSection(sectionId, { field_ids: newOrder });
     }
     setDraggedSectionField(null);
+    onSectionFieldDragEnd?.();
   };
 
   return (
@@ -656,24 +662,57 @@ export function SectionEditor({
                 draggable
                 onDragStart={() => handleDragStart(section.id)}
                 onDragOver={(e) => {
-                  // If dragging a field from main list into section, allow drop
-                  if (draggedFieldId && onDropFieldToSection) {
+                  // If dragging a field (from main list or from another section) into this section, allow drop
+                  if (
+                    (draggedFieldId || draggedSectionField) &&
+                    onDropFieldToSection
+                  ) {
                     e.preventDefault();
                   }
-                  // If dragging a field within the section, ignore section drag
+                  // If dragging a field within the same section, ignore section drag (handled by field drag)
                   else if (draggedSectionField) {
-                    // Don't interfere with field reordering within section
-                    return;
+                    const draggedField = fields.find(
+                      (f) => f.id === draggedSectionField
+                    );
+                    // If dragging within the same section, let field reordering handle it
+                    if (draggedField?.section_id === section.id) {
+                      return;
+                    }
+                    // Otherwise, allow dropping into this section
+                    e.preventDefault();
                   }
                   // Otherwise handle section reordering
                   else {
                     handleSectionDragOver(e, section.id);
                   }
                 }}
-                onDrop={(e) => {
-                  // Only handle drop if dragging from main fields list, not from within section
-                  if (draggedFieldId && !draggedSectionField) {
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  // Handle drop from main fields list
+                  if (
+                    draggedFieldId &&
+                    !draggedSectionField &&
+                    onDropFieldToSection
+                  ) {
                     handleFieldDrop(e, section.id);
+                  }
+                  // Handle drop from another section
+                  else if (draggedSectionField && onDropFieldToSection) {
+                    const draggedField = fields.find(
+                      (f) => f.id === draggedSectionField
+                    );
+                    // Only move if dropping into a different section
+                    if (
+                      draggedField &&
+                      draggedField.section_id !== section.id
+                    ) {
+                      await onDropFieldToSection(
+                        section.id,
+                        draggedSectionField
+                      );
+                      setDraggedSectionField(null);
+                      onSectionFieldDragEnd?.();
+                    }
                   }
                 }}
                 onDragEnd={handleDragEnd}
@@ -1212,13 +1251,13 @@ export function SectionEditor({
                                                     {advancedSectionsOpen.get(
                                                       field.id
                                                     ) ? (
-                                                      <Layers className="w-3 h-3 rotate-180" />
+                                                      <ChevronDown className="w-3 h-3" />
                                                     ) : (
-                                                      <Layers className="w-3 h-3" />
+                                                      <ChevronRight className="w-3 h-3" />
                                                     )}
                                                   </Button>
                                                 </CollapsibleTrigger>
-                                                <CollapsibleContent className="space-y-4 pt-2">
+                                                <CollapsibleContent className="space-y-4 pt-2 pl-4 border-l-2 border-muted bg-muted/20 rounded-r-md">
                                                   {/* Mutually Exclusive Cluster */}
                                                   <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
                                                     <Label className="text-xs">

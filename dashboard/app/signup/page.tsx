@@ -15,12 +15,9 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { formatZodErrors, signUpSchema } from "@/lib/validations";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function SignUp() {
-  const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [organisation, setOrganisation] = useState("");
   const [password, setPassword] = useState("");

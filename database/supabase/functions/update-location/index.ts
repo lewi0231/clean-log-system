@@ -42,6 +42,7 @@ serve(async (req) => {
       contact_person,
       phone,
       hierarchy_parent_id,
+      active,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -104,16 +105,23 @@ serve(async (req) => {
       }
     }
 
+    const updateData: Record<string, unknown> = {
+      name,
+      email,
+      address,
+      contact_person,
+      phone: phone || null,
+      hierarchy_parent_id: hierarchy_parent_id ?? null,
+    };
+
+    // Only update active if provided
+    if (typeof active === "boolean") {
+      updateData.active = active;
+    }
+
     const { data: location, error: locationError } = await supabase
       .from("location")
-      .update({
-        name,
-        email,
-        address,
-        contact_person,
-        phone: phone || null,
-        hierarchy_parent_id: hierarchy_parent_id ?? null,
-      })
+      .update(updateData)
       .eq("id", id)
       .select(`
         *,

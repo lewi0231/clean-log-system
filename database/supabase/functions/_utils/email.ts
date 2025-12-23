@@ -487,6 +487,20 @@ export interface InvoiceEmailData {
   dueDate: string;
 }
 
+export interface AdminInvoiceNotificationData {
+  organizationName: string;
+  recipientEmails: string[];
+  invoiceCount: number;
+  invoices: Array<{
+    invoice_number: string;
+    location_name: string;
+    job_count: number;
+    total: number;
+    currency: string;
+  }>;
+  reviewUrl: string; // URL to the invoice review page
+}
+
 export interface PaymentConfirmationEmailData {
   invoiceNumber: string;
   organizationName: string;
@@ -1144,6 +1158,279 @@ export async function sendPaymentConfirmationEmail(
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send payment confirmation email";
+    if (throwOnError) {
+      throw error;
+    }
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Send admin notification email when invoices are auto-generated
+ */
+export async function sendAdminInvoiceNotificationEmail(
+  data: AdminInvoiceNotificationData,
+  throwOnError = false,
+): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  // Validate configuration
+  const configResult = validateEmailConfig();
+  if (!configResult.valid || !configResult.config) {
+    const error = configResult.error || "Email configuration is invalid";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate recipient emails
+  if (!data.recipientEmails || data.recipientEmails.length === 0) {
+    const error = "No recipient emails provided";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate all recipient emails
+  for (const email of data.recipientEmails) {
+    if (!isValidEmail(email)) {
+      const error = `Invalid recipient email: ${email}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+  }
+
+  // Check if email sending should be skipped
+  const skipEmailSendingEnv = Deno.env.get("SKIP_EMAIL_SENDING");
+  const skipEmailSending = skipEmailSendingEnv === "true";
+
+  if (skipEmailSending) {
+    console.log(
+      "[SKIP EMAIL] Admin invoice notification email skipped",
+      {
+        organizationName: data.organizationName,
+        invoiceCount: data.invoiceCount,
+        recipients: data.recipientEmails,
+      },
+    );
+    return { success: true, emailId: `mock-admin-notification-${Date.now()}` };
+  }
+
+  const fromEmail =
+    `${data.organizationName} <noreply@${configResult.config.resendFromDomain}>`;
+
+  // Check if test mode is enabled
+  const testMode = isTestMode();
+
+  // Format invoice list
+  const invoiceListHtml = data.invoices.map((inv) => {
+    const currencySymbol = inv.currency === "AUD"
+      ? "A$"
+      : inv.currency === "USD"
+      ? "$"
+      : inv.currency === "GBP"
+      ? "£"
+      : inv.currency === "EUR"
+      ? "€"
+      : inv.currency === "CAD"
+      ? "C$"
+      : inv.currency === "NZD"
+      ? "NZ$"
+      : inv.currency;
+    const formattedTotal = `${currencySymbol}${inv.total.toFixed(2)}`;
+    return `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${inv.invoice_number}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${inv.location_name}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${inv.job_count} job(s)</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formattedTotal}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #1f2937; margin-top: 0;">New Invoices Ready for Review</h2>
+        <p>Hello,</p>
+        <p>${data.invoiceCount} new invoice${
+    data.invoiceCount === 1 ? "" : "s"
+  } ${
+    data.invoiceCount === 1 ? "has" : "have"
+  } been automatically generated and ${
+    data.invoiceCount === 1 ? "is" : "are"
+  } ready for your review.</p>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <thead>
+            <tr style="background-color: #f3f4f6;">
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #d1d5db;">Invoice #</th>
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #d1d5db;">Location</th>
+              <th style="padding: 12px; text-align: left; border-bottom: 2px solid #d1d5db;">Jobs</th>
+              <th style="padding: 12px; text-align: right; border-bottom: 2px solid #d1d5db;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${invoiceListHtml}
+          </tbody>
+        </table>
+
+        <div style="margin: 30px 0; text-align: center;">
+          <a href="${data.reviewUrl}" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">Review Invoices</a>
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px; margin-top: 30px;">
+          This is an automated notification from ${data.organizationName}.
+        </p>
+      </body>
+    </html>
+  `;
+
+  const emailText = `
+New Invoices Ready for Review
+
+Hello,
+
+${data.invoiceCount} new invoice${data.invoiceCount === 1 ? "" : "s"} ${
+    data.invoiceCount === 1 ? "has" : "have"
+  } been automatically generated and ${
+    data.invoiceCount === 1 ? "is" : "are"
+  } ready for your review.
+
+${
+    data.invoices.map((inv) =>
+      `- ${inv.invoice_number}: ${inv.location_name} (${inv.job_count} job(s)) - ${inv.currency} ${
+        inv.total.toFixed(2)
+      }`
+    ).join("\n")
+  }
+
+Review invoices: ${data.reviewUrl}
+
+This is an automated notification from ${data.organizationName}.
+  `;
+
+  // Determine recipients based on test mode
+  const testRecipients = testMode
+    ? data.recipientEmails.map((email, idx) =>
+      getTestModeRecipient("invoice", `admin-${idx}`, email)
+    )
+    : data.recipientEmails;
+
+  const emailSubject = testMode
+    ? `[TEST] ${data.invoiceCount} New Invoice${
+      data.invoiceCount === 1 ? "" : "s"
+    } Ready for Review - ${data.organizationName}`
+    : `${data.invoiceCount} New Invoice${
+      data.invoiceCount === 1 ? "" : "s"
+    } Ready for Review - ${data.organizationName}`;
+
+  const requestBody = {
+    from: fromEmail,
+    to: testRecipients,
+    subject: emailSubject,
+    html: emailHtml,
+    text: emailText,
+  };
+
+  const requestBodyStr = JSON.stringify(requestBody);
+
+  try {
+    if (testMode) {
+      console.log(
+        "[TEST MODE] Sending admin notification email to test addresses",
+        {
+          testRecipients,
+          originalRecipients: data.recipientEmails,
+          invoiceCount: data.invoiceCount,
+        },
+      );
+    }
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${configResult.config.apiKey}`,
+      },
+      body: requestBodyStr,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorBody: unknown;
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = { message: errorText };
+      }
+
+      console.error("Resend API error:", {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorBody,
+      });
+
+      const errorMessage = (errorBody &&
+        typeof errorBody === "object" &&
+        "message" in errorBody &&
+        typeof errorBody.message === "string" &&
+        errorBody.message) ||
+        (errorBody &&
+          typeof errorBody === "object" &&
+          "error" in errorBody &&
+          errorBody.error &&
+          typeof errorBody.error === "object" &&
+          "message" in errorBody.error &&
+          typeof errorBody.error.message === "string" &&
+          errorBody.error.message) ||
+        res.statusText ||
+        "Unknown error";
+
+      const error = `Failed to send admin notification email: ${errorMessage}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+
+    const emailResponse = await res.json();
+    const emailId = emailResponse.id;
+
+    if (emailId) {
+      if (testMode) {
+        console.log(
+          "[TEST MODE] Admin notification email sent to test addresses",
+          {
+            mode: "test",
+            emailType: "admin_notification",
+            testRecipients,
+            originalRecipients: data.recipientEmails,
+            invoiceCount: data.invoiceCount,
+            emailId,
+            timestamp: new Date().toISOString(),
+          },
+        );
+      } else {
+        console.log("Admin notification email sent successfully:", emailId);
+      }
+      return { success: true, emailId };
+    } else {
+      console.warn("Resend response missing ID:", emailResponse);
+      return { success: true };
+    }
+  } catch (error) {
+    console.error("Failed to send admin notification email:", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to send admin notification email";
     if (throwOnError) {
       throw error;
     }

@@ -115,6 +115,7 @@ export const businessModeSchema = z.enum([
  */
 export const invoiceStatusSchema = z.enum([
   "draft",
+  "pending_review",
   "sent",
   "paid",
   "overdue",
@@ -337,7 +338,14 @@ export const createInvoiceSchema = z.object({
  */
 export const updateInvoiceStatusSchema = z.object({
   invoice_id: uuidSchema,
-  status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]),
+  status: z.enum([
+    "draft",
+    "pending_review",
+    "sent",
+    "paid",
+    "overdue",
+    "cancelled",
+  ]),
   resend: z.boolean().optional(),
 });
 

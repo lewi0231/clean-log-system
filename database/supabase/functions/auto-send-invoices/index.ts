@@ -192,7 +192,9 @@ serve(async (req: Request) => {
 
     for (const org of organizations) {
       try {
-        // Get all draft invoices for this organization
+        // Get all draft and pending_review invoices for this organization
+        // Note: pending_review invoices should only be sent after approval (status change to draft)
+        // For now, we only send draft invoices (pending_review requires manual approval)
         const { data: draftInvoices, error: invoicesError } = await supabase
           .from("invoice")
           .select(

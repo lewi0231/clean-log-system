@@ -234,7 +234,13 @@ export class InvoiceService {
    */
   static async updateStatus(
     invoiceId: string,
-    status: "draft" | "sent" | "paid" | "overdue" | "cancelled",
+    status:
+      | "draft"
+      | "pending_review"
+      | "sent"
+      | "paid"
+      | "overdue"
+      | "cancelled",
   ): Promise<InvoiceWithJobs> {
     try {
       log.debug("InvoiceService: Updating invoice status", {

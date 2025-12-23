@@ -5,13 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 // 2. Third-party
-import {
-  ChevronDown,
-  ChevronRight,
-  Package,
-  RotateCcw,
-  Sparkles,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Package, Sparkles } from "lucide-react";
 
 // 3. Internal components
 import { VisualFormBuilder } from "@/components/form-builder";
@@ -25,14 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Collapsible,
   CollapsibleContent,
@@ -48,7 +35,7 @@ import useOrganization from "@/hooks/useOrganization";
 // 5. Services/Utils
 import { organizationSettingsKey } from "@/app/query-provider";
 import { supabase } from "@/lib/supabase";
-import { getTemplateDescription, getTemplateFields } from "@/lib/templates";
+import { getTemplateDescription } from "@/lib/templates";
 
 export default function MobileConfigPage() {
   const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
@@ -120,7 +107,8 @@ export default function MobileConfigPage() {
               {labels.mobileConfigDescription}
             </p>
           </div>
-          {fieldConfigs.length > 0 && (
+          {/* Reset to Template button disabled for now */}
+          {/* {fieldConfigs.length > 0 && (
             <Button
               variant="outline"
               onClick={() => {
@@ -133,107 +121,24 @@ export default function MobileConfigPage() {
               <RotateCcw className="mr-2 h-4 w-4" />
               Reset to Template
             </Button>
-          )}
+          )} */}
         </div>
       </div>
 
       <div className="space-y-6">
-        {/* Show template options when no field configs exist */}
-        {fieldConfigs.length === 0 && !loading && (
+        {/* Template options disabled for now - need more specific information */}
+        {/* {fieldConfigs.length === 0 && !loading && (
           <Card>
             <CardHeader>
               <CardTitle>Get Started with a Template</CardTitle>
-              <CardDescription>
-                Start with a pre-configured set of fields tailored to your
-                business mode, or build from scratch with the visual form
-                builder.
-                {settings?.business_mode && (
-                  <span className="block mt-2 text-sm font-medium">
-                    Recommended:{" "}
-                    {settings.business_mode === "service_based"
-                      ? "Service-Based Template"
-                      : "Resource Tracking Template"}
-                  </span>
-                )}
-              </CardDescription>
+              ...
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="relative">
-                  <button
-                    onClick={() => handleApplyTemplate("service_based")}
-                    disabled={applyingTemplate}
-                    className={`w-full flex flex-col rounded-lg border-2 p-6 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
-                      settings?.business_mode === "service_based"
-                        ? "border-primary bg-primary/5"
-                        : "border-muted bg-card"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <div className="font-semibold">
-                          Service-Based Template
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Car Detailer
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {getTemplateDescription("service_based")}
-                    </p>
-                    <div className="text-xs text-muted-foreground">
-                      <div className="font-medium mb-1">Includes:</div>
-                      <ul className="list-disc list-inside space-y-1">
-                        {getTemplateFields("service_based").map((field) => (
-                          <li key={field.name}>{field.label}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </button>
-                </div>
-                <div className="relative">
-                  <button
-                    onClick={() => handleApplyTemplate("resource_tracking")}
-                    disabled={applyingTemplate}
-                    className={`w-full flex flex-col rounded-lg border-2 p-6 hover:bg-accent hover:text-accent-foreground hover:border-primary cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-left ${
-                      settings?.business_mode === "resource_tracking"
-                        ? "border-primary bg-primary/5"
-                        : "border-muted bg-card"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Package className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <div className="font-semibold">
-                          Resource Tracking Template
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Car Yard Business
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      {getTemplateDescription("resource_tracking")}
-                    </p>
-                    <div className="text-xs text-muted-foreground">
-                      <div className="font-medium mb-1">Includes:</div>
-                      <ul className="list-disc list-inside space-y-1">
-                        {getTemplateFields("resource_tracking").map((field) => (
-                          <li key={field.name}>{field.label}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </CardContent>
+            ...
           </Card>
-        )}
+        )} */}
 
-        {/* Show Visual Form Builder when fields exist */}
-        {(fieldConfigs.length > 0 || loading) && (
+        {/* Show Visual Form Builder when fields exist or when loading */}
+        {(fieldConfigs.length > 0 || loading || fieldConfigs.length === 0) && (
           <VisualFormBuilder
             fields={optimisticFieldConfigs}
             sections={sections}
@@ -249,7 +154,7 @@ export default function MobileConfigPage() {
           />
         )}
 
-        {/* Advanced Form Configuration */}
+        {/* Choose One Options Configuration */}
         <Collapsible
           open={advancedSectionOpen}
           onOpenChange={setAdvancedSectionOpen}
@@ -259,11 +164,7 @@ export default function MobileConfigPage() {
               <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Advanced Form Configuration</CardTitle>
-                    <CardDescription className="mt-1">
-                      Configure mutually exclusive groups and clusters for
-                      advanced form behavior
-                    </CardDescription>
+                    <CardTitle>Advanced Options</CardTitle>
                   </div>
                   {advancedSectionOpen ? (
                     <ChevronDown className="w-4 h-4" />
