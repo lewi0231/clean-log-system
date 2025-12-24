@@ -111,9 +111,10 @@ export default function SignUp() {
       setOrganisation("");
       setErrors({});
 
-      log.info("SignUp: Signup process completed, redirecting to dashboard");
+      log.info("SignUp: Signup process completed, redirecting to onboarding");
       // Use window.location for full page reload to ensure middleware sees the session
-      window.location.href = "/dashboard";
+      // Redirect to onboarding for new users
+      window.location.href = "/onboarding";
     } catch (error) {
       // Errors are already set in validateInput via setErrors
       if (error instanceof Error && error.message !== "Validation failed") {

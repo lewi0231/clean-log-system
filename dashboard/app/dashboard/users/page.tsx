@@ -1,5 +1,8 @@
 "use client";
 
+import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
+import { usersTourSteps } from "@/components/tours/tour-definitions";
+import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import {
@@ -126,18 +129,25 @@ export default function UsersPage() {
   }
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage dashboard users and mobile app workers
-        </p>
+    <PageTourWrapper pageId="users" steps={usersTourSteps}>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage dashboard users and mobile app workers
+          </p>
+        </div>
+        <TourTriggerButton />
       </div>
 
       <Tabs defaultValue="dashboard-users" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="dashboard-users">Dashboard Users</TabsTrigger>
-          <TabsTrigger value="workers">Workers</TabsTrigger>
+          <TabsTrigger value="dashboard-users" data-tour="dashboard-users-tab">
+            Dashboard Users
+          </TabsTrigger>
+          <TabsTrigger value="workers" data-tour="workers-tab">
+            Workers
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard-users" className="space-y-4">
@@ -146,6 +156,7 @@ export default function UsersPage() {
             <Button
               className="cursor-pointer"
               onClick={() => setIsOrgUserFormOpen(true)}
+              data-tour="add-dashboard-user-button"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Dashboard User
@@ -180,6 +191,7 @@ export default function UsersPage() {
             <Button
               className="cursor-pointer"
               onClick={() => setIsWorkerFormOpen(true)}
+              data-tour="add-worker-button"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Worker
@@ -230,6 +242,6 @@ export default function UsersPage() {
           }
         }}
       />
-    </>
+    </PageTourWrapper>
   );
 }

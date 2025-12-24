@@ -4,6 +4,9 @@ import { organizationSettingsKey } from "@/app/query-provider";
 import LocationForm from "@/components/locations/location-form";
 import LocationHierarchyManager from "@/components/locations/location-hierarchy-manager";
 import LocationList from "@/components/locations/location-list";
+import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
+import { locationsTourSteps } from "@/components/tours/tour-definitions";
+import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,7 +40,15 @@ import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Info, Plus, Settings } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Info,
+  Layers,
+  MapPin,
+  Plus,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -169,19 +180,28 @@ export default function LocationsPage() {
   }
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Locations</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage your organization&apos;s locations and location hierarchy for
-          regional pricing.
-        </p>
+    <PageTourWrapper pageId="locations" steps={locationsTourSteps}>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Locations</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage your organization&apos;s locations and location hierarchy for
+            regional pricing.
+          </p>
+        </div>
+        <TourTriggerButton />
       </div>
 
       <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="locations">Customer Locations</TabsTrigger>
-          <TabsTrigger value="hierarchy">Location Hierarchy</TabsTrigger>
+          <TabsTrigger value="locations" data-tour="locations-tab">
+            <MapPin className="h-4 w-4 mr-2" />
+            Customer Locations
+          </TabsTrigger>
+          <TabsTrigger value="hierarchy" data-tour="hierarchy-tab">
+            <Layers className="h-4 w-4 mr-2" />
+            Location Hierarchy
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="locations" className="space-y-6">
@@ -191,7 +211,7 @@ export default function LocationsPage() {
             onOpenChange={setLocationSettingsOpen}
             className="mb-6"
           >
-            <Card>
+            <Card data-tour="location-settings">
               <CollapsibleTrigger asChild>
                 <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
                   <div className="flex items-center justify-between">
@@ -276,6 +296,7 @@ export default function LocationsPage() {
             <Button
               onClick={() => setIsLocationFormOpen(true)}
               className="cursor-pointer"
+              data-tour="add-location-button"
             >
               <Plus className="mr-2 h-4 w-4" />
               Add Location
@@ -310,6 +331,6 @@ export default function LocationsPage() {
           }
         }}
       />
-    </>
+    </PageTourWrapper>
   );
 }

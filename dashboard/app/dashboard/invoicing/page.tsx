@@ -185,6 +185,7 @@ export default function InvoicingPage() {
                     checked={settings?.invoice_send_immediately ?? false}
                     onCheckedChange={handleInvoiceSendImmediatelyChange}
                     disabled={settingsLoading}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                   />
                 </div>
               </div>

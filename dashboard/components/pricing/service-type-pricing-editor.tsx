@@ -25,6 +25,7 @@ import { useServicePricingMode } from "@/hooks/use-service-pricing-mode";
 import type { ServicePricingMode } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
 import { DollarSign, Info, Save, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 interface ServiceTypePricingEditorProps {
@@ -247,10 +248,19 @@ export default function ServiceTypePricingEditor({
         <CardHeader>
           <CardTitle>No Select Fields</CardTitle>
           <CardDescription>
-            Create select fields in Mobile Application to configure service-type
-            pricing.
+            To configure service-type pricing, you need to add select fields to
+            your mobile app forms.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/mobile-config">
+              <Button variant="outline" size="sm">
+                Go to Mobile App Configuration
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
       </Card>
     );
   }

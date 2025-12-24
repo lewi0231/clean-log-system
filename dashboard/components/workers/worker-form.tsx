@@ -281,6 +281,7 @@ export default function WorkerForm({
                   checked={active}
                   onCheckedChange={setActive}
                   disabled={!worker?.auth_user_id}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                 />
               </div>
             </div>

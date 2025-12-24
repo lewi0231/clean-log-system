@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -33,14 +32,7 @@ import {
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
-import {
-  DollarSign,
-  ExternalLink,
-  Package,
-  Sparkles,
-  Upload,
-  X,
-} from "lucide-react";
+import { DollarSign, ExternalLink, Upload, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -132,6 +124,7 @@ export default function SettingsPage() {
     return url;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleBusinessModeChange = async (mode: BusinessMode) => {
     if (!organizationId) return;
 
@@ -537,7 +530,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="organization" className="space-y-6">
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="business">Business Mode</TabsTrigger>
+          {/* Business Mode tab hidden - feature not currently in use */}
           <TabsTrigger value="payment">Payment Providers</TabsTrigger>
         </TabsList>
 
@@ -685,7 +678,8 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="business" className="space-y-6">
+        {/* Business Mode tab content hidden - feature not currently in use */}
+        {/* <TabsContent value="business" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Business Mode</CardTitle>
@@ -755,7 +749,7 @@ export default function SettingsPage() {
               </RadioGroup>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent> */}
 
         <TabsContent value="payment" className="space-y-6">
           {/* Contextual Settings Links */}

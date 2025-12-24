@@ -10,6 +10,9 @@ import { ChevronDown, ChevronRight, Package, Sparkles } from "lucide-react";
 // 3. Internal components
 import { VisualFormBuilder } from "@/components/form-builder";
 import { MutuallyExclusiveGroupManager } from "@/components/form-builder/mutually-exclusive-group-manager";
+import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
+import { mobileConfigTourSteps } from "@/components/tours/tour-definitions";
+import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,6 +28,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { PageHeaderSkeleton } from "@/components/ui/skeleton-loaders";
 
 // 4. Hooks
 import { useMobileConfig } from "@/hooks/use-mobile-config";
@@ -73,13 +77,19 @@ export default function MobileConfigPage() {
 
   if (orgLoading || settingsLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">
-            Loading mobile application configuration...
-          </p>
+      <>
+        <PageHeaderSkeleton />
+        <div className="space-y-6">
+          <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+          <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+            <div className="space-y-4">
+              <div className="h-64 bg-muted animate-pulse rounded-lg" />
+              <div className="h-32 bg-muted animate-pulse rounded-lg" />
+            </div>
+            <div className="h-96 bg-muted animate-pulse rounded-lg" />
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -96,16 +106,21 @@ export default function MobileConfigPage() {
   }
 
   return (
-    <>
+    <PageTourWrapper pageId="mobile-config" steps={mobileConfigTourSteps}>
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold tracking-tight">
-              Mobile Application
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {labels.mobileConfigDescription}
-            </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  Mobile Application
+                </h1>
+                <p className="text-muted-foreground mt-2">
+                  {labels.mobileConfigDescription}
+                </p>
+              </div>
+              <TourTriggerButton />
+            </div>
           </div>
           {/* Reset to Template button disabled for now */}
           {/* {fieldConfigs.length > 0 && (
@@ -283,6 +298,6 @@ export default function MobileConfigPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </PageTourWrapper>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { OnboardingChecklistButton } from "@/components/onboarding/onboarding-checklist-button";
 import { cn } from "@/lib/utils";
 import {
   Building2,
@@ -80,6 +81,11 @@ export default function DashboardSidebar() {
     <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col p-6 gap-8 fixed h-screen overflow-y-auto shadow-sm">
       {/* Spacer to maintain spacing (logo removed) */}
       <div className="h-[52px]" />
+
+      {/* Onboarding Checklist Button */}
+      <div className="mb-4">
+        <OnboardingChecklistButton />
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-2">

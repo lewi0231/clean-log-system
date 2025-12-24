@@ -1,5 +1,8 @@
 "use client";
 
+import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
+import { dashboardTourSteps } from "@/components/tours/tour-definitions";
+import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
@@ -57,16 +60,19 @@ export default function Dashboard() {
   }
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-2">
-          Overview of your organization
-        </p>
+    <PageTourWrapper pageId="dashboard" steps={dashboardTourSteps}>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-2">
+            Overview of your organization
+          </p>
+        </div>
+        <TourTriggerButton />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
+        <Card data-tour="workers-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Workers</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -82,7 +88,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card data-tour="locations-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Locations</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -96,6 +102,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </PageTourWrapper>
   );
 }

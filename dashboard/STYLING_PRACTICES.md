@@ -124,6 +124,47 @@ When implementing drag and drop functionality:
 
 ---
 
+## Switch Components
+
+### Standard Styling
+
+All Switch components throughout the application should use consistent styling to match the location settings switch pattern:
+
+- **Checked State**: Primary color background
+- **Unchecked State**: Muted foreground with border for better visibility
+- **Border**: 2px border when unchecked for clear visual distinction
+
+### Implementation
+
+```tsx
+<Switch
+  id="example-switch"
+  checked={isEnabled}
+  onCheckedChange={setIsEnabled}
+  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+/>
+```
+
+### Styling Breakdown
+
+- `data-[state=checked]:bg-primary` - Primary color when switch is ON
+- `data-[state=unchecked]:bg-muted-foreground/50` - Semi-transparent muted background when OFF
+- `data-[state=unchecked]:border-2` - 2px border when OFF
+- `data-[state=unchecked]:border-muted-foreground/30` - Muted border color when OFF
+
+### Usage Guidelines
+
+- Always apply this className to all Switch components for consistency
+- The styling provides clear visual feedback for both checked and unchecked states
+- The border in the unchecked state improves visibility and accessibility
+- Reference: Location settings switch (`dashboard/app/dashboard/locations/page.tsx`)
+
+### Component Location
+
+Switch components are located in: `dashboard/components/ui/switch.tsx`
+
+---
+
 ## General Principles
 
 1. **Consistency**: Follow established patterns for similar UI elements

@@ -1009,6 +1009,10 @@ export default function BasePricingEditor({
                 locationId,
                 locationHierarchyId
               );
+              // Only show if there are overrides
+              if (standaloneOverrides.length === 0) {
+                return null;
+              }
               return (
                 <LocationOverridesMatrix
                   rows={standaloneOverrides}

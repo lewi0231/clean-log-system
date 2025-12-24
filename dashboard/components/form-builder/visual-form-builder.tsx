@@ -265,6 +265,7 @@ export function VisualFormBuilder({
   };
 
   // Apply a template
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleApplyTemplate = async (template: FieldTemplate) => {
     setIsAddingField(true);
     try {
@@ -612,7 +613,11 @@ export function VisualFormBuilder({
                   </Badge>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-tour="add-field-button"
+                      >
                         <Plus className="w-4 h-4 mr-1" />
                         Add Field
                       </Button>
@@ -765,11 +770,10 @@ export function VisualFormBuilder({
               <TooltipProvider>
                 <div className="space-y-2">
                   {fieldsNotInSections.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Plus className="w-12 h-12 mx-auto mb-2 opacity-20" />
+                    <div className="text-center py-6 text-muted-foreground">
                       <p className="text-sm">No fields yet</p>
-                      <p className="text-xs">
-                        Add a field or use a template to get started
+                      <p className="text-xs mt-1">
+                        Click &quot;Add Field&quot; above to get started
                       </p>
                     </div>
                   ) : (
@@ -1106,6 +1110,7 @@ export function VisualFormBuilder({
                                               required: checked,
                                             })
                                           }
+                                          className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                                         />
                                       </div>
 
@@ -1137,6 +1142,7 @@ export function VisualFormBuilder({
                                                 );
                                               }
                                             }}
+                                            className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                                           />
                                           <Label
                                             htmlFor={`restrict-locations-${field.id}`}
@@ -1461,7 +1467,7 @@ export function VisualFormBuilder({
 
         {/* Right Panel - Mobile Preview */}
         <div className="hidden lg:block w-90 shrink-0 self-start sticky top-0">
-          <Card className=" p-6">
+          <Card className=" p-6" data-tour="mobile-preview">
             <MobileDevicePreview
               fields={fields}
               sections={sections}

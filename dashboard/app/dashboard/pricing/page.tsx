@@ -10,8 +10,12 @@ import {
   PricingScopeProvider,
   usePricingScope,
 } from "@/components/pricing/pricing-scope-context";
-import { PricingScopeIndicator } from "@/components/pricing/pricing-scope-indicator";
 import ServiceTypePricingEditor from "@/components/pricing/service-type-pricing-editor";
+import TestInvoiceModal from "@/components/pricing/test-invoice-modal";
+import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
+import { pricingTourSteps } from "@/components/tours/tour-definitions";
+import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -28,9 +32,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import useOrganization from "@/hooks/useOrganization";
-import { AlertTriangle, CalendarRange, ExternalLink } from "lucide-react";
+import {
+  AlertTriangle,
+  DollarSign,
+  ExternalLink,
+  Layers,
+  List,
+  TestTube,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 export default function PricingPage() {
   const {
@@ -91,17 +103,31 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
 
   const { isFixedPricing, location } = useLocationFixedPricingGuard(locationId);
   const { formatCurrency } = useOrganizationCurrency();
+  const [testInvoiceOpen, setTestInvoiceOpen] = useState(false);
 
   return (
-    <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
-        <p className="text-muted-foreground mt-2">
-          Configure customer pricing and worker payments. Prices are calculated
-          using equations based on field values from completed jobs. Customer
-          pricing is used for invoicing, while worker payments determine how
-          much workers are paid for completed jobs.
-        </p>
+    <PageTourWrapper pageId="pricing" steps={pricingTourSteps}>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
+          <p className="text-muted-foreground mt-2">
+            Configure customer pricing and worker payments. Prices are
+            calculated using equations based on field values from completed
+            jobs. Customer pricing is used for invoicing, while worker payments
+            determine how much workers are paid for completed jobs.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setTestInvoiceOpen(true)}
+            className="gap-2"
+          >
+            <TestTube className="h-4 w-4" />
+            Test Invoice
+          </Button>
+          <TourTriggerButton />
+        </div>
       </div>
 
       <Tabs defaultValue="set-pricing" className="space-y-6">
@@ -111,47 +137,18 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
         </TabsList>
 
         <TabsContent value="set-pricing" className="space-y-6">
-          <LocationScopeSelector
-            selectedNodeId={locationNodeId}
-            selectedLocationId={locationId}
-            onNodeChange={setLocationNodeId}
-            onLocationChange={setLocationId}
-            effectiveDate={effectiveDate}
-            onEffectiveDateChange={setEffectiveDate}
-            expirationDate={expirationDate}
-            onExpirationDateChange={setExpirationDate}
-          />
-
-          {effectiveDate && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <CalendarRange className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium">
-                      Viewing pricing as of{" "}
-                      {new Date(effectiveDate).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      This is a view-only filter. Changes you save will create
-                      rules effective immediately (today).
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <PricingScopeIndicator
-            locationNodeId={locationNodeId}
-            locationId={locationId}
-          />
+          <div data-tour="location-scope">
+            <LocationScopeSelector
+              selectedNodeId={locationNodeId}
+              selectedLocationId={locationId}
+              onNodeChange={setLocationNodeId}
+              onLocationChange={setLocationId}
+              effectiveDate={effectiveDate}
+              onEffectiveDateChange={setEffectiveDate}
+              expirationDate={expirationDate}
+              onExpirationDateChange={setExpirationDate}
+            />
+          </div>
 
           {isFixedPricing && location && (
             <Card className="border-amber-500/20 bg-amber-500/5">
@@ -204,17 +201,39 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
 
           <div className="space-y-6">
             <Tabs defaultValue="field-pricing" className="space-y-6">
-              <TabsList className="w-full justify-start">
-                <TabsTrigger value="field-pricing" disabled={isFixedPricing}>
+              <TabsList
+                className="w-full justify-start"
+                data-tour="pricing-tabs"
+              >
+                <TabsTrigger
+                  value="field-pricing"
+                  disabled={isFixedPricing}
+                  data-tour="field-pricing-tab"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
                   Field Pricing
                 </TabsTrigger>
-                <TabsTrigger value="option-pricing" disabled={isFixedPricing}>
+                <TabsTrigger
+                  value="option-pricing"
+                  disabled={isFixedPricing}
+                  data-tour="option-pricing-tab"
+                >
+                  <List className="h-4 w-4 mr-2" />
                   Option Pricing
                 </TabsTrigger>
-                <TabsTrigger value="base-pricing" disabled={isFixedPricing}>
+                <TabsTrigger
+                  value="base-pricing"
+                  disabled={isFixedPricing}
+                  data-tour="base-pricing-tab"
+                >
+                  <Layers className="h-4 w-4 mr-2" />
                   Base Pricing
                 </TabsTrigger>
-                <TabsTrigger value="service-type-pricing">
+                <TabsTrigger
+                  value="service-type-pricing"
+                  data-tour="service-type-pricing-tab"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
                   Service-Type Pricing
                 </TabsTrigger>
               </TabsList>
@@ -239,41 +258,60 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
               </TabsContent>
 
               <TabsContent value="option-pricing" className="space-y-6">
-                {optionPricingFields.length > 0 ? (
-                  <div className="space-y-6">
-                    {optionPricingFields.map((fieldConfig) => (
-                      <Card key={fieldConfig.id}>
-                        <CardHeader>
-                          <CardTitle>{fieldConfig.label}</CardTitle>
-                          <CardDescription>
-                            Set prices for each option (e.g., Nissan: 10,
-                            Chairs_Cleaned: 15).
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <OptionPricingEditor
-                            fieldConfig={fieldConfig}
-                            locationHierarchyId={locationNodeId}
-                            locationId={locationId}
-                            effectiveAt={effectiveDate}
-                            showBothContexts={true}
-                          />
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>No Grouped Breakdown Fields</CardTitle>
-                      <CardDescription>
-                        Create grouped breakdown fields in Mobile Application to
-                        configure option pricing. Select fields are configured
-                        in the Service-Type Pricing tab.
-                      </CardDescription>
-                    </CardHeader>
-                  </Card>
-                )}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Option Pricing</CardTitle>
+                    <CardDescription>
+                      Set prices for each option within grouped breakdown fields
+                      (e.g., Nissan: $10, Chairs_Cleaned: $15). Each grouped
+                      breakdown field can have different pricing for its
+                      options.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {optionPricingFields.length > 0 ? (
+                      <div className="space-y-6">
+                        {optionPricingFields.map((fieldConfig) => (
+                          <div key={fieldConfig.id} className="space-y-4">
+                            <div>
+                              <h3 className="text-lg font-semibold">
+                                {fieldConfig.label}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Configure pricing for each option in this field
+                              </p>
+                            </div>
+                            <OptionPricingEditor
+                              fieldConfig={fieldConfig}
+                              locationHierarchyId={locationNodeId}
+                              locationId={locationId}
+                              effectiveAt={effectiveDate}
+                              showBothContexts={true}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="py-6">
+                        <div className="text-center space-y-4">
+                          <p className="text-sm text-muted-foreground">
+                            To configure option pricing, you need to add grouped
+                            breakdown fields to your mobile app forms. Select
+                            fields are configured in the Service-Type Pricing
+                            tab.
+                          </p>
+                          <div className="flex items-center justify-center">
+                            <Link href="/dashboard/mobile-config">
+                              <Button variant="outline" size="sm">
+                                Go to Mobile App Configuration
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="base-pricing" className="space-y-6">
@@ -321,9 +359,16 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
         </TabsContent>
 
         <TabsContent value="pricing-history" className="space-y-6">
-          <PricingHistory />
+          <div data-tour="pricing-history-tab">
+            <PricingHistory />
+          </div>
         </TabsContent>
       </Tabs>
-    </>
+
+      <TestInvoiceModal
+        open={testInvoiceOpen}
+        onOpenChange={setTestInvoiceOpen}
+      />
+    </PageTourWrapper>
   );
 }

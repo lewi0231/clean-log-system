@@ -10,6 +10,7 @@ import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -473,13 +474,19 @@ export default function FieldPricingList({
         <CardHeader>
           <CardTitle>No Fields Available for Pricing</CardTitle>
           <CardDescription>
-            Add number or boolean field configurations in the{" "}
-            <Link href="/dashboard/mobile-config" className="text-primary">
-              Mobile
-            </Link>{" "}
-            section.
+            To configure field pricing, you need to add number or boolean fields
+            to your mobile app forms.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/mobile-config">
+              <Button variant="outline" size="sm">
+                Go to Mobile App Configuration
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
       </Card>
     );
   }

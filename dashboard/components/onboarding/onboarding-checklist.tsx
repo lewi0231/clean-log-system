@@ -1,0 +1,335 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
+import { useLocations } from "@/hooks/use-locations";
+import { useMobileConfig } from "@/hooks/use-mobile-config";
+import { useOnboardingStatus } from "@/hooks/use-onboarding-status";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
+import { useWorkers } from "@/hooks/use-workers";
+import useOrganization from "@/hooks/useOrganization";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  CreditCard,
+  DollarSign,
+  FileText,
+  MapPin,
+  Smartphone,
+  Users,
+  X,
+} from "lucide-react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useOnboardingChecklist } from "./onboarding-checklist-context";
+
+interface SetupStep {
+  id: string;
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  required: boolean;
+  completed: boolean;
+}
+
+export function OnboardingChecklist() {
+  const { organizationId } = useOrganization();
+  const { onboardingStatus, loading: onboardingLoading } =
+    useOnboardingStatus();
+  const { workers, loading: workersLoading } = useWorkers();
+  const { locations, loading: locationsLoading } = useLocations();
+  const { fieldConfigs, loading: configLoading } =
+    useMobileConfig(organizationId);
+  const { settings, loading: settingsLoading } = useOrganizationSettings();
+  const { isOpen, setIsOpen, isDismissed, setIsDismissed } =
+    useOnboardingChecklist();
+
+  // Check if pricing has been configured
+  const [hasPricing, setHasPricing] = useState(false);
+  const [pricingLoading, setPricingLoading] = useState(true);
+
+  useEffect(() => {
+    const checkPricing = async () => {
+      if (!organizationId) {
+        setPricingLoading(false);
+        return;
+      }
+
+      try {
+        const { PricingService } = await import("@/lib/services");
+        const pricingRules = await PricingService.listRules({
+          organization_id: organizationId,
+          include_inactive: false,
+        });
+        setHasPricing(pricingRules.length > 0);
+      } catch (err) {
+        console.error("Failed to check pricing", err);
+        setHasPricing(false);
+      } finally {
+        setPricingLoading(false);
+      }
+    };
+
+    checkPricing();
+  }, [organizationId]);
+
+  // Check if invoice configuration has been set up
+  // Invoice config is considered set up if invoice_send_immediately is explicitly set
+  // or if the user has visited the invoicing settings page (which sets defaults)
+  const hasInvoiceConfig = settings?.invoice_send_immediately !== undefined;
+
+  const loading =
+    onboardingLoading ||
+    workersLoading ||
+    locationsLoading ||
+    configLoading ||
+    settingsLoading ||
+    pricingLoading;
+
+  // Only show if onboarding is completed and not dismissed
+  if (
+    !onboardingStatus?.completed ||
+    isDismissed ||
+    loading ||
+    !onboardingStatus?.data
+  ) {
+    return null;
+  }
+
+  const onboardingData = onboardingStatus.data;
+
+  const getSetupSteps = (): SetupStep[] => {
+    const steps: SetupStep[] = [];
+
+    // Step 1: Add Workers (if they have employees)
+    if (
+      onboardingData?.employee_count &&
+      onboardingData.employee_count !== "none"
+    ) {
+      const hasWorkers = workers.length > 0;
+      steps.push({
+        id: "workers",
+        title: "Add Your Workers",
+        description: "Add employees or contractors who will use the mobile app",
+        href: "/dashboard/users",
+        icon: Users,
+        required: true,
+        completed: hasWorkers,
+      });
+    }
+
+    // Step 2: Add Locations (if they service locations)
+    if (onboardingData?.has_locations) {
+      const hasLocations = locations.length > 0;
+      steps.push({
+        id: "locations",
+        title: "Add Customer Locations",
+        description: "Set up your customer locations for recurring jobs",
+        href: "/dashboard/locations",
+        icon: MapPin,
+        required: true,
+        completed: hasLocations,
+      });
+    }
+
+    // Step 3: Configure Mobile App (always)
+    const hasFieldConfigs = fieldConfigs.length > 0;
+    steps.push({
+      id: "mobile-config",
+      title: "Customize Mobile App Forms",
+      description:
+        "Configure the forms your workers will use in the mobile app",
+      href: "/dashboard/mobile-config",
+      icon: Smartphone,
+      required: true,
+      completed: hasFieldConfigs,
+    });
+
+    // Step 4: Configure Pricing (always required after fields)
+    steps.push({
+      id: "pricing",
+      title: "Set Up Pricing",
+      description:
+        "Configure pricing for your fields, options, and services. Essential for invoicing.",
+      href: "/dashboard/pricing",
+      icon: DollarSign,
+      required: true,
+      completed: hasPricing,
+    });
+
+    // Step 5: Invoice Configuration (always required)
+    steps.push({
+      id: "invoice-config",
+      title: "Configure Invoice Settings",
+      description:
+        "Set up how invoices are sent, reviewed, and formatted. Configure in Settings.",
+      href: "/dashboard/settings?tab=invoicing",
+      icon: FileText,
+      required: true,
+      completed: hasInvoiceConfig,
+    });
+
+    // Step 6: Payment Setup (optional, can be done later)
+    const hasStripe = !!settings?.stripe_account_id;
+    steps.push({
+      id: "payment",
+      title: "Set Up Payment Processing",
+      description: "Connect Stripe to accept payments from customers",
+      href: "/dashboard/settings?tab=payment",
+      icon: CreditCard,
+      required: false,
+      completed: hasStripe,
+    });
+
+    return steps;
+  };
+
+  const steps = getSetupSteps();
+  const completedSteps = steps.filter((s) => s.completed).length;
+  const requiredSteps = steps.filter((s) => s.required);
+  const completedRequiredSteps = requiredSteps.filter(
+    (s) => s.completed
+  ).length;
+  const allRequiredComplete = completedRequiredSteps === requiredSteps.length;
+  const progress =
+    steps.length > 0 ? (completedSteps / steps.length) * 100 : 100;
+
+  // Hide if all required steps are complete and dismissed
+  if (allRequiredComplete && isDismissed) {
+    return null;
+  }
+
+  return (
+    <div className="fixed top-20 right-4 z-50 w-80 max-w-[calc(100vw-2rem)]">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <Card className="shadow-lg border-2 border-primary/20">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary">
+                    {allRequiredComplete ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <span className="text-sm font-semibold">
+                        {completedRequiredSteps}/{requiredSteps.length}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">
+                      Getting Started
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {allRequiredComplete
+                        ? "All set! Optional steps remain"
+                        : `${completedRequiredSteps} of ${requiredSteps.length} complete`}
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  {isOpen ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDismissed(true);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+              {isOpen && (
+                <div className="mt-3">
+                  <Progress value={progress} className="h-1.5" />
+                </div>
+              )}
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-2">
+              {steps.map((step) => {
+                const Icon = step.icon;
+                return (
+                  <Link
+                    key={step.id}
+                    href={step.href}
+                    className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="shrink-0 mt-0.5">
+                      {step.completed ? (
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/10 text-green-600">
+                          <CheckCircle2 className="h-4 w-4" />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={`text-sm font-medium ${
+                            step.completed
+                              ? "text-muted-foreground line-through"
+                              : ""
+                          }`}
+                        >
+                          {step.title}
+                        </p>
+                        {!step.required && (
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            Optional
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {step.description}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+              {allRequiredComplete && (
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      setIsDismissed(true);
+                    }}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    </div>
+  );
+}

@@ -626,7 +626,9 @@ export function SectionEditor({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-semibold">Form Sections</Label>
+        <Label className="text-sm font-semibold" data-tour="sections">
+          Form Sections
+        </Label>
         <Button
           variant="outline"
           size="sm"
