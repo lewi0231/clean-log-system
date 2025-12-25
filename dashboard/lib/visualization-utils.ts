@@ -74,7 +74,6 @@ export function extractFieldValue(
 export function extractGroupedBreakdown(
   submissionData: Record<string, unknown> | null,
   fieldConfig: FieldConfig,
-  _mode: "brand" | "quantity",
 ): Array<{ brand: string; quantity: number }> | null {
   if (!submissionData || fieldConfig.field_type !== "grouped_breakdown") {
     return null;
@@ -286,7 +285,6 @@ function processGroupedBreakdownData(
       const breakdown = extractGroupedBreakdown(
         job.submission_data,
         fieldConfig,
-        "brand",
       );
       if (breakdown) {
         breakdown.forEach((item) => {
@@ -330,7 +328,6 @@ function processGroupedBreakdownData(
       const breakdown = extractGroupedBreakdown(
         job.submission_data,
         fieldConfig,
-        "quantity",
       );
       if (breakdown) {
         const totalQuantity = breakdown.reduce(

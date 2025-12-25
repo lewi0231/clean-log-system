@@ -572,7 +572,7 @@ describe("fieldConfigSchema", () => {
     ];
 
     fieldTypes.forEach((fieldType) => {
-      const config: any = {
+      const config: Record<string, unknown> = {
         name: "test_field",
         label: "Test Field",
         field_type: fieldType,

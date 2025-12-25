@@ -195,7 +195,7 @@ function AcceptInvitePage() {
     <div className="h-screen w-full flex justify-center items-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Set Up Your CleanLog Account</CardTitle>
+          <CardTitle>Set Up Your Fieldly Account</CardTitle>
           <CardDescription>
             {workerEmail
               ? `Creating account for ${workerEmail}`
@@ -222,7 +222,7 @@ function AcceptInvitePage() {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                You&apos;ll use this to log into CleanLog mobile app that
+                You&apos;ll use this to log into the Fieldly mobile app that
                 you&apos;ll install later.
               </p>
             </div>

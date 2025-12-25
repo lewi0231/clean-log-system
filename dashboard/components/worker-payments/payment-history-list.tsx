@@ -23,7 +23,6 @@ import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
-import useOrganization from "@/hooks/useOrganization";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { format } from "date-fns";
@@ -34,7 +33,6 @@ import MarkPaymentPaidDialog from "./mark-payment-paid-dialog";
 import PaymentDetailDialog from "./payment-detail-dialog";
 
 export default function PaymentHistoryList() {
-  const { organizationId } = useOrganization();
   const { formatCurrency } = useOrganizationCurrency();
   const { jobs } = useJobs();
   const { calculatePayments } = useWorkerPayments();
