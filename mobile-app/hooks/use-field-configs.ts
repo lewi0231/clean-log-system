@@ -62,6 +62,9 @@ export function hasValue(value: unknown, fieldType: FieldType): boolean {
       return typeof value === "string" && value.length > 0;
     case "select":
       return typeof value === "string" && value.length > 0;
+    case "image":
+      // Image values will be stored as URLs (strings) once fully implemented
+      return typeof value === "string" && value.length > 0;
     default:
       return false;
   }

@@ -35,6 +35,8 @@ const getFieldIcon = (fieldType: string): keyof typeof Ionicons.glyphMap => {
       return "document-text-outline";
     case "select":
       return "chevron-down-outline";
+    case "image":
+      return "image-outline";
     default:
       return "text-outline";
   }
@@ -438,6 +440,48 @@ export function FieldRendererNativeBase({
               {config.description}
             </Text>
           )}
+          {error && (
+            <Text className="text-sm text-destructive mt-1">{error}</Text>
+          )}
+        </View>
+      );
+
+    case "image":
+      return (
+        <View className="mb-4">
+          <View className="flex-row items-center mb-2">
+            <Text className="text-sm font-medium text-foreground">
+              {config.label}
+              {config.required && (
+                <Text className="text-destructive ml-1">*</Text>
+              )}
+            </Text>
+          </View>
+          <View
+            className={`bg-card border rounded-xl overflow-hidden ${
+              isInvalid ? "border-destructive" : "border-border"
+            }`}
+          >
+            <View className="flex-row items-center px-4 py-3.5">
+              <View className="ml-3">
+                <Ionicons
+                  name="image-outline"
+                  size={20}
+                  color={disabled ? "#6b7280" : "#9ca3af"}
+                />
+              </View>
+              <View className="flex-1 ml-3">
+                <Text className="text-card-foreground text-base">
+                  Image upload coming soon
+                </Text>
+                {config.description && (
+                  <Text className="text-xs text-muted-foreground mt-1">
+                    {config.description}
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
           {error && (
             <Text className="text-sm text-destructive mt-1">{error}</Text>
           )}

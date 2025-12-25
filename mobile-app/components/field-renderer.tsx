@@ -342,6 +342,18 @@ export function FieldRenderer({
         </View>
       );
 
+    case "image":
+      return (
+        <View>
+          <Text className="text-muted-foreground text-sm py-2">
+            Image upload coming soon ({config.label})
+          </Text>
+          {error && (
+            <Text className="text-red-500 text-sm py-2">{error}</Text>
+          )}
+        </View>
+      );
+
     default:
       return (
         <Text className="text-red-500 text-sm py-2">

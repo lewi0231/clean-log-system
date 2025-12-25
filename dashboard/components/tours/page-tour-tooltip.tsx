@@ -173,9 +173,15 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
         setTargetElement(element);
       });
     } else {
-      // Element not found, skip to next step only if moving forward
-      // Don't auto-skip when going back (previousStep called)
+      // Element not found - auto-skip to next step to prevent tour from hanging
       console.warn(`Tour step target not found: ${currentStepData.target}`);
+      if (currentStep < totalSteps - 1) {
+        // Skip to next step after a short delay to allow for DOM updates
+        setTimeout(() => nextStep(), 100);
+      } else {
+        // If we're at the last step and element not found, end the tour
+        endTour();
+      }
     }
 
     return () => {
@@ -188,7 +194,11 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
   }, [
     isTourActive,
     currentStep,
+    totalSteps,
+    nextStep,
+    endTour,
     // Only re-run when step changes, not when targetElement changes
+    // nextStep, endTour, and totalSteps are stable references from context
   ]);
 
   // Create overlay backdrop
