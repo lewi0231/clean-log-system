@@ -2,7 +2,7 @@ import DashboardLayout from "@/components/dashboard-layout";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard | Clean Log",
+  title: "Dashboard | Fieldly",
   description: "Manage your organization's workers, locations, and jobs",
 };
 
