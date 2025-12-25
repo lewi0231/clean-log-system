@@ -8,4 +8,5 @@ export type FieldType =
   | "date"
   | "time"
   | "grouped_breakdown"
-  | "boolean";
+  | "boolean"
+  | "image";

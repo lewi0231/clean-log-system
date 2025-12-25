@@ -45,11 +45,7 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
       return;
     }
 
-    // Remove highlight from previous element first
-    const previousElement = targetElement;
-    if (previousElement) {
-      previousElement.classList.remove("tour-highlight");
-    }
+    // Cleanup will handle removing highlight from previous element
 
     // Try to find element by data attribute first, then by selector
     let element: HTMLElement | null = null;
@@ -148,16 +144,28 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
 
       // For mobile preview, add extra scroll to ensure it's not cut off at top
       if (isMobilePreview) {
+        // Wait for scroll to complete, then check position
         setTimeout(() => {
           const rect = element.getBoundingClientRect();
-          if (rect.top < 100) {
-            // If too close to top, scroll a bit more
+          const viewportHeight = window.innerHeight;
+          // If element is cut off at top (rect.top < 20px), scroll more
+          if (rect.top < 20) {
+            // Scroll so element is at least 100px from top
+            const scrollAmount = rect.top - 100;
             window.scrollBy({
-              top: -50,
+              top: scrollAmount,
               behavior: "smooth",
             });
           }
-        }, 300);
+          // Also ensure element is visible in viewport
+          if (rect.bottom > viewportHeight) {
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+              inline: "nearest",
+            });
+          }
+        }, 500);
       }
 
       // Update state after DOM operations (defer to avoid cascading renders)
@@ -165,29 +173,22 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
         setTargetElement(element);
       });
     } else {
-      // Element not found, skip to next step
+      // Element not found, skip to next step only if moving forward
+      // Don't auto-skip when going back (previousStep called)
       console.warn(`Tour step target not found: ${currentStepData.target}`);
-      if (currentStep < totalSteps - 1) {
-        setTimeout(() => nextStep(), 100);
-      } else {
-        endTour();
-      }
     }
 
     return () => {
-      // Cleanup: remove highlight class from current element
+      // Cleanup: remove highlight class from element when step changes
       if (element) {
         element.classList.remove("tour-highlight");
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isTourActive,
     currentStep,
-    currentStepData,
-    totalSteps,
-    nextStep,
-    endTour,
-    targetElement,
+    // Only re-run when step changes, not when targetElement changes
   ]);
 
   // Create overlay backdrop

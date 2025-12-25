@@ -71,6 +71,10 @@ export default function SettingsPage() {
     invoice_send_immediately: false,
     feedback_email_send_immediately: false,
     auto_generate_invoices_immediately: false,
+    bank_transfer_bsb: null,
+    bank_transfer_account_number: null,
+    bank_transfer_account_name: null,
+    show_bank_transfer_on_invoices: false,
     rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
@@ -121,6 +125,13 @@ export default function SettingsPage() {
             data.settings.feedback_email_send_immediately ?? false,
           auto_generate_invoices_immediately:
             data.settings.auto_generate_invoices_immediately ?? false,
+          bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+          bank_transfer_account_number:
+            data.settings.bank_transfer_account_number ?? null,
+          bank_transfer_account_name:
+            data.settings.bank_transfer_account_name ?? null,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices ?? false,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -594,6 +605,196 @@ export default function SettingsPage() {
     }
   };
 
+  const handleShowBankTransferChange = async (enabled: boolean) => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating show bank transfer on invoices", {
+        enabled,
+      });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            show_bank_transfer_on_invoices: enabled,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to update show bank transfer", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices,
+        }));
+      }
+
+      log.info("Settings: Show bank transfer updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update show bank transfer", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update bank transfer setting. Please try again.",
+      });
+    }
+  };
+
+  const handleBankTransferBsbChange = async () => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating bank transfer BSB");
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            bank_transfer_bsb: settings.bank_transfer_bsb || null,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to update bank transfer BSB", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          bank_transfer_bsb: data.settings.bank_transfer_bsb,
+        }));
+      }
+
+      log.info("Settings: Bank transfer BSB updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update bank transfer BSB", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update BSB. Please try again.",
+      });
+    }
+  };
+
+  const handleBankTransferAccountNumberChange = async () => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating bank transfer account number");
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            bank_transfer_account_number:
+              settings.bank_transfer_account_number || null,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to update bank transfer account number", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          bank_transfer_account_number:
+            data.settings.bank_transfer_account_number,
+        }));
+      }
+
+      log.info("Settings: Bank transfer account number updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update bank transfer account number", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update account number. Please try again.",
+      });
+    }
+  };
+
+  const handleBankTransferAccountNameChange = async () => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating bank transfer account name");
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            bank_transfer_account_name:
+              settings.bank_transfer_account_name || null,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to update bank transfer account name", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          bank_transfer_account_name: data.settings.bank_transfer_account_name,
+        }));
+      }
+
+      log.info("Settings: Bank transfer account name updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update bank transfer account name", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update account name. Please try again.",
+      });
+    }
+  };
+
   const handleAutoGenerateInvoicesChange = async (enabled: boolean) => {
     if (!organizationId) return;
 
@@ -878,6 +1079,121 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Bank Transfer Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank Transfer Payment Details</CardTitle>
+              <CardDescription>
+                Add your bank account details to display on invoices for manual
+                payment processing. Payments via bank transfer require manual
+                status updates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">
+                    Show Bank Transfer Details on Invoices
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Display bank transfer details on invoices. Payments via bank
+                    transfer will not be automatically tracked and require
+                    manual payment status updates.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.show_bank_transfer_on_invoices}
+                  onCheckedChange={handleShowBankTransferChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+
+              {settings.show_bank_transfer_on_invoices && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-bsb">BSB</Label>
+                    <Input
+                      id="bank-transfer-bsb"
+                      value={settings.bank_transfer_bsb || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_bsb: e.target.value,
+                        }))
+                      }
+                      onBlur={handleBankTransferBsbChange}
+                      placeholder="123-456"
+                      pattern="[0-9]{3}-[0-9]{3}"
+                      maxLength={7}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: XXX-XXX (e.g., 123-456)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-number">
+                      Account Number
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-number"
+                      type="text"
+                      inputMode="numeric"
+                      value={settings.bank_transfer_account_number || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_number: e.target.value.replace(
+                            /\D/g,
+                            ""
+                          ),
+                        }))
+                      }
+                      onBlur={handleBankTransferAccountNumberChange}
+                      placeholder="987654321"
+                      maxLength={10}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">6-10 digits</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-name">
+                      Account Name (Optional)
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-name"
+                      value={settings.bank_transfer_account_name || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_name: e.target.value,
+                        }))
+                      }
+                      onBlur={handleBankTransferAccountNameChange}
+                      placeholder="Account Holder Name"
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Name associated with the bank account
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/50 border border-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Note:</strong> Payments via bank transfer will not
+                      be automatically tracked. You will need to manually update
+                      the payment status when payments are received. Include the
+                      invoice number in your payment reference to help match
+                      payments.
+                    </p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

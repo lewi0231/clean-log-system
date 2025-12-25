@@ -53,6 +53,7 @@ import {
   GripVertical,
   Hash,
   HelpCircle,
+  Image,
   Layers,
   List,
   Mail,
@@ -83,6 +84,7 @@ const FIELD_TYPES: {
   { type: "date", icon: Calendar, label: "Date" },
   { type: "time", icon: Clock, label: "Time" },
   { type: "boolean", icon: CheckSquare, label: "Checkbox" },
+  { type: "image", icon: Image, label: "Image" },
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 
@@ -535,6 +537,11 @@ export function VisualFormBuilder({
                         description: "Checkbox for yes/no or true/false values",
                         example: "e.g., Completed, Verified, Approved",
                       },
+                      image: {
+                        description: "Image upload for photos or documents",
+                        example:
+                          "e.g., Before/after photos, Damage documentation",
+                      },
                       grouped_breakdown: {
                         description:
                           "Grouped breakdown for itemized lists with quantities",
@@ -707,6 +714,12 @@ export function VisualFormBuilder({
                                 description:
                                   "Checkbox for yes/no or true/false values",
                                 example: "e.g., Completed, Verified, Approved",
+                              },
+                              image: {
+                                description:
+                                  "Image upload for photos or documents",
+                                example:
+                                  "e.g., Before/after photos, Damage documentation",
                               },
                               grouped_breakdown: {
                                 description:

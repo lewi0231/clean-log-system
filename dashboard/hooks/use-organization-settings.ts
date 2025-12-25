@@ -50,6 +50,13 @@ async function fetchOrganizationSettings(
       data.settings.default_exclusive_group_label ?? null,
     auto_generate_invoices_immediately:
       data.settings.auto_generate_invoices_immediately ?? false,
+    bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+    bank_transfer_account_number: data.settings.bank_transfer_account_number ??
+      null,
+    bank_transfer_account_name: data.settings.bank_transfer_account_name ??
+      null,
+    show_bank_transfer_on_invoices:
+      data.settings.show_bank_transfer_on_invoices ?? false,
   };
 }
 

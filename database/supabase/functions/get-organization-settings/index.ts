@@ -32,7 +32,9 @@ serve(async (req) => {
     // Fetch organization_settings for additional settings
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
-      .select("auto_generate_invoices_immediately")
+      .select(
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices",
+      )
       .eq("organization_id", organization_id)
       .maybeSingle();
 
@@ -87,6 +89,13 @@ serve(async (req) => {
           organization?.default_exclusive_group_label ?? null,
         auto_generate_invoices_immediately:
           orgSettings?.auto_generate_invoices_immediately ?? false,
+        bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
+        bank_transfer_account_number:
+          orgSettings?.bank_transfer_account_number ?? null,
+        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ??
+          null,
+        show_bank_transfer_on_invoices:
+          orgSettings?.show_bank_transfer_on_invoices ?? false,
       },
     });
   } catch (error) {

@@ -42,6 +42,10 @@ serve(async (req) => {
       locale,
       default_exclusive_group_label,
       auto_generate_invoices_immediately,
+      bank_transfer_bsb,
+      bank_transfer_account_number,
+      bank_transfer_account_name,
+      show_bank_transfer_on_invoices,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -252,6 +256,115 @@ serve(async (req) => {
       }
     }
 
+    // Handle bank transfer details (stored in organization_settings table)
+    if (
+      bank_transfer_bsb !== undefined ||
+      bank_transfer_account_number !== undefined ||
+      bank_transfer_account_name !== undefined ||
+      show_bank_transfer_on_invoices !== undefined
+    ) {
+      // Validate BSB format if provided (Australian format: XXX-XXX)
+      if (bank_transfer_bsb !== undefined && bank_transfer_bsb !== null) {
+        const trimmedBsb = typeof bank_transfer_bsb === "string"
+          ? bank_transfer_bsb.trim()
+          : "";
+        if (trimmedBsb && !/^\d{3}-\d{3}$/.test(trimmedBsb)) {
+          return errorResponse(
+            "BSB must be in format XXX-XXX (e.g., 123-456)",
+            400,
+          );
+        }
+      }
+
+      // Validate account number if provided
+      if (
+        bank_transfer_account_number !== undefined &&
+        bank_transfer_account_number !== null
+      ) {
+        const trimmedAccount = typeof bank_transfer_account_number === "string"
+          ? bank_transfer_account_number.trim()
+          : "";
+        if (
+          trimmedAccount &&
+          (!/^\d+$/.test(trimmedAccount) || trimmedAccount.length < 6 ||
+            trimmedAccount.length > 10)
+        ) {
+          return errorResponse(
+            "Account number must be 6-10 digits",
+            400,
+          );
+        }
+      }
+
+      // Get or create organization_settings record
+      const { data: existingSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      const settingsUpdate: Record<string, unknown> = {};
+
+      if (bank_transfer_bsb !== undefined) {
+        settingsUpdate.bank_transfer_bsb =
+          typeof bank_transfer_bsb === "string" && bank_transfer_bsb.trim()
+            ? bank_transfer_bsb.trim()
+            : null;
+      }
+      if (bank_transfer_account_number !== undefined) {
+        settingsUpdate.bank_transfer_account_number =
+          typeof bank_transfer_account_number === "string" &&
+            bank_transfer_account_number.trim()
+            ? bank_transfer_account_number.trim()
+            : null;
+      }
+      if (bank_transfer_account_name !== undefined) {
+        settingsUpdate.bank_transfer_account_name =
+          typeof bank_transfer_account_name === "string" &&
+            bank_transfer_account_name.trim()
+            ? bank_transfer_account_name.trim()
+            : null;
+      }
+      if (show_bank_transfer_on_invoices !== undefined) {
+        if (typeof show_bank_transfer_on_invoices !== "boolean") {
+          return errorResponse(
+            "show_bank_transfer_on_invoices must be a boolean",
+            400,
+          );
+        }
+        settingsUpdate.show_bank_transfer_on_invoices =
+          show_bank_transfer_on_invoices;
+      }
+
+      if (existingSettings) {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .update(settingsUpdate)
+          .eq("id", existingSettings.id);
+
+        if (settingsError) {
+          logger.error("Failed to update bank transfer settings", {
+            error: settingsError,
+          });
+          // Don't throw - continue with other updates
+        }
+      } else {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id,
+            ...settingsUpdate,
+          });
+
+        if (settingsError) {
+          logger.error("Failed to create bank transfer settings", {
+            error: settingsError,
+          });
+          // Don't throw - continue with other updates
+        }
+      }
+    }
+
     const { data: organization, error: updateError } = await supabase
       .from("organization")
       .update(updateData)
@@ -266,7 +379,9 @@ serve(async (req) => {
     // Fetch organization_settings for response
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
-      .select("auto_generate_invoices_immediately")
+      .select(
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices",
+      )
       .eq("organization_id", organization_id)
       .maybeSingle();
 
@@ -320,6 +435,13 @@ serve(async (req) => {
           organization?.default_exclusive_group_label ?? null,
         auto_generate_invoices_immediately:
           orgSettings?.auto_generate_invoices_immediately ?? false,
+        bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
+        bank_transfer_account_number:
+          orgSettings?.bank_transfer_account_number ?? null,
+        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ??
+          null,
+        show_bank_transfer_on_invoices:
+          orgSettings?.show_bank_transfer_on_invoices ?? false,
       },
     });
   } catch (error) {

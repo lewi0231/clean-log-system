@@ -58,6 +58,7 @@ import {
   GripVertical,
   Hash,
   HelpCircle,
+  Image,
   Layers,
   List,
   Mail,
@@ -120,6 +121,7 @@ const FIELD_TYPES: {
   { type: "date", icon: Calendar, label: "Date" },
   { type: "time", icon: Clock, label: "Time" },
   { type: "boolean", icon: CheckSquare, label: "Checkbox" },
+  { type: "image", icon: Image, label: "Image" },
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 
@@ -673,7 +675,7 @@ export function SectionEditor({
           variant="outline"
           size="sm"
           onClick={() => handleOpenDialog()}
-          className="h-8"
+          className="h-8 cursor-pointer"
         >
           <FolderPlus className="w-4 h-4 mr-1" />
           Add Section
@@ -787,7 +789,7 @@ export function SectionEditor({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="h-7 w-7 cursor-pointer"
                       onClick={() => handleOpenDialog(section)}
                     >
                       <Pencil className="w-3 h-3" />
@@ -795,7 +797,7 @@ export function SectionEditor({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="h-7 w-7 cursor-pointer"
                       onClick={() => onDeleteSection(section.id)}
                     >
                       <Trash2 className="w-3 h-3 text-destructive" />
@@ -964,7 +966,7 @@ export function SectionEditor({
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-6 w-6"
+                                            className="h-6 w-6 cursor-pointer"
                                           >
                                             <Settings className="w-3 h-3" />
                                           </Button>
@@ -1188,6 +1190,7 @@ export function SectionEditor({
                                                         );
                                                       }
                                                     }}
+                                                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                                                   />
                                                   <Label
                                                     htmlFor={`restrict-locations-${field.id}`}
@@ -1317,7 +1320,7 @@ export function SectionEditor({
                                                 <Button
                                                   variant="outline"
                                                   size="sm"
-                                                  className="w-full justify-between"
+                                                  className="w-full justify-between cursor-pointer"
                                                 >
                                                   <span className="text-xs">
                                                     Advanced Options
@@ -1550,7 +1553,7 @@ export function SectionEditor({
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 text-destructive hover:text-destructive"
+                                        className="h-6 w-6 text-destructive hover:text-destructive cursor-pointer"
                                         onClick={() =>
                                           onRemoveFieldFromSection(field.id)
                                         }
@@ -1655,14 +1658,23 @@ export function SectionEditor({
                     collapsed_by_default: checked,
                   }))
                 }
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              className="cursor-pointer"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSubmit} disabled={!formData.title.trim()}>
+            <Button
+              onClick={handleSubmit}
+              disabled={!formData.title.trim()}
+              className="cursor-pointer"
+            >
               {editingSection ? "Update" : "Create"}
             </Button>
           </DialogFooter>
