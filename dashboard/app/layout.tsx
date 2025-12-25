@@ -16,8 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Clean Log Dashboard",
-  description: "Manage your organization's workers, locations, and jobs",
+  title: "Fieldly Dashboard",
+  description:
+    "Flexible job forms for field teams — automate invoicing, payments, and reporting.",
 };
 
 export default function RootLayout({

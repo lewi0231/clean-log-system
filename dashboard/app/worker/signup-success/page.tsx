@@ -19,7 +19,7 @@ export default function WorkerSignupSuccessPage() {
           <div className="flex justify-center mb-4">
             <CheckCircle2 className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-center">Welcome to CleanLog!</CardTitle>
+          <CardTitle className="text-center">Welcome to Fieldly!</CardTitle>
           <CardDescription className="text-center">
             Your account has been created successfully.
           </CardDescription>

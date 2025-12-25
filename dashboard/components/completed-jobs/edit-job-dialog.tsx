@@ -343,20 +343,6 @@ export default function EditJobDialog({
     Record<string, string | null>
   >({});
 
-  // Check if job is invoiced
-  const isInvoiced = useMemo(() => {
-    if (!job) return false;
-    const invoices = job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
-    return invoices.length > 0;
-  }, [job]);
-
-  const invoiceInfo = useMemo(() => {
-    if (!job || !isInvoiced) return null;
-    const invoices = job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
-    if (invoices.length === 0) return null;
-    return invoices[0]?.invoice;
-  }, [job, isInvoiced]);
-
   // Initialize form when dialog opens with job data
   useEffect(() => {
     if (open && job) {

@@ -186,14 +186,14 @@ describe("extractGroupedBreakdown", () => {
     const fieldConfig = createFieldConfig({
       field_type: "grouped_breakdown",
     });
-    expect(extractGroupedBreakdown(null, fieldConfig, "brand")).toBeNull();
+    expect(extractGroupedBreakdown(null, fieldConfig)).toBeNull();
   });
 
   it("should return null for non-grouped_breakdown field", () => {
     const submissionData = { items: [] };
     const fieldConfig = createFieldConfig({ field_type: "number" });
     expect(
-      extractGroupedBreakdown(submissionData, fieldConfig, "brand"),
+      extractGroupedBreakdown(submissionData, fieldConfig),
     ).toBeNull();
   });
 
@@ -208,11 +208,7 @@ describe("extractGroupedBreakdown", () => {
       name: "items",
       field_type: "grouped_breakdown",
     });
-    const result = extractGroupedBreakdown(
-      submissionData,
-      fieldConfig,
-      "brand",
-    );
+    const result = extractGroupedBreakdown(submissionData, fieldConfig);
     expect(result).toEqual([
       { brand: "Brand A", quantity: 5 },
       { brand: "Brand B", quantity: 3 },
@@ -232,11 +228,7 @@ describe("extractGroupedBreakdown", () => {
       name: "items",
       field_type: "grouped_breakdown",
     });
-    const result = extractGroupedBreakdown(
-      submissionData,
-      fieldConfig,
-      "brand",
-    );
+    const result = extractGroupedBreakdown(submissionData, fieldConfig);
     expect(result).toEqual([
       { brand: "Brand A", quantity: 5 },
       { brand: "Brand B", quantity: 3 },
@@ -250,7 +242,7 @@ describe("extractGroupedBreakdown", () => {
       field_type: "grouped_breakdown",
     });
     expect(
-      extractGroupedBreakdown(submissionData, fieldConfig, "brand"),
+      extractGroupedBreakdown(submissionData, fieldConfig),
     ).toBeNull();
   });
 
@@ -260,11 +252,7 @@ describe("extractGroupedBreakdown", () => {
       name: "items",
       field_type: "grouped_breakdown",
     });
-    const result = extractGroupedBreakdown(
-      submissionData,
-      fieldConfig,
-      "brand",
-    );
+    const result = extractGroupedBreakdown(submissionData, fieldConfig);
     expect(result).toEqual([]);
   });
 });
