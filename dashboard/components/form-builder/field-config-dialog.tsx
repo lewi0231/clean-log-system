@@ -21,6 +21,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocations } from "@/hooks/use-locations";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
 import {
@@ -84,6 +85,7 @@ export function FieldConfigDialog({
 
   const { locations } = useLocations();
   const { organizationId } = useOrganization();
+  const { settings } = useOrganizationSettings();
 
   // Update name when label changes (only if not manually edited)
   useEffect(() => {
@@ -328,71 +330,78 @@ export function FieldConfigDialog({
             />
           </div>
 
-          {/* Location Restrictions */}
-          <div className="space-y-3 pt-4 border-t">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="restrict-to-locations"
-                checked={restrictToLocations}
-                onCheckedChange={setRestrictToLocations}
-              />
-              <Label htmlFor="restrict-to-locations" className="cursor-pointer">
-                Restrict to specific locations
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              When enabled, this field will only be available at the selected
-              locations. Leave empty to make it available at all locations.
-            </p>
-
-            {restrictToLocations && (
-              <div className="space-y-2 pl-6 border-l-2 border-muted">
-                {locations.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No locations available. Create locations first.
-                  </p>
-                ) : (
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {locations
-                      .filter((loc) => loc.active)
-                      .map((location) => (
-                        <div
-                          key={location.id}
-                          className="flex items-center space-x-2"
-                        >
-                          <input
-                            type="checkbox"
-                            id={`dialog-location-${location.id}`}
-                            checked={selectedLocationIds.includes(location.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedLocationIds([
-                                  ...selectedLocationIds,
-                                  location.id,
-                                ]);
-                              } else {
-                                setSelectedLocationIds(
-                                  selectedLocationIds.filter(
-                                    (id) => id !== location.id
-                                  )
-                                );
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <Label
-                            htmlFor={`dialog-location-${location.id}`}
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            {location.name}
-                          </Label>
-                        </div>
-                      ))}
-                  </div>
-                )}
+          {/* Location Restrictions - Only show if using customer locations */}
+          {settings?.use_predefined_locations && (
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="restrict-to-locations"
+                  checked={restrictToLocations}
+                  onCheckedChange={setRestrictToLocations}
+                />
+                <Label
+                  htmlFor="restrict-to-locations"
+                  className="cursor-pointer"
+                >
+                  Restrict to specific locations
+                </Label>
               </div>
-            )}
-          </div>
+              <p className="text-xs text-muted-foreground">
+                When enabled, this field will only be available at the selected
+                locations. Leave empty to make it available at all locations.
+              </p>
+
+              {restrictToLocations && (
+                <div className="space-y-2 pl-6 border-l-2 border-muted">
+                  {locations.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No locations available. Create locations first.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {locations
+                        .filter((loc) => loc.active)
+                        .map((location) => (
+                          <div
+                            key={location.id}
+                            className="flex items-center space-x-2"
+                          >
+                            <input
+                              type="checkbox"
+                              id={`dialog-location-${location.id}`}
+                              checked={selectedLocationIds.includes(
+                                location.id
+                              )}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedLocationIds([
+                                    ...selectedLocationIds,
+                                    location.id,
+                                  ]);
+                                } else {
+                                  setSelectedLocationIds(
+                                    selectedLocationIds.filter(
+                                      (id) => id !== location.id
+                                    )
+                                  );
+                                }
+                              }}
+                              className="h-4 w-4 rounded border-gray-300"
+                            />
+                            <Label
+                              htmlFor={`dialog-location-${location.id}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              {location.name}
+                            </Label>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

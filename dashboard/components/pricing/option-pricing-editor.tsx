@@ -762,7 +762,7 @@ export default function OptionPricingEditor({
 
       {/* Collapsible Individual Options */}
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary">
+        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary cursor-pointer">
           {expanded ? (
             <ChevronDown className="h-4 w-4" />
           ) : (

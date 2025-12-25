@@ -165,6 +165,56 @@ Switch components are located in: `dashboard/components/ui/switch.tsx`
 
 ---
 
+## Buttons and Links
+
+### Cursor Pointer
+
+All clickable elements (buttons, links, and interactive components) should use `cursor-pointer` to provide clear visual feedback that the element is clickable.
+
+### Implementation
+
+```tsx
+// Button component (already has cursor-pointer by default)
+<Button onClick={handleClick}>Click Me</Button>
+
+// Link component
+<Link href="/path" className="cursor-pointer">
+  Navigate
+</Link>
+
+// Custom clickable elements
+<div
+  onClick={handleClick}
+  className="cursor-pointer hover:bg-muted/50"
+>
+  Clickable Card
+</div>
+
+// Collapsible triggers
+<CollapsibleTrigger asChild>
+  <CardHeader className="cursor-pointer hover:bg-muted/50">
+    {/* Content */}
+  </CardHeader>
+</CollapsibleTrigger>
+```
+
+### Usage Guidelines
+
+- Always add `cursor-pointer` to custom clickable elements (divs, cards, etc.)
+- Use `cursor-pointer` on interactive elements that aren't standard buttons or links
+- Combine with hover states for better UX (e.g., `hover:bg-muted/50`)
+- Button and Link components from shadcn/ui already include cursor-pointer by default
+- For drag-and-drop elements, use `cursor-move` instead
+
+### Examples
+
+- **Clickable Cards**: Add `cursor-pointer` to card headers that trigger actions
+- **Collapsible Sections**: Use `cursor-pointer` on collapsible triggers
+- **Interactive Lists**: Add `cursor-pointer` to list items that are clickable
+- **Icon Buttons**: Ensure icon buttons have `cursor-pointer` if not using Button component
+
+---
+
 ## General Principles
 
 1. **Consistency**: Follow established patterns for similar UI elements

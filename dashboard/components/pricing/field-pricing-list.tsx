@@ -480,7 +480,7 @@ export default function FieldPricingList({
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <Link href="/dashboard/mobile-config">
+            <Link href="/dashboard/mobile-config" className="cursor-pointer">
               <Button variant="outline" size="sm">
                 Go to Mobile App Configuration
               </Button>

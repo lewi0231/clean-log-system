@@ -1031,7 +1031,7 @@ export default function BasePricingEditor({
             {standalonePricing && isPricingRulesEnabled() && (
               <Collapsible defaultOpen={standaloneConditions.length > 0}>
                 <div className="space-y-3 border-t pt-4">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity group">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity group cursor-pointer">
                     <div className="text-left">
                       <Label className="text-sm font-semibold">
                         Conditional Rules
