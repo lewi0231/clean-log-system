@@ -8,17 +8,18 @@ This document outlines three user personas and scenarios for manual testing of t
 
 - **Business Type**: Car yard detailing service
 - **Business Size**: 6-20 employees/contractors
-- **Payment Model**: Per-job (per car detailed)
+- **Payment Model**: Fortnightly wages
 - **Location Model**: Fixed locations (car yards)
 - **User Role**: Business owner/admin
 
 ### Key Characteristics
 
 - Multiple workers completing jobs at fixed customer locations
-- Workers are paid per car detailed (not hourly)
+- Workers are paid fortnightly (not per job or hourly)
 - Jobs are location-specific (different car yards)
-- Invoicing happens per job completion
+- Invoicing happens monthly (batch invoicing)
 - Business uses customer locations feature
+- No photo upload requirements
 
 ### Testing Focus Areas
 
@@ -30,13 +31,13 @@ This document outlines three user personas and scenarios for manual testing of t
    - Set employee count (6-20 range)
    - Select industry type (automotive/detailing)
    - Enable customer locations (fixed sites)
-   - Configure worker payment: per job
-   - Set invoice frequency (immediate or batch)
+   - Configure worker payment: fortnightly
+   - Set invoice frequency: monthly
 
 2. **Post-Onboarding Setup**
    - Add workers (6-20 employees)
    - Add customer locations (multiple car yards)
-   - Configure mobile app forms (car details, services performed, before/after photos)
+   - Configure mobile app forms (car details, services performed)
    - Set up pricing rules:
      - Field-based pricing (e.g., car size, service type)
      - Option pricing (e.g., interior vs exterior packages)
@@ -51,8 +52,8 @@ This document outlines three user personas and scenarios for manual testing of t
    - Worker logs job via mobile app at car yard location
    - Worker fills in custom form fields (car details, services)
    - Worker submits job completion
-   - System generates invoice automatically
-   - Invoice sent to customer with payment link
+   - Jobs accumulate for monthly invoicing
+   - Monthly invoices generated and sent to customers with payment links
 
 2. **Pricing & Invoicing**
 
@@ -69,6 +70,7 @@ This document outlines three user personas and scenarios for manual testing of t
    - Assign workers to specific locations
    - View worker job history
    - Track worker ratings over time
+   - Process fortnightly worker payments
 
 4. **Location Management**
    - Add/edit customer locations (car yards)
