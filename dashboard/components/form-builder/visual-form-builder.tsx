@@ -35,6 +35,7 @@ import {
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
@@ -206,7 +207,9 @@ export function VisualFormBuilder({
         setLocationRestrictionsMap(restrictionsMap);
         setRestrictToLocationsMap(restrictMap);
       } catch (err) {
-        console.error("Failed to fetch location restrictions", err);
+        log.error("Failed to fetch location restrictions", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
       }
     }
 
@@ -353,7 +356,10 @@ export function VisualFormBuilder({
         });
       }
     } catch (err) {
-      console.error("Failed to load location restrictions", err);
+      log.error("Failed to load location restrictions", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldId,
+      });
     }
   };
 
@@ -978,9 +984,15 @@ export function VisualFormBuilder({
                                             field.id
                                           );
                                         } catch (err) {
-                                          console.error(
+                                          log.error(
                                             "Failed to save location restrictions",
-                                            err
+                                            {
+                                              error:
+                                                err instanceof Error
+                                                  ? err.message
+                                                  : "Unknown error",
+                                              fieldId: field.id,
+                                            }
                                           );
                                         }
                                       }

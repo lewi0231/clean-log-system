@@ -40,6 +40,7 @@ import {
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
@@ -252,7 +253,10 @@ export function SectionEditor({
         });
       }
     } catch (err) {
-      console.error("Failed to load location restrictions", err);
+      log.error("Failed to load location restrictions", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldId,
+      });
     }
   };
 
@@ -308,13 +312,19 @@ export function SectionEditor({
       );
 
       if (locationError) {
-        console.error("Failed to save location restrictions", locationError);
+        log.error("Failed to save location restrictions", {
+          error: locationError.message || "Unknown error",
+          fieldId,
+        });
       } else {
         // Refresh location restrictions after save
         await loadLocationRestrictions(fieldId);
       }
     } catch (err) {
-      console.error("Failed to save location restrictions", err);
+      log.error("Failed to save location restrictions", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldId,
+      });
     }
 
     // Clear all local state for this field after saving
@@ -424,7 +434,9 @@ export function SectionEditor({
         setLocationRestrictionsMap(restrictionsMap);
         setRestrictToLocationsMap(restrictMap);
       } catch (err) {
-        console.error("Failed to fetch location restrictions", err);
+        log.error("Failed to fetch location restrictions", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
       }
     }
 

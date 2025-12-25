@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
@@ -201,15 +202,18 @@ export function FieldConfigDialog({
               );
 
               if (locationError) {
-                console.error(
-                  "Failed to save location restrictions",
-                  locationError
-                );
+                log.error("Failed to save location restrictions", {
+                  error: locationError.message || "Unknown error",
+                  fieldId: newFieldConfig?.id,
+                });
               }
             }
           }
         } catch (err) {
-          console.error("Failed to save location restrictions", err);
+          log.error("Failed to save location restrictions", {
+            error: err instanceof Error ? err.message : "Unknown error",
+            fieldName: name,
+          });
         }
       }
 

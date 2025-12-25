@@ -22,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useServicePricingMode } from "@/hooks/use-service-pricing-mode";
+import { log } from "@/lib/logger";
 import type { ServicePricingMode } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
 import { DollarSign, Info, Save, X } from "lucide-react";
@@ -194,7 +195,11 @@ export default function ServiceTypePricingEditor({
         return next;
       });
     } catch (error) {
-      console.error("Failed to save service pricing mode", error);
+      log.error("Failed to save service pricing mode", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        fieldConfigId: fieldConfig.id,
+        optionValue,
+      });
     } finally {
       setSaving((prev) => {
         const next = { ...prev };
@@ -218,7 +223,11 @@ export default function ServiceTypePricingEditor({
         return next;
       });
     } catch (err) {
-      console.error("Failed to delete service pricing mode", err);
+      log.error("Failed to delete service pricing mode", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldConfigId,
+        optionValue,
+      });
     } finally {
       setDeleting((prev) => {
         const next = { ...prev };
