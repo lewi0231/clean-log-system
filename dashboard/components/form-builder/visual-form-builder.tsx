@@ -648,16 +648,16 @@ export function VisualFormBuilder({
                   </Badge>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        data-tour="add-field-button"
-                      >
+                      <Button variant="outline" size="sm">
                         <Plus className="w-4 h-4 mr-1" />
                         Add Field
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2" align="end">
+                    <PopoverContent
+                      className="w-56 p-2"
+                      align="end"
+                      data-tour="add-field-button"
+                    >
                       <TooltipProvider>
                         <div className="grid grid-cols-2 gap-2">
                           {FIELD_TYPES.map(({ type, icon: Icon, label }) => {

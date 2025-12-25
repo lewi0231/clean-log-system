@@ -88,15 +88,77 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
         }, 150);
       }
 
+      // If element is a PopoverContent, try to open the popover by clicking its trigger
+      // First, find the button that triggers this popover (it should be nearby)
+      if (
+        element.hasAttribute("data-tour") &&
+        element.getAttribute("data-tour") === "add-field-button"
+      ) {
+        // The PopoverContent might not be in DOM yet, so find the button first
+        // Look for a button with "Add Field" text that's near this element
+        const addFieldButton = Array.from(
+          document.querySelectorAll("button")
+        ).find(
+          (btn) =>
+            btn.textContent?.includes("Add Field") &&
+            btn.querySelector(".lucide-plus")
+        );
+
+        if (addFieldButton && addFieldButton instanceof HTMLElement) {
+          // Click the button to open the popover
+          addFieldButton.click();
+
+          // Wait for popover to appear in DOM, then highlight it
+          const checkForPopover = setInterval(() => {
+            const popoverContent = document.querySelector(
+              '[data-tour="add-field-button"]'
+            ) as HTMLElement;
+            if (popoverContent) {
+              clearInterval(checkForPopover);
+              popoverContent.classList.add("tour-highlight");
+              popoverContent.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "center",
+              });
+              setTargetElement(popoverContent);
+            }
+          }, 50);
+
+          // Timeout after 1 second if popover doesn't appear
+          setTimeout(() => clearInterval(checkForPopover), 1000);
+          return; // Exit early, we'll handle highlighting in the interval
+        }
+      }
+
       // Add highlight class immediately for smooth transition
       element.classList.add("tour-highlight");
 
       // Scroll element into view (for large elements, scroll to top)
+      // For mobile preview, ensure it's fully visible
+      const isMobilePreview =
+        element.hasAttribute("data-tour") &&
+        element.getAttribute("data-tour") === "mobile-preview";
+
       element.scrollIntoView({
         behavior: "smooth",
-        block: isVeryLarge ? "start" : "center",
+        block: isVeryLarge ? "start" : isMobilePreview ? "start" : "center",
         inline: "center",
       });
+
+      // For mobile preview, add extra scroll to ensure it's not cut off at top
+      if (isMobilePreview) {
+        setTimeout(() => {
+          const rect = element.getBoundingClientRect();
+          if (rect.top < 100) {
+            // If too close to top, scroll a bit more
+            window.scrollBy({
+              top: -50,
+              behavior: "smooth",
+            });
+          }
+        }, 300);
+      }
 
       // Update state after DOM operations (defer to avoid cascading renders)
       requestAnimationFrame(() => {

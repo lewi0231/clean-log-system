@@ -73,6 +73,7 @@ export async function middleware(request: NextRequest) {
     const publicRoutePrefixes = [
         "/login",
         "/signup",
+        "/verify-email",
         "/review",
         "/invoice",
         "/worker/accept-invite",
@@ -120,6 +121,20 @@ export async function middleware(request: NextRequest) {
             const redirectUrl = new URL("/login", request.url);
             redirectUrl.searchParams.set("redirect", pathname);
             return NextResponse.redirect(redirectUrl);
+        }
+
+        // Check email verification status for authenticated users
+        // Allow access but the dashboard will show restrictions for unverified users
+        if (session.user && !session.user.email_confirmed_at) {
+            console.log(
+                "[MIDDLEWARE DEBUG] User email not verified",
+                {
+                    userId: session.user.id,
+                    email: session.user.email,
+                },
+            );
+            // Don't redirect - allow access but dashboard will show verification banner
+            // This follows the "hybrid approach" - allow access but restrict features
         }
     }
 
@@ -189,7 +204,7 @@ export async function middleware(request: NextRequest) {
         "default-src 'self'",
         "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-eval' needed for Next.js
         "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind
-        "img-src 'self' data: https:",
+        "img-src 'self' data: https: blob:",
         "font-src 'self' data:",
         `connect-src ${connectSrc}`,
         "frame-src 'self' https://*.stripe.com",

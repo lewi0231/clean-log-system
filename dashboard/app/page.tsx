@@ -94,7 +94,7 @@ export default function Home() {
             </p>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="group">
-                <Link href="/dashboard">
+                <Link href="/signup">
                   Get Started
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
@@ -159,7 +159,7 @@ export default function Home() {
             </p>
             <div className="mt-10">
               <Button asChild size="lg" className="group">
-                <Link href="/dashboard">
+                <Link href="/signup">
                   Start Free Trial
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>

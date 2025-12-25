@@ -22,12 +22,25 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
       )
       .eq("id", organization_id)
       .single();
 
     if (orgError) throw orgError;
+
+    // Fetch organization_settings for additional settings
+    const { data: orgSettings, error: orgSettingsError } = await supabase
+      .from("organization_settings")
+      .select("auto_generate_invoices_immediately")
+      .eq("organization_id", organization_id)
+      .maybeSingle();
+
+    // Don't throw if settings don't exist - they might not be created yet
+    if (orgSettingsError && orgSettingsError.code !== "PGRST116") {
+      // PGRST116 is "not found" which is OK
+      console.warn("Error fetching organization_settings", orgSettingsError);
+    }
 
     // Parse rating_config with default fallback
     let ratingConfig = {
@@ -60,6 +73,7 @@ serve(async (req) => {
         abn: organization?.abn ?? null,
         logo_url: organization?.logo_url ?? null,
         primary_contact_email: organization?.primary_contact_email ?? null,
+        business_address: organization?.business_address ?? null,
         invoice_send_immediately: organization?.invoice_send_immediately ??
           false,
         feedback_email_send_immediately:
@@ -71,6 +85,8 @@ serve(async (req) => {
         locale: organization?.locale ?? "en-AU",
         default_exclusive_group_label:
           organization?.default_exclusive_group_label ?? null,
+        auto_generate_invoices_immediately:
+          orgSettings?.auto_generate_invoices_immediately ?? false,
       },
     });
   } catch (error) {

@@ -16,6 +16,12 @@ export interface WorkerInvitationData {
   invitationToken: string;
 }
 
+export interface EmailVerificationData {
+  email: string;
+  verificationLink: string;
+  organizationName?: string;
+}
+
 export interface EmailValidationResult {
   valid: boolean;
   error?: string;
@@ -421,6 +427,163 @@ export async function sendWorkerInvitationEmail(
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send invitation email";
+    if (throwOnError) {
+      throw error;
+    }
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Send email verification email via Resend API
+ */
+export async function sendEmailVerificationEmail(
+  data: EmailVerificationData,
+  throwOnError = false,
+): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  // Validate configuration
+  const configResult = validateEmailConfig();
+  if (!configResult.valid || !configResult.config) {
+    const error = configResult.error || "Email configuration is invalid";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate email data
+  if (!data.email || !data.verificationLink) {
+    const error = "Email and verification link are required";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Check if test mode is enabled
+  const testMode = isTestMode();
+
+  // Determine recipient based on test mode
+  const testRecipient = testMode
+    ? getTestModeRecipient("invitation", data.email, data.email) // Reuse invitation type for test mode
+    : data.email;
+
+  const emailSubject = testMode
+    ? `[TEST] Verify your email address`
+    : `Verify your email address`;
+
+  // Log test mode redirection if enabled
+  if (testMode) {
+    console.log(
+      "[TEST MODE] Verification email redirected to test address",
+      {
+        testRecipient,
+        originalRecipient: data.email,
+      },
+    );
+  }
+
+  const html = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2563eb;">Verify Your Email Address</h2>
+          <p>Thank you for signing up${
+    data.organizationName ? ` with ${data.organizationName}` : ""
+  }!</p>
+          <p>Please click the button below to verify your email address:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.verificationLink}" 
+               style="background-color: #2563eb; color: white; padding: 12px 24px; 
+                      text-decoration: none; border-radius: 5px; display: inline-block;">
+              Verify Email Address
+            </a>
+          </div>
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #666;">${data.verificationLink}</p>
+          <p style="color: #666; font-size: 12px; margin-top: 30px;">
+            If you didn't create an account, you can safely ignore this email.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const requestBody: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    tags?: Array<{ name: string; value: string }>;
+  } = {
+    from: `Clean Log <noreply@${configResult.config.resendFromDomain}>`,
+    to: [testRecipient],
+    subject: emailSubject,
+    html,
+  };
+
+  // Add test mode tags if in test mode
+  if (testMode) {
+    requestBody.tags = getTestModeTags("invitation", data.email, data.email);
+  }
+
+  try {
+    console.log("Sending verification email to:", data.email);
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${configResult.config.apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorBody: unknown;
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = { message: errorText };
+      }
+
+      console.error("Resend API error:", {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorBody,
+      });
+
+      const errorMessage = (errorBody &&
+        typeof errorBody === "object" &&
+        "message" in errorBody &&
+        typeof errorBody.message === "string" &&
+        errorBody.message) ||
+        res.statusText ||
+        "Unknown error";
+
+      const error = `Failed to send verification email: ${errorMessage}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+
+    const emailResponse = await res.json();
+    const emailId = emailResponse.id;
+
+    if (emailId) {
+      console.log("Verification email sent successfully:", emailId);
+      return { success: true, emailId };
+    } else {
+      console.warn("Resend response missing ID:", emailResponse);
+      return { success: true };
+    }
+  } catch (error) {
+    console.error("Failed to send verification email:", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to send verification email";
     if (throwOnError) {
       throw error;
     }

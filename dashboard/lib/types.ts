@@ -84,6 +84,7 @@ export interface OrganizationSettings {
   abn: string | null;
   logo_url: string | null;
   primary_contact_email: string | null;
+  business_address: string | null;
   invoice_send_immediately: boolean;
   feedback_email_send_immediately: boolean;
   rating_config: RatingConfig;
@@ -92,6 +93,7 @@ export interface OrganizationSettings {
   currency: SupportedCurrency;
   locale: string;
   default_exclusive_group_label: string | null;
+  auto_generate_invoices_immediately: boolean;
 }
 
 export interface Job {

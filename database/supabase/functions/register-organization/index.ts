@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
+import {
+  getOrganizationName,
+  sendEmailVerificationEmail,
+} from "../_utils/email.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -21,7 +25,7 @@ function generateOrgCode(businessName: string): string {
 
 async function ensureUniqueOrgCode(
   supabase: SupabaseClient,
-  baseCode: string
+  baseCode: string,
 ): Promise<string> {
   let code = baseCode;
   let counter = 1;
@@ -84,17 +88,55 @@ serve(async (req) => {
     if (orgError) throw orgError;
 
     // 2. Create admin user in Supabase Auth
-    const { data: _authData, error: authError } =
-      await supabase.auth.admin.createUser({
+    // email_confirm: false requires email verification before full access
+    const { data: _authData, error: authError } = await supabase.auth.admin
+      .createUser({
         email: admin_email,
         password: password,
-        email_confirm: true, // Auto-confirm for now (add email verification later)
+        email_confirm: false, // Require email verification
       });
 
     if (authError) throw authError;
 
-    // 3. Link user to organization
-    const { error: linkError } = await supabase
+    // 3. Generate verification link
+    // Get the site URL from environment or use a default
+    const siteUrl = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
+    const redirectTo = `${siteUrl}/verify-email?email=${
+      encodeURIComponent(admin_email)
+    }`;
+
+    const { data: linkData, error: verificationLinkError } = await supabase.auth
+      .admin
+      .generateLink({
+        type: "signup",
+        email: admin_email,
+        password: password, // Required for signup type
+        options: {
+          redirectTo: redirectTo,
+        },
+      });
+
+    if (verificationLinkError) {
+      console.error(
+        "Failed to generate verification link:",
+        verificationLinkError,
+      );
+      // Don't fail registration if link generation fails - user can request resend later
+    } else if (linkData?.properties?.action_link) {
+      // 4. Send verification email
+      const orgName = await getOrganizationName(supabase, org.id);
+      await sendEmailVerificationEmail(
+        {
+          email: admin_email,
+          verificationLink: linkData.properties.action_link,
+          organizationName: orgName,
+        },
+        false, // Don't throw on error - registration succeeded even if email fails
+      );
+    }
+
+    // 5. Link user to organization
+    const { error: _orgUserLinkError } = await supabase
       .from("organization_user")
       .insert({
         organization_id: org.id,
@@ -102,9 +144,9 @@ serve(async (req) => {
         role: "admin",
       });
 
-    if (linkError) throw linkError;
+    if (_orgUserLinkError) throw _orgUserLinkError;
 
-    // 4. Return success with org code
+    // 6. Return success with org code
     return jsonResponse({
       success: true,
       message: "Organization created successfully",
@@ -115,12 +157,13 @@ serve(async (req) => {
       },
       admin_email: admin_email,
       // Show org_code prominently - employees will need this
-      instructions: `Your organization code is: ${orgCode}. Give this to your employees for mobile app login.`,
+      instructions:
+        `Your organization code is: ${orgCode}. Give this to your employees for mobile app login.`,
     });
   } catch (error) {
     console.error("Registration error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Registration failed"
+      error instanceof Error ? error : "Registration failed",
     );
   }
 });

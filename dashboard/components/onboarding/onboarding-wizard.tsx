@@ -46,7 +46,7 @@ interface OnboardingData {
   invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
   invoice_weekly_day: number | null; // 0-6, Sunday-Saturday
   invoice_monthly_day: number | null; // 1-31
-  review_invoices_before_sending: boolean;
+  auto_generate_invoices: boolean; // Whether to auto-generate invoices from completed jobs
 }
 
 const TOTAL_STEPS = 4;
@@ -66,7 +66,7 @@ export function OnboardingWizard() {
     invoice_frequency: "immediately",
     invoice_weekly_day: null,
     invoice_monthly_day: null,
-    review_invoices_before_sending: true,
+    auto_generate_invoices: false,
   });
 
   const progress = (currentStep / TOTAL_STEPS) * 100;
@@ -195,11 +195,16 @@ export function OnboardingWizard() {
             variant="outline"
             onClick={handleBack}
             disabled={currentStep === 1 || isSubmitting}
+            className="cursor-pointer"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
-          <Button onClick={handleNext} disabled={!canProceed() || isSubmitting}>
+          <Button
+            onClick={handleNext}
+            disabled={!canProceed() || isSubmitting}
+            className="cursor-pointer"
+          >
             {currentStep === TOTAL_STEPS ? (
               <>
                 Complete Setup
@@ -592,16 +597,20 @@ function Step4Invoicing({
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label className="text-base font-semibold">
-              Review invoices before sending?
+              Automatically generate invoices from completed jobs?
             </Label>
             <p className="text-sm text-muted-foreground">
-              If enabled, invoices will be created as drafts for your review
+              If enabled, invoices will be automatically created immediately
+              when jobs are completed. For organizations with location
+              hierarchies, configure this per location. For others, invoices are
+              created in pending review for you to review and send.
+              Location-specific auto-generate takes precedence.
             </p>
           </div>
           <Switch
-            checked={data.review_invoices_before_sending}
+            checked={data.auto_generate_invoices}
             onCheckedChange={(checked) =>
-              updateData({ review_invoices_before_sending: checked })
+              updateData({ auto_generate_invoices: checked })
             }
             className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
           />

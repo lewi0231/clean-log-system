@@ -87,34 +87,21 @@ export default function SignUp() {
         orgCode: data?.organization?.org_code,
       });
 
-      log.debug("SignUp: Signing in user after registration");
-      const { data: authData, error: signInError } =
-        await supabase.auth.signInWithPassword({
-          email: validatedData.email,
-          password: validatedData.password,
-        });
-
-      if (signInError) {
-        log.error("SignUp: Sign in after registration failed", {
-          error: signInError.message,
-        });
-        throw new Error(signInError.message);
-      }
-
-      log.info("SignUp: User signed in successfully", {
-        userId: authData.user?.id,
-        email: authData.user?.email,
-      });
+      // Verification email is sent automatically by the backend
+      // during organization registration
 
       setEmail("");
       setPassword("");
       setOrganisation("");
       setErrors({});
 
-      log.info("SignUp: Signup process completed, redirecting to onboarding");
-      // Use window.location for full page reload to ensure middleware sees the session
-      // Redirect to onboarding for new users
-      window.location.href = "/onboarding";
+      log.info(
+        "SignUp: Signup process completed, redirecting to verification page"
+      );
+      // Redirect to verification page - email should have been sent by backend
+      window.location.href = `/verify-email?email=${encodeURIComponent(
+        validatedData.email
+      )}`;
     } catch (error) {
       // Errors are already set in validateInput via setErrors
       if (error instanceof Error && error.message !== "Validation failed") {

@@ -645,12 +645,10 @@ export function SectionEditor({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-tour="sections">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Label className="text-sm font-semibold" data-tour="sections">
-            Form Sections
-          </Label>
+          <Label className="text-sm font-semibold">Form Sections</Label>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

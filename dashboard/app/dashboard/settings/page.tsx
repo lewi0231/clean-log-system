@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AutoSaveInput } from "@/components/ui/auto-save-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +32,14 @@ import {
   FormSkeleton,
   PageHeaderSkeleton,
 } from "@/components/ui/skeleton-loaders";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -32,7 +48,7 @@ import {
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
-import { DollarSign, ExternalLink, Upload, X } from "lucide-react";
+import { DollarSign, ExternalLink, Info, Upload, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -51,8 +67,10 @@ export default function SettingsPage() {
     abn: null,
     logo_url: null,
     primary_contact_email: null,
+    business_address: null,
     invoice_send_immediately: false,
     feedback_email_send_immediately: false,
+    auto_generate_invoices_immediately: false,
     rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
@@ -64,6 +82,11 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [errorDialog, setErrorDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({ open: false, title: "", message: "" });
 
   const fetchSettings = async () => {
     if (!organizationId) return;
@@ -91,10 +114,13 @@ export default function SettingsPage() {
           abn: data.settings.abn ?? null,
           logo_url: data.settings.logo_url ?? null,
           primary_contact_email: data.settings.primary_contact_email ?? null,
+          business_address: data.settings.business_address ?? null,
           invoice_send_immediately:
             data.settings.invoice_send_immediately ?? false,
           feedback_email_send_immediately:
             data.settings.feedback_email_send_immediately ?? false,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately ?? false,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -232,18 +258,55 @@ export default function SettingsPage() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !organizationId) return;
+    if (!file || !organizationId) {
+      // Clear file input if no file selected
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
 
-    // Validate file type
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!validTypes.includes(file.type)) {
-      alert("Please upload a valid image file (JPEG, PNG, WebP, or GIF)");
+    // Validate file type (including SVG)
+    const validTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    // Check file extension as fallback (SVG might not have correct MIME type)
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    const isValidExtension =
+      ["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(
+        fileExtension || ""
+      ) || validTypes.includes(file.type);
+
+    if (!isValidExtension) {
+      setErrorDialog({
+        open: true,
+        title: "Invalid File Type",
+        message:
+          "Please upload a valid image file (JPEG, PNG, WebP, GIF, or SVG).",
+      });
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5MB");
+      setErrorDialog({
+        open: true,
+        title: "File Too Large",
+        message: "Image size must be less than 5MB.",
+      });
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
@@ -302,15 +365,22 @@ export default function SettingsPage() {
       log.error("Settings: Failed to upload logo", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to upload logo. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Upload Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to upload logo. Please try again.",
+      });
       // Reset preview on error
       setLogoPreview(normalizeLogoUrl(settings.logo_url));
-    } finally {
-      setUploadingLogo(false);
-      // Reset file input
+      // Clear file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -351,7 +421,11 @@ export default function SettingsPage() {
       log.error("Settings: Failed to delete logo", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to delete logo. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Delete Failed",
+        message: "Failed to delete logo. Please try again.",
+      });
     }
   };
 
@@ -387,6 +461,40 @@ export default function SettingsPage() {
     }
 
     log.info("Settings: Primary contact email updated successfully");
+  };
+
+  const handleBusinessAddressChange = async (address: string) => {
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    log.info("Settings: Updating business address", { address });
+
+    const { data, error: updateError } = await supabase.functions.invoke(
+      "update-organization-settings",
+      {
+        body: {
+          organization_id: organizationId,
+          business_address: address || null,
+        },
+      }
+    );
+
+    if (updateError) {
+      log.error("Settings: Failed to update business address", {
+        error: updateError,
+      });
+      throw updateError;
+    }
+
+    if (data?.settings) {
+      setSettings((prev) => ({
+        ...prev,
+        business_address: data.settings.business_address,
+      }));
+    }
+
+    log.info("Settings: Business address updated successfully");
   };
 
   const handleConnectStripe = async () => {
@@ -483,6 +591,53 @@ export default function SettingsPage() {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       alert("Failed to update currency. Please try again.");
+    }
+  };
+
+  const handleAutoGenerateInvoicesChange = async (enabled: boolean) => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating auto-generate invoices", { enabled });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            auto_generate_invoices_immediately: enabled,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to update auto-generate invoices", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately,
+        }));
+      }
+
+      log.info("Settings: Auto-generate invoices updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update auto-generate invoices", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update auto-generate invoices setting. Please try again.",
+      });
     }
   };
 
@@ -595,7 +750,7 @@ export default function SettingsPage() {
                       ref={fileInputRef}
                       id="logo"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
                       onChange={handleLogoUpload}
                       disabled={uploadingLogo}
                       className="cursor-pointer disabled:cursor-not-allowed"
@@ -603,19 +758,48 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground mt-1">
                       {uploadingLogo
                         ? "Uploading logo..."
-                        : "Upload a logo (max 5MB, JPEG, PNG, WebP, or GIF)"}
+                        : "Upload a logo (max 5MB, JPEG, PNG, WebP, GIF, or SVG)"}
                     </p>
                   </div>
                 </div>
               </div>
 
+              <TooltipProvider>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="primary-contact-email">
+                      Primary Contact Email
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          This email is used for business communications and
+                          notifications. It does not change your sign-in email
+                          address.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <AutoSaveInput
+                    id="primary-contact-email"
+                    type="email"
+                    value={settings.primary_contact_email}
+                    onSave={handlePrimaryContactEmailChange}
+                    placeholder="Enter primary contact email"
+                    description="The primary business contact email for account communications and notifications."
+                  />
+                </div>
+              </TooltipProvider>
+
               <AutoSaveInput
-                label="Primary Contact Email"
-                type="email"
-                value={settings.primary_contact_email}
-                onSave={handlePrimaryContactEmailChange}
-                placeholder="Enter primary contact email"
-                description="The primary business contact email for account communications and notifications."
+                label="Business Address"
+                value={settings.business_address}
+                onSave={handleBusinessAddressChange}
+                placeholder="Enter business address (optional)"
+                description="Your business physical address for invoices and official documents."
               />
 
               <div className="space-y-2">
@@ -673,6 +857,26 @@ export default function SettingsPage() {
                   Default currency for pricing and invoicing. This affects how
                   prices are displayed throughout the application.
                 </p>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">
+                      Auto-Generate Invoices
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically create invoices in pending review when jobs
+                      are completed. Location-specific auto-generate takes
+                      precedence. All invoices require review before sending.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.auto_generate_invoices_immediately}
+                    onCheckedChange={handleAutoGenerateInvoicesChange}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -883,6 +1087,30 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Error Dialog */}
+      <AlertDialog
+        open={errorDialog.open}
+        onOpenChange={(open) => setErrorDialog((prev) => ({ ...prev, open }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{errorDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {errorDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() =>
+                setErrorDialog({ open: false, title: "", message: "" })
+              }
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

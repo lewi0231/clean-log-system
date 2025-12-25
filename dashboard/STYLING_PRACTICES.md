@@ -215,6 +215,154 @@ All clickable elements (buttons, links, and interactive components) should use `
 
 ---
 
+## Error Messages and Alerts
+
+### AlertDialog for User-Facing Errors
+
+When displaying error messages to users (especially for file uploads, form submissions, or critical operations), use `AlertDialog` instead of browser `alert()` or `confirm()` dialogs. This provides a consistent, accessible UI that matches the application design.
+
+### Implementation
+
+```tsx
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// State for dialog
+const [errorDialog, setErrorDialog] = useState<{
+  open: boolean;
+  title: string;
+  message: string;
+}>({ open: false, title: "", message: "" });
+
+// Show error
+setErrorDialog({
+  open: true,
+  title: "Upload Failed",
+  message: "Failed to upload file. Please try again.",
+});
+
+// In JSX
+<AlertDialog
+  open={errorDialog.open}
+  onOpenChange={(open) => setErrorDialog((prev) => ({ ...prev, open }))}
+>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>{errorDialog.title}</AlertDialogTitle>
+      <AlertDialogDescription>{errorDialog.message}</AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogAction
+        onClick={() => setErrorDialog({ open: false, title: "", message: "" })}
+      >
+        OK
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>;
+```
+
+### Usage Guidelines
+
+- **Use AlertDialog for**: File upload errors, form validation errors, critical operation failures
+- **Don't use browser alerts**: Avoid `alert()`, `confirm()`, or `prompt()` - they break the user experience
+- **Keep messages clear**: Use descriptive titles and actionable error messages
+- **Provide context**: Explain what went wrong and what the user can do next
+- **Single action**: Typically just an "OK" button to dismiss, unless user action is required
+
+### When to Use Other Patterns
+
+- **Toast notifications** (`sonner`): For non-critical success/info messages
+- **Inline error messages**: For form field validation (use `Alert` component)
+- **Error boundaries**: For unexpected application errors
+
+### Component Location
+
+AlertDialog components are located in: `dashboard/components/ui/alert-dialog.tsx`
+
+---
+
+## Page Tours
+
+### Tour Target Elements
+
+When implementing page tours, use `data-tour` attributes to mark elements that should be highlighted during the tour. The tour system will automatically find and highlight these elements.
+
+### Implementation
+
+```tsx
+// Mark a container element (preferred for cards/sections)
+<div className="space-y-3" data-tour="sections">
+  <Label>Form Sections</Label>
+  {/* Content */}
+</div>
+
+// Mark interactive elements (buttons, inputs, etc.)
+<Button data-tour="add-field-button">
+  Add Field
+</Button>
+
+// Mark preview/display areas
+<Card data-tour="mobile-preview">
+  {/* Preview content */}
+</Card>
+```
+
+### Best Practices
+
+- **Target containers, not labels**: For cards or sections, put `data-tour` on the container div, not just the label
+- **Use descriptive names**: Use clear, descriptive names for `data-tour` attributes (e.g., `sections`, `add-field-button`, `mobile-preview`)
+- **Handle dynamic content**: For popovers or modals, the tour system can automatically open them by clicking their triggers
+- **Scroll behavior**: The tour system automatically scrolls elements into view, but for elements near the top of the page, use `block: "start"` to ensure they're fully visible
+
+### Tour Step Configuration
+
+```tsx
+export const mobileConfigTourSteps: TourStep[] = [
+  {
+    target: "[data-tour='sections']",
+    title: "Form Sections",
+    content: "Description of what this section does...",
+    position: "right", // or "left", "top", "bottom"
+  },
+];
+```
+
+### Popover Handling
+
+When targeting popover content, the tour system will:
+
+1. Find the trigger button
+2. Click it to open the popover
+3. Wait for the popover content to appear
+4. Highlight the popover content
+
+Ensure the `data-tour` attribute is on the `PopoverContent` element:
+
+```tsx
+<Popover>
+  <PopoverTrigger asChild>
+    <Button>Add Field</Button>
+  </PopoverTrigger>
+  <PopoverContent data-tour="add-field-button">
+    {/* Popover content */}
+  </PopoverContent>
+</Popover>
+```
+
+### Component Location
+
+Tour components are located in: `dashboard/components/tours/`
+
+---
+
 ## General Principles
 
 1. **Consistency**: Follow established patterns for similar UI elements

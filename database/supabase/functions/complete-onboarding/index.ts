@@ -27,7 +27,7 @@ interface OnboardingData {
   invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
   invoice_weekly_day: number | null;
   invoice_monthly_day: number | null;
-  review_invoices_before_sending: boolean;
+  auto_generate_invoices: boolean; // Preference for auto-generating invoices (requires location setup)
 }
 
 serve(async (req: Request) => {
@@ -162,12 +162,16 @@ serve(async (req: Request) => {
     }
 
     // 3. Configure invoice sending
+    // Always require review before sending to reduce liability
+    // Note: reviewInvoicesBeforeSending is always true - invoices are created as drafts
+    // This is enforced in the invoice creation logic, not stored as a setting
+
     let invoiceSendImmediately = false;
     let autoSendConfig: Record<string, unknown> | null = null;
 
     if (onboardingData.invoice_frequency === "immediately") {
-      invoiceSendImmediately = !onboardingData
-        .review_invoices_before_sending;
+      // Even for immediate sending, invoices are created as drafts for review
+      invoiceSendImmediately = false; // Always false since we require review
     } else {
       autoSendConfig = {
         enabled: true,
@@ -250,6 +254,46 @@ serve(async (req: Request) => {
         error: businessModeError,
       });
       // Don't throw - this is optional
+    }
+
+    // 5. Configure auto-generate invoices if enabled
+    if (onboardingData.auto_generate_invoices) {
+      // Get or create organization_settings
+      const { data: existingSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+
+      if (existingSettings) {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .update({
+            auto_generate_invoices_immediately: true,
+          })
+          .eq("id", existingSettings.id);
+
+        if (settingsError) {
+          logger.error("Failed to update auto-generate invoices setting", {
+            error: settingsError,
+          });
+          // Don't throw - this is optional
+        }
+      } else {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id: organizationId,
+            auto_generate_invoices_immediately: true,
+          });
+
+        if (settingsError) {
+          logger.error("Failed to create auto-generate invoices setting", {
+            error: settingsError,
+          });
+          // Don't throw - this is optional
+        }
+      }
     }
 
     logger.info("Onboarding completed successfully", { organizationId });
