@@ -36,8 +36,10 @@ import {
   AlertTriangle,
   DollarSign,
   ExternalLink,
+  Hash,
   Layers,
   List,
+  ScrollText,
   TestTube,
   Zap,
 } from "lucide-react";
@@ -132,8 +134,14 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
 
       <Tabs defaultValue="set-pricing" className="space-y-6">
         <TabsList className="w-full justify-start">
-          <TabsTrigger value="set-pricing">Pricing</TabsTrigger>
-          <TabsTrigger value="pricing-history">Pricing History</TabsTrigger>
+          <TabsTrigger value="set-pricing">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Pricing
+          </TabsTrigger>
+          <TabsTrigger value="pricing-history">
+            <ScrollText className="h-4 w-4 mr-2" />
+            Pricing History
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="set-pricing" className="space-y-6">
@@ -188,7 +196,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                     </div>
                     <Link
                       href="/dashboard/locations"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer"
                     >
                       Edit in Location Settings
                       <ExternalLink className="h-3 w-3" />
@@ -210,7 +218,7 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                   disabled={isFixedPricing}
                   data-tour="field-pricing-tab"
                 >
-                  <DollarSign className="h-4 w-4 mr-2" />
+                  <Hash className="h-4 w-4 mr-2" />
                   Field Pricing
                 </TabsTrigger>
                 <TabsTrigger
@@ -301,7 +309,10 @@ function PricingPageContent({ optionPricingFields }: PricingPageContentProps) {
                             tab.
                           </p>
                           <div className="flex items-center justify-center">
-                            <Link href="/dashboard/mobile-config">
+                            <Link
+                              href="/dashboard/mobile-config"
+                              className="cursor-pointer"
+                            >
                               <Button variant="outline" size="sm">
                                 Go to Mobile App Configuration
                               </Button>

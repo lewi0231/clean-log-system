@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { log } from "@/lib/logger";
 import {
   buildScopedPricingMap,
   getPricingScopeSource,
@@ -283,7 +284,9 @@ export default function BasePricingEditor({
       } as Parameters<typeof upsertPricing>[0];
       await upsertPricing(request);
     } catch (error) {
-      console.error("Failed to add conditional rule", error);
+      log.error("Failed to add conditional rule", {
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       setRuleError(
         error instanceof Error ? error.message : "Failed to add rule."
       );
@@ -388,7 +391,9 @@ export default function BasePricingEditor({
           return next;
         });
       } catch (error) {
-        console.error("Failed to save standalone base pricing", error);
+        log.error("Failed to save standalone base pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -449,7 +454,9 @@ export default function BasePricingEditor({
           return next;
         });
       } catch (error) {
-        console.error("Failed to save standalone base pricing", error);
+        log.error("Failed to save standalone base pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -548,7 +555,9 @@ export default function BasePricingEditor({
           return next;
         });
       } catch (error) {
-        console.error("Failed to save field-based base pricing", error);
+        log.error("Failed to save field-based base pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -606,7 +615,9 @@ export default function BasePricingEditor({
           return next;
         });
       } catch (error) {
-        console.error("Failed to save field-based base pricing", error);
+        log.error("Failed to save field-based base pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -622,7 +633,10 @@ export default function BasePricingEditor({
     try {
       await deletePricing(id);
     } catch (error) {
-      console.error("Failed to delete base pricing", error);
+      log.error("Failed to delete base pricing", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        pricingId: id,
+      });
     } finally {
       setDeleting((prev) => {
         const next = { ...prev };
@@ -1021,7 +1035,13 @@ export default function BasePricingEditor({
                     try {
                       await deletePricing(id);
                     } catch (error) {
-                      console.error("Failed to delete override", error);
+                      log.error("Failed to delete override", {
+                        error:
+                          error instanceof Error
+                            ? error.message
+                            : "Unknown error",
+                        pricingId: id,
+                      });
                     }
                   }}
                 />
@@ -1031,7 +1051,7 @@ export default function BasePricingEditor({
             {standalonePricing && isPricingRulesEnabled() && (
               <Collapsible defaultOpen={standaloneConditions.length > 0}>
                 <div className="space-y-3 border-t pt-4">
-                  <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity group">
+                  <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity group cursor-pointer">
                     <div className="text-left">
                       <Label className="text-sm font-semibold">
                         Conditional Rules
@@ -1429,10 +1449,13 @@ export default function BasePricingEditor({
                                   try {
                                     await deletePricing(id);
                                   } catch (error) {
-                                    console.error(
-                                      "Failed to delete override",
-                                      error
-                                    );
+                                    log.error("Failed to delete override", {
+                                      error:
+                                        error instanceof Error
+                                          ? error.message
+                                          : "Unknown error",
+                                      pricingId: id,
+                                    });
                                   }
                                 }}
                               />

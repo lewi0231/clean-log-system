@@ -98,7 +98,7 @@ export function LocationOverridesMatrix({
         className
       )}
     >
-      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left font-medium text-foreground">
+      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left font-medium text-foreground cursor-pointer">
         <span>Location overrides</span>
         <Badge variant="secondary">{rows.length}</Badge>
       </CollapsibleTrigger>

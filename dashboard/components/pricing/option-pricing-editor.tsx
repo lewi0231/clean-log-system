@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { log } from "@/lib/logger";
 import {
   buildScopedPricingMap,
   getPricingScopeSource,
@@ -223,7 +224,12 @@ export default function OptionPricingEditor({
           return next;
         });
       } catch (error) {
-        console.error("Failed to save option pricing", error);
+        log.error("Failed to save option pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          fieldConfigId: fieldConfig.id,
+          optionValue,
+          pricingContext: showBothContexts ? "both" : pricingContext,
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -266,7 +272,12 @@ export default function OptionPricingEditor({
           return next;
         });
       } catch (error) {
-        console.error("Failed to save option pricing", error);
+        log.error("Failed to save option pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          fieldConfigId: fieldConfig.id,
+          optionValue,
+          pricingContext,
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -331,7 +342,11 @@ export default function OptionPricingEditor({
       // Clear all editing state
       setEditingPrices({});
     } catch (error) {
-      console.error("Failed to save option pricing", error);
+      log.error("Failed to save option pricing (save all)", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        fieldConfigId: fieldConfig.id,
+        pricingContext,
+      });
     } finally {
       setSavingAll(false);
     }
@@ -393,7 +408,11 @@ export default function OptionPricingEditor({
         return next;
       });
     } catch (error) {
-      console.error("Failed to apply bulk pricing", error);
+      log.error("Failed to apply bulk pricing (customer)", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        fieldConfigId: fieldConfig.id,
+        optionsCount: optionsWithoutPrice.length,
+      });
     } finally {
       setSavingAll(false);
     }
@@ -459,7 +478,11 @@ export default function OptionPricingEditor({
           await refetchWorkerPricing();
         }
       } catch (error) {
-        console.error("Failed to apply bulk pricing", error);
+        log.error("Failed to apply bulk pricing (worker)", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          fieldConfigId: fieldConfig.id,
+          optionsCount: options.length,
+        });
       } finally {
         setSavingAll(false);
         setBulkCustomerPrice("");
@@ -486,7 +509,12 @@ export default function OptionPricingEditor({
           )
         );
       } catch (error) {
-        console.error("Failed to apply bulk pricing", error);
+        log.error("Failed to apply bulk pricing (all)", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          fieldConfigId: fieldConfig.id,
+          optionsCount: options.length,
+          pricingContext,
+        });
       } finally {
         setSavingAll(false);
         if (pricingContext === "customer") {
@@ -762,7 +790,7 @@ export default function OptionPricingEditor({
 
       {/* Collapsible Individual Options */}
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary">
+        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary cursor-pointer">
           {expanded ? (
             <ChevronDown className="h-4 w-4" />
           ) : (

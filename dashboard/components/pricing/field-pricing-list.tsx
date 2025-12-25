@@ -35,6 +35,7 @@ import {
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
+import { log } from "@/lib/logger";
 import {
   buildScopedPricingMap,
   getPricingScopeSource,
@@ -304,7 +305,10 @@ export default function FieldPricingList({
         // Refresh pricing history after save
         refreshPricingHistory();
       } catch (error) {
-        console.error("Failed to save pricing", error);
+        log.error("Failed to save pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          fieldConfigId: fieldConfig.id,
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -365,7 +369,10 @@ export default function FieldPricingList({
         // Refresh pricing history after save
         refreshPricingHistory();
       } catch (error) {
-        console.error("Failed to save pricing", error);
+        log.error("Failed to save pricing", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          fieldConfigId: fieldConfig.id,
+        });
       } finally {
         setSaving((prev) => {
           const next = { ...prev };
@@ -445,7 +452,10 @@ export default function FieldPricingList({
       });
       closeConditionalModal();
     } catch (error) {
-      console.error("Failed to add rule", error);
+      log.error("Failed to add rule", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        fieldConfigId: ruleModalField.id,
+      });
       setRuleError(
         error instanceof Error ? error.message : "Failed to add rule."
       );
@@ -480,7 +490,7 @@ export default function FieldPricingList({
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <Link href="/dashboard/mobile-config">
+            <Link href="/dashboard/mobile-config" className="cursor-pointer">
               <Button variant="outline" size="sm">
                 Go to Mobile App Configuration
               </Button>
@@ -617,14 +627,11 @@ export default function FieldPricingList({
               // Refresh pricing history after delete
               refreshPricingHistory();
             } catch (error) {
-              console.error(
-                "[Pricing Debug] Failed to delete location override:",
-                {
-                  error,
-                  ruleId: id,
-                  fieldConfigId: fieldConfig.id,
-                }
-              );
+              log.error("Failed to delete location override", {
+                error: error instanceof Error ? error.message : "Unknown error",
+                ruleId: id,
+                fieldConfigId: fieldConfig.id,
+              });
               throw error;
             } finally {
               setDeletingIds((prev) => {

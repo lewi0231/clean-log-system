@@ -263,8 +263,8 @@ export function FieldPricingCard({
               )}
             </div>
 
-            {/* Only show location overrides when organizational default is selected */}
-            {!locationId && !locationHierarchyId && (
+            {/* Only show location overrides when organizational default is selected and there are overrides */}
+            {!locationId && !locationHierarchyId && overrides.length > 0 && (
               <LocationOverridesMatrix
                 rows={overrides}
                 emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."

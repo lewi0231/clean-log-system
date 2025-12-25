@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { PricingService } from "@/lib/services";
 import type { FieldConfig } from "@clean-log/shared";
 import { CheckCircle2 } from "lucide-react";
@@ -103,7 +104,10 @@ export function BulkPricingEditor({
       setAmount("");
       onOpenChange(false);
     } catch (err) {
-      console.error("Failed to bulk update pricing", err);
+      log.error("Failed to bulk update pricing", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldCount: selectedFields.length,
+      });
       setError(
         err instanceof Error ? err.message : "Failed to bulk update pricing."
       );

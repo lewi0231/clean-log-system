@@ -33,7 +33,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useLocations } from "@/hooks/use-locations";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
@@ -50,6 +52,7 @@ import {
   Clock,
   GripVertical,
   Hash,
+  HelpCircle,
   Layers,
   List,
   Mail,
@@ -159,6 +162,7 @@ export function VisualFormBuilder({
 
   const { locations } = useLocations();
   const { organizationId } = useOrganization();
+  const { settings } = useOrganizationSettings();
 
   // Keep local order in sync when fields change externally
   React.useEffect(() => {
@@ -203,7 +207,9 @@ export function VisualFormBuilder({
         setLocationRestrictionsMap(restrictionsMap);
         setRestrictToLocationsMap(restrictMap);
       } catch (err) {
-        console.error("Failed to fetch location restrictions", err);
+        log.error("Failed to fetch location restrictions", {
+          error: err instanceof Error ? err.message : "Unknown error",
+        });
       }
     }
 
@@ -350,7 +356,10 @@ export function VisualFormBuilder({
         });
       }
     } catch (err) {
-      console.error("Failed to load location restrictions", err);
+      log.error("Failed to load location restrictions", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldId,
+      });
     }
   };
 
@@ -408,9 +417,14 @@ export function VisualFormBuilder({
   };
 
   // Filter out fields that are in sections from the main Form Fields list
+  // Also exclude the draggedSectionField if it's being dragged to form fields
+  // to prevent duplicate keys during drag operations
   const fieldsNotInSections = React.useMemo(
-    () => orderedFields.filter((field) => !field.section_id),
-    [orderedFields]
+    () =>
+      orderedFields.filter(
+        (field) => !field.section_id && field.id !== draggedSectionField
+      ),
+    [orderedFields, draggedSectionField]
   );
 
   return (
@@ -604,9 +618,30 @@ export function VisualFormBuilder({
           <Card className="flex flex-col">
             <CardHeader className="pb-3 shrink-0">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold">
-                  Form Fields
-                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold">
+                    Form Fields
+                  </CardTitle>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <div className="space-y-1">
+                          <p className="font-medium text-xs text-slate-50">
+                            Form Fields
+                          </p>
+                          <p className="text-xs text-slate-200">
+                            This is a holding place for configured fields that
+                            are not currently assigned to any section. Fields in
+                            sections appear in the mobile app preview.
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">
                     {fieldsNotInSections.length} fields
@@ -949,9 +984,15 @@ export function VisualFormBuilder({
                                             field.id
                                           );
                                         } catch (err) {
-                                          console.error(
+                                          log.error(
                                             "Failed to save location restrictions",
-                                            err
+                                            {
+                                              error:
+                                                err instanceof Error
+                                                  ? err.message
+                                                  : "Unknown error",
+                                              fieldId: field.id,
+                                            }
                                           );
                                         }
                                       }
@@ -1114,123 +1155,133 @@ export function VisualFormBuilder({
                                         />
                                       </div>
 
-                                      {/* Location Restrictions */}
-                                      <div className="space-y-3 pt-4 border-t">
-                                        <div className="flex items-center space-x-2">
-                                          <Switch
-                                            id={`restrict-locations-${field.id}`}
-                                            checked={
-                                              restrictToLocationsMap.get(
-                                                field.id
-                                              ) || false
-                                            }
-                                            onCheckedChange={(checked) => {
-                                              setRestrictToLocationsMap(
-                                                (prev) => {
-                                                  const next = new Map(prev);
-                                                  next.set(field.id, checked);
-                                                  return next;
-                                                }
-                                              );
-                                              if (!checked) {
-                                                setLocationRestrictionsMap(
+                                      {/* Location Restrictions - Only show if using customer locations */}
+                                      {settings?.use_predefined_locations && (
+                                        <div className="space-y-3 pt-4 border-t">
+                                          <div className="flex items-center space-x-2">
+                                            <Switch
+                                              id={`restrict-locations-${field.id}`}
+                                              checked={
+                                                restrictToLocationsMap.get(
+                                                  field.id
+                                                ) || false
+                                              }
+                                              onCheckedChange={(checked) => {
+                                                setRestrictToLocationsMap(
                                                   (prev) => {
                                                     const next = new Map(prev);
-                                                    next.set(field.id, []);
+                                                    next.set(field.id, checked);
                                                     return next;
                                                   }
                                                 );
-                                              }
-                                            }}
-                                            className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-                                          />
-                                          <Label
-                                            htmlFor={`restrict-locations-${field.id}`}
-                                            className="text-xs cursor-pointer"
-                                          >
-                                            Restrict to specific locations
-                                          </Label>
-                                        </div>
-                                        {restrictToLocationsMap.get(
-                                          field.id
-                                        ) && (
-                                          <div className="space-y-2 pl-6 border-l-2 border-muted">
-                                            {locations.length === 0 ? (
-                                              <p className="text-xs text-muted-foreground">
-                                                No locations available
-                                              </p>
-                                            ) : (
-                                              <div className="space-y-2 max-h-48 overflow-y-auto">
-                                                {locations
-                                                  .filter((loc) => loc.active)
-                                                  .map((location) => (
-                                                    <div
-                                                      key={location.id}
-                                                      className="flex items-center space-x-2"
-                                                    >
-                                                      <input
-                                                        type="checkbox"
-                                                        id={`visual-location-${field.id}-${location.id}`}
-                                                        checked={(
-                                                          locationRestrictionsMap.get(
-                                                            field.id
-                                                          ) || []
-                                                        ).includes(location.id)}
-                                                        onChange={(e) => {
-                                                          const currentIds =
+                                                if (!checked) {
+                                                  setLocationRestrictionsMap(
+                                                    (prev) => {
+                                                      const next = new Map(
+                                                        prev
+                                                      );
+                                                      next.set(field.id, []);
+                                                      return next;
+                                                    }
+                                                  );
+                                                }
+                                              }}
+                                              className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                                            />
+                                            <Label
+                                              htmlFor={`restrict-locations-${field.id}`}
+                                              className="text-xs cursor-pointer"
+                                            >
+                                              Restrict to specific locations
+                                            </Label>
+                                          </div>
+                                          {restrictToLocationsMap.get(
+                                            field.id
+                                          ) && (
+                                            <div className="space-y-2 pl-6 border-l-2 border-muted">
+                                              {locations.length === 0 ? (
+                                                <p className="text-xs text-muted-foreground">
+                                                  No locations available
+                                                </p>
+                                              ) : (
+                                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                  {locations
+                                                    .filter((loc) => loc.active)
+                                                    .map((location) => (
+                                                      <div
+                                                        key={location.id}
+                                                        className="flex items-center space-x-2"
+                                                      >
+                                                        <input
+                                                          type="checkbox"
+                                                          id={`visual-location-${field.id}-${location.id}`}
+                                                          checked={(
                                                             locationRestrictionsMap.get(
                                                               field.id
-                                                            ) || [];
-                                                          if (
-                                                            e.target.checked
-                                                          ) {
-                                                            setLocationRestrictionsMap(
-                                                              (prev) => {
-                                                                const next =
-                                                                  new Map(prev);
-                                                                next.set(
-                                                                  field.id,
-                                                                  [
-                                                                    ...currentIds,
-                                                                    location.id,
-                                                                  ]
-                                                                );
-                                                                return next;
-                                                              }
-                                                            );
-                                                          } else {
-                                                            setLocationRestrictionsMap(
-                                                              (prev) => {
-                                                                const next =
-                                                                  new Map(prev);
-                                                                next.set(
-                                                                  field.id,
-                                                                  currentIds.filter(
-                                                                    (id) =>
-                                                                      id !==
-                                                                      location.id
-                                                                  )
-                                                                );
-                                                                return next;
-                                                              }
-                                                            );
-                                                          }
-                                                        }}
-                                                        className="h-4 w-4 rounded border-gray-300"
-                                                      />
-                                                      <Label
-                                                        htmlFor={`visual-location-${field.id}-${location.id}`}
-                                                        className="text-xs font-normal cursor-pointer"
-                                                      >
-                                                        {location.name}
-                                                      </Label>
-                                                    </div>
-                                                  ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
+                                                            ) || []
+                                                          ).includes(
+                                                            location.id
+                                                          )}
+                                                          onChange={(e) => {
+                                                            const currentIds =
+                                                              locationRestrictionsMap.get(
+                                                                field.id
+                                                              ) || [];
+                                                            if (
+                                                              e.target.checked
+                                                            ) {
+                                                              setLocationRestrictionsMap(
+                                                                (prev) => {
+                                                                  const next =
+                                                                    new Map(
+                                                                      prev
+                                                                    );
+                                                                  next.set(
+                                                                    field.id,
+                                                                    [
+                                                                      ...currentIds,
+                                                                      location.id,
+                                                                    ]
+                                                                  );
+                                                                  return next;
+                                                                }
+                                                              );
+                                                            } else {
+                                                              setLocationRestrictionsMap(
+                                                                (prev) => {
+                                                                  const next =
+                                                                    new Map(
+                                                                      prev
+                                                                    );
+                                                                  next.set(
+                                                                    field.id,
+                                                                    currentIds.filter(
+                                                                      (id) =>
+                                                                        id !==
+                                                                        location.id
+                                                                    )
+                                                                  );
+                                                                  return next;
+                                                                }
+                                                              );
+                                                            }
+                                                          }}
+                                                          className="h-4 w-4 rounded border-gray-300"
+                                                        />
+                                                        <Label
+                                                          htmlFor={`visual-location-${field.id}-${location.id}`}
+                                                          className="text-xs font-normal cursor-pointer"
+                                                        >
+                                                          {location.name}
+                                                        </Label>
+                                                      </div>
+                                                    ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
 
                                       {/* Advanced Section */}
                                       <Collapsible
