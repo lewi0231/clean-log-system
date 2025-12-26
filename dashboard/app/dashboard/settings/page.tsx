@@ -60,6 +60,14 @@ export default function SettingsPage() {
     error: orgError,
   } = useOrganization();
 
+  // Separate state for business address fields
+  const [businessAddressFields, setBusinessAddressFields] = useState({
+    street: "",
+    city: "",
+    state: "",
+    postcode: "",
+  });
+
   const [settings, setSettings] = useState<OrganizationSettings>({
     name: "",
     use_predefined_locations: true,
@@ -110,6 +118,13 @@ export default function SettingsPage() {
       }
 
       if (data?.settings) {
+        // Parse business_address if it exists (format: "Street, City, State Postcode")
+        const addressParts = data.settings.business_address
+          ? parseBusinessAddress(data.settings.business_address)
+          : { street: "", city: "", state: "", postcode: "" };
+
+        setBusinessAddressFields(addressParts);
+
         setSettings({
           name: data.settings.name ?? "",
           use_predefined_locations:
@@ -474,19 +489,83 @@ export default function SettingsPage() {
     log.info("Settings: Primary contact email updated successfully");
   };
 
-  const handleBusinessAddressChange = async (address: string) => {
+  // Helper function to parse business address string into components
+  const parseBusinessAddress = (
+    address: string
+  ): {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+  } => {
+    // Try to parse format: "Street, City, State Postcode"
+    // This is a simple parser - may need refinement based on actual data
+    const parts = address.split(",").map((p) => p.trim());
+    if (parts.length >= 2) {
+      const street = parts[0];
+      const cityStatePostcode = parts.slice(1).join(", ");
+      // Try to extract state and postcode (e.g., "NSW 2000" or "New South Wales 2000")
+      const statePostcodeMatch = cityStatePostcode.match(/^(.+?)\s+(\d{4})$/);
+      if (statePostcodeMatch) {
+        return {
+          street,
+          city: parts.length > 2 ? parts[1] : "",
+          state: statePostcodeMatch[1].trim(),
+          postcode: statePostcodeMatch[2],
+        };
+      }
+      // If no postcode match, assume last part is city
+      return {
+        street,
+        city: parts[1],
+        state: parts[2] || "",
+        postcode: parts[3] || "",
+      };
+    }
+    // If format doesn't match, return as street address
+    return {
+      street: address,
+      city: "",
+      state: "",
+      postcode: "",
+    };
+  };
+
+  // Helper function to format address fields into a single string
+  const formatBusinessAddress = (fields: {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+  }): string => {
+    const parts = [
+      fields.street,
+      fields.city,
+      fields.state && fields.postcode
+        ? `${fields.state} ${fields.postcode}`
+        : fields.state || fields.postcode,
+    ].filter(Boolean);
+    return parts.join(", ") || "";
+  };
+
+  const handleBusinessAddressChange = async () => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
     }
 
-    log.info("Settings: Updating business address", { address });
+    const formattedAddress = formatBusinessAddress(businessAddressFields);
+
+    log.info("Settings: Updating business address", {
+      address: formattedAddress,
+      fields: businessAddressFields,
+    });
 
     const { data, error: updateError } = await supabase.functions.invoke(
       "update-organization-settings",
       {
         body: {
           organization_id: organizationId,
-          business_address: address || null,
+          business_address: formattedAddress || null,
         },
       }
     );
@@ -995,13 +1074,90 @@ export default function SettingsPage() {
                 </div>
               </TooltipProvider>
 
-              <AutoSaveInput
-                label="Business Address"
-                value={settings.business_address}
-                onSave={handleBusinessAddressChange}
-                placeholder="Enter business address (optional)"
-                description="Your business physical address for invoices and official documents."
-              />
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">
+                    Business Address
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your business physical address for invoices and official
+                    documents.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="business-address-street">
+                      Street Address
+                    </Label>
+                    <Input
+                      id="business-address-street"
+                      value={businessAddressFields.street}
+                      onChange={(e) =>
+                        setBusinessAddressFields((prev) => ({
+                          ...prev,
+                          street: e.target.value,
+                        }))
+                      }
+                      onBlur={handleBusinessAddressChange}
+                      placeholder="123 Main Street"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="business-address-city">City</Label>
+                      <Input
+                        id="business-address-city"
+                        value={businessAddressFields.city}
+                        onChange={(e) =>
+                          setBusinessAddressFields((prev) => ({
+                            ...prev,
+                            city: e.target.value,
+                          }))
+                        }
+                        onBlur={handleBusinessAddressChange}
+                        placeholder="Sydney"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="business-address-state">State</Label>
+                      <Input
+                        id="business-address-state"
+                        value={businessAddressFields.state}
+                        onChange={(e) =>
+                          setBusinessAddressFields((prev) => ({
+                            ...prev,
+                            state: e.target.value,
+                          }))
+                        }
+                        onBlur={handleBusinessAddressChange}
+                        placeholder="NSW"
+                        maxLength={3}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="business-address-postcode">Postcode</Label>
+                    <Input
+                      id="business-address-postcode"
+                      value={businessAddressFields.postcode}
+                      onChange={(e) =>
+                        setBusinessAddressFields((prev) => ({
+                          ...prev,
+                          postcode: e.target.value.replace(/\D/g, ""),
+                        }))
+                      }
+                      onBlur={handleBusinessAddressChange}
+                      placeholder="2000"
+                      maxLength={4}
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>

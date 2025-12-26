@@ -122,6 +122,7 @@ const FIELD_TYPES: {
   { type: "time", icon: Clock, label: "Time" },
   { type: "boolean", icon: CheckSquare, label: "Checkbox" },
   { type: "image", icon: Image, label: "Image" },
+  { type: "address", icon: MapPin, label: "Address" },
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 

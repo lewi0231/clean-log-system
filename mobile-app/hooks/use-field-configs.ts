@@ -65,6 +65,9 @@ export function hasValue(value: unknown, fieldType: FieldType): boolean {
     case "image":
       // Image values will be stored as URLs (strings) once fully implemented
       return typeof value === "string" && value.length > 0;
+    case "address":
+      // Address values are stored as strings
+      return typeof value === "string" && value.trim().length > 0;
     default:
       return false;
   }

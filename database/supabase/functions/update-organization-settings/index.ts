@@ -365,16 +365,33 @@ serve(async (req) => {
       }
     }
 
-    const { data: organization, error: updateError } = await supabase
-      .from("organization")
-      .update(updateData)
-      .eq("id", organization_id)
-      .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
-      )
-      .single();
+    // Only update organization table if there are fields to update
+    let organization = null;
+    if (Object.keys(updateData).length > 0) {
+      const { data: orgData, error: updateError } = await supabase
+        .from("organization")
+        .update(updateData)
+        .eq("id", organization_id)
+        .select(
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        )
+        .single();
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
+      organization = orgData;
+    } else {
+      // If no organization fields to update, just fetch the current organization data
+      const { data: orgData, error: fetchError } = await supabase
+        .from("organization")
+        .select(
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        )
+        .eq("id", organization_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      organization = orgData;
+    }
 
     // Fetch organization_settings for response
     const { data: orgSettings, error: orgSettingsError } = await supabase

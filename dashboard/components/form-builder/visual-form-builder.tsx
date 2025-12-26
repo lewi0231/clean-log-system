@@ -85,6 +85,7 @@ const FIELD_TYPES: {
   { type: "time", icon: Clock, label: "Time" },
   { type: "boolean", icon: CheckSquare, label: "Checkbox" },
   { type: "image", icon: Image, label: "Image" },
+  { type: "address", icon: MapPin, label: "Address" },
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 
@@ -542,6 +543,11 @@ export function VisualFormBuilder({
                         example:
                           "e.g., Before/after photos, Damage documentation",
                       },
+                      address: {
+                        description:
+                          "Address input with autocomplete suggestions",
+                        example: "e.g., Customer address, Service location",
+                      },
                       grouped_breakdown: {
                         description:
                           "Grouped breakdown for itemized lists with quantities",
@@ -720,6 +726,12 @@ export function VisualFormBuilder({
                                   "Image upload for photos or documents",
                                 example:
                                   "e.g., Before/after photos, Damage documentation",
+                              },
+                              address: {
+                                description:
+                                  "Address input with autocomplete suggestions",
+                                example:
+                                  "e.g., Customer address, Service location",
                               },
                               grouped_breakdown: {
                                 description:

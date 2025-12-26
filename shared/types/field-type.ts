@@ -9,4 +9,5 @@ export type FieldType =
   | "time"
   | "grouped_breakdown"
   | "boolean"
-  | "image";
+  | "image"
+  | "address";

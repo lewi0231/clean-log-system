@@ -558,6 +558,7 @@ export default function FieldConfigForm({
                 <SelectItem value="time">Time</SelectItem>
                 <SelectItem value="boolean">Boolean</SelectItem>
                 <SelectItem value="image">Image</SelectItem>
+                <SelectItem value="address">Address</SelectItem>
                 <SelectItem value="grouped_breakdown">
                   Grouped Breakdown
                 </SelectItem>

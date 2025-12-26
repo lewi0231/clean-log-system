@@ -57,6 +57,7 @@ function hasValue(value: unknown, fieldType: string): boolean {
     case "textarea":
     case "email":
     case "phone":
+    case "address":
       return typeof value === "string" && value.trim().length > 0;
     case "date":
     case "time":
@@ -536,6 +537,17 @@ export function MobileDevicePreview({
             value={String(value)}
             onChange={(e) => updateFieldValue(field.id, e.target.value)}
             className={baseClasses}
+          />
+        );
+      case "address":
+        return (
+          <input
+            type="text"
+            value={String(value)}
+            onChange={(e) => updateFieldValue(field.id, e.target.value)}
+            placeholder={field.description || `Enter ${field.label}`}
+            className={baseClasses}
+            autoComplete="street-address"
           />
         );
       default:

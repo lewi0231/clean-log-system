@@ -196,15 +196,35 @@ export async function middleware(request: NextRequest) {
         "https://*.supabase.co",
         "https://*.stripe.com",
         "wss://*.supabase.co",
+        "https://api.geoapify.com", // Geoapify API for address autocomplete
     );
 
     const connectSrc = connectSrcParts.join(" ");
+
+    // Build img-src directive to allow Supabase storage images
+    const imgSrcParts = ["'self'", "data:", "https:", "blob:"];
+
+    // Add Supabase storage URLs
+    if (supabaseOrigin) {
+        imgSrcParts.push(supabaseOrigin);
+    }
+
+    // Add localhost patterns for development (Supabase local storage)
+    if (isDevelopment) {
+        imgSrcParts.push(
+            "http://localhost:54321",
+            "http://127.0.0.1:54321",
+        );
+    }
+
+    // Add production Supabase storage patterns
+    imgSrcParts.push("https://*.supabase.co");
 
     const csp = [
         "default-src 'self'",
         "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-eval' needed for Next.js
         "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind
-        "img-src 'self' data: https: blob:",
+        `img-src ${imgSrcParts.join(" ")}`,
         "font-src 'self' data:",
         `connect-src ${connectSrc}`,
         "frame-src 'self' https://*.stripe.com",

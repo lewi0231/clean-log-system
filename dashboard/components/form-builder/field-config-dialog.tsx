@@ -63,6 +63,7 @@ const FIELD_TYPE_LABELS: Record<FieldType, string> = {
   time: "Time",
   boolean: "Checkbox",
   image: "Image",
+  address: "Address",
   grouped_breakdown: "Grouped Breakdown",
 };
 
