@@ -98,6 +98,7 @@ export interface OrganizationSettings {
   bank_transfer_account_number: string | null;
   bank_transfer_account_name: string | null;
   show_bank_transfer_on_invoices: boolean;
+  default_invoice_due_days: number;
 }
 
 export interface Job {

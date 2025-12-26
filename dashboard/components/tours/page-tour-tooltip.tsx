@@ -91,14 +91,10 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
         element.getAttribute("data-tour") === "add-field-button"
       ) {
         // The PopoverContent might not be in DOM yet, so find the button first
-        // Look for a button with "Add Field" text that's near this element
-        const addFieldButton = Array.from(
-          document.querySelectorAll("button")
-        ).find(
-          (btn) =>
-            btn.textContent?.includes("Add Field") &&
-            btn.querySelector(".lucide-plus")
-        );
+        // Use data-tour-trigger attribute for reliable targeting
+        const addFieldButton = document.querySelector(
+          '[data-tour-trigger="add-field-popover"]'
+        ) as HTMLElement | null;
 
         if (addFieldButton && addFieldButton instanceof HTMLElement) {
           // Click the button to open the popover

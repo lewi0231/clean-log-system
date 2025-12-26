@@ -12,12 +12,32 @@ import {
 } from "@/components/ui/card";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
-export default function VerifyEmail() {
+// Loading fallback for Suspense
+function VerifyEmailLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+          <CardTitle>Loading...</CardTitle>
+          <CardDescription>
+            Please wait while we load your verification status.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+}
+
+// Main content component that uses useSearchParams
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const email = searchParams.get("email") || "";
@@ -440,5 +460,14 @@ export default function VerifyEmail() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+// Export wrapper with Suspense boundary
+export default function VerifyEmail() {
+  return (
+    <Suspense fallback={<VerifyEmailLoading />}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

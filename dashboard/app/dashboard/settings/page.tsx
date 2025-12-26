@@ -91,6 +91,7 @@ export default function SettingsPage() {
     bank_transfer_account_number: null,
     bank_transfer_account_name: null,
     show_bank_transfer_on_invoices: false,
+    default_invoice_due_days: 30,
     rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
@@ -161,6 +162,8 @@ export default function SettingsPage() {
             data.settings.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
             data.settings.show_bank_transfer_on_invoices ?? false,
+          default_invoice_due_days:
+            data.settings.default_invoice_due_days ?? 30,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -197,6 +200,8 @@ export default function SettingsPage() {
             data.settings.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
             data.settings.show_bank_transfer_on_invoices ?? false,
+          default_invoice_due_days:
+            data.settings.default_invoice_due_days ?? 30,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -681,7 +686,11 @@ export default function SettingsPage() {
     // 2. Redirect user to Stripe authorization page
     // 3. Handle OAuth callback
     // 4. Store stripe_account_id in organization
-    alert("Stripe connection will be implemented soon");
+    setErrorDialog({
+      open: true,
+      title: "Coming Soon",
+      message: "Stripe connection will be implemented soon.",
+    });
   };
 
   const handleDisconnectStripe = async () => {
@@ -718,7 +727,11 @@ export default function SettingsPage() {
       log.error("Settings: Failed to disconnect Stripe account", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to disconnect Stripe account. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Disconnection Failed",
+        message: "Failed to disconnect Stripe account. Please try again.",
+      });
     }
   };
 
@@ -768,7 +781,11 @@ export default function SettingsPage() {
       log.error("Settings: Failed to update currency", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to update currency. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update currency. Please try again.",
+      });
     }
   };
 
@@ -1519,6 +1536,61 @@ export default function SettingsPage() {
                     <ExternalLink className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
+              </div>
+              <div className="p-4 border rounded-lg space-y-3">
+                <div>
+                  <p className="font-medium">Default Invoice Due Days</p>
+                  <p className="text-sm text-muted-foreground">
+                    Number of days after invoice creation when payment is due
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={settings.default_invoice_due_days}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value >= 1 && value <= 365) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          default_invoice_due_days: value,
+                        }));
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (isNaN(value) || value < 1 || value > 365) {
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.functions.invoke(
+                          "update-organization-settings",
+                          {
+                            body: {
+                              organization_id: organizationId,
+                              default_invoice_due_days: value,
+                            },
+                          }
+                        );
+                        if (error) throw error;
+                      } catch (err) {
+                        log.error("Failed to update invoice due days", {
+                          error: err,
+                        });
+                        setErrorDialog({
+                          open: true,
+                          title: "Update Failed",
+                          message:
+                            "Failed to update invoice due days. Please try again.",
+                        });
+                      }
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">days</span>
+                </div>
               </div>
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>

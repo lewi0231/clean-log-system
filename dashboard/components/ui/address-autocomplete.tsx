@@ -43,12 +43,34 @@ interface AddressAutocompleteProps {
 /**
  * AddressAutocomplete - An address input component with Geoapify autocomplete
  *
+ * @status RESERVED - This component is not currently in use but is reserved for future implementation.
+ *
+ * @future-use
+ * - Mobile config: Address field autocomplete in form builder
+ * - Mobile app: Address field autocomplete for workers entering addresses
+ * - Customer portal: Address input for customer-facing forms
+ *
+ * @requires NEXT_PUBLIC_GEOAPIFY_API_KEY environment variable
+ *
  * Features:
  * - Real-time address suggestions as user types
- * - Debounced API calls to reduce requests
- * - Auto-saves selected address
- * - Australia-focused by default (can be customized)
+ * - Debounced API calls (400ms) to reduce requests
+ * - Auto-saves selected address on selection or blur
+ * - Australia-focused by default (can be customized via countryCode prop)
  * - Graceful degradation if API key is missing
+ * - Keyboard navigation (arrow keys, enter, escape)
+ * - Loading and error states
+ *
+ * @example
+ * ```tsx
+ * <AddressAutocomplete
+ *   label="Business Address"
+ *   value={address}
+ *   onSave={handleAddressSave}
+ *   placeholder="Start typing an address..."
+ *   countryCode="AU"
+ * />
+ * ```
  */
 export function AddressAutocomplete({
   label,

@@ -661,7 +661,11 @@ export function VisualFormBuilder({
                   </Badge>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        data-tour-trigger="add-field-popover"
+                      >
                         <Plus className="w-4 h-4 mr-1" />
                         Add Field
                       </Button>

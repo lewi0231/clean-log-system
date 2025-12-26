@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import {
   errorResponse,
   extractErrorMessage,
@@ -470,241 +471,30 @@ serve(async (req: Request) => {
     }
 
     // Auto-generate invoice if job was just completed and setting is enabled
+    // Uses shared utility to avoid code duplication with create-job
     const wasJustCompleted = updateData.completed_at !== undefined &&
       (!existingJob.completed_at ||
         existingJob.completed_at !== updateData.completed_at);
 
     if (wasJustCompleted) {
-      try {
-        // Check if organization has auto-generate enabled
-        const { data: orgSettings, error: orgSettingsError } =
-          await supabaseAdmin
-            .from("organization_settings")
-            .select("auto_generate_invoices_immediately")
-            .eq("organization_id", organizationId)
-            .maybeSingle();
+      const autoInvoiceResult = await autoGenerateInvoiceForJob({
+        jobId: finalJob.id,
+        organizationId,
+        locationId: finalJob.location_id,
+        supabaseAdmin,
+        logger,
+      });
 
-        if (
-          !orgSettingsError && orgSettings?.auto_generate_invoices_immediately
-        ) {
-          // Check if job location has hierarchy auto-generate (if location exists)
-          let hasHierarchyAutoGenerate = false;
-
-          if (finalJob.location_id) {
-            const { data: location } = await supabaseAdmin
-              .from("location")
-              .select("hierarchy_parent_id")
-              .eq("id", finalJob.location_id)
-              .single();
-
-            if (location?.hierarchy_parent_id) {
-              const { data: hierarchyNode } = await supabaseAdmin
-                .from("location_hierarchy")
-                .select("metadata")
-                .eq("id", location.hierarchy_parent_id)
-                .eq("active", true)
-                .single();
-
-              if (hierarchyNode?.metadata) {
-                const metadata = hierarchyNode.metadata as Record<
-                  string,
-                  unknown
-                >;
-                const autoGenerate = metadata.auto_generate_invoices;
-                if (
-                  autoGenerate &&
-                  typeof autoGenerate === "object" &&
-                  (autoGenerate as Record<string, unknown>).enabled === true
-                ) {
-                  hasHierarchyAutoGenerate = true;
-                }
-              }
-            }
-          }
-
-          // Only auto-generate if no hierarchy auto-generate is enabled
-          if (!hasHierarchyAutoGenerate) {
-            logger.info("Auto-generating invoice for completed job", {
-              jobId: finalJob.id,
-              organizationId,
-            });
-
-            // Check if invoice already exists for this job
-            const { data: existingInvoice } = await supabaseAdmin
-              .from("invoice_job")
-              .select("invoice_id")
-              .eq("job_id", finalJob.id)
-              .maybeSingle();
-
-            if (!existingInvoice) {
-              try {
-                // Calculate invoice totals
-                const { data: calculationData, error: calcError } =
-                  await supabaseAdmin
-                    .functions.invoke("calculate-invoice", {
-                      body: {
-                        organization_id: organizationId,
-                        job_ids: [finalJob.id],
-                      },
-                    });
-
-                if (calcError) {
-                  throw calcError;
-                }
-
-                if (!calculationData?.calculation) {
-                  throw new Error("Failed to calculate invoice totals");
-                }
-
-                const calculation = calculationData.calculation;
-
-                // Get organization currency
-                const { data: orgSettings } = await supabaseAdmin
-                  .from("organization_settings")
-                  .select("currency")
-                  .eq("organization_id", organizationId)
-                  .maybeSingle();
-
-                const currency = orgSettings?.currency || "AUD";
-
-                // Generate invoice number
-                const { data: org } = await supabaseAdmin
-                  .from("organization")
-                  .select("org_code")
-                  .eq("id", organizationId)
-                  .single();
-
-                if (!org) {
-                  throw new Error("Organization not found");
-                }
-
-                const orgCode = org.org_code;
-                const year = new Date().getFullYear();
-                const { data: existingInvoices } = await supabaseAdmin
-                  .from("invoice")
-                  .select("invoice_number")
-                  .eq("organization_id", organizationId)
-                  .like("invoice_number", `${orgCode}-${year}-%`)
-                  .order("invoice_number", { ascending: false })
-                  .limit(1);
-
-                let nextNumber = 1;
-                if (existingInvoices && existingInvoices.length > 0) {
-                  const lastInvoice = existingInvoices[0].invoice_number;
-                  const match = lastInvoice.match(/-(\d+)$/);
-                  if (match) {
-                    nextNumber = parseInt(match[1], 10) + 1;
-                  }
-                }
-
-                const invoiceNumber = `${orgCode}-${year}-${
-                  nextNumber.toString().padStart(4, "0")
-                }`;
-
-                // Create invoice with pending_review status
-                const { data: invoice, error: invoiceError } =
-                  await supabaseAdmin
-                    .from("invoice")
-                    .insert({
-                      organization_id: organizationId,
-                      invoice_number: invoiceNumber,
-                      status: "pending_review",
-                      subtotal: calculation.total_subtotal,
-                      total: calculation.total,
-                      currency: currency,
-                      due_date: new Date(
-                        Date.now() + 30 * 24 * 60 * 60 * 1000,
-                      ).toISOString(), // 30 days from now
-                    })
-                    .select()
-                    .single();
-
-                if (invoiceError) {
-                  throw invoiceError;
-                }
-
-                // Create invoice_job record
-                const { error: invoiceJobError } = await supabaseAdmin
-                  .from("invoice_job")
-                  .insert({
-                    invoice_id: invoice.id,
-                    job_id: finalJob.id,
-                  });
-
-                if (invoiceJobError) {
-                  throw invoiceJobError;
-                }
-
-                // Create pricing snapshot records
-                const snapshotRecords = calculation.job_calculations?.flatMap(
-                  (jobCalc: {
-                    job_id: string;
-                    applied_rules?: Array<{
-                      pricing_rule_id: string;
-                      field_config_id: string | null;
-                      line_item_key?: string;
-                      snapshot_data?: Record<string, unknown>;
-                    }>;
-                  }) =>
-                    (jobCalc.applied_rules || []).map((rule) => ({
-                      organization_id: organizationId,
-                      invoice_id: invoice.id,
-                      job_id: jobCalc.job_id,
-                      pricing_rule_id: rule.pricing_rule_id,
-                      field_config_id: rule.field_config_id,
-                      line_item_key: rule.line_item_key || null,
-                      snapshot_data: rule.snapshot_data || {},
-                    })),
-                ) || [];
-
-                if (snapshotRecords.length > 0) {
-                  const { error: snapshotError } = await supabaseAdmin
-                    .from("pricing_snapshot")
-                    .insert(snapshotRecords);
-
-                  if (snapshotError) {
-                    logger.warn("Failed to create pricing snapshots", {
-                      error: snapshotError,
-                      invoiceId: invoice.id,
-                    });
-                    // Don't throw - snapshots are for audit, invoice creation should succeed
-                  }
-                }
-
-                logger.info("Invoice auto-generated successfully", {
-                  invoiceId: invoice.id,
-                  invoiceNumber: invoice.invoice_number,
-                  jobId: finalJob.id,
-                  organizationId,
-                });
-              } catch (autoGenErr) {
-                logger.error("Failed to auto-generate invoice", autoGenErr, {
-                  jobId: finalJob.id,
-                  organizationId,
-                });
-                // Don't fail job update if invoice generation fails
-              }
-            } else {
-              logger.debug("Invoice already exists for job", {
-                jobId: finalJob.id,
-                invoiceId: existingInvoice.invoice_id,
-              });
-            }
-          } else {
-            logger.debug(
-              "Skipping auto-generate - location has hierarchy auto-generate",
-              {
-                jobId: finalJob.id,
-                locationId: finalJob.location_id,
-              },
-            );
-          }
-        }
-      } catch (autoGenError) {
-        // Log error but don't fail job update
-        logger.error("Error in auto-generate invoice process", autoGenError, {
+      if (autoInvoiceResult.skipped) {
+        logger.debug("Auto-invoice generation skipped", {
           jobId: finalJob.id,
-          organizationId,
+          reason: autoInvoiceResult.skipReason,
+        });
+      } else if (!autoInvoiceResult.success) {
+        // Log but don't fail job update
+        logger.warn("Auto-invoice generation failed", {
+          jobId: finalJob.id,
+          error: autoInvoiceResult.error,
         });
       }
     }

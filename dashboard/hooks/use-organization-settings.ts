@@ -57,6 +57,7 @@ async function fetchOrganizationSettings(
       null,
     show_bank_transfer_on_invoices:
       data.settings.show_bank_transfer_on_invoices ?? false,
+    default_invoice_due_days: data.settings.default_invoice_due_days ?? 30,
   };
 }
 

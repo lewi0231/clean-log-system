@@ -1173,15 +1173,34 @@ export function SectionEditor({
                                                     checked: boolean
                                                   ) => {
                                                     if (onUpdateField) {
+                                                      // Preserve other validation rules when toggling allow_multiple
+                                                      const existingRules =
+                                                        field.validation_rules ||
+                                                        {};
+                                                      const updatedRules =
+                                                        checked
+                                                          ? {
+                                                              ...existingRules,
+                                                              allow_multiple:
+                                                                true,
+                                                            }
+                                                          : Object.fromEntries(
+                                                              Object.entries(
+                                                                existingRules
+                                                              ).filter(
+                                                                ([key]) =>
+                                                                  key !==
+                                                                  "allow_multiple"
+                                                              )
+                                                            );
                                                       await onUpdateField(
                                                         field.id,
                                                         {
                                                           validation_rules:
-                                                            checked
-                                                              ? {
-                                                                  allow_multiple:
-                                                                    true,
-                                                                }
+                                                            Object.keys(
+                                                              updatedRules
+                                                            ).length > 0
+                                                              ? updatedRules
                                                               : null,
                                                         }
                                                       );

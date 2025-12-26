@@ -33,7 +33,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days",
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -96,6 +96,7 @@ serve(async (req) => {
           null,
         show_bank_transfer_on_invoices:
           orgSettings?.show_bank_transfer_on_invoices ?? false,
+        default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
       },
     });
   } catch (error) {
