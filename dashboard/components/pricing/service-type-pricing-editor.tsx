@@ -33,15 +33,10 @@ export default function ServiceTypePricingEditor({
   locationId = null,
 }: ServiceTypePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
-  const {
-    servicePricingModes,
-    loading,
-    error,
-    upsertPricingMode,
-    deletePricingMode,
-  } = useServicePricingMode({
-    locationId,
-  });
+  const { servicePricingModes, loading, error, upsertPricingMode } =
+    useServicePricingMode({
+      locationId,
+    });
   const { currency: orgCurrency } = useOrganizationCurrency();
   const { workers } = useWorkers();
   const hasWorkers = workers.length > 0;
@@ -75,7 +70,6 @@ export default function ServiceTypePricingEditor({
     >
   >({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [deleting, setDeleting] = useState<Record<string, boolean>>({});
 
   // Initialize field-level fixed toggles from persisted pricing modes
   useEffect(() => {
@@ -211,34 +205,6 @@ export default function ServiceTypePricingEditor({
     }
   };
 
-  const handleDelete = async (fieldConfigId: string, optionValue: string) => {
-    const key = `${fieldConfigId}:${optionValue}`;
-    const existing = pricingModeMap.get(key);
-    if (!existing) return;
-
-    setDeleting((prev) => ({ ...prev, [key]: true }));
-    try {
-      await deletePricingMode(existing.id);
-      setEditingStates((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    } catch (err) {
-      log.error("Failed to delete service pricing mode", {
-        error: err instanceof Error ? err.message : "Unknown error",
-        fieldConfigId,
-        optionValue,
-      });
-    } finally {
-      setDeleting((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
-  };
-
   if (loading) {
     return <TableSkeleton rows={5} columns={4} />;
   }
@@ -356,9 +322,7 @@ export default function ServiceTypePricingEditor({
                 {options.map((optionValue) => {
                   const state = getEditingState(fieldConfig.id, optionValue);
                   const key = `${fieldConfig.id}:${optionValue}`;
-                  const existing = pricingModeMap.get(key);
                   const isSavingField = saving[fieldConfig.id];
-                  const isDeleting = deleting[key];
 
                   return (
                     <div
@@ -399,7 +363,7 @@ export default function ServiceTypePricingEditor({
                               }
                               placeholder="0.00"
                               className="pl-7 h-9 text-sm"
-                              disabled={isSavingField || isDeleting}
+                              disabled={isSavingField}
                             />
                           </div>
                         </div>
@@ -429,7 +393,7 @@ export default function ServiceTypePricingEditor({
                                 }
                                 placeholder="0.00"
                                 className="pl-7 h-9 text-sm"
-                                disabled={isSavingField || isDeleting}
+                                disabled={isSavingField}
                               />
                             </div>
                           </div>
@@ -443,10 +407,10 @@ export default function ServiceTypePricingEditor({
                 <Button
                   size="sm"
                   onClick={() => handleSaveField(fieldConfig)}
-                  disabled={isSavingField}
+                  disabled={saving[fieldConfig.id]}
                   className="cursor-pointer"
                 >
-                  {isSavingField ? (
+                  {saving[fieldConfig.id] ? (
                     "Saving..."
                   ) : (
                     <>
