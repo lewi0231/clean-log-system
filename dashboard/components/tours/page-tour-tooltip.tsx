@@ -182,7 +182,11 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
 
     return () => {
       // Cleanup: remove highlight class from element when step changes
-      if (element) {
+      // Use targetElement state which may have been updated for popover content
+      if (targetElement) {
+        targetElement.classList.remove("tour-highlight");
+      } else if (element) {
+        // Fallback to the originally found element
         element.classList.remove("tour-highlight");
       }
     };

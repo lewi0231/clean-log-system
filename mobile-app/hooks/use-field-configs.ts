@@ -103,7 +103,7 @@ export function isFieldDisabled(
   groupFields.forEach((otherField) => {
     if (
       otherField.id !== fieldConfig.id &&
-      hasValue(fieldValues[otherField.id], otherField.field_type)
+      hasValue(fieldValues[otherField.id], otherField.field_type, otherField)
     ) {
       const otherCluster = getFieldCluster(otherField);
       activeClusters.add(otherCluster);
