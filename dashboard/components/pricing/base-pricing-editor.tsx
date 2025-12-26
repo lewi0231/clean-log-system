@@ -692,20 +692,20 @@ export default function BasePricingEditor({
       {hasSelectFields && (
         <Card>
           <CardHeader>
-            <CardTitle>Base Pricing Type</CardTitle>
+            <CardTitle>Invoice Adjustment Type</CardTitle>
             <CardDescription>
-              Choose whether base pricing is a fixed amount or varies by field
-              selection
+              Choose how to adjust the invoice total — universally or based on
+              service type
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label>Field-Based Pricing</Label>
+                <Label>Service-Based Adjustment</Label>
                 <p className="text-sm text-muted-foreground">
                   {selectedFieldConfig
-                    ? `Base price varies by ${selectedFieldConfig.label} options`
-                    : "Set different base prices for each option in a select field"}
+                    ? `Adjustment varies by ${selectedFieldConfig.label} selection`
+                    : "Set different adjustments based on service type (e.g., Basic vs Premium)"}
                 </p>
               </div>
               <Switch
@@ -717,13 +717,14 @@ export default function BasePricingEditor({
         </Card>
       )}
 
-      {/* Standalone Base Pricing */}
+      {/* Universal Adjustment */}
       {!isFieldBased && (
         <Card>
           <CardHeader>
-            <CardTitle>Standalone Base Pricing</CardTitle>
+            <CardTitle>Universal Adjustment</CardTitle>
             <CardDescription>
-              Add a fixed amount or multiply the entire invoice
+              Apply a fixed fee (e.g., call-out fee) or multiplier (e.g., profit
+              margin) to every invoice
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1095,19 +1096,19 @@ export default function BasePricingEditor({
         </Card>
       )}
 
-      {/* Field-Based Base Pricing */}
+      {/* Service-Based Adjustment */}
       {isFieldBased && (
         <Card>
           <CardHeader>
             <CardTitle>
               {selectedFieldConfig
-                ? `Base Pricing by ${selectedFieldConfig.label}`
-                : "Field-Based Base Pricing"}
+                ? `Service-Based Adjustment by ${selectedFieldConfig.label}`
+                : "Service-Based Adjustment"}
             </CardTitle>
             <CardDescription>
               {selectedFieldConfig
-                ? `Set base prices for each ${selectedFieldConfig.label} option`
-                : "Select a field to set base prices for each option"}
+                ? `Set different adjustments for each ${selectedFieldConfig.label} option (e.g., premium services get higher markup)`
+                : "Select a service type field to vary adjustments by option"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1116,8 +1117,8 @@ export default function BasePricingEditor({
               <div className="bg-muted/50 rounded-md p-2 text-sm">
                 <span className="text-muted-foreground">Equation: </span>
                 <span className="font-mono font-medium">
-                  Total = adjustment[{selectedFieldConfig.label}] applied to
-                  invoice
+                  Total = invoice_total + adjustment[{selectedFieldConfig.label}
+                  ]
                 </span>
               </div>
             )}

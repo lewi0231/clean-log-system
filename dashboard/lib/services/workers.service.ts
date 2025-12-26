@@ -54,7 +54,7 @@ export class WorkersService {
     try {
       log.debug("WorkersService: Creating worker", {
         organizationId: request.organization_id,
-        name: request.name,
+        name: `${request.first_name} ${request.last_name}`,
       });
 
       const { data, error } = await supabase.functions.invoke("create-worker", {

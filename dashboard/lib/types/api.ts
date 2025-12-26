@@ -1,4 +1,5 @@
 // API request and response types for Supabase Edge Functions
+import type { JobEdit } from "../types";
 
 // Workers API
 export interface ListWorkersAndLocationsRequest {

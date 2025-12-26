@@ -58,6 +58,7 @@ interface FieldPricingListProps {
   refreshToken?: number;
   pricingContext?: "customer" | "worker"; // Defaults to 'customer'
   showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
+  fieldTypeFilter?: FieldType; // Filter to show only specific field type
 }
 
 export default function FieldPricingList({
@@ -67,6 +68,7 @@ export default function FieldPricingList({
   refreshToken,
   pricingContext = "customer",
   showBothContexts = false,
+  fieldTypeFilter,
 }: FieldPricingListProps) {
   const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
   const {
@@ -137,10 +139,15 @@ export default function FieldPricingList({
 
   // Filter to only field types that support pricing
   const pricingFieldConfigs = useMemo(() => {
-    return fieldConfigs.filter((fc) =>
+    let filtered = fieldConfigs.filter((fc) =>
       PRICING_SUPPORTED_TYPES.includes(fc.field_type)
     );
-  }, [fieldConfigs]);
+    // If a specific field type filter is provided, apply it
+    if (fieldTypeFilter) {
+      filtered = filtered.filter((fc) => fc.field_type === fieldTypeFilter);
+    }
+    return filtered;
+  }, [fieldConfigs, fieldTypeFilter]);
 
   const scopeParams = useMemo(
     () => ({ locationId, locationHierarchyId }),

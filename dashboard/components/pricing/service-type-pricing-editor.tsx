@@ -33,7 +33,7 @@ export default function ServiceTypePricingEditor({
   locationId = null,
 }: ServiceTypePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
-  const { servicePricingModes, loading, error, upsertPricingMode } =
+  const { servicePricingModes, loading, error, upsertPricingMode, refetch } =
     useServicePricingMode({
       locationId,
     });
@@ -158,7 +158,6 @@ export default function ServiceTypePricingEditor({
       await Promise.all(
         options.map(async (optionValue) => {
           const state = getEditingState(fieldConfig.id, optionValue);
-          const key = `${fieldConfig.id}:${optionValue}`;
 
           // Validate price inputs
           const customerPrice = parseFloat(state.customerPrice);
@@ -171,10 +170,15 @@ export default function ServiceTypePricingEditor({
             return;
           }
 
+          // If prices are entered, always use fixed_price mode
+          // The toggle determines if ALL options in the field use fixed pricing
+          // but individual options with prices should always be fixed_price
+          const shouldUseFixedPrice = isFixedForField || customerPrice > 0;
+
           await upsertPricingMode(
             fieldConfig.id,
             optionValue,
-            isFixedForField ? "fixed_price" : "field_based",
+            shouldUseFixedPrice ? "fixed_price" : "field_based",
             {
               fixedCustomerPrice: customerPrice,
               fixedWorkerPayment: hasWorkers ? workerPayment : 0,
@@ -182,15 +186,21 @@ export default function ServiceTypePricingEditor({
               locationId,
             }
           );
-
-          // Clear editing state for this option
-          setEditingStates((prev) => {
-            const next = { ...prev };
-            delete next[key];
-            return next;
-          });
         })
       );
+
+      // Wait for the query to refetch so the saved values appear
+      await refetch();
+
+      // Clear editing states after refetch completes
+      options.forEach((optionValue) => {
+        const key = `${fieldConfig.id}:${optionValue}`;
+        setEditingStates((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      });
     } catch (error) {
       log.error("Failed to save service pricing modes", {
         error: error instanceof Error ? error.message : "Unknown error",

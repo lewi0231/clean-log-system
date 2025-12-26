@@ -597,15 +597,90 @@ export default function OptionPricingEditor({
     );
   }
 
-  // Create a more understandable equation
-  const equationPreview = `Total = Sum of (option price × option quantity)`;
+  // Calculate average price for priced options
+  const pricedOptions = options.filter((opt) =>
+    showBothContexts
+      ? customerPricingMap[opt]?.source === scopeSource
+      : pricingMap[opt]?.source === scopeSource
+  );
+  const averagePrice =
+    pricedOptions.length > 0
+      ? pricedOptions.reduce((sum, opt) => {
+          const entry = showBothContexts
+            ? customerPricingMap[opt]
+            : pricingMap[opt];
+          return sum + (entry?.record?.customer_price || 0);
+        }, 0) / pricedOptions.length
+      : 0;
 
   return (
     <div className="space-y-4">
-      {/* Equation Preview */}
-      <div className="bg-muted/50 rounded-md p-2 text-sm">
-        <span className="text-muted-foreground">Equation: </span>
-        <span className="font-mono font-medium">{equationPreview}</span>
+      {/* Options Preview Grid - Always Visible */}
+      <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {options.map((optionValue) => {
+          const customerEntry = customerPricingMap[optionValue];
+          const workerEntry = workerPricingMap[optionValue];
+          const hasCustomerPrice = customerEntry?.source === scopeSource;
+          const hasWorkerPrice = workerEntry?.source === scopeSource;
+          const hasPricing = showBothContexts
+            ? hasCustomerPrice || hasWorkerPrice
+            : pricingMap[optionValue]?.source === scopeSource;
+
+          return (
+            <div
+              key={optionValue}
+              className={`rounded-lg border p-3 transition-colors ${
+                hasPricing
+                  ? "border-primary/20 bg-primary/5"
+                  : "border-dashed border-muted-foreground/30"
+              }`}
+            >
+              <div className="space-y-1">
+                <p className="font-medium text-sm truncate" title={optionValue}>
+                  {optionValue}
+                </p>
+                {hasPricing ? (
+                  <div className="flex flex-col gap-0.5">
+                    {showBothContexts ? (
+                      <>
+                        {hasCustomerPrice && (
+                          <p className="text-xs text-muted-foreground">
+                            Customer:{" "}
+                            <span className="font-medium text-foreground">
+                              {formatCurrency(
+                                customerEntry?.record?.customer_price || 0
+                              )}
+                            </span>
+                          </p>
+                        )}
+                        {hasWorkerPrice && (
+                          <p className="text-xs text-muted-foreground">
+                            Worker:{" "}
+                            <span className="font-medium text-foreground">
+                              {formatCurrency(
+                                workerEntry?.record?.worker_payment_rate || 0
+                              )}
+                            </span>
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(
+                          pricingMap[optionValue]?.record?.customer_price || 0
+                        )}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    No price set
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Save All Changes Button - Show when there are pending changes */}
@@ -790,13 +865,25 @@ export default function OptionPricingEditor({
 
       {/* Collapsible Individual Options */}
       <Collapsible open={expanded} onOpenChange={setExpanded}>
-        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary cursor-pointer">
-          {expanded ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronRight className="h-4 w-4" />
-          )}
-          Individual Group Prices
+        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg border hover:bg-muted/50 cursor-pointer">
+          <div className="flex items-center gap-2">
+            {expanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            <span className="text-sm font-medium">Edit Individual Prices</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              {pricedCount}/{options.length} priced
+            </span>
+            {pricedCount > 0 && (
+              <span className="text-primary">
+                • {formatCurrency(averagePrice)} avg
+              </span>
+            )}
+          </div>
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">
           <div className="space-y-2">

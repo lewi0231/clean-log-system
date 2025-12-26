@@ -144,9 +144,9 @@ export default function InvoicingPage() {
         onOpenChange={setInvoiceSettingsOpen}
         className="mb-6"
       >
-        <Card>
+        <Card className="border-primary/20 bg-primary/5">
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <CardHeader className="cursor-pointer hover:bg-primary/10 transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Settings className="h-4 w-4 text-muted-foreground" />

@@ -363,6 +363,78 @@ Tour components are located in: `dashboard/components/tours/`
 
 ---
 
+## Settings Sections
+
+### Visual Separation
+
+Settings sections within pages or sub-pages should use a distinct background color to visually separate configuration settings from the main content. This helps users quickly identify where settings are located and distinguishes them from operational content.
+
+### Styling
+
+Settings cards use a subtle primary-colored background with matching border:
+
+- **Background**: `bg-primary/5` (subtle primary color tint)
+- **Border**: `border-primary/20` (matching primary border)
+- **Hover State**: `hover:bg-primary/10` (slightly darker on hover)
+
+### Implementation Example
+
+```tsx
+<Card className="border-primary/20 bg-primary/5">
+  <CollapsibleTrigger asChild>
+    <CardHeader className="cursor-pointer hover:bg-primary/10 transition-colors">
+      <CardTitle>Settings Section</CardTitle>
+      <CardDescription>Configure settings for this feature</CardDescription>
+    </CardHeader>
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    <CardContent>{/* Settings content */}</CardContent>
+  </CollapsibleContent>
+</Card>
+```
+
+### Usage Guidelines
+
+- **Use for**: Settings sections that configure behavior or appearance (e.g., "Pricing Scope", "Location Settings", "Invoice Settings")
+- **Don't use for**: Main content cards, data display cards, or operational UI elements
+- **Consistency**: Apply this pattern consistently across all pages that have settings sections
+- **Visual Hierarchy**: The subtle background helps settings stand out without being too prominent
+
+### Examples
+
+- **Pricing Page**: "Pricing Scope" card uses this styling
+- **Locations Page**: "Location Settings" card uses this styling
+- **Invoicing Page**: "Invoice Settings" card uses this styling
+
+---
+
+## Tabs
+
+### Cursor Pointer
+
+All tab triggers should use `cursor-pointer` to clearly indicate they are clickable.
+
+### Implementation
+
+```tsx
+<TabsList>
+  <TabsTrigger value="tab1" className="cursor-pointer">
+    Tab 1
+  </TabsTrigger>
+  <TabsTrigger value="tab2" className="cursor-pointer">
+    Tab 2
+  </TabsTrigger>
+</TabsList>
+```
+
+### Usage Guidelines
+
+- Always add `cursor-pointer` to `TabsTrigger` components
+- This provides clear visual feedback that tabs are interactive
+- Improves accessibility and user experience
+
+---
+
 ## General Principles
 
 1. **Consistency**: Follow established patterns for similar UI elements
