@@ -75,13 +75,39 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
       const isTabTrigger =
         element.getAttribute("role") === "tab" ||
         element.hasAttribute("data-state") ||
-        element.closest('[role="tablist"]') !== null;
+        element.closest('[role="tablist"]') !== null ||
+        (element.hasAttribute("data-tour") &&
+          (element.getAttribute("data-tour")?.includes("tab") ||
+            element.getAttribute("data-tour")?.includes("pricing")));
 
       if (isTabTrigger && element instanceof HTMLElement) {
         // Use a small delay to ensure the element is ready, then click it
         setTimeout(() => {
-          element.click();
-        }, 150);
+          // Try to find the button inside if it's wrapped, or click the element itself
+          const button = element.querySelector("button") || element;
+          if (button instanceof HTMLElement) {
+            button.click();
+            // Also trigger a change event to ensure the tab state updates
+            const value =
+              button.getAttribute("data-value") ||
+              button.getAttribute("value") ||
+              button.textContent?.trim().toLowerCase().replace(/\s+/g, "-");
+            if (value) {
+              // Find the parent Tabs component and update its value
+              const tabsRoot =
+                element.closest('[role="tablist"]')?.parentElement;
+              if (tabsRoot) {
+                const tabsContent = tabsRoot.querySelector(
+                  `[data-value="${value}"]`
+                );
+                if (tabsContent) {
+                  // Ensure the content is visible
+                  tabsContent.setAttribute("data-state", "active");
+                }
+              }
+            }
+          }
+        }, 200);
       }
 
       // If element is a PopoverContent, try to open the popover by clicking its trigger

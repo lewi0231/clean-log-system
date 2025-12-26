@@ -23,6 +23,7 @@ export default function SignUp() {
   const [password, setPassword] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{
     organisation?: string;
     email?: string;
@@ -60,6 +61,7 @@ export default function SignUp() {
       log.info("SignUp: Starting signup process");
       setIsLoading(true);
       setErrors({});
+      setGeneralError(null);
 
       const validatedData = validateInput();
 
@@ -76,10 +78,24 @@ export default function SignUp() {
       );
 
       if (error) {
+        // Handle different error types from Supabase functions
+        const errorMessage =
+          error.message ||
+          (error as { context?: { message?: string } }).context?.message ||
+          "Registration failed. Please try again.";
         log.error("SignUp: Organization registration failed", {
-          error: error.message,
+          error: errorMessage,
+          errorDetails: JSON.stringify(error),
         });
-        throw new Error(error.message);
+        throw new Error(errorMessage);
+      }
+
+      // Check if the response contains an error from the edge function
+      if (data?.error) {
+        log.error("SignUp: Edge function returned error", {
+          error: data.error,
+        });
+        throw new Error(data.error);
       }
 
       log.info("SignUp: Organization registered successfully", {
@@ -106,6 +122,7 @@ export default function SignUp() {
       // Errors are already set in validateInput via setErrors
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("SignUp: Signup process failed", { error: error.message });
+        setGeneralError(error.message);
       }
     } finally {
       setIsLoading(false);
@@ -122,6 +139,11 @@ export default function SignUp() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {generalError && (
+            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              {generalError}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="organization">Organization Name</Label>
             <Input

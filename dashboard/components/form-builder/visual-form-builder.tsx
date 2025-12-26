@@ -665,6 +665,7 @@ export function VisualFormBuilder({
                         variant="outline"
                         size="sm"
                         data-tour-trigger="add-field-popover"
+                        className="cursor-pointer"
                       >
                         <Plus className="w-4 h-4 mr-1" />
                         Add Field
@@ -915,6 +916,15 @@ export function VisualFormBuilder({
                                       Conditional
                                     </Badge>
                                   )}
+                                  {field.field_type === "select" &&
+                                    field.validation_rules?.allow_multiple && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] px-1.5 text-primary border-primary/40"
+                                      >
+                                        Multiple
+                                      </Badge>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                                   <Badge
@@ -1527,7 +1537,7 @@ export function VisualFormBuilder({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive cursor-pointer"
                                   onClick={() => onDeleteField(field.id)}
                                 >
                                   <Trash2 className="w-4 h-4" />
