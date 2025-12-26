@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import {
   errorResponse,
   extractErrorMessage,
@@ -465,6 +466,35 @@ serve(async (req: Request) => {
           error: auditErr,
           jobId,
           organizationId,
+        });
+      }
+    }
+
+    // Auto-generate invoice if job was just completed and setting is enabled
+    // Uses shared utility to avoid code duplication with create-job
+    const wasJustCompleted = updateData.completed_at !== undefined &&
+      (!existingJob.completed_at ||
+        existingJob.completed_at !== updateData.completed_at);
+
+    if (wasJustCompleted) {
+      const autoInvoiceResult = await autoGenerateInvoiceForJob({
+        jobId: finalJob.id,
+        organizationId,
+        locationId: finalJob.location_id,
+        supabaseAdmin,
+        logger,
+      });
+
+      if (autoInvoiceResult.skipped) {
+        logger.debug("Auto-invoice generation skipped", {
+          jobId: finalJob.id,
+          reason: autoInvoiceResult.skipReason,
+        });
+      } else if (!autoInvoiceResult.success) {
+        // Log but don't fail job update
+        logger.warn("Auto-invoice generation failed", {
+          jobId: finalJob.id,
+          error: autoInvoiceResult.error,
         });
       }
     }

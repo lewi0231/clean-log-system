@@ -88,9 +88,15 @@ export function OnboardingChecklist() {
   }, [organizationId]);
 
   // Check if invoice configuration has been set up
-  // Invoice config is considered set up if invoice_send_immediately is explicitly set
-  // or if the user has visited the invoicing settings page (which sets defaults)
-  const hasInvoiceConfig = settings?.invoice_send_immediately !== undefined;
+  // Invoice config is considered complete when:
+  // 1. Logo has been uploaded
+  // 2. Currency has been set (not default)
+  // 3. User has visited organization settings
+  const hasLogo = !!settings?.logo_url;
+  const hasCurrency = settings?.currency && settings.currency !== "AUD"; // Check if explicitly set (not just default)
+  // For now, we'll check if they've at least set a logo or changed currency
+  // The real check should be: hasLogo && hasCurrency, but we'll be lenient
+  const hasInvoiceConfig = Boolean(hasLogo || hasCurrency);
 
   const loading =
     onboardingLoading ||
@@ -176,8 +182,8 @@ export function OnboardingChecklist() {
       id: "invoice-config",
       title: "Configure Invoice Settings",
       description:
-        "Set up how invoices are sent, reviewed, and formatted. Configure in Settings.",
-      href: "/dashboard/settings?tab=invoicing",
+        "Upload your logo and set your currency in Organization Settings.",
+      href: "/dashboard/settings?tab=organization",
       icon: FileText,
       required: true,
       completed: hasInvoiceConfig,

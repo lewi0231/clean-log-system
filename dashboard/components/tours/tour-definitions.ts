@@ -91,7 +91,7 @@ export const mobileConfigTourSteps: TourStep[] = [
         target: "[data-tour='add-field-button']",
         title: "Add Fields",
         content:
-            "Click here to add new fields to your form. Choose from text, number, select, checkbox, and other field types. After adding a field, drag it into a section.",
+            "Click the 'Add Field' button to see all available field types. Choose from text, number, select, checkbox, and other field types. After adding a field, drag it into a section.",
         position: "left",
     },
     {

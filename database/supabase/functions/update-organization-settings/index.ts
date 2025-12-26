@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
   validateBusinessMode,
@@ -10,6 +11,10 @@ import {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, {
+    functionName: "update-organization-settings",
+  });
 
   try {
     const body = await req.json();
@@ -27,6 +32,7 @@ serve(async (req) => {
       abn,
       logo_url,
       primary_contact_email,
+      business_address,
       invoice_send_immediately,
       feedback_email_send_immediately,
       rating_config,
@@ -35,6 +41,12 @@ serve(async (req) => {
       currency,
       locale,
       default_exclusive_group_label,
+      auto_generate_invoices_immediately,
+      bank_transfer_bsb,
+      bank_transfer_account_number,
+      bank_transfer_account_name,
+      show_bank_transfer_on_invoices,
+      default_invoice_due_days,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -95,6 +107,12 @@ serve(async (req) => {
       } else {
         updateData.primary_contact_email = null;
       }
+    }
+
+    if (business_address !== undefined) {
+      updateData.business_address = business_address === ""
+        ? null
+        : business_address.trim();
     }
 
     if (invoice_send_immediately !== undefined) {
@@ -190,16 +208,216 @@ serve(async (req) => {
       updateData.rating_config = rating_config;
     }
 
-    const { data: organization, error: updateError } = await supabase
-      .from("organization")
-      .update(updateData)
-      .eq("id", organization_id)
-      .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
-      )
-      .single();
+    // Handle auto_generate_invoices_immediately (stored in organization_settings table)
+    if (auto_generate_invoices_immediately !== undefined) {
+      if (typeof auto_generate_invoices_immediately !== "boolean") {
+        return errorResponse(
+          "auto_generate_invoices_immediately must be a boolean",
+          400,
+        );
+      }
 
-    if (updateError) throw updateError;
+      // Get or create organization_settings record
+      const { data: existingSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      if (existingSettings) {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .update({
+            auto_generate_invoices_immediately:
+              auto_generate_invoices_immediately,
+          })
+          .eq("id", existingSettings.id);
+
+        if (settingsError) {
+          logger.error("Failed to update auto_generate_invoices_immediately", {
+            error: settingsError,
+          });
+          // Don't throw - continue with other updates
+        }
+      } else {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id,
+            auto_generate_invoices_immediately:
+              auto_generate_invoices_immediately,
+          });
+
+        if (settingsError) {
+          logger.error("Failed to create auto_generate_invoices_immediately", {
+            error: settingsError,
+          });
+          // Don't throw - continue with other updates
+        }
+      }
+    }
+
+    // Handle bank transfer details (stored in organization_settings table)
+    if (
+      bank_transfer_bsb !== undefined ||
+      bank_transfer_account_number !== undefined ||
+      bank_transfer_account_name !== undefined ||
+      show_bank_transfer_on_invoices !== undefined
+    ) {
+      // Validate BSB format if provided (Australian format: XXX-XXX)
+      if (bank_transfer_bsb !== undefined && bank_transfer_bsb !== null) {
+        const trimmedBsb = typeof bank_transfer_bsb === "string"
+          ? bank_transfer_bsb.trim()
+          : "";
+        if (trimmedBsb && !/^\d{3}-\d{3}$/.test(trimmedBsb)) {
+          return errorResponse(
+            "BSB must be in format XXX-XXX (e.g., 123-456)",
+            400,
+          );
+        }
+      }
+
+      // Validate account number if provided
+      if (
+        bank_transfer_account_number !== undefined &&
+        bank_transfer_account_number !== null
+      ) {
+        const trimmedAccount = typeof bank_transfer_account_number === "string"
+          ? bank_transfer_account_number.trim()
+          : "";
+        if (
+          trimmedAccount &&
+          (!/^\d+$/.test(trimmedAccount) || trimmedAccount.length < 6 ||
+            trimmedAccount.length > 10)
+        ) {
+          return errorResponse(
+            "Account number must be 6-10 digits",
+            400,
+          );
+        }
+      }
+
+      // Get or create organization_settings record
+      const { data: existingSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      const settingsUpdate: Record<string, unknown> = {};
+
+      if (bank_transfer_bsb !== undefined) {
+        settingsUpdate.bank_transfer_bsb =
+          typeof bank_transfer_bsb === "string" && bank_transfer_bsb.trim()
+            ? bank_transfer_bsb.trim()
+            : null;
+      }
+      if (bank_transfer_account_number !== undefined) {
+        settingsUpdate.bank_transfer_account_number =
+          typeof bank_transfer_account_number === "string" &&
+            bank_transfer_account_number.trim()
+            ? bank_transfer_account_number.trim()
+            : null;
+      }
+      if (bank_transfer_account_name !== undefined) {
+        settingsUpdate.bank_transfer_account_name =
+          typeof bank_transfer_account_name === "string" &&
+            bank_transfer_account_name.trim()
+            ? bank_transfer_account_name.trim()
+            : null;
+      }
+      if (show_bank_transfer_on_invoices !== undefined) {
+        if (typeof show_bank_transfer_on_invoices !== "boolean") {
+          return errorResponse(
+            "show_bank_transfer_on_invoices must be a boolean",
+            400,
+          );
+        }
+        settingsUpdate.show_bank_transfer_on_invoices =
+          show_bank_transfer_on_invoices;
+      }
+
+      if (default_invoice_due_days !== undefined) {
+        const days = Number(default_invoice_due_days);
+        if (isNaN(days) || days < 1 || days > 365) {
+          return errorResponse(
+            "default_invoice_due_days must be a number between 1 and 365",
+            400,
+          );
+        }
+        settingsUpdate.default_invoice_due_days = days;
+      }
+
+      if (existingSettings) {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .update(settingsUpdate)
+          .eq("id", existingSettings.id);
+
+        if (settingsError) {
+          logger.error("Failed to update bank transfer settings", {
+            error: settingsError,
+          });
+          // Don't throw - continue with other updates
+        }
+      } else {
+        const { error: settingsError } = await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id,
+            ...settingsUpdate,
+          });
+
+        if (settingsError) {
+          logger.error("Failed to create bank transfer settings", {
+            error: settingsError,
+          });
+          // Don't throw - continue with other updates
+        }
+      }
+    }
+
+    // Only update organization table if there are fields to update
+    let organization = null;
+    if (Object.keys(updateData).length > 0) {
+      const { data: orgData, error: updateError } = await supabase
+        .from("organization")
+        .update(updateData)
+        .eq("id", organization_id)
+        .select(
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        )
+        .single();
+
+      if (updateError) throw updateError;
+      organization = orgData;
+    } else {
+      // If no organization fields to update, just fetch the current organization data
+      const { data: orgData, error: fetchError } = await supabase
+        .from("organization")
+        .select(
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+        )
+        .eq("id", organization_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      organization = orgData;
+    }
+
+    // Fetch organization_settings for response
+    const { data: orgSettings, error: orgSettingsError } = await supabase
+      .from("organization_settings")
+      .select(
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days",
+      )
+      .eq("organization_id", organization_id)
+      .maybeSingle();
+
+    // Don't throw if settings don't exist
+    if (orgSettingsError && orgSettingsError.code !== "PGRST116") {
+      console.warn("Error fetching organization_settings", orgSettingsError);
+    }
 
     // Parse rating_config with default fallback
     let ratingConfig = {
@@ -232,6 +450,7 @@ serve(async (req) => {
         abn: organization?.abn ?? null,
         logo_url: organization?.logo_url ?? null,
         primary_contact_email: organization?.primary_contact_email ?? null,
+        business_address: organization?.business_address ?? null,
         invoice_send_immediately: organization?.invoice_send_immediately ??
           false,
         feedback_email_send_immediately:
@@ -243,6 +462,16 @@ serve(async (req) => {
         locale: organization?.locale ?? "en-AU",
         default_exclusive_group_label:
           organization?.default_exclusive_group_label ?? null,
+        auto_generate_invoices_immediately:
+          orgSettings?.auto_generate_invoices_immediately ?? false,
+        bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
+        bank_transfer_account_number:
+          orgSettings?.bank_transfer_account_number ?? null,
+        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ??
+          null,
+        show_bank_transfer_on_invoices:
+          orgSettings?.show_bank_transfer_on_invoices ?? false,
+        default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
       },
     });
   } catch (error) {

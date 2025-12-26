@@ -45,11 +45,7 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
       return;
     }
 
-    // Remove highlight from previous element first
-    const previousElement = targetElement;
-    if (previousElement) {
-      previousElement.classList.remove("tour-highlight");
-    }
+    // Cleanup will handle removing highlight from previous element
 
     // Try to find element by data attribute first, then by selector
     let element: HTMLElement | null = null;
@@ -88,44 +84,121 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
         }, 150);
       }
 
+      // If element is a PopoverContent, try to open the popover by clicking its trigger
+      // First, find the button that triggers this popover (it should be nearby)
+      if (
+        element.hasAttribute("data-tour") &&
+        element.getAttribute("data-tour") === "add-field-button"
+      ) {
+        // The PopoverContent might not be in DOM yet, so find the button first
+        // Use data-tour-trigger attribute for reliable targeting
+        const addFieldButton = document.querySelector(
+          '[data-tour-trigger="add-field-popover"]'
+        ) as HTMLElement | null;
+
+        if (addFieldButton && addFieldButton instanceof HTMLElement) {
+          // Click the button to open the popover
+          addFieldButton.click();
+
+          // Wait for popover to appear in DOM, then highlight it
+          const checkForPopover = setInterval(() => {
+            const popoverContent = document.querySelector(
+              '[data-tour="add-field-button"]'
+            ) as HTMLElement;
+            if (popoverContent) {
+              clearInterval(checkForPopover);
+              popoverContent.classList.add("tour-highlight");
+              popoverContent.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "center",
+              });
+              setTargetElement(popoverContent);
+            }
+          }, 50);
+
+          // Timeout after 1 second if popover doesn't appear
+          setTimeout(() => clearInterval(checkForPopover), 1000);
+          return; // Exit early, we'll handle highlighting in the interval
+        }
+      }
+
       // Add highlight class immediately for smooth transition
       element.classList.add("tour-highlight");
 
       // Scroll element into view (for large elements, scroll to top)
+      // For mobile preview, ensure it's fully visible
+      const isMobilePreview =
+        element.hasAttribute("data-tour") &&
+        element.getAttribute("data-tour") === "mobile-preview";
+
       element.scrollIntoView({
         behavior: "smooth",
-        block: isVeryLarge ? "start" : "center",
+        block: isVeryLarge ? "start" : isMobilePreview ? "start" : "center",
         inline: "center",
       });
+
+      // For mobile preview, add extra scroll to ensure it's not cut off at top
+      if (isMobilePreview) {
+        // Wait for scroll to complete, then check position
+        setTimeout(() => {
+          const rect = element.getBoundingClientRect();
+          const viewportHeight = window.innerHeight;
+          // If element is cut off at top (rect.top < 20px), scroll more
+          if (rect.top < 20) {
+            // Scroll so element is at least 100px from top
+            const scrollAmount = rect.top - 100;
+            window.scrollBy({
+              top: scrollAmount,
+              behavior: "smooth",
+            });
+          }
+          // Also ensure element is visible in viewport
+          if (rect.bottom > viewportHeight) {
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+              inline: "nearest",
+            });
+          }
+        }, 500);
+      }
 
       // Update state after DOM operations (defer to avoid cascading renders)
       requestAnimationFrame(() => {
         setTargetElement(element);
       });
     } else {
-      // Element not found, skip to next step
+      // Element not found - auto-skip to next step to prevent tour from hanging
       console.warn(`Tour step target not found: ${currentStepData.target}`);
       if (currentStep < totalSteps - 1) {
+        // Skip to next step after a short delay to allow for DOM updates
         setTimeout(() => nextStep(), 100);
       } else {
+        // If we're at the last step and element not found, end the tour
         endTour();
       }
     }
 
     return () => {
-      // Cleanup: remove highlight class from current element
-      if (element) {
+      // Cleanup: remove highlight class from element when step changes
+      // Use targetElement state which may have been updated for popover content
+      if (targetElement) {
+        targetElement.classList.remove("tour-highlight");
+      } else if (element) {
+        // Fallback to the originally found element
         element.classList.remove("tour-highlight");
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     isTourActive,
     currentStep,
-    currentStepData,
     totalSteps,
     nextStep,
     endTour,
-    targetElement,
+    // Only re-run when step changes, not when targetElement changes
+    // nextStep, endTour, and totalSteps are stable references from context
   ]);
 
   // Create overlay backdrop

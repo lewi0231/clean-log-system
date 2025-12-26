@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import {
   type FeedbackEmailData,
   generateFeedbackToken,
@@ -533,6 +534,29 @@ serve(async (req) => {
       logger.error("Error in feedback email sending process", feedbackError, {
         jobId: job.id,
         organizationId,
+      });
+    }
+
+    // Auto-generate invoice if enabled (for non-location orgs)
+    // Uses shared utility to avoid code duplication with update-job
+    const autoInvoiceResult = await autoGenerateInvoiceForJob({
+      jobId: job.id,
+      organizationId,
+      locationId: job.location_id,
+      supabaseAdmin,
+      logger,
+    });
+
+    if (autoInvoiceResult.skipped) {
+      logger.debug("Auto-invoice generation skipped", {
+        jobId: job.id,
+        reason: autoInvoiceResult.skipReason,
+      });
+    } else if (!autoInvoiceResult.success) {
+      // Log but don't fail job creation
+      logger.warn("Auto-invoice generation failed", {
+        jobId: job.id,
+        error: autoInvoiceResult.error,
       });
     }
 

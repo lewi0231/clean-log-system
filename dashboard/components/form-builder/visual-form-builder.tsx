@@ -53,6 +53,7 @@ import {
   GripVertical,
   Hash,
   HelpCircle,
+  Image,
   Layers,
   List,
   Mail,
@@ -83,6 +84,8 @@ const FIELD_TYPES: {
   { type: "date", icon: Calendar, label: "Date" },
   { type: "time", icon: Clock, label: "Time" },
   { type: "boolean", icon: CheckSquare, label: "Checkbox" },
+  { type: "image", icon: Image, label: "Image" },
+  { type: "address", icon: MapPin, label: "Address" },
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 
@@ -535,6 +538,16 @@ export function VisualFormBuilder({
                         description: "Checkbox for yes/no or true/false values",
                         example: "e.g., Completed, Verified, Approved",
                       },
+                      image: {
+                        description: "Image upload for photos or documents",
+                        example:
+                          "e.g., Before/after photos, Damage documentation",
+                      },
+                      address: {
+                        description:
+                          "Address input with autocomplete suggestions",
+                        example: "e.g., Customer address, Service location",
+                      },
                       grouped_breakdown: {
                         description:
                           "Grouped breakdown for itemized lists with quantities",
@@ -651,13 +664,17 @@ export function VisualFormBuilder({
                       <Button
                         variant="outline"
                         size="sm"
-                        data-tour="add-field-button"
+                        data-tour-trigger="add-field-popover"
                       >
                         <Plus className="w-4 h-4 mr-1" />
                         Add Field
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-56 p-2" align="end">
+                    <PopoverContent
+                      className="w-56 p-2"
+                      align="end"
+                      data-tour="add-field-button"
+                    >
                       <TooltipProvider>
                         <div className="grid grid-cols-2 gap-2">
                           {FIELD_TYPES.map(({ type, icon: Icon, label }) => {
@@ -707,6 +724,18 @@ export function VisualFormBuilder({
                                 description:
                                   "Checkbox for yes/no or true/false values",
                                 example: "e.g., Completed, Verified, Approved",
+                              },
+                              image: {
+                                description:
+                                  "Image upload for photos or documents",
+                                example:
+                                  "e.g., Before/after photos, Damage documentation",
+                              },
+                              address: {
+                                description:
+                                  "Address input with autocomplete suggestions",
+                                example:
+                                  "e.g., Customer address, Service location",
                               },
                               grouped_breakdown: {
                                 description:
@@ -873,7 +902,7 @@ export function VisualFormBuilder({
                                   {field.required && (
                                     <Badge
                                       variant="destructive"
-                                      className="text-[10px] px-1.5"
+                                      className="text-[10px] px-1.5 text-white"
                                     >
                                       Required
                                     </Badge>

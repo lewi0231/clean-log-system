@@ -9,13 +9,13 @@ import {
 } from "@/components/ui/card";
 import {
   ArrowRight,
-  FileText,
-  Sparkles,
   BadgeCheck,
   BarChart3,
   Blocks,
   CreditCard,
   FileSpreadsheet,
+  FileText,
+  Sparkles,
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
@@ -89,6 +89,8 @@ export default function Home() {
             </div>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="group">
+                <Link href="/signup">
+                  Get Started
                 <Link href="/dashboard">
                   Get started
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
@@ -278,6 +280,8 @@ export default function Home() {
             </p>
             <div className="mt-10">
               <Button asChild size="lg" className="group">
+                <Link href="/signup">
+                  Start Free Trial
                 <Link href="/dashboard">
                   Start now
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />

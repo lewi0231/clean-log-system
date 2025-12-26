@@ -342,6 +342,52 @@ export function FieldRenderer({
         </View>
       );
 
+    case "image":
+      return (
+        <View>
+          <Text className="text-muted-foreground text-sm py-2">
+            Image upload coming soon ({config.label})
+          </Text>
+          {error && <Text className="text-red-500 text-sm py-2">{error}</Text>}
+        </View>
+      );
+
+    case "address":
+      // Address field - renders as text input
+      // Autocomplete will be implemented in a future update
+      return (
+        <View>
+          <TextInput
+            className={`bg-white border-[1.5px] ${
+              error ? "border-red-500" : "border-[#e0e0e0]"
+            } rounded-xl px-4 py-3.5 text-base text-foreground ${
+              disabled ? "opacity-50" : ""
+            }`}
+            placeholder={placeholder}
+            placeholderTextColor="#999"
+            value={String(value || "")}
+            onChangeText={(text) => handleFieldChange(text)}
+            editable={!disabled}
+            autoCapitalize="words"
+            autoComplete="street-address"
+            returnKeyType="next"
+            accessibilityLabel={config.label}
+            accessibilityHint={config.description || undefined}
+            accessibilityState={{ disabled }}
+            accessibilityLiveRegion={error ? "polite" : "none"}
+          />
+          {error && (
+            <Text
+              className="text-sm text-destructive mt-1"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              {error}
+            </Text>
+          )}
+        </View>
+      );
+
     default:
       return (
         <Text className="text-red-500 text-sm py-2">

@@ -34,6 +34,7 @@ async function fetchOrganizationSettings(
     abn: data.settings.abn ?? null,
     logo_url: data.settings.logo_url ?? null,
     primary_contact_email: data.settings.primary_contact_email ?? null,
+    business_address: data.settings.business_address ?? null,
     invoice_send_immediately: data.settings.invoice_send_immediately ?? false,
     feedback_email_send_immediately:
       data.settings.feedback_email_send_immediately ?? false,
@@ -47,6 +48,16 @@ async function fetchOrganizationSettings(
     locale: data.settings.locale ?? "en-AU",
     default_exclusive_group_label:
       data.settings.default_exclusive_group_label ?? null,
+    auto_generate_invoices_immediately:
+      data.settings.auto_generate_invoices_immediately ?? false,
+    bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+    bank_transfer_account_number: data.settings.bank_transfer_account_number ??
+      null,
+    bank_transfer_account_name: data.settings.bank_transfer_account_name ??
+      null,
+    show_bank_transfer_on_invoices:
+      data.settings.show_bank_transfer_on_invoices ?? false,
+    default_invoice_due_days: data.settings.default_invoice_due_days ?? 30,
   };
 }
 

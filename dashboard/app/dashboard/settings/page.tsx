@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AutoSaveInput } from "@/components/ui/auto-save-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +32,14 @@ import {
   FormSkeleton,
   PageHeaderSkeleton,
 } from "@/components/ui/skeleton-loaders";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -32,7 +48,15 @@ import {
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
-import { DollarSign, ExternalLink, Upload, X } from "lucide-react";
+import {
+  DollarSign,
+  ExternalLink,
+  Info,
+  Loader2,
+  Save,
+  Upload,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -44,6 +68,14 @@ export default function SettingsPage() {
     error: orgError,
   } = useOrganization();
 
+  // Separate state for business address fields
+  const [businessAddressFields, setBusinessAddressFields] = useState({
+    street: "",
+    city: "",
+    state: "",
+    postcode: "",
+  });
+
   const [settings, setSettings] = useState<OrganizationSettings>({
     name: "",
     use_predefined_locations: true,
@@ -51,8 +83,15 @@ export default function SettingsPage() {
     abn: null,
     logo_url: null,
     primary_contact_email: null,
+    business_address: null,
     invoice_send_immediately: false,
     feedback_email_send_immediately: false,
+    auto_generate_invoices_immediately: false,
+    bank_transfer_bsb: null,
+    bank_transfer_account_number: null,
+    bank_transfer_account_name: null,
+    show_bank_transfer_on_invoices: false,
+    default_invoice_due_days: 30,
     rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
@@ -64,6 +103,17 @@ export default function SettingsPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [errorDialog, setErrorDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({ open: false, title: "", message: "" });
+
+  // Track unsaved changes and saving state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [initialSettings, setInitialSettings] =
+    useState<OrganizationSettings | null>(null);
 
   const fetchSettings = async () => {
     if (!organizationId) return;
@@ -83,6 +133,13 @@ export default function SettingsPage() {
       }
 
       if (data?.settings) {
+        // Parse business_address if it exists (format: "Street, City, State Postcode")
+        const addressParts = data.settings.business_address
+          ? parseBusinessAddress(data.settings.business_address)
+          : { street: "", city: "", state: "", postcode: "" };
+
+        setBusinessAddressFields(addressParts);
+
         setSettings({
           name: data.settings.name ?? "",
           use_predefined_locations:
@@ -91,10 +148,22 @@ export default function SettingsPage() {
           abn: data.settings.abn ?? null,
           logo_url: data.settings.logo_url ?? null,
           primary_contact_email: data.settings.primary_contact_email ?? null,
+          business_address: data.settings.business_address ?? null,
           invoice_send_immediately:
             data.settings.invoice_send_immediately ?? false,
           feedback_email_send_immediately:
             data.settings.feedback_email_send_immediately ?? false,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately ?? false,
+          bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+          bank_transfer_account_number:
+            data.settings.bank_transfer_account_number ?? null,
+          bank_transfer_account_name:
+            data.settings.bank_transfer_account_name ?? null,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices ?? false,
+          default_invoice_due_days:
+            data.settings.default_invoice_due_days ?? 30,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -107,6 +176,45 @@ export default function SettingsPage() {
             data.settings.default_exclusive_group_label ?? null,
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
+
+        // Store initial settings snapshot to track changes
+        const initialSnapshot: OrganizationSettings = {
+          name: data.settings.name ?? "",
+          use_predefined_locations:
+            data.settings.use_predefined_locations ?? true,
+          business_mode: data.settings.business_mode ?? "service_based",
+          abn: data.settings.abn ?? null,
+          logo_url: data.settings.logo_url ?? null,
+          primary_contact_email: data.settings.primary_contact_email ?? null,
+          business_address: data.settings.business_address ?? null,
+          invoice_send_immediately:
+            data.settings.invoice_send_immediately ?? false,
+          feedback_email_send_immediately:
+            data.settings.feedback_email_send_immediately ?? false,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately ?? false,
+          bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+          bank_transfer_account_number:
+            data.settings.bank_transfer_account_number ?? null,
+          bank_transfer_account_name:
+            data.settings.bank_transfer_account_name ?? null,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices ?? false,
+          default_invoice_due_days:
+            data.settings.default_invoice_due_days ?? 30,
+          rating_config: data.settings.rating_config ?? {
+            type: "single",
+            dimensions: ["overall"],
+          },
+          stripe_account_id: data.settings.stripe_account_id ?? null,
+          payment_provider: data.settings.payment_provider ?? null,
+          currency: data.settings.currency ?? "AUD",
+          locale: data.settings.locale ?? "en-AU",
+          default_exclusive_group_label:
+            data.settings.default_exclusive_group_label ?? null,
+        };
+        setInitialSettings(initialSnapshot);
+        setHasUnsavedChanges(false);
       }
     } catch (err) {
       log.error("Settings: Failed to fetch organization settings", {
@@ -114,6 +222,43 @@ export default function SettingsPage() {
       });
     }
   };
+
+  // Track changes to bank transfer settings
+  useEffect(() => {
+    if (!initialSettings) return;
+
+    const hasBankTransferChanges =
+      settings.bank_transfer_bsb !== initialSettings.bank_transfer_bsb ||
+      settings.bank_transfer_account_number !==
+        initialSettings.bank_transfer_account_number ||
+      settings.bank_transfer_account_name !==
+        initialSettings.bank_transfer_account_name ||
+      settings.show_bank_transfer_on_invoices !==
+        initialSettings.show_bank_transfer_on_invoices;
+
+    setHasUnsavedChanges(hasBankTransferChanges);
+  }, [
+    settings.bank_transfer_bsb,
+    settings.bank_transfer_account_number,
+    settings.bank_transfer_account_name,
+    settings.show_bank_transfer_on_invoices,
+    initialSettings,
+  ]);
+
+  // Warn user if they try to leave with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
 
   const normalizeLogoUrl = (url: string | null): string | null => {
     if (!url) return null;
@@ -232,18 +377,55 @@ export default function SettingsPage() {
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    if (!file || !organizationId) return;
+    if (!file || !organizationId) {
+      // Clear file input if no file selected
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
 
-    // Validate file type
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!validTypes.includes(file.type)) {
-      alert("Please upload a valid image file (JPEG, PNG, WebP, or GIF)");
+    // Validate file type (including SVG)
+    const validTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "image/svg+xml",
+    ];
+
+    // Check file extension as fallback (SVG might not have correct MIME type)
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    const isValidExtension =
+      ["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(
+        fileExtension || ""
+      ) || validTypes.includes(file.type);
+
+    if (!isValidExtension) {
+      setErrorDialog({
+        open: true,
+        title: "Invalid File Type",
+        message:
+          "Please upload a valid image file (JPEG, PNG, WebP, GIF, or SVG).",
+      });
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image size must be less than 5MB");
+      setErrorDialog({
+        open: true,
+        title: "File Too Large",
+        message: "Image size must be less than 5MB.",
+      });
+      // Clear file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
@@ -302,15 +484,22 @@ export default function SettingsPage() {
       log.error("Settings: Failed to upload logo", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to upload logo. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Upload Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to upload logo. Please try again.",
+      });
       // Reset preview on error
       setLogoPreview(normalizeLogoUrl(settings.logo_url));
-    } finally {
-      setUploadingLogo(false);
-      // Reset file input
+      // Clear file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -351,7 +540,11 @@ export default function SettingsPage() {
       log.error("Settings: Failed to delete logo", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to delete logo. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Delete Failed",
+        message: "Failed to delete logo. Please try again.",
+      });
     }
   };
 
@@ -389,13 +582,115 @@ export default function SettingsPage() {
     log.info("Settings: Primary contact email updated successfully");
   };
 
+  // Helper function to parse business address string into components
+  const parseBusinessAddress = (
+    address: string
+  ): {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+  } => {
+    // Try to parse format: "Street, City, State Postcode"
+    // This is a simple parser - may need refinement based on actual data
+    const parts = address.split(",").map((p) => p.trim());
+    if (parts.length >= 2) {
+      const street = parts[0];
+      const cityStatePostcode = parts.slice(1).join(", ");
+      // Try to extract state and postcode (e.g., "NSW 2000" or "New South Wales 2000")
+      const statePostcodeMatch = cityStatePostcode.match(/^(.+?)\s+(\d{4})$/);
+      if (statePostcodeMatch) {
+        return {
+          street,
+          city: parts.length > 2 ? parts[1] : "",
+          state: statePostcodeMatch[1].trim(),
+          postcode: statePostcodeMatch[2],
+        };
+      }
+      // If no postcode match, assume last part is city
+      return {
+        street,
+        city: parts[1],
+        state: parts[2] || "",
+        postcode: parts[3] || "",
+      };
+    }
+    // If format doesn't match, return as street address
+    return {
+      street: address,
+      city: "",
+      state: "",
+      postcode: "",
+    };
+  };
+
+  // Helper function to format address fields into a single string
+  const formatBusinessAddress = (fields: {
+    street: string;
+    city: string;
+    state: string;
+    postcode: string;
+  }): string => {
+    const parts = [
+      fields.street,
+      fields.city,
+      fields.state && fields.postcode
+        ? `${fields.state} ${fields.postcode}`
+        : fields.state || fields.postcode,
+    ].filter(Boolean);
+    return parts.join(", ") || "";
+  };
+
+  const handleBusinessAddressChange = async () => {
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    const formattedAddress = formatBusinessAddress(businessAddressFields);
+
+    log.info("Settings: Updating business address", {
+      address: formattedAddress,
+      fields: businessAddressFields,
+    });
+
+    const { data, error: updateError } = await supabase.functions.invoke(
+      "update-organization-settings",
+      {
+        body: {
+          organization_id: organizationId,
+          business_address: formattedAddress || null,
+        },
+      }
+    );
+
+    if (updateError) {
+      log.error("Settings: Failed to update business address", {
+        error: updateError,
+      });
+      throw updateError;
+    }
+
+    if (data?.settings) {
+      setSettings((prev) => ({
+        ...prev,
+        business_address: data.settings.business_address,
+      }));
+    }
+
+    log.info("Settings: Business address updated successfully");
+  };
+
   const handleConnectStripe = async () => {
     // TODO: Implement Stripe OAuth connection
     // 1. Call edge function to initiate Stripe OAuth flow
     // 2. Redirect user to Stripe authorization page
     // 3. Handle OAuth callback
     // 4. Store stripe_account_id in organization
-    alert("Stripe connection will be implemented soon");
+    setErrorDialog({
+      open: true,
+      title: "Coming Soon",
+      message: "Stripe connection will be implemented soon.",
+    });
   };
 
   const handleDisconnectStripe = async () => {
@@ -432,7 +727,11 @@ export default function SettingsPage() {
       log.error("Settings: Failed to disconnect Stripe account", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to disconnect Stripe account. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Disconnection Failed",
+        message: "Failed to disconnect Stripe account. Please try again.",
+      });
     }
   };
 
@@ -482,7 +781,180 @@ export default function SettingsPage() {
       log.error("Settings: Failed to update currency", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert("Failed to update currency. Please try again.");
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update currency. Please try again.",
+      });
+    }
+  };
+
+  const handleShowBankTransferChange = (enabled: boolean) => {
+    // Just update local state - will be saved with other bank transfer settings
+    setSettings((prev) => ({
+      ...prev,
+      show_bank_transfer_on_invoices: enabled,
+    }));
+  };
+
+  // Save all bank transfer settings together
+  const handleSaveBankTransferSettings = async () => {
+    if (!organizationId) return;
+
+    // Validate BSB format if provided
+    if (settings.bank_transfer_bsb && settings.bank_transfer_bsb.trim()) {
+      const trimmedBsb = settings.bank_transfer_bsb.trim();
+      if (!/^\d{3}-\d{3}$/.test(trimmedBsb)) {
+        setErrorDialog({
+          open: true,
+          title: "Validation Error",
+          message: "BSB must be in format XXX-XXX (e.g., 123-456)",
+        });
+        return;
+      }
+    }
+
+    // Validate account number if provided
+    if (
+      settings.bank_transfer_account_number &&
+      settings.bank_transfer_account_number.trim()
+    ) {
+      const trimmedAccount = settings.bank_transfer_account_number.trim();
+      if (
+        !/^\d+$/.test(trimmedAccount) ||
+        trimmedAccount.length < 6 ||
+        trimmedAccount.length > 10
+      ) {
+        setErrorDialog({
+          open: true,
+          title: "Validation Error",
+          message: "Account number must be 6-10 digits",
+        });
+        return;
+      }
+    }
+
+    setSaving(true);
+    try {
+      log.info("Settings: Saving bank transfer settings", {
+        bsb: settings.bank_transfer_bsb,
+        accountNumber: settings.bank_transfer_account_number ? "***" : null,
+        accountName: settings.bank_transfer_account_name,
+        showOnInvoices: settings.show_bank_transfer_on_invoices,
+      });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
+            bank_transfer_account_number:
+              settings.bank_transfer_account_number?.trim() || null,
+            bank_transfer_account_name:
+              settings.bank_transfer_account_name?.trim() || null,
+            show_bank_transfer_on_invoices:
+              settings.show_bank_transfer_on_invoices,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to save bank transfer settings", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          bank_transfer_bsb: data.settings.bank_transfer_bsb,
+          bank_transfer_account_number:
+            data.settings.bank_transfer_account_number,
+          bank_transfer_account_name: data.settings.bank_transfer_account_name,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices,
+        }));
+
+        // Update initial settings to mark as saved
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            bank_transfer_bsb: data.settings.bank_transfer_bsb,
+            bank_transfer_account_number:
+              data.settings.bank_transfer_account_number,
+            bank_transfer_account_name:
+              data.settings.bank_transfer_account_name,
+            show_bank_transfer_on_invoices:
+              data.settings.show_bank_transfer_on_invoices,
+          });
+        }
+        setHasUnsavedChanges(false);
+      }
+
+      log.info("Settings: Bank transfer settings saved successfully");
+    } catch (err) {
+      log.error("Settings: Failed to save bank transfer settings", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Save Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to save bank transfer settings. Please try again.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAutoGenerateInvoicesChange = async (enabled: boolean) => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating auto-generate invoices", { enabled });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            auto_generate_invoices_immediately: enabled,
+          },
+        }
+      );
+
+      if (updateError) {
+        log.error("Settings: Failed to update auto-generate invoices", {
+          error: updateError,
+        });
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately,
+        }));
+      }
+
+      log.info("Settings: Auto-generate invoices updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update auto-generate invoices", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to update auto-generate invoices setting. Please try again.",
+      });
     }
   };
 
@@ -595,7 +1067,7 @@ export default function SettingsPage() {
                       ref={fileInputRef}
                       id="logo"
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
                       onChange={handleLogoUpload}
                       disabled={uploadingLogo}
                       className="cursor-pointer disabled:cursor-not-allowed"
@@ -603,20 +1075,126 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground mt-1">
                       {uploadingLogo
                         ? "Uploading logo..."
-                        : "Upload a logo (max 5MB, JPEG, PNG, WebP, or GIF)"}
+                        : "Upload a logo (max 5MB, JPEG, PNG, WebP, GIF, or SVG)"}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <AutoSaveInput
-                label="Primary Contact Email"
-                type="email"
-                value={settings.primary_contact_email}
-                onSave={handlePrimaryContactEmailChange}
-                placeholder="Enter primary contact email"
-                description="The primary business contact email for account communications and notifications."
-              />
+              <TooltipProvider>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="primary-contact-email">
+                      Primary Contact Email
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          This email is used for business communications and
+                          notifications. It does not change your sign-in email
+                          address.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <AutoSaveInput
+                    id="primary-contact-email"
+                    type="email"
+                    value={settings.primary_contact_email}
+                    onSave={handlePrimaryContactEmailChange}
+                    placeholder="Enter primary contact email"
+                    description="The primary business contact email for account communications and notifications."
+                  />
+                </div>
+              </TooltipProvider>
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base font-semibold">
+                    Business Address
+                  </Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your business physical address for invoices and official
+                    documents.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="business-address-street">
+                      Street Address
+                    </Label>
+                    <Input
+                      id="business-address-street"
+                      value={businessAddressFields.street}
+                      onChange={(e) =>
+                        setBusinessAddressFields((prev) => ({
+                          ...prev,
+                          street: e.target.value,
+                        }))
+                      }
+                      onBlur={handleBusinessAddressChange}
+                      placeholder="123 Main Street"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="business-address-city">City</Label>
+                      <Input
+                        id="business-address-city"
+                        value={businessAddressFields.city}
+                        onChange={(e) =>
+                          setBusinessAddressFields((prev) => ({
+                            ...prev,
+                            city: e.target.value,
+                          }))
+                        }
+                        onBlur={handleBusinessAddressChange}
+                        placeholder="Sydney"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="business-address-state">State</Label>
+                      <Input
+                        id="business-address-state"
+                        value={businessAddressFields.state}
+                        onChange={(e) =>
+                          setBusinessAddressFields((prev) => ({
+                            ...prev,
+                            state: e.target.value,
+                          }))
+                        }
+                        onBlur={handleBusinessAddressChange}
+                        placeholder="NSW"
+                        maxLength={3}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="business-address-postcode">Postcode</Label>
+                    <Input
+                      id="business-address-postcode"
+                      value={businessAddressFields.postcode}
+                      onChange={(e) =>
+                        setBusinessAddressFields((prev) => ({
+                          ...prev,
+                          postcode: e.target.value.replace(/\D/g, ""),
+                        }))
+                      }
+                      onBlur={handleBusinessAddressChange}
+                      placeholder="2000"
+                      maxLength={4}
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="currency">Currency</Label>
@@ -674,6 +1252,175 @@ export default function SettingsPage() {
                   prices are displayed throughout the application.
                 </p>
               </div>
+
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-base font-semibold">
+                      Auto-Generate Invoices
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically create invoices in pending review when jobs
+                      are completed. Location-specific auto-generate takes
+                      precedence. All invoices require review before sending.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.auto_generate_invoices_immediately}
+                    onCheckedChange={handleAutoGenerateInvoicesChange}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Bank Transfer Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank Transfer Payment Details</CardTitle>
+              <CardDescription>
+                Add your bank account details to display on invoices for manual
+                payment processing. Payments via bank transfer require manual
+                status updates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">
+                    Show Bank Transfer Details on Invoices
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Display bank transfer details on invoices. Payments via bank
+                    transfer will not be automatically tracked and require
+                    manual payment status updates.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.show_bank_transfer_on_invoices}
+                  onCheckedChange={handleShowBankTransferChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+
+              {settings.show_bank_transfer_on_invoices && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-bsb">BSB</Label>
+                    <Input
+                      id="bank-transfer-bsb"
+                      value={settings.bank_transfer_bsb || ""}
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        // Auto-format BSB as user types: XXX-XXX
+                        // Remove non-digits
+                        const digits = value.replace(/\D/g, "");
+                        // Format as XXX-XXX
+                        if (digits.length <= 3) {
+                          value = digits;
+                        } else if (digits.length <= 6) {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+                        } else {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
+                        }
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_bsb: value,
+                        }));
+                      }}
+                      placeholder="123-456"
+                      maxLength={7}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: XXX-XXX (e.g., 123-456)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-number">
+                      Account Number
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-number"
+                      type="text"
+                      inputMode="numeric"
+                      value={settings.bank_transfer_account_number || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_number: e.target.value.replace(
+                            /\D/g,
+                            ""
+                          ),
+                        }))
+                      }
+                      placeholder="987654321"
+                      maxLength={10}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">6-10 digits</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-name">
+                      Account Name (Optional)
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-name"
+                      value={settings.bank_transfer_account_name || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_name: e.target.value,
+                        }))
+                      }
+                      placeholder="Account Holder Name"
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Name associated with the bank account
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/50 border border-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Note:</strong> Payments via bank transfer will not
+                      be automatically tracked. You will need to manually update
+                      the payment status when payments are received. Include the
+                      invoice number in your payment reference to help match
+                      payments.
+                    </p>
+                  </div>
+
+                  {/* Save Button */}
+                  {hasUnsavedChanges && (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        You have unsaved changes
+                      </p>
+                      <Button
+                        onClick={handleSaveBankTransferSettings}
+                        disabled={saving}
+                        className="cursor-pointer"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Bank Transfer Settings
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -790,6 +1537,61 @@ export default function SettingsPage() {
                   </Link>
                 </Button>
               </div>
+              <div className="p-4 border rounded-lg space-y-3">
+                <div>
+                  <p className="font-medium">Default Invoice Due Days</p>
+                  <p className="text-sm text-muted-foreground">
+                    Number of days after invoice creation when payment is due
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={settings.default_invoice_due_days}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value >= 1 && value <= 365) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          default_invoice_due_days: value,
+                        }));
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (isNaN(value) || value < 1 || value > 365) {
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.functions.invoke(
+                          "update-organization-settings",
+                          {
+                            body: {
+                              organization_id: organizationId,
+                              default_invoice_due_days: value,
+                            },
+                          }
+                        );
+                        if (error) throw error;
+                      } catch (err) {
+                        log.error("Failed to update invoice due days", {
+                          error: err,
+                        });
+                        setErrorDialog({
+                          open: true,
+                          title: "Update Failed",
+                          message:
+                            "Failed to update invoice due days. Please try again.",
+                        });
+                      }
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">days</span>
+                </div>
+              </div>
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
                   <p className="font-medium">Feedback & Rating Settings</p>
@@ -883,6 +1685,30 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Error Dialog */}
+      <AlertDialog
+        open={errorDialog.open}
+        onOpenChange={(open) => setErrorDialog((prev) => ({ ...prev, open }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{errorDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {errorDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() =>
+                setErrorDialog({ open: false, title: "", message: "" })
+              }
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

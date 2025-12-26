@@ -10,6 +10,7 @@ const envSchema = z.object({
     NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
+    NEXT_PUBLIC_GEOAPIFY_API_KEY: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -40,6 +41,7 @@ export function getEnv(): Env {
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
             process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+        NEXT_PUBLIC_GEOAPIFY_API_KEY: process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY,
     };
 
     const result = envSchema.safeParse(rawEnv);
@@ -66,6 +68,8 @@ export function getEnv(): Env {
                 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
                     rawEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
                 NEXT_PUBLIC_APP_URL: rawEnv.NEXT_PUBLIC_APP_URL,
+                NEXT_PUBLIC_GEOAPIFY_API_KEY:
+                    rawEnv.NEXT_PUBLIC_GEOAPIFY_API_KEY,
             };
             return validatedEnv;
         } else {

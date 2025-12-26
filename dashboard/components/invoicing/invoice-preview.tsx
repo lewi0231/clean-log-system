@@ -72,6 +72,10 @@ interface OrganizationInfo {
   abn: string | null;
   logo_url: string | null;
   primary_contact_email: string | null;
+  bank_transfer_bsb: string | null;
+  bank_transfer_account_number: string | null;
+  bank_transfer_account_name: string | null;
+  show_bank_transfer_on_invoices: boolean;
 }
 
 interface LocationWithHierarchy {
@@ -133,6 +137,13 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
             abn: data.settings.abn ?? null,
             logo_url: data.settings.logo_url ?? null,
             primary_contact_email: data.settings.primary_contact_email ?? null,
+            bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+            bank_transfer_account_number:
+              data.settings.bank_transfer_account_number ?? null,
+            bank_transfer_account_name:
+              data.settings.bank_transfer_account_name ?? null,
+            show_bank_transfer_on_invoices:
+              data.settings.show_bank_transfer_on_invoices ?? false,
           };
           setOrgInfo(info);
 
@@ -611,6 +622,45 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
           </div>
         </>
       )}
+
+      {/* Bank Transfer Payment Details */}
+      {orgInfo?.show_bank_transfer_on_invoices &&
+        orgInfo.bank_transfer_bsb &&
+        orgInfo.bank_transfer_account_number && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">
+                Payment via Bank Transfer
+              </h3>
+              <div className="text-sm space-y-1">
+                {orgInfo.bank_transfer_account_name && (
+                  <p className="font-medium">
+                    Account Name: {orgInfo.bank_transfer_account_name}
+                  </p>
+                )}
+                <p>
+                  BSB:{" "}
+                  <span className="font-mono">{orgInfo.bank_transfer_bsb}</span>
+                </p>
+                <p>
+                  Account Number:{" "}
+                  <span className="font-mono">
+                    {orgInfo.bank_transfer_account_number}
+                  </span>
+                </p>
+                <p className="font-medium mt-2">
+                  Reference: {invoice.invoice_number}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2 italic">
+                  Note: Payments via bank transfer will not be automatically
+                  tracked. Please include the invoice number in your transfer
+                  reference.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
 
       {/* Footer */}
       <Separator />

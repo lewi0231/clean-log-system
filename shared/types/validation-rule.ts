@@ -8,4 +8,5 @@ export interface ValidationRules {
   min_items?: number;
   max_items?: number;
   allow_zero_quantities?: boolean;
+  allow_multiple?: boolean; // For select fields - allows multiple selections
 }
