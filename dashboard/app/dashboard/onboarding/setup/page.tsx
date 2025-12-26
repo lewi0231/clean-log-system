@@ -109,7 +109,7 @@ export default function GuidedSetupPage() {
           Let&apos;s Get You Set Up
         </h1>
         <p className="text-muted-foreground">
-          Complete these steps to start using Clean Log System. You can always
+          Complete these steps to start using Fieldly. You can always
           come back to finish later.
         </p>
       </div>

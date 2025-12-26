@@ -9,67 +9,42 @@ import {
 } from "@/components/ui/card";
 import {
   ArrowRight,
+  BadgeCheck,
   BarChart3,
-  Camera,
+  Blocks,
   CreditCard,
-  DollarSign,
-  Download,
-  FileCheck,
+  FileSpreadsheet,
   FileText,
-  Mail,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 
 export default function Home() {
-  const features = [
+  const outcomes = [
     {
-      icon: Mail,
-      title: "Automatic Feedback Collection",
+      icon: FileSpreadsheet,
+      title: "Turn job data into invoices automatically",
       description:
-        "Automatically send emails to customers when jobs are logged, collecting ratings and valuable feedback to improve your service.",
+        "Build your job forms once, then generate line items, totals, and PDFs from the exact data your team submits in the field.",
     },
     {
-      icon: FileText,
-      title: "Custom Field Data Collection",
+      icon: Workflow,
+      title: "Standardize how work gets logged",
       description:
-        "Collect any data you need when logging jobs. Customize fields to track exactly what matters most to your business.",
-    },
-    {
-      icon: DollarSign,
-      title: "Automatic Invoicing & Payments",
-      description:
-        "Trigger invoices and payment links instantly when jobs are complete. Batch invoicing available for efficient bulk processing.",
-    },
-    {
-      icon: Download,
-      title: "Feedback Analytics & Export",
-      description:
-        "Easily collate and analyze customer feedback. Download reports to track trends and identify areas for improvement.",
-    },
-    {
-      icon: Camera,
-      title: "Before & After Photos",
-      description:
-        "Upload and organize before and after photos for every job. Showcase your work and build customer trust.",
-    },
-    {
-      icon: BarChart3,
-      title: "Dashboard Statistics",
-      description:
-        "Track total jobs, revenue, and average ratings at a glance. Make data-driven decisions with real-time insights.",
+        "Give workers a clear, consistent workflow so every job entry includes the details you need—no more missing info.",
     },
     {
       icon: CreditCard,
-      title: "Payment Status Tracking",
+      title: "Get paid faster with clear payment status",
       description:
-        "Monitor payment status for all invoices. Know exactly what's been paid and what's pending.",
+        "Send invoices with payment links and keep tabs on what’s paid, pending, or needs a follow‑up.",
     },
     {
-      icon: FileCheck,
-      title: "PDF Invoice Generation",
+      icon: BarChart3,
+      title: "See trends and performance at a glance",
       description:
-        "Generate professional PDF invoices automatically. Brand them with your logo and send them directly to customers.",
+        "Track jobs, revenue, and operations in one place—built for owner‑operators and small teams.",
     },
   ];
 
@@ -83,48 +58,138 @@ export default function Home() {
               <Logo />
             </div>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-              Streamline Your Car Detailing
+              Field work in.
               <br />
-              <span className="text-primary">Business Operations</span>
+              <span className="text-primary">Invoices out.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-              The all-in-one solution for car detailers and car yard cleaners.
-              Manage jobs, collect feedback, automate invoicing, and grow your
-              business with powerful tools designed for your industry.
+              Fieldly helps service businesses capture the right job details from
+              workers, then automatically generate invoices and payment links
+              from that data—without spreadsheets.
             </p>
+            <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2 text-sm text-muted-foreground">
+              <span className="rounded-full border bg-muted px-3 py-1">
+                Cleaning
+              </span>
+              <span className="rounded-full border bg-muted px-3 py-1">
+                Landscaping
+              </span>
+              <span className="rounded-full border bg-muted px-3 py-1">
+                Maintenance
+              </span>
+              <span className="rounded-full border bg-muted px-3 py-1">
+                Pest control
+              </span>
+              <span className="rounded-full border bg-muted px-3 py-1">
+                Trades & installs
+              </span>
+              <span className="rounded-full border bg-muted px-3 py-1">
+                Vehicle services
+              </span>
+            </div>
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="group">
                 <Link href="/signup">
                   Get Started
+                <Link href="/dashboard">
+                  Get started
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link href="#features">Learn More</Link>
+                <Link href="#how-it-works">See how it works</Link>
               </Button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-24 sm:py-32 min-h-screen">
+      {/* How it works */}
+      <section id="how-it-works" className="py-20 sm:py-28">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-muted px-4 py-1.5 text-sm">
               <Sparkles className="size-4" />
-              <span>Powerful Features</span>
+              <span>Designed for field teams</span>
             </div>
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Everything You Need to Run Your Business
+              Configure your workflow once, then run it every day
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Built specifically for car detailers and car yard cleaners, with
-              features that save time and help you grow.
+              Most tools force you into one “job template”. Fieldly lets you
+              design the exact data workers submit, and connect it directly to
+              pricing and invoicing.
             </p>
           </div>
-          <div className="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature) => {
+
+          <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-3">
+            <Card className="flex flex-col">
+              <CardHeader>
+                <div className="mb-4 inline-flex size-12 items-center justify-center rounded-lg bg-primary/10">
+                  <Blocks className="size-6 text-primary" />
+                </div>
+                <CardTitle className="text-xl">1) Build your job form</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <CardDescription className="text-base">
+                  Add fields like quantities, photos, checklists, materials,
+                  notes, and signatures. Make it match how your team works.
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="flex flex-col">
+              <CardHeader>
+                <div className="mb-4 inline-flex size-12 items-center justify-center rounded-lg bg-primary/10">
+                  <BadgeCheck className="size-6 text-primary" />
+                </div>
+                <CardTitle className="text-xl">
+                  2) Workers submit it onsite
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <CardDescription className="text-base">
+                  Workers follow a guided workflow, so entries are consistent and
+                  complete—no back‑and‑forth later.
+                </CardDescription>
+              </CardContent>
+            </Card>
+
+            <Card className="flex flex-col">
+              <CardHeader>
+                <div className="mb-4 inline-flex size-12 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="size-6 text-primary" />
+                </div>
+                <CardTitle className="text-xl">
+                  3) Generate invoices automatically
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <CardDescription className="text-base">
+                  Convert submitted data into line items, totals, and PDFs.
+                  Invoice immediately or batch-send on your schedule.
+                </CardDescription>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Outcomes */}
+      <section id="features" className="py-20 sm:py-28 border-t bg-muted/20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Everything you need to go from job to payment
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Built for small service businesses that want a system, not more
+              admin work.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2">
+            {outcomes.map((feature) => {
               const Icon = feature.icon;
               return (
                 <Card key={feature.title} className="flex flex-col">
@@ -146,21 +211,79 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Use cases */}
+      <section className="py-20 sm:py-28">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border bg-muted px-4 py-1.5 text-sm">
+              <Sparkles className="size-4" />
+              <span>Where Fieldly fits</span>
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Made for work that doesn’t happen at a desk
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              If your pricing depends on what happened onsite (quantity, area,
+              materials, photos), Fieldly is designed for you.
+            </p>
+
+            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Per‑unit jobs</CardTitle>
+                  <CardDescription>
+                    Track counts, measurements, and options that impact price.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Multi‑location customers</CardTitle>
+                  <CardDescription>
+                    Standardize data capture across sites and invoice by location
+                    or batch.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Compliance & proof of work</CardTitle>
+                  <CardDescription>
+                    Photos, checklists, notes, and signatures—saved with every
+                    job.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Owner‑operator friendly</CardTitle>
+                  <CardDescription>
+                    Simple setup, clear workflows, and automated admin tasks.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="border-t bg-muted/30 py-24 sm:py-32 flex items-center h-screen">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-4xl font-bold tracking-tight sm:text-5xl">
-              Ready to Transform Your Business?
+              Ready to turn field work into invoices?
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Join car detailers and car yard cleaners who are already using
-              CleanLog to streamline their operations and grow their business.
+              Set up your workflow, invite your team, and start capturing clean
+              job data that powers invoicing and payments.
             </p>
             <div className="mt-10">
               <Button asChild size="lg" className="group">
                 <Link href="/signup">
                   Start Free Trial
+                <Link href="/dashboard">
+                  Start now
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>

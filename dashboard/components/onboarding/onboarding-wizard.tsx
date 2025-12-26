@@ -172,7 +172,7 @@ export function OnboardingWizard() {
         <CardHeader>
           <div className="space-y-2">
             <CardTitle className="text-2xl">
-              Welcome to Clean Log System
+              Welcome to Fieldly
             </CardTitle>
             <CardDescription>
               Let&apos;s get your account set up. This will only take a few

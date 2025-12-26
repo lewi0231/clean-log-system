@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563EB" />
+      <stop offset="1" stop-color="#14B8A6" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#g)" />
+  <!-- Pin -->
+  <path
+    d="M64 112s32-27.8 32-56a32 32 0 1 0-64 0c0 28.2 32 56 32 56Z"
+    fill="none"
+    stroke="#fff"
+    stroke-width="8"
+    stroke-linejoin="round"
+  />
+  <!-- Form lines -->
+  <path
+    d="M46 50h36M46 66h24"
+    stroke="#fff"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+  <!-- Check -->
+  <path
+    d="m46 82 8 8 20-20"
+    stroke="#fff"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

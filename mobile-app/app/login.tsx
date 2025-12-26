@@ -74,7 +74,7 @@ export default function LoginScreen() {
                 type="title"
                 className="text-3xl font-bold text-center mb-2"
               >
-                Clean Log
+                Fieldly
               </ThemedText>
               <ThemedText
                 type="subtitle"
