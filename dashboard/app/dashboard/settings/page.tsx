@@ -48,7 +48,15 @@ import {
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
-import { DollarSign, ExternalLink, Info, Upload, X } from "lucide-react";
+import {
+  DollarSign,
+  ExternalLink,
+  Info,
+  Loader2,
+  Save,
+  Upload,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -99,6 +107,12 @@ export default function SettingsPage() {
     title: string;
     message: string;
   }>({ open: false, title: "", message: "" });
+
+  // Track unsaved changes and saving state
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [initialSettings, setInitialSettings] =
+    useState<OrganizationSettings | null>(null);
 
   const fetchSettings = async () => {
     if (!organizationId) return;
@@ -159,6 +173,43 @@ export default function SettingsPage() {
             data.settings.default_exclusive_group_label ?? null,
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
+
+        // Store initial settings snapshot to track changes
+        const initialSnapshot: OrganizationSettings = {
+          name: data.settings.name ?? "",
+          use_predefined_locations:
+            data.settings.use_predefined_locations ?? true,
+          business_mode: data.settings.business_mode ?? "service_based",
+          abn: data.settings.abn ?? null,
+          logo_url: data.settings.logo_url ?? null,
+          primary_contact_email: data.settings.primary_contact_email ?? null,
+          business_address: data.settings.business_address ?? null,
+          invoice_send_immediately:
+            data.settings.invoice_send_immediately ?? false,
+          feedback_email_send_immediately:
+            data.settings.feedback_email_send_immediately ?? false,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately ?? false,
+          bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
+          bank_transfer_account_number:
+            data.settings.bank_transfer_account_number ?? null,
+          bank_transfer_account_name:
+            data.settings.bank_transfer_account_name ?? null,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices ?? false,
+          rating_config: data.settings.rating_config ?? {
+            type: "single",
+            dimensions: ["overall"],
+          },
+          stripe_account_id: data.settings.stripe_account_id ?? null,
+          payment_provider: data.settings.payment_provider ?? null,
+          currency: data.settings.currency ?? "AUD",
+          locale: data.settings.locale ?? "en-AU",
+          default_exclusive_group_label:
+            data.settings.default_exclusive_group_label ?? null,
+        };
+        setInitialSettings(initialSnapshot);
+        setHasUnsavedChanges(false);
       }
     } catch (err) {
       log.error("Settings: Failed to fetch organization settings", {
@@ -166,6 +217,43 @@ export default function SettingsPage() {
       });
     }
   };
+
+  // Track changes to bank transfer settings
+  useEffect(() => {
+    if (!initialSettings) return;
+
+    const hasBankTransferChanges =
+      settings.bank_transfer_bsb !== initialSettings.bank_transfer_bsb ||
+      settings.bank_transfer_account_number !==
+        initialSettings.bank_transfer_account_number ||
+      settings.bank_transfer_account_name !==
+        initialSettings.bank_transfer_account_name ||
+      settings.show_bank_transfer_on_invoices !==
+        initialSettings.show_bank_transfer_on_invoices;
+
+    setHasUnsavedChanges(hasBankTransferChanges);
+  }, [
+    settings.bank_transfer_bsb,
+    settings.bank_transfer_account_number,
+    settings.bank_transfer_account_name,
+    settings.show_bank_transfer_on_invoices,
+    initialSettings,
+  ]);
+
+  // Warn user if they try to leave with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
 
   const normalizeLogoUrl = (url: string | null): string | null => {
     if (!url) return null;
@@ -684,73 +772,78 @@ export default function SettingsPage() {
     }
   };
 
-  const handleShowBankTransferChange = async (enabled: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating show bank transfer on invoices", {
-        enabled,
-      });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            show_bank_transfer_on_invoices: enabled,
-          },
-        }
-      );
-
-      if (updateError) {
-        log.error("Settings: Failed to update show bank transfer", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
-          show_bank_transfer_on_invoices:
-            data.settings.show_bank_transfer_on_invoices,
-        }));
-      }
-
-      log.info("Settings: Show bank transfer updated successfully");
-    } catch (err) {
-      log.error("Settings: Failed to update show bank transfer", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Update Failed",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to update bank transfer setting. Please try again.",
-      });
-    }
+  const handleShowBankTransferChange = (enabled: boolean) => {
+    // Just update local state - will be saved with other bank transfer settings
+    setSettings((prev) => ({
+      ...prev,
+      show_bank_transfer_on_invoices: enabled,
+    }));
   };
 
-  const handleBankTransferBsbChange = async () => {
+  // Save all bank transfer settings together
+  const handleSaveBankTransferSettings = async () => {
     if (!organizationId) return;
 
+    // Validate BSB format if provided
+    if (settings.bank_transfer_bsb && settings.bank_transfer_bsb.trim()) {
+      const trimmedBsb = settings.bank_transfer_bsb.trim();
+      if (!/^\d{3}-\d{3}$/.test(trimmedBsb)) {
+        setErrorDialog({
+          open: true,
+          title: "Validation Error",
+          message: "BSB must be in format XXX-XXX (e.g., 123-456)",
+        });
+        return;
+      }
+    }
+
+    // Validate account number if provided
+    if (
+      settings.bank_transfer_account_number &&
+      settings.bank_transfer_account_number.trim()
+    ) {
+      const trimmedAccount = settings.bank_transfer_account_number.trim();
+      if (
+        !/^\d+$/.test(trimmedAccount) ||
+        trimmedAccount.length < 6 ||
+        trimmedAccount.length > 10
+      ) {
+        setErrorDialog({
+          open: true,
+          title: "Validation Error",
+          message: "Account number must be 6-10 digits",
+        });
+        return;
+      }
+    }
+
+    setSaving(true);
     try {
-      log.info("Settings: Updating bank transfer BSB");
+      log.info("Settings: Saving bank transfer settings", {
+        bsb: settings.bank_transfer_bsb,
+        accountNumber: settings.bank_transfer_account_number ? "***" : null,
+        accountName: settings.bank_transfer_account_name,
+        showOnInvoices: settings.show_bank_transfer_on_invoices,
+      });
 
       const { data, error: updateError } = await supabase.functions.invoke(
         "update-organization-settings",
         {
           body: {
             organization_id: organizationId,
-            bank_transfer_bsb: settings.bank_transfer_bsb || null,
+            bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
+            bank_transfer_account_number:
+              settings.bank_transfer_account_number?.trim() || null,
+            bank_transfer_account_name:
+              settings.bank_transfer_account_name?.trim() || null,
+            show_bank_transfer_on_invoices:
+              settings.show_bank_transfer_on_invoices,
           },
         }
       );
 
       if (updateError) {
-        log.error("Settings: Failed to update bank transfer BSB", {
+        log.error("Settings: Failed to save bank transfer settings", {
           error: updateError,
         });
         throw updateError;
@@ -760,117 +853,44 @@ export default function SettingsPage() {
         setSettings((prev) => ({
           ...prev,
           bank_transfer_bsb: data.settings.bank_transfer_bsb,
-        }));
-      }
-
-      log.info("Settings: Bank transfer BSB updated successfully");
-    } catch (err) {
-      log.error("Settings: Failed to update bank transfer BSB", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Update Failed",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to update BSB. Please try again.",
-      });
-    }
-  };
-
-  const handleBankTransferAccountNumberChange = async () => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating bank transfer account number");
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            bank_transfer_account_number:
-              settings.bank_transfer_account_number || null,
-          },
-        }
-      );
-
-      if (updateError) {
-        log.error("Settings: Failed to update bank transfer account number", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
           bank_transfer_account_number:
             data.settings.bank_transfer_account_number,
-        }));
-      }
-
-      log.info("Settings: Bank transfer account number updated successfully");
-    } catch (err) {
-      log.error("Settings: Failed to update bank transfer account number", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Update Failed",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to update account number. Please try again.",
-      });
-    }
-  };
-
-  const handleBankTransferAccountNameChange = async () => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating bank transfer account name");
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            bank_transfer_account_name:
-              settings.bank_transfer_account_name || null,
-          },
-        }
-      );
-
-      if (updateError) {
-        log.error("Settings: Failed to update bank transfer account name", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
           bank_transfer_account_name: data.settings.bank_transfer_account_name,
+          show_bank_transfer_on_invoices:
+            data.settings.show_bank_transfer_on_invoices,
         }));
+
+        // Update initial settings to mark as saved
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            bank_transfer_bsb: data.settings.bank_transfer_bsb,
+            bank_transfer_account_number:
+              data.settings.bank_transfer_account_number,
+            bank_transfer_account_name:
+              data.settings.bank_transfer_account_name,
+            show_bank_transfer_on_invoices:
+              data.settings.show_bank_transfer_on_invoices,
+          });
+        }
+        setHasUnsavedChanges(false);
       }
 
-      log.info("Settings: Bank transfer account name updated successfully");
+      log.info("Settings: Bank transfer settings saved successfully");
     } catch (err) {
-      log.error("Settings: Failed to update bank transfer account name", {
+      log.error("Settings: Failed to save bank transfer settings", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       setErrorDialog({
         open: true,
-        title: "Update Failed",
+        title: "Save Failed",
         message:
           err instanceof Error
             ? err.message
-            : "Failed to update account name. Please try again.",
+            : "Failed to save bank transfer settings. Please try again.",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1274,15 +1294,25 @@ export default function SettingsPage() {
                     <Input
                       id="bank-transfer-bsb"
                       value={settings.bank_transfer_bsb || ""}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        // Auto-format BSB as user types: XXX-XXX
+                        // Remove non-digits
+                        const digits = value.replace(/\D/g, "");
+                        // Format as XXX-XXX
+                        if (digits.length <= 3) {
+                          value = digits;
+                        } else if (digits.length <= 6) {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+                        } else {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
+                        }
                         setSettings((prev) => ({
                           ...prev,
-                          bank_transfer_bsb: e.target.value,
-                        }))
-                      }
-                      onBlur={handleBankTransferBsbChange}
+                          bank_transfer_bsb: value,
+                        }));
+                      }}
                       placeholder="123-456"
-                      pattern="[0-9]{3}-[0-9]{3}"
                       maxLength={7}
                       className="max-w-xs"
                     />
@@ -1309,7 +1339,6 @@ export default function SettingsPage() {
                           ),
                         }))
                       }
-                      onBlur={handleBankTransferAccountNumberChange}
                       placeholder="987654321"
                       maxLength={10}
                       className="max-w-xs"
@@ -1330,7 +1359,6 @@ export default function SettingsPage() {
                           bank_transfer_account_name: e.target.value,
                         }))
                       }
-                      onBlur={handleBankTransferAccountNameChange}
                       placeholder="Account Holder Name"
                       className="max-w-xs"
                     />
@@ -1348,6 +1376,32 @@ export default function SettingsPage() {
                       payments.
                     </p>
                   </div>
+
+                  {/* Save Button */}
+                  {hasUnsavedChanges && (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        You have unsaved changes
+                      </p>
+                      <Button
+                        onClick={handleSaveBankTransferSettings}
+                        disabled={saving}
+                        className="cursor-pointer"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Bank Transfer Settings
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
