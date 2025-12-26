@@ -41,7 +41,11 @@ export function groupFieldsByMutualExclusivity(
 }
 
 // Helper: Check if a field has a non-empty value
-export function hasValue(value: unknown, fieldType: FieldType): boolean {
+export function hasValue(
+  value: unknown,
+  fieldType: FieldType,
+  fieldConfig?: { validation_rules?: { allow_multiple?: boolean } | null },
+): boolean {
   if (value === null || value === undefined) return false;
 
   switch (fieldType) {
@@ -61,6 +65,10 @@ export function hasValue(value: unknown, fieldType: FieldType): boolean {
     case "time":
       return typeof value === "string" && value.length > 0;
     case "select":
+      // Handle multi-select (array) and single-select (string)
+      if (fieldConfig?.validation_rules?.allow_multiple) {
+        return Array.isArray(value) && value.length > 0;
+      }
       return typeof value === "string" && value.length > 0;
     case "image":
       // Image values will be stored as URLs (strings) once fully implemented
@@ -148,7 +156,11 @@ export function useFieldConfigs(
 
       const groupId = currentField.mutually_exclusive_group;
       const currentCluster = getFieldCluster(currentField);
-      const hasNonEmptyValue = hasValue(value, currentField.field_type);
+      const hasNonEmptyValue = hasValue(
+        value,
+        currentField.field_type,
+        currentField,
+      );
 
       // If this field now has a value and is in a group, clear conflicting values
       if (hasNonEmptyValue && groupId) {
@@ -162,7 +174,7 @@ export function useFieldConfigs(
           return (
             fc.id !== fieldId &&
             fcCluster !== currentCluster &&
-            hasValue(prev[fc.id], fc.field_type)
+            hasValue(prev[fc.id], fc.field_type, fc)
           );
         });
 

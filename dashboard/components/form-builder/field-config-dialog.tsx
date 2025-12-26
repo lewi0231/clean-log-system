@@ -84,6 +84,7 @@ export function FieldConfigDialog({
   const [saving, setSaving] = useState(false);
   const [restrictToLocations, setRestrictToLocations] = useState(false);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [allowMultiple, setAllowMultiple] = useState(false);
   const nameManuallyEditedRef = useRef(false);
 
   const { locations } = useLocations();
@@ -133,6 +134,7 @@ export function FieldConfigDialog({
       );
       setRestrictToLocations(false);
       setSelectedLocationIds([]);
+      setAllowMultiple(false);
       // Reset manual edit flag when dialog opens
       nameManuallyEditedRef.current = false;
     }
@@ -151,7 +153,10 @@ export function FieldConfigDialog({
         description: description.trim() || null,
         required,
         order_position: 0, // Will be set by the parent
-        validation_rules: null,
+        validation_rules:
+          fieldType === "select" && allowMultiple
+            ? { allow_multiple: true }
+            : null,
         options:
           (fieldType === "select" || fieldType === "grouped_breakdown") &&
           options.trim()
@@ -333,8 +338,30 @@ export function FieldConfigDialog({
               id="field-required"
               checked={required}
               onCheckedChange={setRequired}
+              className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
             />
           </div>
+
+          {/* Allow Multiple Selections - Only for select fields */}
+          {fieldType === "select" && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="space-y-0.5">
+                <Label htmlFor="field-allow-multiple">
+                  Allow Multiple Selections
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Enable users to select multiple options from this list. The
+                  mobile app will handle the UI implementation.
+                </p>
+              </div>
+              <Switch
+                id="field-allow-multiple"
+                checked={allowMultiple}
+                onCheckedChange={setAllowMultiple}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+              />
+            </div>
+          )}
 
           {/* Location Restrictions - Only show if using customer locations */}
           {settings?.use_predefined_locations && (

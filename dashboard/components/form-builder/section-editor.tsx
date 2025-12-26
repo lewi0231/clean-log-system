@@ -876,7 +876,7 @@ export function SectionEditor({
                                       {field.required && (
                                         <Badge
                                           variant="destructive"
-                                          className="text-[10px] px-1.5"
+                                          className="text-[10px] px-1.5 text-white"
                                         >
                                           Required
                                         </Badge>
@@ -1148,8 +1148,49 @@ export function SectionEditor({
                                                     );
                                                   }
                                                 }}
+                                                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                                               />
                                             </div>
+
+                                            {/* Allow Multiple Selections - Only for select fields */}
+                                            {field.field_type === "select" && (
+                                              <div className="flex items-center justify-between pt-4 border-t">
+                                                <div className="space-y-0.5">
+                                                  <Label className="text-xs">
+                                                    Allow Multiple Selections
+                                                  </Label>
+                                                  <p className="text-[10px] text-muted-foreground">
+                                                    Enable multiple option
+                                                    selection
+                                                  </p>
+                                                </div>
+                                                <Switch
+                                                  checked={
+                                                    field.validation_rules
+                                                      ?.allow_multiple || false
+                                                  }
+                                                  onCheckedChange={async (
+                                                    checked: boolean
+                                                  ) => {
+                                                    if (onUpdateField) {
+                                                      await onUpdateField(
+                                                        field.id,
+                                                        {
+                                                          validation_rules:
+                                                            checked
+                                                              ? {
+                                                                  allow_multiple:
+                                                                    true,
+                                                                }
+                                                              : null,
+                                                        }
+                                                      );
+                                                    }
+                                                  }}
+                                                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                                                />
+                                              </div>
+                                            )}
 
                                             {/* Location Restrictions - Only show if using customer locations */}
                                             {settings?.use_predefined_locations && (

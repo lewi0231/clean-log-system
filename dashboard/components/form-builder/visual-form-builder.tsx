@@ -898,7 +898,7 @@ export function VisualFormBuilder({
                                   {field.required && (
                                     <Badge
                                       variant="destructive"
-                                      className="text-[10px] px-1.5"
+                                      className="text-[10px] px-1.5 text-white"
                                     >
                                       Required
                                     </Badge>

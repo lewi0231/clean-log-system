@@ -682,11 +682,38 @@ export default function FieldConfigForm({
               id="required"
               checked={required}
               onCheckedChange={setRequired}
+              className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
             />
             <Label htmlFor="required" className="cursor-pointer">
               Required field
             </Label>
           </div>
+
+          {/* Allow Multiple Selections - Only for select fields */}
+          {fieldType === "select" && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div className="space-y-0.5">
+                <Label htmlFor="allow-multiple">
+                  Allow Multiple Selections
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Enable users to select multiple options from this list. The
+                  mobile app will handle the UI implementation.
+                </p>
+              </div>
+              <Switch
+                id="allow-multiple"
+                checked={validationRules?.allow_multiple || false}
+                onCheckedChange={(checked) => {
+                  setValidationRules((prev) => ({
+                    ...prev,
+                    allow_multiple: checked ? true : undefined,
+                  }));
+                }}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+              />
+            </div>
+          )}
 
           <ValidationRulesEditor
             fieldType={fieldType}

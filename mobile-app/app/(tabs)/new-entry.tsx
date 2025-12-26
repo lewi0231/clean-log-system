@@ -1051,7 +1051,9 @@ export default function NewEntryScreen() {
           const fieldsToShow = visibleFields.filter((config) => {
             const value = fieldValues[config.id];
             // Show if required OR has a value
-            return config.required || hasValue(value, config.field_type);
+            return (
+              config.required || hasValue(value, config.field_type, config)
+            );
           });
 
           if (fieldsToShow.length === 0) return null;

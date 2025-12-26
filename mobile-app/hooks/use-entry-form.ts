@@ -107,7 +107,7 @@ export function useEntryForm({
 
       clusters.forEach((fields, cluster) => {
         const fieldsWithValues = fields.filter((fc) =>
-          hasValue(submissionData[fc.name], fc.field_type)
+          hasValue(submissionData[fc.name], fc.field_type, fc)
         );
 
         if (fieldsWithValues.length > 0) {
@@ -131,7 +131,7 @@ export function useEntryForm({
         activeFields.forEach((config) => {
           if (
             config.required &&
-            !hasValue(submissionData[config.name], config.field_type)
+            !hasValue(submissionData[config.name], config.field_type, config)
           ) {
             errors[config.id] = `${config.label} is required`;
           }
