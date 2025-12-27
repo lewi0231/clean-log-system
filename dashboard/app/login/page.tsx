@@ -16,9 +16,9 @@ import { supabase } from "@/lib/supabase";
 import { formatZodErrors, loginSchema } from "@/lib/validations";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
-export default function Login() {
+function LoginForm() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -156,5 +156,19 @@ export default function Login() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function Login() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex justify-center items-center">
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

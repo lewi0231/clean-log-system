@@ -63,9 +63,9 @@ export default function Home() {
               <span className="text-primary">Invoices out.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-              Fieldly helps service businesses capture the right job details from
-              workers, then automatically generate invoices and payment links
-              from that data—without spreadsheets.
+              Fieldly helps service businesses capture the right job details
+              from workers, then automatically generate invoices and payment
+              links from that data—without spreadsheets.
             </p>
             <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2 text-sm text-muted-foreground">
               <span className="rounded-full border bg-muted px-3 py-1">
@@ -90,8 +90,6 @@ export default function Home() {
             <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button asChild size="lg" className="group">
                 <Link href="/signup">
-                  Get Started
-                <Link href="/dashboard">
                   Get started
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
@@ -128,7 +126,9 @@ export default function Home() {
                 <div className="mb-4 inline-flex size-12 items-center justify-center rounded-lg bg-primary/10">
                   <Blocks className="size-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl">1) Build your job form</CardTitle>
+                <CardTitle className="text-xl">
+                  1) Build your job form
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex-1">
                 <CardDescription className="text-base">
@@ -149,8 +149,8 @@ export default function Home() {
               </CardHeader>
               <CardContent className="flex-1">
                 <CardDescription className="text-base">
-                  Workers follow a guided workflow, so entries are consistent and
-                  complete—no back‑and‑forth later.
+                  Workers follow a guided workflow, so entries are consistent
+                  and complete—no back‑and‑forth later.
                 </CardDescription>
               </CardContent>
             </Card>
@@ -238,16 +238,20 @@ export default function Home() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Multi‑location customers</CardTitle>
+                  <CardTitle className="text-lg">
+                    Multi‑location customers
+                  </CardTitle>
                   <CardDescription>
-                    Standardize data capture across sites and invoice by location
-                    or batch.
+                    Standardize data capture across sites and invoice by
+                    location or batch.
                   </CardDescription>
                 </CardHeader>
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Compliance & proof of work</CardTitle>
+                  <CardTitle className="text-lg">
+                    Compliance & proof of work
+                  </CardTitle>
                   <CardDescription>
                     Photos, checklists, notes, and signatures—saved with every
                     job.
@@ -256,7 +260,9 @@ export default function Home() {
               </Card>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Owner‑operator friendly</CardTitle>
+                  <CardTitle className="text-lg">
+                    Owner‑operator friendly
+                  </CardTitle>
                   <CardDescription>
                     Simple setup, clear workflows, and automated admin tasks.
                   </CardDescription>
@@ -281,9 +287,7 @@ export default function Home() {
             <div className="mt-10">
               <Button asChild size="lg" className="group">
                 <Link href="/signup">
-                  Start Free Trial
-                <Link href="/dashboard">
-                  Start now
+                  Start free trial
                   <ArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
                 </Link>
               </Button>

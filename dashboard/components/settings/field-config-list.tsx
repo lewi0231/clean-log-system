@@ -137,6 +137,15 @@ function SortableFieldConfigItem({
                       {locationRestrictions.length !== 1 ? "s" : ""}
                     </Badge>
                   )}
+                  {fieldConfig.field_type === "select" &&
+                    fieldConfig.validation_rules?.allow_multiple && (
+                      <Badge
+                        variant="outline"
+                        className="text-primary border-primary/40"
+                      >
+                        Multiple
+                      </Badge>
+                    )}
                 </div>
                 {fieldConfig.description && (
                   <CardDescription className="mb-2">

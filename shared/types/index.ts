@@ -1,15 +1,15 @@
 // Central export point for shared types
-export {
+export type {
   ConditionalLogic,
   ConditionalOperator,
   ConditionalRule,
 } from "./conditional-logic";
-export { FieldConfig } from "./field-config";
+export type { FieldConfig } from "./field-config";
 export {
   BUILT_IN_TEMPLATES,
-  FieldTemplate,
-  FieldTemplateField,
+  type FieldTemplate,
+  type FieldTemplateField,
 } from "./field-template";
-export { FieldType } from "./field-type";
-export { FormSection, FormSectionWithFields } from "./form-section";
-export { ValidationRules } from "./validation-rule";
+export type { FieldType } from "./field-type";
+export type { FormSection, FormSectionWithFields } from "./form-section";
+export type { ValidationRules } from "./validation-rule";

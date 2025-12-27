@@ -112,38 +112,45 @@ export const pricingTourSteps: TourStep[] = [
         position: "bottom",
     },
     {
-        target: "[data-tour='pricing-tabs']",
-        title: "Pricing Types",
+        target: "[data-tour='invoice-adjustments']",
+        title: "Invoice Adjustments",
         content:
-            "Configure different types of pricing: Field Pricing for numerical values, Option Pricing for dropdowns, Base Pricing for adjustments, and Service-Type Pricing for fixed prices.",
+            "Apply universal adjustments (e.g., call-out fee, profit margin) to every invoice, or service-based adjustments that vary by service type. This is often the first thing to set up.",
         position: "bottom",
     },
     {
-        target: "[data-tour='field-pricing-tab']",
+        target: "[data-tour='pricing-tabs']",
         title: "Field Pricing",
         content:
-            "Set prices for numerical or boolean fields. Define how much each unit costs for the customer and how much workers are paid.",
+            "Configure pricing by field type. Each tab shows fields of that type with their pricing. Tabs with (0) have no fields yet—create them in Mobile Config first.",
         position: "bottom",
     },
     {
-        target: "[data-tour='option-pricing-tab']",
-        title: "Option Pricing",
+        target: "[data-tour='number-pricing-tab']",
+        title: "Number Fields",
         content:
-            "Configure prices for each option in grouped breakdown fields. For example, set different prices for different vehicle types or service options.",
+            "Set per-unit prices for countable items. Workers enter a quantity, and the price is calculated automatically (e.g., 10 windows × $5 = $50).",
         position: "bottom",
     },
     {
-        target: "[data-tour='base-pricing-tab']",
-        title: "Base Pricing",
+        target: "[data-tour='boolean-pricing-tab']",
+        title: "Boolean Fields",
         content:
-            "Add fixed amounts or multipliers to invoices. Useful for base fees, call-out charges, or scaling entire invoices based on job type.",
+            "Set fixed prices for yes/no options. The price is added only when the worker checks the box (e.g., Premium Materials = +$25).",
         position: "bottom",
     },
     {
-        target: "[data-tour='service-type-pricing-tab']",
-        title: "Service-Type Pricing",
+        target: "[data-tour='select-pricing-tab']",
+        title: "Select Fields",
         content:
-            "Set fixed prices for specific service types. When enabled, these bypass all field-based calculations and use a fixed price instead.",
+            "Set different prices for each dropdown option. Workers choose an option, and its price is added (e.g., Basic = $100, Premium = $200).",
+        position: "bottom",
+    },
+    {
+        target: "[data-tour='group-pricing-tab']",
+        title: "Group Fields",
+        content:
+            "Set per-unit prices for categorized counts. Workers count items by group, each with its own price (e.g., 5 Nissan × $7 + 3 Toyota × $8).",
         position: "bottom",
     },
     {

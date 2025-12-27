@@ -5,14 +5,16 @@ This guide explains how to use the pricing system to configure how customers are
 ## Table of Contents
 
 1. [Understanding Pricing Scope](#understanding-pricing-scope)
-2. [Setting Up Basic Field Pricing](#setting-up-basic-field-pricing)
-3. [Location-Based Price Overrides](#location-based-price-overrides)
-4. [Conditional Pricing Rules](#conditional-pricing-rules)
-5. [Option & Group Pricing](#option--group-pricing)
+2. [Number Field Pricing](#number-field-pricing)
+3. [Boolean Field Pricing](#boolean-field-pricing)
+4. [Select Field Pricing](#select-field-pricing)
+5. [Group Field Pricing](#group-field-pricing)
 6. [Base Pricing Adjustments](#base-pricing-adjustments)
-7. [Bulk Editing Prices](#bulk-editing-prices)
-8. [Effective Dates & Versioning](#effective-dates--versioning)
-9. [Common Workflows](#common-workflows)
+7. [Location-Based Price Overrides](#location-based-price-overrides)
+8. [Conditional Pricing Rules](#conditional-pricing-rules)
+9. [Bulk Editing Prices](#bulk-editing-prices)
+10. [Effective Dates & Versioning](#effective-dates--versioning)
+11. [Common Workflows](#common-workflows)
 
 ---
 
@@ -51,30 +53,106 @@ The **Pricing Scope** selector at the top of the pricing page controls which pri
 
 ---
 
-## Setting Up Basic Field Pricing
+## Number Field Pricing
 
-Field pricing applies to fields that collect **numbers** or **booleans** (yes/no values).
+Number field pricing applies to fields that collect **numerical values** (quantities, counts, measurements).
 
 ### Steps
 
-1. Navigate to the **Field Pricing** tab
-2. Find the field you want to price (e.g., "Number of Windows", "Has Premium Materials")
-3. Enter a price in the input field
+1. Navigate to the **Number** tab in pricing
+2. Find the field you want to price (e.g., "Number of Windows", "Panel Count")
+3. Enter a per-unit price in the input field
 4. Click **Save** (for new pricing) or **Update** (to modify existing pricing)
 
 ### How It Calculates
 
-- **Number fields**: `Total = price_per_unit × quantity`
-  - Example: If "Windows" costs $5.00 per unit and a job has 10 windows, total = $50.00
-- **Boolean fields**: `Total = base_price (when field is true)`
-  - Example: If "Premium Materials" costs $25.00 and is checked, add $25.00 to the invoice
+`Total = price_per_unit × quantity`
+
+- Example: If "Windows" costs $5.00 per unit and a job has 10 windows, total = $50.00
+- Example: If "Panels" costs $2.00 per unit and a job has 25 panels, total = $50.00
 
 ### Quick Preview
 
-Each field shows a preview calculation:
+Each field shows a preview calculation using 10 as a sample quantity:
 
-- Number fields: Shows `10 × $5.00 = $50.00` (using 10 as a sample quantity)
-- Boolean fields: Shows `$25.00 when true`
+- Shows `10 × $5.00 = $50.00`
+
+---
+
+## Boolean Field Pricing
+
+Boolean field pricing applies to fields that collect **yes/no values** (checkboxes, toggles).
+
+### Steps
+
+1. Navigate to the **Boolean** tab in pricing
+2. Find the field you want to price (e.g., "Premium Materials", "Rush Service")
+3. Enter a fixed price in the input field
+4. Click **Save** (for new pricing) or **Update** (to modify existing pricing)
+
+### How It Calculates
+
+`Total = fixed_price (when field is checked/true)`
+
+- Example: If "Premium Materials" costs $25.00 and is checked, add $25.00 to the invoice
+- Example: If "Rush Service" costs $50.00 and is checked, add $50.00 to the invoice
+
+### Quick Preview
+
+Each field shows a preview: `$25.00 when true`
+
+---
+
+## Select Field Pricing
+
+Select field pricing applies to **dropdown/select fields** where users choose one option.
+
+### Steps
+
+1. Navigate to the **Select** tab in pricing
+2. Find the select field you want to price (e.g., "Service Type", "Package Level")
+3. For each option, enter a price
+4. Click **Save** for each option
+
+### How It Calculates
+
+`Total = price of selected option`
+
+- Example: "Service Type" field with options:
+  - Basic Detail = $100
+  - Premium Detail = $200
+  - Deluxe Detail = $350
+- If worker selects "Premium Detail", add $200 to the invoice
+
+### Multi-Select Fields
+
+For select fields with "Allow multiple selections" enabled:
+
+- Each selected option's price is added to the total
+- Example: If "Add-ons" has Clay Bar ($30) and Paint Sealant ($50) selected, add $80 to invoice
+
+---
+
+## Group Field Pricing
+
+Group field pricing applies to **grouped breakdown fields** where users enter quantities for multiple categories.
+
+### Steps
+
+1. Navigate to the **Group** tab in pricing
+2. Find the grouped breakdown field (e.g., "Vehicles by Make", "Items by Type")
+3. For each group/category, enter a per-unit price
+4. Click **Save** for each group
+
+### How It Calculates
+
+`Total = sum of (price_per_group × quantity_per_group)`
+
+- Example: "Soaps By Vehicle Make" with groups:
+  - Nissan: $7.00 per unit
+  - Toyota: $8.00 per unit
+  - Hyundai: $6.50 per unit
+- If a job has 5 Nissan and 3 Toyota: (5 × $7.00) + (3 × $8.00) = $59.00
 
 ---
 
@@ -152,57 +230,37 @@ Each field shows its conditional rules as chips below the price input. The chips
 
 ---
 
-## Option & Group Pricing
+## Invoice Adjustments (Base Pricing)
 
-For fields with **select** or **grouped_breakdown** types, you set prices for each option or group.
+Invoice adjustments modify the total invoice amount. There are two types:
 
-### Select Fields (Single Choice)
+### 1. Universal Adjustment
 
-- Each option gets its own price
-- Total = sum of selected option prices
-- Example: "Service Type" field with options "Basic ($50)", "Premium ($100)", "Deluxe ($150)"
+Applies the same adjustment to **every invoice**, regardless of service type.
 
-### Grouped Breakdown Fields (Multiple Groups with Quantities)
+**Use cases:**
 
-- Each group gets a price per unit
-- Total = sum of (price_per_group × quantity_per_group)
-- Example: "Soaps By Vehicle Make" with groups:
-  - Nissan: $7.00 per unit
-  - Toyota: $8.00 per unit
-  - Hyundai: $6.50 per unit
-  - If a job has 5 Nissan and 3 Toyota, total = (5 × $7.00) + (3 × $8.00) = $59.00
+- **Call-out fee**: Add $25 to every invoice for travel/diagnostic
+- **Profit margin**: Multiply every invoice by 1.15 (15% markup)
+- **Fuel surcharge**: Add $10 to cover fuel costs
 
-### How to Configure
+### 2. Service-Based Adjustment
 
-1. Go to the **Group & Option Pricing** tab
-2. Find the field you want to price
-3. For each option/group:
-   - Enter a price
-   - Click **Save** or **Update**
-4. Location overrides work the same way: select a location in Pricing Scope, then edit the option prices
+Varies the adjustment based on a **select field** (e.g., Service Type, Package Level).
 
----
+**Use cases:**
 
-## Base Pricing Adjustments
-
-Base pricing adds fixed amounts or multipliers to the entire invoice, regardless of field values.
-
-### Types of Base Pricing
-
-1. **Fixed Amount**: Add or subtract a fixed dollar amount
-   - Example: Add $25.00 to every invoice
-2. **Percentage Multiplier**: Multiply the entire invoice by a percentage
-   - Example: Multiply by 1.15 (15% increase)
-3. **Job Type Adjustments**: Vary the base price based on job type
-   - Example: "If Job Type is 'Large Vehicle', multiply base by 1.2x"
+- **Tiered pricing**: Basic Detail adds $50, Premium Detail adds $100, Deluxe Detail adds $150
+- **Service multipliers**: Standard service × 1.0, Rush service × 1.5, Emergency × 2.0
+- **Package upgrades**: Bronze = +$0, Silver = +$50, Gold = +$100
 
 ### How to Configure
 
-1. Go to the **Base Pricing** tab
-2. Choose the adjustment type
-3. Enter the amount or percentage
-4. Optionally, set a job type condition (select a field and value)
-5. Add conditional rules if needed (same as field pricing)
+1. Go to the **Base** tab in pricing
+2. Toggle between **Universal Adjustment** and **Service-Based Adjustment**
+3. For Universal: Enter the amount or multiplier
+4. For Service-Based: Select the service type field, then set amounts for each option
+5. Add conditional rules if needed (e.g., "If after-hours, add $50")
 6. Click **Save** or **Update**
 
 ---
@@ -291,7 +349,7 @@ When creating or updating a pricing rule in the advanced editor, you can set:
 ### Workflow 1: Simple Setup (Most Locations Same Price)
 
 1. Leave Location Hierarchy as "Organization Default"
-2. Go to **Field Pricing** tab
+2. Go through each pricing tab (Number, Boolean, Select, Group)
 3. Enter prices for each field
 4. Save each field
 
@@ -305,28 +363,36 @@ When creating or updating a pricing rule in the advanced editor, you can set:
 ### Workflow 3: After-Hours Surcharge
 
 1. Ensure you have a "Time of Day" or similar field
-2. Go to **Field Pricing** tab
-3. Find a field you want to surcharge (e.g., "Base Service")
-4. Click **Add rule**
-5. Create rule: "If Time of Day equals 'after-hours', add $50"
-6. Save the rule
+2. Go to **Base** tab in pricing
+3. Click **Add rule**
+4. Create rule: "If Time of Day equals 'after-hours', add $50"
+5. Save the rule
 
 ### Workflow 4: Premium Material Multiplier
 
 1. Ensure you have a "Material Type" or similar field
-2. Go to **Field Pricing** tab
-3. Find the field that uses materials
-4. Click **Add rule**
-5. Create rule: "If Material Type equals 'premium', multiply by 1.5"
-6. Save the rule
+2. Go to **Base** tab in pricing
+3. Click **Add rule**
+4. Create rule: "If Material Type equals 'premium', multiply by 1.5"
+5. Save the rule
 
 ### Workflow 5: Scheduled Price Increase
 
-1. Go to **Field Pricing** tab
+1. Go to the appropriate pricing tab (Number, Boolean, Select, or Group)
 2. Edit a field's price
 3. Set **Effective At** to a future date (e.g., next month)
 4. Save
 5. The new price will automatically apply starting on that date
+
+### Workflow 6: Car Detailing Packages
+
+1. Create a "Service Package" select field in Mobile Config with options like "Basic", "Premium", "Deluxe"
+2. Go to **Select** tab in pricing
+3. Set prices for each package:
+   - Basic Detail = $100
+   - Premium Detail = $200
+   - Deluxe Detail = $350
+4. These prices combine with other pricing (add-ons, per-unit charges, etc.)
 
 ---
 
@@ -368,3 +434,13 @@ This usually happens when:
 - See `docs/pricing-ux-research.md` for design patterns and inspiration from other platforms
 - Check the database schema in `database/supabase/migrations/` for technical details
 - Review the pricing calculation logic in `database/supabase/functions/calculate-invoice/`
+
+## Pricing Tab Summary
+
+| Tab         | Field Type          | Calculation                    | Example                                             |
+| ----------- | ------------------- | ------------------------------ | --------------------------------------------------- |
+| **Number**  | `number`            | price × quantity               | $5 × 10 windows = $50                               |
+| **Boolean** | `boolean`           | fixed price when true          | Premium Materials = $25                             |
+| **Select**  | `select`            | price of selected option       | Premium Detail = $200                               |
+| **Group**   | `grouped_breakdown` | sum of (price × qty per group) | 5 Nissan × $7 + 3 Toyota × $8 = $59                 |
+| **Base**    | N/A                 | Universal or service-based     | +$25 call-out fee, or Premium tier × 1.2 multiplier |

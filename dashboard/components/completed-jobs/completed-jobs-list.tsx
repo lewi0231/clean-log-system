@@ -296,6 +296,7 @@ export default function CompletedJobsList({
       "default" | "secondary" | "destructive" | "outline"
     > = {
       draft: "outline",
+      pending_review: "outline",
       sent: "default",
       paid: "secondary",
       overdue: "destructive",
@@ -305,6 +306,7 @@ export default function CompletedJobsList({
     // Map status to user-friendly label
     const statusLabels: Record<InvoiceStatus, string> = {
       draft: "Draft",
+      pending_review: "Pending Review",
       sent: "Invoice Sent",
       paid: "Paid",
       overdue: "Overdue",

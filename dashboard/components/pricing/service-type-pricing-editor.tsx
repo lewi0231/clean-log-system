@@ -10,22 +10,16 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useServicePricingMode } from "@/hooks/use-service-pricing-mode";
+import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
 import type { ServicePricingMode } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
-import { DollarSign, Info, Save, X } from "lucide-react";
+import { DollarSign, Info, Save } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -39,16 +33,13 @@ export default function ServiceTypePricingEditor({
   locationId = null,
 }: ServiceTypePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
-  const {
-    servicePricingModes,
-    loading,
-    error,
-    upsertPricingMode,
-    deletePricingMode,
-  } = useServicePricingMode({
+  const { servicePricingModes, loading, error, upsertPricingMode, refetch } =
+    useServicePricingMode({
     locationId,
   });
   const { currency: orgCurrency } = useOrganizationCurrency();
+  const { workers } = useWorkers();
+  const hasWorkers = workers.length > 0;
 
   // Filter to only select-type fields
   const selectFieldConfigs = useMemo(() => {
@@ -75,12 +66,10 @@ export default function ServiceTypePricingEditor({
       {
         customerPrice: string;
         workerPayment: string;
-        currency: string;
       }
     >
   >({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [deleting, setDeleting] = useState<Record<string, boolean>>({});
 
   // Initialize field-level fixed toggles from persisted pricing modes
   useEffect(() => {
@@ -117,7 +106,6 @@ export default function ServiceTypePricingEditor({
   ): {
     customerPrice: string;
     workerPayment: string;
-    currency: string;
   } => {
     const key = `${fieldConfigId}:${optionValue}`;
     const existing = pricingModeMap.get(key);
@@ -130,7 +118,6 @@ export default function ServiceTypePricingEditor({
     return {
       customerPrice: existing?.fixed_customer_price?.toString() || "",
       workerPayment: existing?.fixed_worker_payment?.toString() || "",
-      currency: existing?.fixed_price_currency || orgCurrency || "USD",
     };
   };
 
@@ -140,7 +127,6 @@ export default function ServiceTypePricingEditor({
     updates: Partial<{
       customerPrice: string;
       workerPayment: string;
-      currency: string;
     }>
   ) => {
     const key = `${fieldConfigId}:${optionValue}`;
@@ -160,10 +146,18 @@ export default function ServiceTypePricingEditor({
     }));
   };
 
-  const handleSave = async (fieldConfig: FieldConfig, optionValue: string) => {
-    const state = getEditingState(fieldConfig.id, optionValue);
-    const key = `${fieldConfig.id}:${optionValue}`;
+  const handleSaveField = async (fieldConfig: FieldConfig) => {
+    const options = fieldConfig.options || [];
     const isFixedForField = fieldFixedToggles[fieldConfig.id] ?? false;
+    const fieldKey = fieldConfig.id;
+
+    setSaving((prev) => ({ ...prev, [fieldKey]: true }));
+
+    try {
+      // Save all options for this field
+      await Promise.all(
+        options.map(async (optionValue) => {
+          const state = getEditingState(fieldConfig.id, optionValue);
 
     // Validate price inputs
     const customerPrice = parseFloat(state.customerPrice);
@@ -172,66 +166,50 @@ export default function ServiceTypePricingEditor({
     if (isNaN(customerPrice) || customerPrice < 0) {
       return;
     }
-    if (isNaN(workerPayment) || workerPayment < 0) {
+          if (hasWorkers && (isNaN(workerPayment) || workerPayment < 0)) {
       return;
     }
 
-    setSaving((prev) => ({ ...prev, [key]: true }));
-    try {
+          // If prices are entered, always use fixed_price mode
+          // The toggle determines if ALL options in the field use fixed pricing
+          // but individual options with prices should always be fixed_price
+          const shouldUseFixedPrice = isFixedForField || customerPrice > 0;
+
       await upsertPricingMode(
         fieldConfig.id,
         optionValue,
-        isFixedForField ? "fixed_price" : "field_based",
+            shouldUseFixedPrice ? "fixed_price" : "field_based",
         {
           fixedCustomerPrice: customerPrice,
-          fixedWorkerPayment: workerPayment,
-          fixedPriceCurrency: state.currency,
+              fixedWorkerPayment: hasWorkers ? workerPayment : 0,
+              fixedPriceCurrency: orgCurrency,
           locationId,
         }
       );
+        })
+      );
+
+      // Wait for the query to refetch so the saved values appear
+      await refetch();
+
+      // Clear editing states after refetch completes
+      options.forEach((optionValue) => {
+        const key = `${fieldConfig.id}:${optionValue}`;
       setEditingStates((prev) => {
         const next = { ...prev };
         delete next[key];
         return next;
+        });
       });
     } catch (error) {
-      log.error("Failed to save service pricing mode", {
+      log.error("Failed to save service pricing modes", {
         error: error instanceof Error ? error.message : "Unknown error",
         fieldConfigId: fieldConfig.id,
-        optionValue,
       });
     } finally {
       setSaving((prev) => {
         const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
-  };
-
-  const handleDelete = async (fieldConfigId: string, optionValue: string) => {
-    const key = `${fieldConfigId}:${optionValue}`;
-    const existing = pricingModeMap.get(key);
-    if (!existing) return;
-
-    setDeleting((prev) => ({ ...prev, [key]: true }));
-    try {
-      await deletePricingMode(existing.id);
-      setEditingStates((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    } catch (err) {
-      log.error("Failed to delete service pricing mode", {
-        error: err instanceof Error ? err.message : "Unknown error",
-        fieldConfigId,
-        optionValue,
-      });
-    } finally {
-      setDeleting((prev) => {
-        const next = { ...prev };
-        delete next[key];
+        delete next[fieldKey];
         return next;
       });
     }
@@ -350,31 +328,36 @@ export default function ServiceTypePricingEditor({
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {options.map((optionValue) => {
                   const state = getEditingState(fieldConfig.id, optionValue);
                   const key = `${fieldConfig.id}:${optionValue}`;
-                  const existing = pricingModeMap.get(key);
-                  const isSaving = saving[key];
-                  const isDeleting = deleting[key];
+                  const isSavingField = saving[fieldConfig.id];
 
                   return (
                     <div
                       key={optionValue}
-                      className="flex items-start gap-4 rounded-lg border p-4"
+                      className="flex items-center gap-3 rounded-lg border p-3"
                     >
-                      <div className="flex-1 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Label className="font-medium">{optionValue}</Label>
+                      <div className="flex-1 min-w-0">
+                        <Label className="font-medium text-sm">
+                          {optionValue}
+                        </Label>
                         </div>
-
-                        <div className="grid gap-4 md:grid-cols-3">
-                          <div className="space-y-2">
-                            <Label htmlFor={`customer-${key}`}>
-                              Customer Price
+                      <div
+                        className={`grid gap-3 ${
+                          hasWorkers ? "grid-cols-2" : "grid-cols-1"
+                        }`}
+                      >
+                        <div className="space-y-1.5 min-w-[140px]">
+                          <Label
+                            htmlFor={`customer-${key}`}
+                            className="text-xs text-muted-foreground"
+                          >
+                            Customer Price ({orgCurrency})
                             </Label>
                             <div className="relative">
-                              <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <DollarSign className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                               <Input
                                 id={`customer-${key}`}
                                 type="number"
@@ -389,18 +372,22 @@ export default function ServiceTypePricingEditor({
                                   )
                                 }
                                 placeholder="0.00"
-                                className="pl-9"
-                                disabled={isSaving || isDeleting}
+                              className="pl-7 h-9 text-sm"
+                              disabled={isSavingField}
                               />
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label htmlFor={`worker-${key}`}>
-                              Worker Payment
+                        {hasWorkers && (
+                          <div className="space-y-1.5 min-w-[140px]">
+                            <Label
+                              htmlFor={`worker-${key}`}
+                              className="text-xs text-muted-foreground"
+                            >
+                              Worker Payment ({orgCurrency})
                             </Label>
                             <div className="relative">
-                              <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              <DollarSign className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                               <Input
                                 id={`worker-${key}`}
                                 type="number"
@@ -415,78 +402,33 @@ export default function ServiceTypePricingEditor({
                                   )
                                 }
                                 placeholder="0.00"
-                                className="pl-9"
-                                disabled={isSaving || isDeleting}
+                                className="pl-7 h-9 text-sm"
+                                disabled={isSavingField}
                               />
                             </div>
                           </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor={`currency-${key}`}>Currency</Label>
-                            <Select
-                              value={state.currency}
-                              onValueChange={(value) =>
-                                updateEditingState(
-                                  fieldConfig.id,
-                                  optionValue,
-                                  { currency: value }
-                                )
-                              }
-                              disabled={isSaving || isDeleting}
-                            >
-                              <SelectTrigger id={`currency-${key}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="USD">USD</SelectItem>
-                                <SelectItem value="AUD">AUD</SelectItem>
-                                <SelectItem value="GBP">GBP</SelectItem>
-                                <SelectItem value="EUR">EUR</SelectItem>
-                                <SelectItem value="CAD">CAD</SelectItem>
-                                <SelectItem value="NZD">NZD</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap justify-end gap-2">
-                          {existing && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleDelete(fieldConfig.id, optionValue)
-                              }
-                              disabled={isSaving || isDeleting}
-                            >
-                              <X className="mr-2 h-4 w-4" />
-                              Remove pricing
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            onClick={() => handleSave(fieldConfig, optionValue)}
-                            disabled={
-                              isSaving ||
-                              isDeleting ||
-                              !state.customerPrice ||
-                              !state.workerPayment
-                            }
-                          >
-                            {isSaving ? (
-                              "Saving..."
-                            ) : (
-                              <>
-                                <Save className="mr-2 h-4 w-4" />
-                                Save
-                              </>
-                            )}
-                          </Button>
-                        </div>
+                        )}
                       </div>
                     </div>
                   );
                 })}
+              </div>
+              <div className="mt-4 flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  size="sm"
+                  onClick={() => handleSaveField(fieldConfig)}
+                  disabled={saving[fieldConfig.id]}
+                  className="cursor-pointer"
+                >
+                  {saving[fieldConfig.id] ? (
+                    "Saving..."
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save All Options
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
