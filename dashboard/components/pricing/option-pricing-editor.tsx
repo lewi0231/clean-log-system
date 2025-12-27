@@ -1,7 +1,6 @@
 "use client";
 
 import { usePricingScope } from "@/components/pricing/pricing-scope-context";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -322,8 +321,20 @@ export default function OptionPricingEditor({
           } gap-2 p-3 bg-muted/50 border-b text-sm font-medium`}
         >
           <div>Option</div>
-          <div>Customer Price</div>
-          {showBothContexts && <div>Worker Payment</div>}
+          <div>
+            Customer Price{" "}
+            <span className="text-muted-foreground font-normal">
+              ({pricedCount}/{options.length})
+            </span>
+          </div>
+          {showBothContexts && (
+            <div>
+              Worker Payment{" "}
+              <span className="text-muted-foreground font-normal">
+                ({pricedCount}/{options.length})
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Table Body - Inline Editable Rows */}
@@ -418,10 +429,7 @@ export default function OptionPricingEditor({
       )}
 
       {/* Save Button Bar */}
-      <div className="flex items-center justify-between gap-4 p-3 rounded-lg border bg-muted/30">
-        <Badge variant="secondary" className="text-xs">
-          {pricedCount}/{options.length} priced
-        </Badge>
+      <div className="flex items-center justify-end gap-4 p-3 rounded-lg border bg-muted/30">
         {pendingChangesCount > 0 && (
           <Button
             size="sm"

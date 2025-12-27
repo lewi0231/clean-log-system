@@ -37,6 +37,7 @@ import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
 import {
   buildScopedPricingMap,
@@ -45,7 +46,13 @@ import {
 } from "@/lib/pricing-scope";
 import type { BasePricing } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
-import { ChevronDown, DollarSign, Save, Trash2 } from "lucide-react";
+import {
+  AlertCircle,
+  ChevronDown,
+  DollarSign,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 interface BasePricingEditorProps {
@@ -64,6 +71,8 @@ export default function BasePricingEditor({
   showBothContexts = false,
 }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
+  const { workers } = useWorkers();
+  const hasWorkers = workers && workers.length > 0;
   const {
     basePricing: customerPricing,
     loading: customerLoading,
@@ -1112,14 +1121,19 @@ export default function BasePricingEditor({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Dynamic Equation Preview */}
+            {/* How it works */}
             {selectedFieldConfig && (
-              <div className="bg-muted/50 rounded-md p-2 text-sm">
-                <span className="text-muted-foreground">Equation: </span>
-                <span className="font-mono font-medium">
-                  Total = invoice_total + adjustment[{selectedFieldConfig.label}
-                  ]
-                </span>
+              <div className="bg-muted/50 rounded-md p-3 text-sm">
+                <p className="font-medium text-foreground">How it works:</p>
+                <p className="text-muted-foreground">
+                  Set different adjustments for each {selectedFieldConfig.label}{" "}
+                  option. For example, if &quot;Premium Service&quot; has a $50
+                  call-out fee and &quot;Basic Service&quot; has no fee →{" "}
+                  <span className="font-medium text-foreground">
+                    Premium adds $50, Basic adds $0
+                  </span>{" "}
+                  to the invoice total.
+                </p>
               </div>
             )}
 
@@ -1143,76 +1157,74 @@ export default function BasePricingEditor({
             </div>
 
             {selectedFieldConfig && selectedFieldConfig.options && (
-              <div className="space-y-3">
-                {selectedFieldConfig.options.map((optionValue) => {
-                  const customerEntry =
-                    customerFieldBasedPricingMap[optionValue];
-                  const workerEntry = workerFieldBasedPricingMap[optionValue];
-                  const customerPricing = customerEntry?.record;
-                  const workerPricing = workerEntry?.record;
+              <div className="space-y-4">
+                {/* Compact Inline-Editable Table */}
+                <div className="rounded-lg border overflow-hidden">
+                  {/* Table Header */}
+                  <div
+                    className={`grid ${
+                      showBothContexts
+                        ? "grid-cols-[1fr_120px_140px_140px]"
+                        : "grid-cols-[1fr_120px_140px]"
+                    } gap-2 p-3 bg-muted/50 border-b text-sm font-medium`}
+                  >
+                    <div>Option</div>
+                    <div>Type</div>
+                    <div>Customer Adjustment</div>
+                    {showBothContexts && <div>Worker Adjustment</div>}
+                  </div>
 
-                  // For backward compatibility
-                  const pricingEntry = showBothContexts
-                    ? customerEntry
-                    : pricingContext === "customer"
-                    ? customerEntry
-                    : workerEntry;
-                  const existingPricing = showBothContexts
-                    ? customerPricing
-                    : pricingContext === "customer"
-                    ? customerPricing
-                    : workerPricing;
+                  {/* Table Body - Inline Editable Rows */}
+                  <div className="divide-y">
+                    {selectedFieldConfig.options.map((optionValue) => {
+                      const customerEntry =
+                        customerFieldBasedPricingMap[optionValue];
+                      const workerEntry =
+                        workerFieldBasedPricingMap[optionValue];
+                      const customerPricing = customerEntry?.record;
+                      const workerPricing = workerEntry?.record;
 
-                  const editing = editingPrices[optionValue];
-                  const currentAdjustmentType =
-                    editingAdjustmentTypes[optionValue] ||
-                    existingPricing?.adjustment_type ||
-                    "add";
-                  const currentCustomerPrice =
-                    editing?.customer !== undefined
-                      ? editing.customer
-                      : customerPricing
-                      ? customerPricing.customer_base_price.toString()
-                      : "";
-                  const currentWorkerPrice =
-                    editing?.worker !== undefined
-                      ? editing.worker
-                      : workerPricing
-                      ? workerPricing.worker_base_payment?.toString() || ""
-                      : "";
+                      const existingPricing = showBothContexts
+                        ? customerPricing
+                        : pricingContext === "customer"
+                        ? customerPricing
+                        : workerPricing;
 
-                  const hasCustomerChanges =
-                    editing?.customer !== undefined &&
-                    editing.customer !==
-                      (customerPricing?.customer_base_price.toString() || "");
-                  const hasWorkerChanges =
-                    editing?.worker !== undefined &&
-                    editing.worker !==
-                      (workerPricing?.worker_base_payment?.toString() || "");
-                  const hasChanges = showBothContexts
-                    ? hasCustomerChanges || hasWorkerChanges
-                    : pricingContext === "customer"
-                    ? hasCustomerChanges
-                    : hasWorkerChanges;
-                  const hasScopedValue = isEntryForScope(
-                    pricingEntry,
-                    scopeSource
-                  );
+                      const editing = editingPrices[optionValue];
+                      const currentAdjustmentType =
+                        editingAdjustmentTypes[optionValue] ||
+                        existingPricing?.adjustment_type ||
+                        "add";
+                      const currentCustomerPrice =
+                        editing?.customer !== undefined
+                          ? editing.customer
+                          : customerPricing
+                          ? customerPricing.customer_base_price.toString()
+                          : "";
+                      const currentWorkerPrice =
+                        editing?.worker !== undefined
+                          ? editing.worker
+                          : workerPricing
+                          ? workerPricing.worker_base_payment?.toString() || ""
+                          : "";
 
-                  return (
-                    <Card key={optionValue} className="p-4">
-                      <div className="space-y-3">
-                        <Label className="font-medium text-base">
-                          {optionValue}
-                        </Label>
-
-                        {/* Adjustment Type Toggle */}
-                        <div className="space-y-2">
-                          <Label className="text-xs text-muted-foreground">
-                            Adjustment Type
-                          </Label>
-                          <div className="flex gap-4">
-                            <label className="flex items-center space-x-2 cursor-pointer">
+                      return (
+                        <div
+                          key={optionValue}
+                          className={`grid ${
+                            showBothContexts
+                              ? "grid-cols-[1fr_120px_140px_140px]"
+                              : "grid-cols-[1fr_120px_140px]"
+                          } gap-2 p-2 items-center hover:bg-muted/30 transition-colors`}
+                        >
+                          <div
+                            className="text-sm font-medium truncate"
+                            title={optionValue}
+                          >
+                            {optionValue}
+                          </div>
+                          <div className="flex gap-2">
+                            <label className="flex items-center space-x-1 cursor-pointer">
                               <input
                                 type="radio"
                                 name={`adjustment-type-${optionValue}`}
@@ -1226,9 +1238,9 @@ export default function BasePricingEditor({
                                   deleting[existingPricing?.id || ""]
                                 }
                               />
-                              <span className="text-xs">Add Amount</span>
+                              <span className="text-xs">Add</span>
                             </label>
-                            <label className="flex items-center space-x-2 cursor-pointer">
+                            <label className="flex items-center space-x-1 cursor-pointer">
                               <input
                                 type="radio"
                                 name={`adjustment-type-${optionValue}`}
@@ -1245,98 +1257,40 @@ export default function BasePricingEditor({
                                   deleting[existingPricing?.id || ""]
                                 }
                               />
-                              <span className="text-xs">Multiply Invoice</span>
+                              <span className="text-xs">×</span>
                             </label>
                           </div>
-                        </div>
-
-                        {/* Price Input */}
-                        {showBothContexts ? (
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <div className="space-y-2">
-                              <Label className="text-xs">
-                                Customer{" "}
-                                {currentAdjustmentType === "add"
-                                  ? "Amount to Add"
-                                  : "Multiplier"}
-                              </Label>
-                              <div className="relative">
-                                <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min={
-                                    currentAdjustmentType === "multiply"
-                                      ? "0.01"
-                                      : "0"
-                                  }
-                                  placeholder={
-                                    currentAdjustmentType === "multiply"
-                                      ? "1.00"
-                                      : "0.00"
-                                  }
-                                  value={currentCustomerPrice}
-                                  onChange={(e) =>
-                                    handlePriceChange(
-                                      optionValue,
-                                      e.target.value,
-                                      "customer"
-                                    )
-                                  }
-                                  className="pl-7 h-9 text-sm"
-                                  disabled={
-                                    saving[optionValue] ||
-                                    deleting[customerPricing?.id || ""]
-                                  }
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-xs">
-                                Worker{" "}
-                                {currentAdjustmentType === "add"
-                                  ? "Amount to Add"
-                                  : "Multiplier"}
-                              </Label>
-                              <div className="relative">
-                                <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  min={
-                                    currentAdjustmentType === "multiply"
-                                      ? "0.01"
-                                      : "0"
-                                  }
-                                  placeholder={
-                                    currentAdjustmentType === "multiply"
-                                      ? "1.00"
-                                      : "0.00"
-                                  }
-                                  value={currentWorkerPrice}
-                                  onChange={(e) =>
-                                    handlePriceChange(
-                                      optionValue,
-                                      e.target.value,
-                                      "worker"
-                                    )
-                                  }
-                                  className="pl-7 h-9 text-sm"
-                                  disabled={
-                                    saving[optionValue] ||
-                                    deleting[workerPricing?.id || ""]
-                                  }
-                                />
-                              </div>
-                            </div>
+                          <div className="relative">
+                            <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min={
+                                currentAdjustmentType === "multiply"
+                                  ? "0.01"
+                                  : "0"
+                              }
+                              placeholder={
+                                currentAdjustmentType === "multiply"
+                                  ? "1.00"
+                                  : "0.00"
+                              }
+                              value={currentCustomerPrice}
+                              onChange={(e) =>
+                                handlePriceChange(
+                                  optionValue,
+                                  e.target.value,
+                                  "customer"
+                                )
+                              }
+                              className="pl-6 h-8 text-sm"
+                              disabled={
+                                saving[optionValue] ||
+                                deleting[customerPricing?.id || ""]
+                              }
+                            />
                           </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <Label className="text-xs">
-                              {currentAdjustmentType === "add"
-                                ? "Amount to Add (USD)"
-                                : "Multiplier (e.g., 1.2 = 20% increase)"}
-                            </Label>
+                          {showBothContexts && (
                             <div className="relative">
                               <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                               <Input
@@ -1352,120 +1306,112 @@ export default function BasePricingEditor({
                                     ? "1.00"
                                     : "0.00"
                                 }
-                                value={
-                                  pricingContext === "customer"
-                                    ? currentCustomerPrice
-                                    : currentWorkerPrice
-                                }
+                                value={currentWorkerPrice}
                                 onChange={(e) =>
                                   handlePriceChange(
                                     optionValue,
                                     e.target.value,
-                                    pricingContext
+                                    "worker"
                                   )
                                 }
-                                className="pl-7 h-9 text-sm"
+                                className="pl-6 h-8 text-sm"
                                 disabled={
                                   saving[optionValue] ||
-                                  deleting[existingPricing?.id || ""]
+                                  deleting[workerPricing?.id || ""] ||
+                                  !hasWorkers
+                                }
+                                title={
+                                  !hasWorkers
+                                    ? "Add workers to your organization to set worker payments"
+                                    : undefined
                                 }
                               />
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              {currentAdjustmentType === "add"
-                                ? "Fixed amount added when this option is selected"
-                                : "Multiplier for entire invoice (1.0 = no change)"}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 justify-end">
-                          {hasScopedValue && existingPricing && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(existingPricing.id)}
-                              disabled={
-                                saving[optionValue] ||
-                                deleting[existingPricing.id]
-                              }
-                            >
-                              <Trash2 className="mr-2 h-3 w-3" />
-                              Delete
-                            </Button>
                           )}
-                          <Button
-                            size="sm"
-                            onClick={() => handleSaveFieldBased(optionValue)}
-                            disabled={
-                              !hasChanges ||
-                              (showBothContexts
-                                ? (!currentCustomerPrice ||
-                                    isNaN(parseFloat(currentCustomerPrice)) ||
-                                    parseFloat(currentCustomerPrice) < 0) &&
-                                  (!currentWorkerPrice ||
-                                    isNaN(parseFloat(currentWorkerPrice)) ||
-                                    parseFloat(currentWorkerPrice) < 0)
-                                : pricingContext === "customer"
-                                ? !currentCustomerPrice ||
-                                  isNaN(parseFloat(currentCustomerPrice)) ||
-                                  parseFloat(currentCustomerPrice) < 0
-                                : !currentWorkerPrice ||
-                                  isNaN(parseFloat(currentWorkerPrice)) ||
-                                  parseFloat(currentWorkerPrice) < 0) ||
-                              saving[optionValue] ||
-                              deleting[existingPricing?.id || ""]
-                            }
-                          >
-                            {saving[optionValue] ? (
-                              "Saving..."
-                            ) : hasScopedValue ? (
-                              "Update"
-                            ) : (
-                              <>
-                                <Save className="mr-2 h-3 w-3" />
-                                Save
-                              </>
-                            )}
-                          </Button>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                        {/* Location Overrides for Field-Based - Only show when organizational default is selected */}
-                        {!locationId &&
-                          !locationHierarchyId &&
-                          (() => {
-                            const fieldBasedOverrides = getBasePricingOverrides(
-                              basePricing,
-                              selectedFieldConfigId,
-                              optionValue,
-                              locationId,
-                              locationHierarchyId
-                            );
-                            return (
-                              <LocationOverridesMatrix
-                                rows={fieldBasedOverrides}
-                                emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this option's price to create an override."
-                                onDelete={async (id) => {
-                                  try {
-                                    await deletePricing(id);
-                                  } catch (error) {
-                                    log.error("Failed to delete override", {
-                                      error:
-                                        error instanceof Error
-                                          ? error.message
-                                          : "Unknown error",
-                                      pricingId: id,
-                                    });
-                                  }
-                                }}
-                              />
-                            );
-                          })()}
-                      </div>
-                    </Card>
+                {/* Worker Payment Notice */}
+                {showBothContexts && !hasWorkers && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Worker payment fields are disabled. Add workers to your
+                      organization to enable worker payment settings.
+                    </p>
+                  </div>
+                )}
+
+                {/* Save Button Bar */}
+                {(() => {
+                  const pendingChanges = selectedFieldConfig.options.filter(
+                    (optionValue) => {
+                      const editing = editingPrices[optionValue];
+                      if (!editing) return false;
+
+                      const customerEntry =
+                        customerFieldBasedPricingMap[optionValue];
+                      const workerEntry =
+                        workerFieldBasedPricingMap[optionValue];
+                      const customerPricing = customerEntry?.record;
+                      const workerPricing = workerEntry?.record;
+
+                      const hasCustomerChanges =
+                        editing.customer !== undefined &&
+                        editing.customer !==
+                          (customerPricing?.customer_base_price.toString() ||
+                            "");
+                      const hasWorkerChanges =
+                        editing.worker !== undefined &&
+                        editing.worker !==
+                          (workerPricing?.worker_base_payment?.toString() ||
+                            "");
+
+                      return showBothContexts
+                        ? hasCustomerChanges || hasWorkerChanges
+                        : pricingContext === "customer"
+                        ? hasCustomerChanges
+                        : hasWorkerChanges;
+                    }
                   );
-                })}
+
+                  if (pendingChanges.length === 0) return null;
+
+                  return (
+                    <div className="flex items-center justify-end gap-2 p-3 rounded-lg border bg-muted/30">
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          // Save all pending changes
+                          await Promise.all(
+                            pendingChanges.map((optionValue) =>
+                              handleSaveFieldBased(optionValue)
+                            )
+                          );
+                        }}
+                        disabled={pendingChanges.some(
+                          (opt) =>
+                            saving[opt] ||
+                            deleting[
+                              (showBothContexts
+                                ? customerFieldBasedPricingMap[opt]?.record
+                                : pricingContext === "customer"
+                                ? customerFieldBasedPricingMap[opt]?.record
+                                : workerFieldBasedPricingMap[opt]?.record
+                              )?.id || ""
+                            ]
+                        )}
+                        className="gap-1 cursor-pointer"
+                      >
+                        <Save className="h-3 w-3" />
+                        Save All ({pendingChanges.length})
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </CardContent>
