@@ -26,6 +26,7 @@ import {
 } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
+import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
@@ -105,6 +106,7 @@ export default function NewEntryScreen() {
   const { settings } = useOrganizationSettings(organizationId);
   const { user } = useAuth();
   const { worker } = useCurrentWorker();
+  const { isAdmin } = useUserRole();
   const { locations } = useLocations(organizationId);
   const { colleagues } = useColleagues(organizationId);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
@@ -480,6 +482,18 @@ export default function NewEntryScreen() {
           }}
           onErrorClear={() => clearFieldError(config.id)}
           disabled={disabled}
+          onFocus={() => {
+            // Scroll to field when focused to ensure it's visible above keyboard
+            setTimeout(() => {
+              const fieldY = fieldPositions.current[config.id];
+              if (fieldY !== undefined && scrollViewRef.current) {
+                scrollViewRef.current.scrollTo({
+                  y: fieldY - 100, // Offset to show field above keyboard
+                  animated: true,
+                });
+              }
+            }, 100);
+          }}
         />
       </View>
     );
@@ -824,88 +838,94 @@ export default function NewEntryScreen() {
 
     return (
       <View className="flex-col gap-4">
-        <View className="mb-2">
-          <Text className="text-lg font-bold text-foreground mb-1">
-            {section.title}
-          </Text>
-          {section.description && (
-            <Text className="text-sm text-muted-foreground">
-              {section.description}
+        {/* Section Card - following mobile UX best practices */}
+        <View className="bg-gray-50 dark:bg-gray-900/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+          <View className="mb-4">
+            <Text className="text-lg font-bold text-foreground mb-1">
+              {section.title}
             </Text>
-          )}
-        </View>
+            {section.description && (
+              <Text className="text-sm text-muted-foreground">
+                {section.description}
+              </Text>
+            )}
+          </View>
 
-        {/* Render mutual exclusion groups with select dropdowns */}
-        {Array.from(groupedFields.keys()).map((groupId) => {
-          const fields = groupedFields.get(groupId) || [];
-          const clusters = getClustersForGroup(groupId);
-          const selectedCluster = selectedClusters[groupId] || null;
+          {/* Render mutual exclusion groups with select dropdowns */}
+          {Array.from(groupedFields.keys()).map((groupId) => {
+            const fields = groupedFields.get(groupId) || [];
+            const clusters = getClustersForGroup(groupId);
+            const selectedCluster = selectedClusters[groupId] || null;
 
-          // Use custom label for default_exclusive_group if available, otherwise generate from group ID
-          const firstField = fields[0];
-          const isDefaultGroup = groupId === "default_exclusive_group";
-          const groupLabel =
-            isDefaultGroup && settings?.default_exclusive_group_label
-              ? settings.default_exclusive_group_label
-              : firstField.mutually_exclusive_group
-                  ?.split("_")
-                  .map(
-                    (word) =>
-                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                  )
-                  .join(" ") || "Select Option";
+            // Use custom label for default_exclusive_group if available, otherwise generate from group ID
+            const firstField = fields[0];
+            const isDefaultGroup = groupId === "default_exclusive_group";
+            const groupLabel =
+              isDefaultGroup && settings?.default_exclusive_group_label
+                ? settings.default_exclusive_group_label
+                : firstField.mutually_exclusive_group
+                    ?.split("_")
+                    .map(
+                      (word) =>
+                        word.charAt(0).toUpperCase() +
+                        word.slice(1).toLowerCase()
+                    )
+                    .join(" ") || "Select Option";
 
-          return (
-            <View key={groupId} className="mb-4">
-              <View className="mb-2">
-                <Text className="text-sm font-medium text-foreground">
-                  {groupLabel}
-                  <Text className="text-destructive ml-1">*</Text>
-                </Text>
-              </View>
-              <View
-                className={`rounded-xl h-12 bg-card border ${
-                  touchedFields.has(`mutual-exclusion-${groupId}`) &&
-                  !selectedCluster
-                    ? "border-destructive"
-                    : "border-border"
-                }`}
-              >
-                <Select
-                  value={selectedCluster || ""}
-                  onValueChange={(value) => {
-                    handleClusterSelect(groupId, value || null);
-                    markFieldAsTouched(`mutual-exclusion-${groupId}`);
-                  }}
-                  placeholder={`Choose ${groupLabel.toLowerCase()}`}
-                  size="medium"
-                  triggerClassName="border-0 h-12 pl-5"
-                >
-                  {clusters.map((clusterId) => (
-                    <SelectItem key={clusterId} value={clusterId}>
-                      {formatClusterName(clusterId)}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </View>
-              {touchedFields.has(`mutual-exclusion-${groupId}`) &&
-                !selectedCluster && (
-                  <Text className="text-sm text-destructive mt-1">
-                    {groupLabel} is required
+            return (
+              <View key={groupId} className="mb-4">
+                <View className="mb-2">
+                  <Text className="text-sm font-medium text-foreground">
+                    {groupLabel}
+                    <Text className="text-destructive ml-1">*</Text>
                   </Text>
-                )}
+                </View>
+                <View
+                  className={`rounded-xl h-12 bg-card border ${
+                    touchedFields.has(`mutual-exclusion-${groupId}`) &&
+                    !selectedCluster
+                      ? "border-destructive"
+                      : "border-border"
+                  }`}
+                >
+                  <Select
+                    value={selectedCluster || ""}
+                    onValueChange={(value) => {
+                      handleClusterSelect(groupId, value || null);
+                      markFieldAsTouched(`mutual-exclusion-${groupId}`);
+                    }}
+                    placeholder={`Choose ${groupLabel.toLowerCase()}`}
+                    size="medium"
+                    triggerClassName="border-0 h-12 pl-5"
+                  >
+                    {clusters.map((clusterId) => (
+                      <SelectItem key={clusterId} value={clusterId}>
+                        {formatClusterName(clusterId)}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </View>
+                {touchedFields.has(`mutual-exclusion-${groupId}`) &&
+                  !selectedCluster && (
+                    <Text className="text-sm text-destructive mt-1">
+                      {groupLabel} is required
+                    </Text>
+                  )}
 
-              {/* Render fields only for the selected cluster */}
-              {selectedCluster &&
-                fields
-                  .filter((field) => getFieldCluster(field) === selectedCluster)
-                  .map(renderField)}
-            </View>
-          );
-        })}
+                {/* Render fields only for the selected cluster */}
+                {selectedCluster &&
+                  fields
+                    .filter(
+                      (field) => getFieldCluster(field) === selectedCluster
+                    )
+                    .map(renderField)}
+              </View>
+            );
+          })}
 
-        {/* Render regular fields (not in mutual exclusion groups) */}
-        {regularFields.map(renderField)}
+          {/* Render regular fields (not in mutual exclusion groups) */}
+          {regularFields.map(renderField)}
+        </View>
       </View>
     );
   };
@@ -913,7 +933,13 @@ export default function NewEntryScreen() {
   // Format field value for display
   const formatFieldValue = (
     config: FieldConfig,
-    value: string | number | boolean | GroupedBreakdownItem[] | undefined
+    value:
+      | string
+      | number
+      | boolean
+      | string[]
+      | GroupedBreakdownItem[]
+      | undefined
   ): string => {
     if (value === undefined || value === null || value === "") {
       return "Not provided";
@@ -938,14 +964,22 @@ export default function NewEntryScreen() {
         }
         return String(value);
       case "grouped_breakdown":
-        if (Array.isArray(value)) {
-          if (value.length === 0) return "None";
-          return value
+        if (
+          Array.isArray(value) &&
+          value.length > 0 &&
+          typeof value[0] !== "string"
+        ) {
+          return (value as GroupedBreakdownItem[])
             .map((item) => `${item.brand}: ${item.quantity}`)
             .join(", ");
         }
         return "None";
       case "select":
+        // Handle multi-select (array) and single-select (string)
+        if (config.validation_rules?.allow_multiple && Array.isArray(value)) {
+          if (value.length === 0) return "None";
+          return (value as string[]).join(", ");
+        }
         return String(value);
       default:
         return String(value);
@@ -1129,9 +1163,15 @@ export default function NewEntryScreen() {
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center gap-2">
                 <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
-                  {worker?.name ? (
+                  {worker?.name || (isAdmin && user?.email) ? (
                     <Text className="text-xs font-semibold text-primary">
-                      {worker.name
+                      {(
+                        worker?.name ||
+                        (isAdmin && user?.email
+                          ? user.email.split("@")[0]
+                          : "") ||
+                        ""
+                      )
                         .split(" ")
                         .map((n) => n[0])
                         .join("")
@@ -1144,7 +1184,7 @@ export default function NewEntryScreen() {
                 </View>
                 <View>
                   <Text className="text-sm font-medium text-foreground">
-                    {worker?.name || user.email?.split("@")[0] || "User"}
+                    {worker?.name || user?.email?.split("@")[0] || "User"}
                   </Text>
                 </View>
               </View>
@@ -1168,12 +1208,16 @@ export default function NewEntryScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
         >
           <ScrollView
             ref={scrollViewRef}
             className="flex-1 px-4 pt-4"
-            contentContainerStyle={{ paddingBottom: 100 }}
+            // Best practice: allow scrolling even when content is short, so focused inputs
+            // can always scroll above the keyboard (prevents "third field hidden" issue).
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 320 }}
+            // iOS best practice: let ScrollView automatically adjust for keyboard insets.
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={true}
             keyboardDismissMode="on-drag"

@@ -50,7 +50,8 @@
       "router": {},
       "eas": {
         "projectId": "dca48c2e-07e9-4e38-ad54-c3b5417e950d"
-      }
+      },
+      "enableAddressAutocomplete": false
     }
   }
 }

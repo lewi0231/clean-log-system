@@ -135,18 +135,24 @@ export function useFieldConfigs(
   const [loading, setLoading] = useState(true);
   // Dynamic field values: key is field config id, value is the field value
   const [fieldValues, setFieldValues] = useState<
-    Record<string, string | number | boolean | GroupedBreakdownItem[]>
+    Record<
+      string,
+      string | number | boolean | string[] | GroupedBreakdownItem[]
+    >
   >({});
 
   const resetFieldValues = (
-    values: Record<string, string | number | boolean | GroupedBreakdownItem[]>,
+    values: Record<
+      string,
+      string | number | boolean | string[] | GroupedBreakdownItem[]
+    >,
   ) => {
     setFieldValues(values);
   };
 
   const updateFieldValue = (
     fieldId: string,
-    value: string | number | boolean | GroupedBreakdownItem[],
+    value: string | number | boolean | string[] | GroupedBreakdownItem[],
   ) => {
     setFieldValues((prev) => {
       const currentField = fieldConfigs.find((fc) => fc.id === fieldId);

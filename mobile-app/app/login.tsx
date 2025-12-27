@@ -42,7 +42,7 @@ export default function LoginScreen() {
 
       // Success - reset loading state before navigation
       setIsLoading(false);
-      router.replace("/(tabs)/new-entry");
+      router.replace("/(tabs)");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : (error as string);

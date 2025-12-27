@@ -3,12 +3,14 @@ import { Alert, Pressable, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useCurrentWorker } from "@/hooks/use-current-worker";
+import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { worker } = useCurrentWorker();
+  const { isAdmin } = useUserRole();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   const handleLogout = () => {
@@ -46,9 +48,15 @@ export default function SettingsScreen() {
             <View className="bg-card rounded-xl p-4 mb-4">
               <View className="flex-row items-center gap-3">
                 <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center">
-                  {worker?.name ? (
+                  {worker?.name || (isAdmin && user?.email) ? (
                     <Text className="text-sm font-semibold text-primary">
-                      {worker.name
+                      {(
+                        worker?.name ||
+                        (isAdmin && user?.email
+                          ? user.email.split("@")[0]
+                          : "") ||
+                        ""
+                      )
                         .split(" ")
                         .map((n) => n[0])
                         .join("")
@@ -61,7 +69,7 @@ export default function SettingsScreen() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-semibold text-card-foreground">
-                    {worker?.name || user.email}
+                    {worker?.name || user?.email || "User"}
                   </Text>
                   <Text className="text-sm text-muted-foreground mt-0.5">
                     {user.email}
