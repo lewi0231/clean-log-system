@@ -155,10 +155,9 @@ function PricingPageContent({
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pricing</h1>
           <p className="text-muted-foreground mt-2">
-            Configure customer pricing and worker payments. Prices are
-            calculated using equations based on field values from completed
-            jobs. Customer pricing is used for invoicing, while worker payments
-            determine how much workers are paid for completed jobs.
+            Configure customer pricing and worker payments. Customer pricing is
+            used for invoicing, while worker payments determine how much workers
+            are paid for completed jobs.
           </p>
         </div>
         <div className="flex items-center gap-2">
