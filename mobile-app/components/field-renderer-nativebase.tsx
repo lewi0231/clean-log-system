@@ -25,7 +25,7 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, Switch, Text, TextInput, View } from "react-native";
 import { TimePicker } from "./ui/time-picker";
 
@@ -44,7 +44,7 @@ interface FieldRendererProps {
   ) => void;
   onErrorClear?: () => void;
   disabled?: boolean;
-  onFocus?: () => void; // Callback when field receives focus
+  onFocus?: (opts?: { subFieldYOffset?: number }) => void; // Callback when field receives focus
 }
 
 // Icon mapping for different field types
@@ -129,7 +129,7 @@ export function FieldRendererNativeBase({
                 placeholderTextColor="#6b7280"
                 value={String(value || "")}
                 onChangeText={(text) => handleFieldChange(text)}
-                onFocus={onFocus}
+                onFocus={() => onFocus?.()}
                 editable={!disabled}
                 keyboardType={
                   config.field_type === "email"
@@ -196,7 +196,7 @@ export function FieldRendererNativeBase({
                   const numValue = text === "" ? 0 : Number(text) || 0;
                   handleFieldChange(numValue);
                 }}
-                onFocus={onFocus}
+                onFocus={() => onFocus?.()}
                 keyboardType="number-pad"
                 editable={!disabled}
                 style={{ opacity: disabled ? 0.5 : 1 }}
@@ -236,7 +236,7 @@ export function FieldRendererNativeBase({
               placeholderTextColor="#6b7280"
               value={String(value || "")}
               onChangeText={(text) => handleFieldChange(text)}
-              onFocus={onFocus}
+              onFocus={() => onFocus?.()}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
@@ -611,7 +611,7 @@ export function FieldRendererNativeBase({
               placeholder={config.description || "Start typing an address..."}
               disabled={disabled}
               error={isInvalid}
-              onFocus={onFocus}
+              onFocus={() => onFocus?.()}
             />
             {config.description && (
               <Text className="text-xs text-muted-foreground mt-1">
@@ -671,6 +671,28 @@ export function FieldRendererNativeBase({
       const [addressParts, setAddressParts] = useState(() =>
         parseAddress(String(value || ""))
       );
+      // Track refs to each sub-field's TextInput for measuring
+      const addressContainerRef = useRef<View>(null);
+      const streetInputRef = useRef<TextInput>(null);
+      const cityInputRef = useRef<TextInput>(null);
+      const stateInputRef = useRef<TextInput>(null);
+      const postcodeInputRef = useRef<TextInput>(null);
+
+      // Function to measure a sub-field's position relative to the address container
+      const measureSubFieldOffset = (
+        inputRef: React.RefObject<TextInput | null>,
+        callback: (offset: number) => void
+      ) => {
+        if (inputRef.current && addressContainerRef.current) {
+          inputRef.current.measureLayout(
+            addressContainerRef.current as any,
+            (_x, y) => callback(y),
+            () => callback(0) // Fallback to 0 on error
+          );
+        } else {
+          callback(0);
+        }
+      };
 
       // Update local state when external value changes
       useEffect(() => {
@@ -698,6 +720,20 @@ export function FieldRendererNativeBase({
         handleFieldChange(fullAddress);
       };
 
+      // Get the ref for a specific part
+      const getInputRef = (part: "street" | "city" | "state" | "postcode") => {
+        switch (part) {
+          case "street":
+            return streetInputRef;
+          case "city":
+            return cityInputRef;
+          case "state":
+            return stateInputRef;
+          case "postcode":
+            return postcodeInputRef;
+        }
+      };
+
       const renderAddressField = (
         label: string,
         part: "street" | "city" | "state" | "postcode",
@@ -707,47 +743,57 @@ export function FieldRendererNativeBase({
           | "address-line1"
           | "address-line2"
           | "postal-code"
-      ) => (
-        <View className="mb-3">
-          <Text className="text-xs font-medium text-muted-foreground mb-1.5">
-            {label}
-          </Text>
-          <View
-            className={`bg-card border rounded-xl overflow-hidden ${
-              isInvalid ? "border-destructive" : "border-border"
-            }`}
-          >
-            <View className="flex-row items-center">
-              <View className="ml-3">
-                <Ionicons
-                  name="location-outline"
-                  size={18}
-                  color={disabled ? "#6b7280" : "#9ca3af"}
+      ) => {
+        const inputRef = getInputRef(part);
+
+        return (
+          <View className="mb-3">
+            <Text className="text-xs font-medium text-muted-foreground mb-1.5">
+              {label}
+            </Text>
+            <View
+              className={`bg-card border rounded-xl overflow-hidden ${
+                isInvalid ? "border-destructive" : "border-border"
+              }`}
+            >
+              <View className="flex-row items-center">
+                <View className="ml-3">
+                  <Ionicons
+                    name="location-outline"
+                    size={18}
+                    color={disabled ? "#6b7280" : "#9ca3af"}
+                  />
+                </View>
+                <TextInput
+                  ref={inputRef}
+                  className="flex-1 bg-transparent text-card-foreground px-4 py-3 text-base"
+                  placeholder={placeholder}
+                  placeholderTextColor="#6b7280"
+                  value={addressParts[part]}
+                  onChangeText={(text) => updateAddressPart(part, text)}
+                  onFocus={() => {
+                    // Measure the actual position relative to the address container
+                    measureSubFieldOffset(inputRef, (offset) => {
+                      onFocus?.({ subFieldYOffset: offset });
+                    });
+                  }}
+                  editable={!disabled}
+                  autoCapitalize={part === "state" ? "characters" : "words"}
+                  autoComplete={autoComplete}
+                  keyboardType={part === "postcode" ? "numeric" : "default"}
+                  maxLength={
+                    part === "state" ? 3 : part === "postcode" ? 4 : undefined
+                  }
+                  style={{ opacity: disabled ? 0.5 : 1 }}
                 />
               </View>
-              <TextInput
-                className="flex-1 bg-transparent text-card-foreground px-4 py-3 text-base"
-                placeholder={placeholder}
-                placeholderTextColor="#6b7280"
-                value={addressParts[part]}
-                onChangeText={(text) => updateAddressPart(part, text)}
-                onFocus={onFocus}
-                editable={!disabled}
-                autoCapitalize={part === "state" ? "characters" : "words"}
-                autoComplete={autoComplete}
-                keyboardType={part === "postcode" ? "numeric" : "default"}
-                maxLength={
-                  part === "state" ? 3 : part === "postcode" ? 4 : undefined
-                }
-                style={{ opacity: disabled ? 0.5 : 1 }}
-              />
             </View>
           </View>
-        </View>
-      );
+        );
+      };
 
       return (
-        <View className="mb-4">
+        <View className="mb-4" ref={addressContainerRef}>
           <View className="flex-row items-center mb-3">
             <Text className="text-sm font-medium text-foreground">
               {config.label}

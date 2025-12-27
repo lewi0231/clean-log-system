@@ -38,6 +38,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -127,6 +128,7 @@ export default function NewEntryScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   // Alert dialog state
   const [alertOpen, setAlertOpen] = useState(false);
@@ -136,6 +138,20 @@ export default function NewEntryScreen() {
     null
   );
   const okButtonPressedRef = useRef(false);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Time states
   const [startTime, setStartTime] = useState<Date | undefined>(undefined);
@@ -482,13 +498,16 @@ export default function NewEntryScreen() {
           }}
           onErrorClear={() => clearFieldError(config.id)}
           disabled={disabled}
-          onFocus={() => {
+          onFocus={(opts) => {
             // Scroll to field when focused to ensure it's visible above keyboard
             setTimeout(() => {
               const fieldY = fieldPositions.current[config.id];
               if (fieldY !== undefined && scrollViewRef.current) {
+                const subFieldYOffset = opts?.subFieldYOffset ?? 0;
                 scrollViewRef.current.scrollTo({
-                  y: fieldY - 100, // Offset to show field above keyboard
+                  // For compound fields (like address), include the sub-field y-offset.
+                  // Use a larger offset so the focused input sits comfortably above the keyboard.
+                  y: Math.max(0, fieldY + subFieldYOffset - 160),
                   animated: true,
                 });
               }
@@ -1282,85 +1301,91 @@ export default function NewEntryScreen() {
           </ScrollView>
 
           {/* Fixed Bottom Action Bar */}
-          <View className="absolute bottom-0 left-0 right-0 bg-card border-t border-border/50 px-4 py-4 shadow-2xl">
-            <View className="flex-row gap-3">
-              {/* Previous Button - shown on all steps except first */}
-              {currentStep > 0 && (
-                <Button
-                  onPress={handlePrevious}
-                  disabled={isSubmitting}
-                  variant="secondary"
-                  size="lg"
-                  className="flex-1 bg-secondary"
-                >
-                  <Ionicons
-                    name="chevron-back"
-                    size={20}
-                    color="rgb(var(--color-secondary-foreground))"
-                  />
-                  <Text className="text-secondary-foreground text-base font-semibold">
-                    Previous
-                  </Text>
-                </Button>
-              )}
-              {/* Next Button - shown on all steps except last */}
-              {!isLastStep && (
-                <Button
-                  onPress={async () => {
-                    if (Platform.OS === "ios") {
-                      try {
-                        await Haptics.impactAsync(
-                          Haptics.ImpactFeedbackStyle.Light
-                        );
-                      } catch (err) {
-                        // Haptics not available
+          {!isKeyboardVisible && (
+            <View className="absolute bottom-0 left-0 right-0 bg-card border-t border-border/50 px-4 py-4 shadow-2xl">
+              <View className="flex-row gap-3">
+                {/* Previous Button - shown on all steps except first */}
+                {currentStep > 0 && (
+                  <Button
+                    onPress={handlePrevious}
+                    disabled={isSubmitting}
+                    variant="secondary"
+                    size="lg"
+                    className="flex-1 bg-secondary"
+                  >
+                    <Ionicons
+                      name="chevron-back"
+                      size={20}
+                      color="rgb(var(--color-secondary-foreground))"
+                    />
+                    <Text className="text-secondary-foreground text-base font-semibold">
+                      Previous
+                    </Text>
+                  </Button>
+                )}
+                {/* Next Button - shown on all steps except last */}
+                {!isLastStep && (
+                  <Button
+                    onPress={async () => {
+                      if (Platform.OS === "ios") {
+                        try {
+                          await Haptics.impactAsync(
+                            Haptics.ImpactFeedbackStyle.Light
+                          );
+                        } catch (err) {
+                          // Haptics not available
+                        }
                       }
-                    }
-                    handleNext();
-                  }}
-                  disabled={isSubmitting}
-                  variant="default"
-                  size="lg"
-                  className="flex-1"
-                >
-                  <Text className="text-white text-base font-semibold">
-                    Next
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color="white" />
-                </Button>
-              )}
-              {/* Submit Button - shown only on last step */}
-              {isLastStep && (
-                <Button
-                  onPress={async () => {
-                    if (Platform.OS === "ios") {
-                      try {
-                        await Haptics.impactAsync(
-                          Haptics.ImpactFeedbackStyle.Medium
-                        );
-                      } catch (err) {
-                        // Haptics not available
+                      handleNext();
+                    }}
+                    disabled={isSubmitting}
+                    variant="default"
+                    size="lg"
+                    className="flex-1"
+                  >
+                    <Text className="text-white text-base font-semibold">
+                      Next
+                    </Text>
+                    <Ionicons name="chevron-forward" size={20} color="white" />
+                  </Button>
+                )}
+                {/* Submit Button - shown only on last step */}
+                {isLastStep && (
+                  <Button
+                    onPress={async () => {
+                      if (Platform.OS === "ios") {
+                        try {
+                          await Haptics.impactAsync(
+                            Haptics.ImpactFeedbackStyle.Medium
+                          );
+                        } catch (err) {
+                          // Haptics not available
+                        }
                       }
-                    }
-                    handleSubmit();
-                  }}
-                  disabled={isSubmitting}
-                  variant="default"
-                  size="lg"
-                  className="flex-1"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Ionicons name="checkmark-circle" size={20} color="white" />
-                  )}
-                  <Text className="text-white text-base font-semibold">
-                    {isSubmitting ? "Submitting..." : "Submit Entry"}
-                  </Text>
-                </Button>
-              )}
+                      handleSubmit();
+                    }}
+                    disabled={isSubmitting}
+                    variant="default"
+                    size="lg"
+                    className="flex-1"
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color="white"
+                      />
+                    )}
+                    <Text className="text-white text-base font-semibold">
+                      {isSubmitting ? "Submitting..." : "Submit Entry"}
+                    </Text>
+                  </Button>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
 
