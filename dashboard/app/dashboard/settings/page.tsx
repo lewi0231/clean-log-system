@@ -582,7 +582,20 @@ export default function SettingsPage() {
     log.info("Settings: Primary contact email updated successfully");
   };
 
-  // Helper function to parse business address string into components
+  // Helper function to capitalize first letter of each word (title case)
+  const toTitleCase = (str: string): string => {
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  // Helper function to capitalize state (all caps)
+  const toStateCase = (str: string): string => {
+    return str.toUpperCase().trim();
+  };
+
   const parseBusinessAddress = (
     address: string
   ): {
@@ -592,32 +605,51 @@ export default function SettingsPage() {
     postcode: string;
   } => {
     // Try to parse format: "Street, City, State Postcode"
-    // This is a simple parser - may need refinement based on actual data
     const parts = address.split(",").map((p) => p.trim());
     if (parts.length >= 2) {
       const street = parts[0];
-      const cityStatePostcode = parts.slice(1).join(", ");
-      // Try to extract state and postcode (e.g., "NSW 2000" or "New South Wales 2000")
-      const statePostcodeMatch = cityStatePostcode.match(/^(.+?)\s+(\d{4})$/);
+      // Last part should contain state and postcode (e.g., "NSW 2000")
+      const lastPart = parts[parts.length - 1];
+      const statePostcodeMatch = lastPart.match(/^(.+?)\s+(\d{4})$/);
+      
       if (statePostcodeMatch) {
+        // Format: "Street, City, State Postcode" or "Street, City, Suburb, State Postcode"
+        const state = statePostcodeMatch[1].trim();
+        const postcode = statePostcodeMatch[2];
+        // City is everything between street and the last part
+        const city = parts.length > 2 
+          ? parts.slice(1, -1).join(", ") 
+          : parts[1];
+        
         return {
-          street,
-          city: parts.length > 2 ? parts[1] : "",
-          state: statePostcodeMatch[1].trim(),
-          postcode: statePostcodeMatch[2],
+          street: toTitleCase(street),
+          city: toTitleCase(city),
+          state: toStateCase(state),
+          postcode,
         };
       }
-      // If no postcode match, assume last part is city
+      
+      // If no postcode match, try to parse as "Street, City, State" or "Street, City"
+      if (parts.length >= 3) {
+        return {
+          street: toTitleCase(parts[0]),
+          city: toTitleCase(parts[1]),
+          state: toStateCase(parts[2]),
+          postcode: "",
+        };
+      }
+      
+      // Two parts: assume "Street, City"
       return {
-        street,
-        city: parts[1],
-        state: parts[2] || "",
-        postcode: parts[3] || "",
+        street: toTitleCase(parts[0]),
+        city: toTitleCase(parts[1]),
+        state: "",
+        postcode: "",
       };
     }
     // If format doesn't match, return as street address
     return {
-      street: address,
+      street: toTitleCase(address),
       city: "",
       state: "",
       postcode: "",
@@ -631,12 +663,20 @@ export default function SettingsPage() {
     state: string;
     postcode: string;
   }): string => {
+    // Apply capitalization before formatting
+    const capitalizedFields = {
+      street: toTitleCase(fields.street),
+      city: toTitleCase(fields.city),
+      state: toStateCase(fields.state),
+      postcode: fields.postcode,
+    };
+    
     const parts = [
-      fields.street,
-      fields.city,
-      fields.state && fields.postcode
-        ? `${fields.state} ${fields.postcode}`
-        : fields.state || fields.postcode,
+      capitalizedFields.street,
+      capitalizedFields.city,
+      capitalizedFields.state && capitalizedFields.postcode
+        ? `${capitalizedFields.state} ${capitalizedFields.postcode}`
+        : capitalizedFields.state || capitalizedFields.postcode,
     ].filter(Boolean);
     return parts.join(", ") || "";
   };
@@ -1002,8 +1042,9 @@ export default function SettingsPage() {
       <Tabs defaultValue="organization" className="space-y-6">
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
+          <TabsTrigger value="features">Feature Specific</TabsTrigger>
           {/* Business Mode tab hidden - feature not currently in use */}
-          <TabsTrigger value="payment">Payment Providers</TabsTrigger>
+          <TabsTrigger value="payment">Payment Details</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organization" className="space-y-6">
@@ -1136,7 +1177,18 @@ export default function SettingsPage() {
                           street: e.target.value,
                         }))
                       }
-                      onBlur={handleBusinessAddressChange}
+                      onBlur={(e) => {
+                        // Apply title case on blur
+                        const capitalized = toTitleCase(e.target.value);
+                        if (capitalized !== e.target.value) {
+                          setBusinessAddressFields((prev) => ({
+                            ...prev,
+                            street: capitalized,
+                          }));
+                        }
+                        // Then save the address
+                        handleBusinessAddressChange();
+                      }}
                       placeholder="123 Main Street"
                     />
                   </div>
@@ -1147,13 +1199,24 @@ export default function SettingsPage() {
                       <Input
                         id="business-address-city"
                         value={businessAddressFields.city}
-                        onChange={(e) =>
+                      onChange={(e) =>
+                        setBusinessAddressFields((prev) => ({
+                          ...prev,
+                          city: e.target.value,
+                        }))
+                      }
+                      onBlur={(e) => {
+                        // Apply title case on blur
+                        const capitalized = toTitleCase(e.target.value);
+                        if (capitalized !== e.target.value) {
                           setBusinessAddressFields((prev) => ({
                             ...prev,
-                            city: e.target.value,
-                          }))
+                            city: capitalized,
+                          }));
                         }
-                        onBlur={handleBusinessAddressChange}
+                        // Then save the address
+                        handleBusinessAddressChange();
+                      }}
                         placeholder="Sydney"
                       />
                     </div>
@@ -1163,12 +1226,12 @@ export default function SettingsPage() {
                       <Input
                         id="business-address-state"
                         value={businessAddressFields.state}
-                        onChange={(e) =>
-                          setBusinessAddressFields((prev) => ({
-                            ...prev,
-                            state: e.target.value,
-                          }))
-                        }
+                      onChange={(e) =>
+                        setBusinessAddressFields((prev) => ({
+                          ...prev,
+                          state: e.target.value.toUpperCase(),
+                        }))
+                      }
                         onBlur={handleBusinessAddressChange}
                         placeholder="NSW"
                         maxLength={3}
@@ -1274,7 +1337,194 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="features" className="space-y-6">
+          {/* Feature-Specific Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Feature-Specific Settings</CardTitle>
+              <CardDescription>
+                Configure settings for specific features on their respective
+                pages
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Locations Settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Configure mobile app location integration
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/locations">
+                    Go to Locations
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Invoice Settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Configure invoice templates and sending behavior
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/invoicing">
+                    Go to Invoicing
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+              <div className="p-4 border rounded-lg space-y-3">
+                <div>
+                  <p className="font-medium">Default Invoice Due Days</p>
+                  <p className="text-sm text-muted-foreground">
+                    Number of days after invoice creation when payment is due
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={settings.default_invoice_due_days}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value >= 1 && value <= 365) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          default_invoice_due_days: value,
+                        }));
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (isNaN(value) || value < 1 || value > 365) {
+                        return;
+                      }
+                      try {
+                        const { error } = await supabase.functions.invoke(
+                          "update-organization-settings",
+                          {
+                            body: {
+                              organization_id: organizationId,
+                              default_invoice_due_days: value,
+                            },
+                          }
+                        );
+                        if (error) throw error;
+                      } catch (err) {
+                        log.error("Failed to update invoice due days", {
+                          error: err,
+                        });
+                        setErrorDialog({
+                          open: true,
+                          title: "Update Failed",
+                          message:
+                            "Failed to update invoice due days. Please try again.",
+                        });
+                      }
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">days</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <p className="font-medium">Feedback & Rating Settings</p>
+                  <p className="text-sm text-muted-foreground">
+                    Configure feedback requests and rating system
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/ratings">
+                    Go to Ratings
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Business Mode tab content hidden - feature not currently in use */}
+        {/* <TabsContent value="business" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Business Mode</CardTitle>
+              <CardDescription>
+                Select how your business operates to get tailored guidance and
+                features throughout the application
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RadioGroup
+                value={settings.business_mode}
+                onValueChange={(value) =>
+                  handleBusinessModeChange(value as BusinessMode)
+                }
+                className="grid gap-4 md:grid-cols-2"
+              >
+                <div className="relative">
+                  <RadioGroupItem
+                    value="service_based"
+                    id="service_based"
+                    className="peer sr-only"
+                  />
+                  <Label
+                    htmlFor="service_based"
+                    className="flex flex-col rounded-lg border-2 border-muted bg-card p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <div className="font-semibold">Service-Based</div>
+                        <div className="text-sm text-muted-foreground">
+                          Car Detailer
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Offer specific services at fixed prices (e.g., Vacuum +
+                      Clean, Wax, Interior Detail)
+                    </p>
+                  </Label>
+                </div>
+                <div className="relative">
+                  <RadioGroupItem
+                    value="resource_tracking"
+                    id="resource_tracking"
+                    className="peer sr-only"
+                  />
+                  <Label
+                    htmlFor="resource_tracking"
+                    className="flex flex-col rounded-lg border-2 border-muted bg-card p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <Package className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <div className="font-semibold">Resource Tracking</div>
+                        <div className="text-sm text-muted-foreground">
+                          Car Yard Business
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Track materials and resources used per job (e.g., Soaps,
+                      Wipes, Polish)
+                    </p>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        </TabsContent> */}
+
+        <TabsContent value="payment" className="space-y-6">
           {/* Bank Transfer Settings */}
           <Card>
             <CardHeader>
@@ -1421,191 +1671,6 @@ export default function SettingsPage() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Business Mode tab content hidden - feature not currently in use */}
-        {/* <TabsContent value="business" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Business Mode</CardTitle>
-              <CardDescription>
-                Select how your business operates to get tailored guidance and
-                features throughout the application
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RadioGroup
-                value={settings.business_mode}
-                onValueChange={(value) =>
-                  handleBusinessModeChange(value as BusinessMode)
-                }
-                className="grid gap-4 md:grid-cols-2"
-              >
-                <div className="relative">
-                  <RadioGroupItem
-                    value="service_based"
-                    id="service_based"
-                    className="peer sr-only"
-                  />
-                  <Label
-                    htmlFor="service_based"
-                    className="flex flex-col rounded-lg border-2 border-muted bg-card p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <div className="font-semibold">Service-Based</div>
-                        <div className="text-sm text-muted-foreground">
-                          Car Detailer
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Offer specific services at fixed prices (e.g., Vacuum +
-                      Clean, Wax, Interior Detail)
-                    </p>
-                  </Label>
-                </div>
-                <div className="relative">
-                  <RadioGroupItem
-                    value="resource_tracking"
-                    id="resource_tracking"
-                    className="peer sr-only"
-                  />
-                  <Label
-                    htmlFor="resource_tracking"
-                    className="flex flex-col rounded-lg border-2 border-muted bg-card p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <Package className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <div className="font-semibold">Resource Tracking</div>
-                        <div className="text-sm text-muted-foreground">
-                          Car Yard Business
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Track materials and resources used per job (e.g., Soaps,
-                      Wipes, Polish)
-                    </p>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </CardContent>
-          </Card>
-        </TabsContent> */}
-
-        <TabsContent value="payment" className="space-y-6">
-          {/* Contextual Settings Links */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Feature-Specific Settings</CardTitle>
-              <CardDescription>
-                Configure settings for specific features on their respective
-                pages
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Locations Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure mobile app location integration
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/locations">
-                    Go to Locations
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Invoice Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure invoice templates and sending behavior
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/invoicing">
-                    Go to Invoicing
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="p-4 border rounded-lg space-y-3">
-                <div>
-                  <p className="font-medium">Default Invoice Due Days</p>
-                  <p className="text-sm text-muted-foreground">
-                    Number of days after invoice creation when payment is due
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={settings.default_invoice_due_days}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value, 10);
-                      if (!isNaN(value) && value >= 1 && value <= 365) {
-                        setSettings((prev) => ({
-                          ...prev,
-                          default_invoice_due_days: value,
-                        }));
-                      }
-                    }}
-                    onBlur={async (e) => {
-                      const value = parseInt(e.target.value, 10);
-                      if (isNaN(value) || value < 1 || value > 365) {
-                        return;
-                      }
-                      try {
-                        const { error } = await supabase.functions.invoke(
-                          "update-organization-settings",
-                          {
-                            body: {
-                              organization_id: organizationId,
-                              default_invoice_due_days: value,
-                            },
-                          }
-                        );
-                        if (error) throw error;
-                      } catch (err) {
-                        log.error("Failed to update invoice due days", {
-                          error: err,
-                        });
-                        setErrorDialog({
-                          open: true,
-                          title: "Update Failed",
-                          message:
-                            "Failed to update invoice due days. Please try again.",
-                        });
-                      }
-                    }}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">days</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Feedback & Rating Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure feedback requests and rating system
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/ratings">
-                    Go to Ratings
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
             </CardContent>
           </Card>
 

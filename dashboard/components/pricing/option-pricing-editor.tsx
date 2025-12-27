@@ -238,13 +238,40 @@ export default function OptionPricingEditor({
     });
   };
 
-  // Count options with and without pricing (for the current scope)
-  const pricedCount = options.filter((opt) =>
-    showBothContexts
-      ? customerPricingMap[opt]?.source === scopeSource ||
-        workerPricingMap[opt]?.source === scopeSource
-      : pricingMap[opt]?.source === scopeSource
-  ).length;
+  // Count options with pricing (for the current scope)
+  // Check if the pricing record exists AND has a valid price value
+  const pricedCount = options.filter((opt) => {
+    if (showBothContexts) {
+      const customerEntry = customerPricingMap[opt];
+      const workerEntry = workerPricingMap[opt];
+      const hasCustomerPrice =
+        customerEntry?.source === scopeSource &&
+        customerEntry?.record.customer_price != null &&
+        customerEntry.record.customer_price > 0;
+      const hasWorkerPrice =
+        workerEntry?.source === scopeSource &&
+        workerEntry?.record.worker_payment_rate != null &&
+        workerEntry.record.worker_payment_rate > 0;
+      return hasCustomerPrice || hasWorkerPrice;
+    } else {
+      const entry = pricingMap[opt];
+      if (entry?.source !== scopeSource) return false;
+      if (pricingContext === "customer") {
+        return (
+          entry.record.customer_price != null &&
+          entry.record.customer_price > 0
+        );
+      } else {
+        return (
+          entry.record.worker_payment_rate != null &&
+          entry.record.worker_payment_rate > 0
+        );
+      }
+    }
+  }).length;
+
+  // Only show fraction if there are unpriced options
+  const hasUnpricedOptions = pricedCount < options.length;
 
   // Count pending changes
   const pendingChangesCount = Object.keys(editingPrices).filter(
@@ -322,17 +349,21 @@ export default function OptionPricingEditor({
         >
           <div>Option</div>
           <div>
-            Customer Price{" "}
-            <span className="text-muted-foreground font-normal">
-              ({pricedCount}/{options.length})
-            </span>
+            Customer
+            {hasUnpricedOptions && (
+              <span className="text-muted-foreground font-normal">
+                {" "}({pricedCount}/{options.length})
+              </span>
+            )}
           </div>
           {showBothContexts && (
             <div>
-              Worker Payment{" "}
-              <span className="text-muted-foreground font-normal">
-                ({pricedCount}/{options.length})
-              </span>
+              Worker
+              {hasUnpricedOptions && (
+                <span className="text-muted-foreground font-normal">
+                  {" "}({pricedCount}/{options.length})
+                </span>
+              )}
             </div>
           )}
         </div>

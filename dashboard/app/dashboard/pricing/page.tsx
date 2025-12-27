@@ -149,6 +149,24 @@ function PricingPageContent({
     groupedBreakdownFields.length;
   const hasNoPriceableFields = totalPriceableFields === 0;
 
+  // Determine the first active tab (leftmost tab that has fields)
+  const defaultTab = useMemo(() => {
+    if (!isFixedPricing) {
+      if (numberFields.length > 0) return "number-pricing";
+      if (booleanFields.length > 0) return "boolean-pricing";
+      if (selectFields.length > 0) return "select-pricing";
+      if (groupedBreakdownFields.length > 0) return "group-pricing";
+    }
+    // Fallback to number-pricing if all are disabled or empty
+    return "number-pricing";
+  }, [
+    isFixedPricing,
+    numberFields.length,
+    booleanFields.length,
+    selectFields.length,
+    groupedBreakdownFields.length,
+  ]);
+
   return (
     <PageTourWrapper pageId="pricing" steps={pricingTourSteps}>
       <div className="mb-8 flex items-start justify-between">
@@ -368,7 +386,7 @@ function PricingPageContent({
 
             {/* Field Type Pricing Tabs */}
             {!hasNoPriceableFields && (
-              <Tabs defaultValue="number-pricing" className="space-y-6">
+              <Tabs defaultValue={defaultTab} className="space-y-6">
                 <TabsList
                   className="w-full justify-start"
                   data-tour="pricing-tabs"

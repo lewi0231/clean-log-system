@@ -1170,8 +1170,8 @@ export default function BasePricingEditor({
                   >
                     <div>Option</div>
                     <div>Type</div>
-                    <div>Customer Adjustment</div>
-                    {showBothContexts && <div>Worker Adjustment</div>}
+                    <div>Customer </div>
+                    {showBothContexts && <div>Worker </div>}
                   </div>
 
                   {/* Table Body - Inline Editable Rows */}
