@@ -35,8 +35,8 @@ export default function ServiceTypePricingEditor({
   const { fieldConfigs } = useFieldConfigs();
   const { servicePricingModes, loading, error, upsertPricingMode, refetch } =
     useServicePricingMode({
-      locationId,
-    });
+    locationId,
+  });
   const { currency: orgCurrency } = useOrganizationCurrency();
   const { workers } = useWorkers();
   const hasWorkers = workers.length > 0;
@@ -159,33 +159,33 @@ export default function ServiceTypePricingEditor({
         options.map(async (optionValue) => {
           const state = getEditingState(fieldConfig.id, optionValue);
 
-          // Validate price inputs
-          const customerPrice = parseFloat(state.customerPrice);
-          const workerPayment = parseFloat(state.workerPayment);
+    // Validate price inputs
+    const customerPrice = parseFloat(state.customerPrice);
+    const workerPayment = parseFloat(state.workerPayment);
 
-          if (isNaN(customerPrice) || customerPrice < 0) {
-            return;
-          }
+    if (isNaN(customerPrice) || customerPrice < 0) {
+      return;
+    }
           if (hasWorkers && (isNaN(workerPayment) || workerPayment < 0)) {
-            return;
-          }
+      return;
+    }
 
           // If prices are entered, always use fixed_price mode
           // The toggle determines if ALL options in the field use fixed pricing
           // but individual options with prices should always be fixed_price
           const shouldUseFixedPrice = isFixedForField || customerPrice > 0;
 
-          await upsertPricingMode(
-            fieldConfig.id,
-            optionValue,
+      await upsertPricingMode(
+        fieldConfig.id,
+        optionValue,
             shouldUseFixedPrice ? "fixed_price" : "field_based",
-            {
-              fixedCustomerPrice: customerPrice,
+        {
+          fixedCustomerPrice: customerPrice,
               fixedWorkerPayment: hasWorkers ? workerPayment : 0,
               fixedPriceCurrency: orgCurrency,
-              locationId,
-            }
-          );
+          locationId,
+        }
+      );
         })
       );
 
@@ -195,10 +195,10 @@ export default function ServiceTypePricingEditor({
       // Clear editing states after refetch completes
       options.forEach((optionValue) => {
         const key = `${fieldConfig.id}:${optionValue}`;
-        setEditingStates((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
+      setEditingStates((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
         });
       });
     } catch (error) {
@@ -343,7 +343,7 @@ export default function ServiceTypePricingEditor({
                         <Label className="font-medium text-sm">
                           {optionValue}
                         </Label>
-                      </div>
+                        </div>
                       <div
                         className={`grid gap-3 ${
                           hasWorkers ? "grid-cols-2" : "grid-cols-1"
@@ -355,28 +355,28 @@ export default function ServiceTypePricingEditor({
                             className="text-xs text-muted-foreground"
                           >
                             Customer Price ({orgCurrency})
-                          </Label>
-                          <div className="relative">
+                            </Label>
+                            <div className="relative">
                             <DollarSign className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              id={`customer-${key}`}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={state.customerPrice}
-                              onChange={(e) =>
-                                updateEditingState(
-                                  fieldConfig.id,
-                                  optionValue,
-                                  { customerPrice: e.target.value }
-                                )
-                              }
-                              placeholder="0.00"
+                              <Input
+                                id={`customer-${key}`}
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={state.customerPrice}
+                                onChange={(e) =>
+                                  updateEditingState(
+                                    fieldConfig.id,
+                                    optionValue,
+                                    { customerPrice: e.target.value }
+                                  )
+                                }
+                                placeholder="0.00"
                               className="pl-7 h-9 text-sm"
                               disabled={isSavingField}
-                            />
+                              />
+                            </div>
                           </div>
-                        </div>
 
                         {hasWorkers && (
                           <div className="space-y-1.5 min-w-[140px]">

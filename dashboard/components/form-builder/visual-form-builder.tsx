@@ -923,8 +923,8 @@ export function VisualFormBuilder({
                                         className="text-[10px] px-1.5 text-primary border-primary/40"
                                       >
                                         Multiple
-                                      </Badge>
-                                    )}
+                                    </Badge>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                                   <Badge

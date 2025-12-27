@@ -83,6 +83,7 @@ export default function SettingsPage() {
     abn: null,
     logo_url: null,
     primary_contact_email: null,
+    primary_contact_phone: null,
     business_address: null,
     invoice_send_immediately: false,
     feedback_email_send_immediately: false,
@@ -148,6 +149,7 @@ export default function SettingsPage() {
           abn: data.settings.abn ?? null,
           logo_url: data.settings.logo_url ?? null,
           primary_contact_email: data.settings.primary_contact_email ?? null,
+          primary_contact_phone: data.settings.primary_contact_phone ?? null,
           business_address: data.settings.business_address ?? null,
           invoice_send_immediately:
             data.settings.invoice_send_immediately ?? false,
@@ -186,6 +188,7 @@ export default function SettingsPage() {
           abn: data.settings.abn ?? null,
           logo_url: data.settings.logo_url ?? null,
           primary_contact_email: data.settings.primary_contact_email ?? null,
+          primary_contact_phone: data.settings.primary_contact_phone ?? null,
           business_address: data.settings.business_address ?? null,
           invoice_send_immediately:
             data.settings.invoice_send_immediately ?? false,
@@ -582,6 +585,40 @@ export default function SettingsPage() {
     log.info("Settings: Primary contact email updated successfully");
   };
 
+  const handlePrimaryContactPhoneChange = async (phone: string) => {
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    log.info("Settings: Updating primary contact phone", { phone });
+
+    const { data, error: updateError } = await supabase.functions.invoke(
+      "update-organization-settings",
+      {
+        body: {
+          organization_id: organizationId,
+          primary_contact_phone: phone || null,
+        },
+      }
+    );
+
+    if (updateError) {
+      log.error("Settings: Failed to update primary contact phone", {
+        error: updateError,
+      });
+      throw updateError;
+    }
+
+    if (data?.settings) {
+      setSettings((prev) => ({
+        ...prev,
+        primary_contact_phone: data.settings.primary_contact_phone,
+      }));
+    }
+
+    log.info("Settings: Primary contact phone updated successfully");
+  };
+
   // Helper function to capitalize first letter of each word (title case)
   const toTitleCase = (str: string): string => {
     return str
@@ -611,16 +648,15 @@ export default function SettingsPage() {
       // Last part should contain state and postcode (e.g., "NSW 2000")
       const lastPart = parts[parts.length - 1];
       const statePostcodeMatch = lastPart.match(/^(.+?)\s+(\d{4})$/);
-      
+
       if (statePostcodeMatch) {
         // Format: "Street, City, State Postcode" or "Street, City, Suburb, State Postcode"
         const state = statePostcodeMatch[1].trim();
         const postcode = statePostcodeMatch[2];
         // City is everything between street and the last part
-        const city = parts.length > 2 
-          ? parts.slice(1, -1).join(", ") 
-          : parts[1];
-        
+        const city =
+          parts.length > 2 ? parts.slice(1, -1).join(", ") : parts[1];
+
         return {
           street: toTitleCase(street),
           city: toTitleCase(city),
@@ -628,7 +664,7 @@ export default function SettingsPage() {
           postcode,
         };
       }
-      
+
       // If no postcode match, try to parse as "Street, City, State" or "Street, City"
       if (parts.length >= 3) {
         return {
@@ -638,7 +674,7 @@ export default function SettingsPage() {
           postcode: "",
         };
       }
-      
+
       // Two parts: assume "Street, City"
       return {
         street: toTitleCase(parts[0]),
@@ -670,7 +706,7 @@ export default function SettingsPage() {
       state: toStateCase(fields.state),
       postcode: fields.postcode,
     };
-    
+
     const parts = [
       capitalizedFields.street,
       capitalizedFields.city,
@@ -951,53 +987,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleAutoGenerateInvoicesChange = async (enabled: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Settings: Updating auto-generate invoices", { enabled });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            auto_generate_invoices_immediately: enabled,
-          },
-        }
-      );
-
-      if (updateError) {
-        log.error("Settings: Failed to update auto-generate invoices", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
-          auto_generate_invoices_immediately:
-            data.settings.auto_generate_invoices_immediately,
-        }));
-      }
-
-      log.info("Settings: Auto-generate invoices updated successfully");
-    } catch (err) {
-      log.error("Settings: Failed to update auto-generate invoices", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Update Failed",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to update auto-generate invoices setting. Please try again.",
-      });
-    }
-  };
-
   useEffect(() => {
     if (organizationId) {
       fetchSettings();
@@ -1152,6 +1141,35 @@ export default function SettingsPage() {
                 </div>
               </TooltipProvider>
 
+              <TooltipProvider>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="primary-contact-phone">
+                      Primary Contact Phone
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          This phone number is displayed on invoices for
+                          customer contact purposes.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <AutoSaveInput
+                    id="primary-contact-phone"
+                    type="tel"
+                    value={settings.primary_contact_phone}
+                    onSave={handlePrimaryContactPhoneChange}
+                    placeholder="Enter primary contact phone (e.g., 0412 345 678)"
+                    description="The primary business contact phone number displayed on invoices."
+                  />
+                </div>
+              </TooltipProvider>
+
               <div className="space-y-4">
                 <div>
                   <Label className="text-base font-semibold">
@@ -1199,24 +1217,24 @@ export default function SettingsPage() {
                       <Input
                         id="business-address-city"
                         value={businessAddressFields.city}
-                      onChange={(e) =>
-                        setBusinessAddressFields((prev) => ({
-                          ...prev,
-                          city: e.target.value,
-                        }))
-                      }
-                      onBlur={(e) => {
-                        // Apply title case on blur
-                        const capitalized = toTitleCase(e.target.value);
-                        if (capitalized !== e.target.value) {
+                        onChange={(e) =>
                           setBusinessAddressFields((prev) => ({
                             ...prev,
-                            city: capitalized,
-                          }));
+                            city: e.target.value,
+                          }))
                         }
-                        // Then save the address
-                        handleBusinessAddressChange();
-                      }}
+                        onBlur={(e) => {
+                          // Apply title case on blur
+                          const capitalized = toTitleCase(e.target.value);
+                          if (capitalized !== e.target.value) {
+                            setBusinessAddressFields((prev) => ({
+                              ...prev,
+                              city: capitalized,
+                            }));
+                          }
+                          // Then save the address
+                          handleBusinessAddressChange();
+                        }}
                         placeholder="Sydney"
                       />
                     </div>
@@ -1226,12 +1244,12 @@ export default function SettingsPage() {
                       <Input
                         id="business-address-state"
                         value={businessAddressFields.state}
-                      onChange={(e) =>
-                        setBusinessAddressFields((prev) => ({
-                          ...prev,
-                          state: e.target.value.toUpperCase(),
-                        }))
-                      }
+                        onChange={(e) =>
+                          setBusinessAddressFields((prev) => ({
+                            ...prev,
+                            state: e.target.value.toUpperCase(),
+                          }))
+                        }
                         onBlur={handleBusinessAddressChange}
                         placeholder="NSW"
                         maxLength={3}
@@ -1314,26 +1332,6 @@ export default function SettingsPage() {
                   Default currency for pricing and invoicing. This affects how
                   prices are displayed throughout the application.
                 </p>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-base font-semibold">
-                      Auto-Generate Invoices
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Automatically create invoices in pending review when jobs
-                      are completed. Location-specific auto-generate takes
-                      precedence. All invoices require review before sending.
-                    </p>
-                  </div>
-                  <Switch
-                    checked={settings.auto_generate_invoices_immediately}
-                    onCheckedChange={handleAutoGenerateInvoicesChange}
-                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-                  />
-                </div>
               </div>
             </CardContent>
           </Card>

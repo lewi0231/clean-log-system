@@ -84,6 +84,7 @@ export interface OrganizationSettings {
   abn: string | null;
   logo_url: string | null;
   primary_contact_email: string | null;
+  primary_contact_phone: string | null;
   business_address: string | null;
   invoice_send_immediately: boolean;
   feedback_email_send_immediately: boolean;
@@ -419,7 +420,7 @@ export type {
   PaymentLink,
   PaymentLinkStatus,
   PaymentMethod,
-  PaymentStatus,
+  PaymentStatus
 } from "./types/payment";
 
 export interface LineItemDisplayConfig {
