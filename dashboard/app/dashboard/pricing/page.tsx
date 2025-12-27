@@ -162,14 +162,6 @@ function PricingPageContent({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setTestInvoiceOpen(true)}
-            className="gap-2"
-          >
-            <TestTube className="h-4 w-4" />
-            Test Invoice
-          </Button>
           <TourTriggerButton />
         </div>
       </div>
