@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimePicker } from "@/components/ui/time-picker";
+import { useAlertDialog } from "@/hooks/use-alert-dialog";
 import { useColleagues } from "@/hooks/use-colleagues";
 import { useCurrentWorker } from "@/hooks/use-current-worker";
 import { useEntryForm } from "@/hooks/use-entry-form";
@@ -34,7 +35,6 @@ import { ConditionalLogic, FieldConfig } from "@clean-log/shared/types";
 import { FormSectionWithFields } from "@clean-log/shared/types/form-section";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -100,7 +100,21 @@ function evaluateCondition(
 }
 
 export default function NewEntryScreen() {
-  const router = useRouter();
+  // #region agent log
+  fetch("http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "new-entry.tsx:102",
+      message: "Component rendering/mounting",
+      data: {},
+      timestamp: Date.now(),
+      sessionId: "debug-session",
+      runId: "run1",
+      hypothesisId: "A",
+    }),
+  }).catch(() => {});
+  // #endregion
   const scrollViewRef = useRef<any>(null);
   const fieldPositions = useRef<Record<string, number>>({});
   const { organizationId } = useOrganization();
@@ -130,14 +144,16 @@ export default function NewEntryScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  // Alert dialog state
-  const [alertOpen, setAlertOpen] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | null>(
-    null
-  );
-  const okButtonPressedRef = useRef(false);
+  // Alert dialog management
+  const {
+    alertOpen,
+    alertTitle,
+    alertMessage,
+    showAlert,
+    showSuccessAndNavigate,
+    handleDialogChange,
+    handleOkPress,
+  } = useAlertDialog();
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () => {
@@ -248,39 +264,46 @@ export default function NewEntryScreen() {
     if (currentStep === 0) {
       // Step 0: Validate start time is required
       if (!startTime) {
-        setAlertTitle("Required Field");
-        setAlertMessage("Please select a start time to continue.");
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
+        showAlert("Required Field", "Please select a start time to continue.");
         return;
       }
       // Validate location is required if predefined locations are enabled
       if (settings?.use_predefined_locations && !selectedLocation) {
-        setAlertTitle("Required Field");
-        setAlertMessage("Please select a location to continue.");
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
+        showAlert("Required Field", "Please select a location to continue.");
         return;
       }
       // Validate finish time is not in the future
       if (finishTime && finishTime > new Date()) {
-        setAlertTitle("Invalid Time");
-        setAlertMessage(
+        showAlert(
+          "Invalid Time",
           "Finish time cannot be in the future. Please select a valid finish time."
         );
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
         return;
       }
       // Validate start time is not after finish time
       if (startTime && finishTime && startTime > finishTime) {
-        setAlertTitle("Invalid Time");
-        setAlertMessage(
+        showAlert(
+          "Invalid Time",
           "Start time cannot be after finish time. Please select a valid start time."
         );
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
         return;
+      }
+      // Validate required fields in step 0 (fields with section_id === null)
+      const basicInfoFields = organizedFields.get(null) || [];
+      const visibleBasicFields = basicInfoFields.filter(isFieldVisible);
+      for (const config of visibleBasicFields) {
+        if (config.required) {
+          const value = fieldValues[config.id];
+          if (!hasValue(value, config.field_type, config)) {
+            // Mark field as touched to show error
+            markFieldAsTouched(config.id);
+            showAlert(
+              "Required Field",
+              `Please fill in ${config.label} to continue.`
+            );
+            return;
+          }
+        }
       }
     } else if (currentStep > 0 && currentStep < totalSteps - 1) {
       // Validate section steps: Check if mutual exclusion groups have selections
@@ -309,11 +332,30 @@ export default function NewEntryScreen() {
                   )
                   .join(" ") || "an option";
 
-          setAlertTitle("Required Field");
-          setAlertMessage(`Please select ${groupLabel} to continue.`);
-          setAlertOnConfirm(null);
-          setAlertOpen(true);
+          showAlert(
+            "Required Field",
+            `Please select ${groupLabel} to continue.`
+          );
           return;
+        }
+      }
+
+      // Validate required fields in the current section (ungrouped fields)
+      for (const config of visibleFields) {
+        // Skip fields that are in mutual exclusion groups (already validated above)
+        if (config.mutually_exclusive_group) continue;
+
+        if (config.required) {
+          const value = fieldValues[config.id];
+          if (!hasValue(value, config.field_type, config)) {
+            // Mark field as touched to show error
+            markFieldAsTouched(config.id);
+            showAlert(
+              "Required Field",
+              `Please fill in ${config.label} to continue.`
+            );
+            return;
+          }
         }
       }
     }
@@ -367,21 +409,16 @@ export default function NewEntryScreen() {
 
       if (fetchError) {
         setIsSubmitting(false);
-        setAlertTitle("Error");
-        setAlertMessage(
+        showAlert(
+          "Error",
           "There was a problem on the server! Please try again later."
         );
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
         return;
       }
 
       if (data?.error) {
         setIsSubmitting(false);
-        setAlertTitle("Error");
-        setAlertMessage(data.error);
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
+        showAlert("Error", data.error);
         return;
       }
 
@@ -394,42 +431,32 @@ export default function NewEntryScreen() {
           }
         } catch (err) {}
 
-        // Show success alert first, then navigate on OK click
+        // Reset form state immediately (before showing dialog)
         setIsSubmitting(false);
-        setAlertTitle("Success");
-        setAlertMessage("Entry submitted successfully!");
-        setAlertOnConfirm(() => {
-          // Reset form state
-          resetForm();
-          if (currentUserColleagueId) {
-            setSelectedColleagues([currentUserColleagueId]);
-          } else {
-            setSelectedColleagues([]);
-          }
-          setSelectedLocation("");
-          setStartTime(undefined);
-          setFinishTime(new Date());
-          setCurrentStep(0);
-          setSelectedClusters({});
-          setTouchedFields(new Set()); // Reset touched fields
-          // Navigate back to home after alert is dismissed
-          // Use setTimeout to defer navigation to avoid React render warnings
-          setTimeout(() => {
-            router.replace("./");
-          }, 100);
-        });
-        setAlertOpen(true);
+        resetForm();
+        if (currentUserColleagueId) {
+          setSelectedColleagues([currentUserColleagueId]);
+        } else {
+          setSelectedColleagues([]);
+        }
+        setSelectedLocation("");
+        setStartTime(undefined);
+        setFinishTime(new Date());
+        setCurrentStep(0);
+        setSelectedClusters({});
+        setTouchedFields(new Set()); // Reset touched fields
+
+        // Show success alert and navigate after OK is clicked
+        showSuccessAndNavigate("Entry submitted successfully!");
       }
     } catch (err) {
       setIsSubmitting(false);
-      setAlertTitle("Error");
-      setAlertMessage(
+      showAlert(
+        "Error",
         err instanceof Error
           ? err.message
           : "An unexpected error occurred. Please try again."
       );
-      setAlertOnConfirm(null);
-      setAlertOpen(true);
     }
   };
 
@@ -1390,37 +1417,12 @@ export default function NewEntryScreen() {
       </SafeAreaView>
 
       {/* Alert Dialog */}
-      <AlertDialog
-        open={alertOpen}
-        onOpenChange={(open) => {
-          setAlertOpen(open);
-          // Reset flag when dialog opens
-          if (open) {
-            okButtonPressedRef.current = false;
-          }
-          // Only execute callback when dialog is closed AND OK button was pressed
-          if (!open && alertOnConfirm && okButtonPressedRef.current) {
-            // Wait for dialog animation to complete before executing callback
-            setTimeout(() => {
-              alertOnConfirm();
-              // Clear the callback and reset flag after execution
-              setAlertOnConfirm(null);
-              okButtonPressedRef.current = false;
-            }, 200);
-          } else if (!open) {
-            // Clear callback and reset flag if dialog is closed without OK press
-            setAlertOnConfirm(null);
-            okButtonPressedRef.current = false;
-          }
-        }}
-      >
+      <AlertDialog open={alertOpen} onOpenChange={handleDialogChange}>
         <AlertDialogContent
           className="bg-secondary border-border"
           onInteractOutside={() => {
             // Allow dismissing by clicking outside, but don't execute callback
-            okButtonPressedRef.current = false;
-            setAlertOpen(false);
-            setAlertOnConfirm(null);
+            handleDialogChange(false);
           }}
         >
           <AlertDialogHeader>
@@ -1436,10 +1438,7 @@ export default function NewEntryScreen() {
               <Pressable
                 onPress={(e) => {
                   e.stopPropagation();
-                  // Mark that OK button was pressed before closing
-                  okButtonPressedRef.current = true;
-                  // Close the dialog - the onOpenChange handler will execute the callback
-                  setAlertOpen(false);
+                  handleOkPress();
                 }}
                 className="bg-primary active:bg-primary-600 px-6 py-3 rounded-lg"
               >

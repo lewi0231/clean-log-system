@@ -7,7 +7,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   test: {
     globals: true,
-    environment: "node", // Use 'node' for utility functions, not 'jsdom'
+    environment: "jsdom", // Use 'jsdom' for React hooks testing
+    server: {
+      deps: {
+        inline: [
+          "react-native",
+          "@react-navigation/native",
+          "expo-router",
+          "@testing-library/react-native",
+        ],
+      },
+    },
   },
   resolve: {
     alias: {

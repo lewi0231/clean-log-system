@@ -644,16 +644,17 @@ export function FieldRendererNativeBase({
           const street = parts[0];
           const lastPart = parts[parts.length - 1];
           // Extract state and postcode from last part (e.g., "NSW 2000" or "NSW")
+          // Allow lowercase state codes (will be converted to uppercase)
           const statePostcodeMatch = lastPart.match(
-            /^([A-Z]{2,3})\s*(\d{4})?$/
+            /^([A-Za-z]{2,3})\s*(\d{4})?$/
           );
           if (statePostcodeMatch) {
-            const state = statePostcodeMatch[1] || "";
+            const state = (statePostcodeMatch[1] || "").toUpperCase();
             const postcode = statePostcodeMatch[2] || "";
             const city =
               parts.length > 2
                 ? parts.slice(1, -1).join(", ")
-                : parts[1].replace(/^[A-Z]{2,3}\s*\d{0,4}$/, "").trim();
+                : parts[1].replace(/^[A-Za-z]{2,3}\s*\d{0,4}$/i, "").trim();
             return { street, city, state, postcode };
           }
           // Fallback: treat last part as city, no state/postcode
@@ -668,8 +669,9 @@ export function FieldRendererNativeBase({
         return { street: addr, city: "", state: "", postcode: "" };
       };
 
+      const initialValue = String(value || "");
       const [addressParts, setAddressParts] = useState(() =>
-        parseAddress(String(value || ""))
+        parseAddress(initialValue)
       );
       // Track refs to each sub-field's TextInput for measuring
       const addressContainerRef = useRef<View>(null);
@@ -677,6 +679,8 @@ export function FieldRendererNativeBase({
       const cityInputRef = useRef<TextInput>(null);
       const stateInputRef = useRef<TextInput>(null);
       const postcodeInputRef = useRef<TextInput>(null);
+      // Track the last address we set ourselves to avoid re-parsing our own updates
+      const lastSetAddressRef = useRef<string>(initialValue);
 
       // Function to measure a sub-field's position relative to the address container
       const measureSubFieldOffset = (
@@ -694,9 +698,14 @@ export function FieldRendererNativeBase({
         }
       };
 
-      // Update local state when external value changes
+      // Update local state when external value changes (but not if it's our own update)
       useEffect(() => {
-        setAddressParts(parseAddress(String(value || "")));
+        const currentValue = String(value || "");
+        // Only parse if the value is different from what we just set
+        // This prevents circular updates when user is typing
+        if (currentValue !== lastSetAddressRef.current) {
+          setAddressParts(parseAddress(currentValue));
+        }
       }, [value]);
 
       const updateAddressPart = (
@@ -717,6 +726,8 @@ export function FieldRendererNativeBase({
           .filter(Boolean)
           .join(", ");
 
+        // Track that we set this value ourselves
+        lastSetAddressRef.current = fullAddress;
         handleFieldChange(fullAddress);
       };
 

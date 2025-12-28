@@ -74,8 +74,47 @@ export function hasValue(
       // Image values will be stored as URLs (strings) once fully implemented
       return typeof value === "string" && value.length > 0;
     case "address":
-      // Address values are stored as strings
-      return typeof value === "string" && value.trim().length > 0;
+      // Address values are stored as concatenated strings
+      // Format: "Street, City, State Postcode" (empty parts are filtered out)
+      // For validation, we need to check that all parts (street, city, state, postcode) are filled
+      if (typeof value !== "string" || value.trim().length === 0) {
+        return false;
+      }
+
+      // Parse the address - empty parts are filtered out during concatenation
+      // So a complete address should have: "Street, City, State Postcode" (3 comma-separated parts)
+      const addressParts = value.split(",").map((p) => p.trim()).filter((p) =>
+        p.length > 0
+      );
+
+      // A complete address needs at least 3 parts: street, city, and "State Postcode"
+      if (addressParts.length < 3) {
+        return false;
+      }
+
+      // Check street (first part) is not empty
+      if (!addressParts[0] || addressParts[0].length === 0) {
+        return false;
+      }
+
+      // Check city (middle parts) is not empty
+      const city = addressParts.slice(1, -1).join(", ").trim();
+      if (!city || city.length === 0) {
+        return false;
+      }
+
+      // Check last part for state and postcode (e.g., "NSW 2000")
+      const lastPart = addressParts[addressParts.length - 1];
+      const statePostcodeMatch = lastPart.match(/^([A-Za-z]{2,3})\s+(\d{4})$/);
+
+      // Must have both state and postcode
+      if (
+        !statePostcodeMatch || !statePostcodeMatch[1] || !statePostcodeMatch[2]
+      ) {
+        return false;
+      }
+
+      return true;
     default:
       return false;
   }
