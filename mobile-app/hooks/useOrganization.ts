@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./useAuth";
 
 export function useOrganization() {
@@ -7,19 +7,40 @@ export function useOrganization() {
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fetchedUserIdRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
     if (authLoading) {
       return;
     }
 
-    if (!user) {
+    if (!user?.id) {
       setLoading(false);
+      // Reset if user is no longer available
+      if (!user) {
+        setOrganizationId(null);
+        fetchedUserIdRef.current = null;
+      }
+      return;
+    }
+
+    // Skip if we've already fetched for this user
+    if (fetchedUserIdRef.current === user.id) {
+      setLoading(false);
+      return;
+    }
+
+    // Skip if we're already fetching
+    if (isFetchingRef.current) {
       return;
     }
 
     async function fetchOrganization() {
       if (!user) return;
+
+      // Mark as fetching to prevent concurrent calls
+      isFetchingRef.current = true;
 
       try {
         console.log("🏢 Organization: Fetching organization for user", {
@@ -30,14 +51,14 @@ export function useOrganization() {
         // Call Edge Function to get organization_id
         // For workers: auth token is automatically included in headers
         // For admin users: we can optionally pass email, but the function
-        // will also try to use the auth token first
+        // will also check auth token (for workers)
         const { data, error: fetchError } = await supabase.functions.invoke(
           "get-organization-id",
           {
             // Pass email if available (for admin users), but function will
             // also check auth token (for workers)
             body: user.email ? { email: user.email } : {},
-          }
+          },
         );
 
         if (fetchError) {
@@ -50,24 +71,31 @@ export function useOrganization() {
             organizationId: data.organization_id,
           });
           setOrganizationId(data.organization_id);
+          fetchedUserIdRef.current = user.id;
         } else {
           console.warn("🏢 Organization: No organization found for user");
           setError("No organization found");
+          fetchedUserIdRef.current = user.id; // Mark as fetched even if no org found
         }
       } catch (err) {
         console.error("🏢 Organization: Failed to fetch", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
         setError(
-          err instanceof Error ? err.message : "Failed to fetch organization"
+          err instanceof Error ? err.message : "Failed to fetch organization",
         );
+        fetchedUserIdRef.current = user.id; // Mark as fetched even on error
       } finally {
         setLoading(false);
+        isFetchingRef.current = false;
       }
     }
 
     fetchOrganization();
-  }, [user, authLoading]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // We intentionally use user?.id and user?.email instead of user to avoid
+    // re-fetching when the user object reference changes but the data hasn't
+  }, [user?.id, user?.email, authLoading]);
 
   return { organizationId, loading, error };
 }
