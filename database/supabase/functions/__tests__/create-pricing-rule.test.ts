@@ -13,7 +13,11 @@ import { isValidUuid } from "./test-utils.ts";
  * Test required field validation
  */
 Deno.test("create-pricing-rule: should require organization_id and scope", () => {
-  const body: { organization_id?: string; scope?: string; pricing_type?: string } = {
+  const body: {
+    organization_id?: string;
+    scope?: string;
+    pricing_type?: string;
+  } = {
     organization_id: "org-1",
     scope: "field",
     pricing_type: "unit",
@@ -28,11 +32,16 @@ Deno.test("create-pricing-rule: should require organization_id and scope", () =>
 });
 
 Deno.test("create-pricing-rule: should detect missing organization_id", () => {
-  const body: { organization_id?: string; scope?: string; pricing_type?: string } = {
+  const body: {
+    organization_id?: string;
+    scope?: string;
+    pricing_type?: string;
+  } = {
     scope: "field",
     pricing_type: "unit",
   };
-  const hasOrgId = body.organization_id !== undefined && body.organization_id !== null;
+  const hasOrgId = body.organization_id !== undefined &&
+    body.organization_id !== null;
   assertEquals(hasOrgId, false);
 });
 
@@ -50,7 +59,8 @@ Deno.test("create-pricing-rule: should validate scope values", () => {
 Deno.test("create-pricing-rule: should require field_config_id for field scope", () => {
   const scope = "field";
   const fieldConfigId = "field-config-1";
-  const isValid = scope !== "field" || fieldConfigId !== undefined && fieldConfigId !== null;
+  const isValid = scope !== "field" ||
+    fieldConfigId !== undefined && fieldConfigId !== null;
   assertEquals(isValid, true);
 });
 
@@ -115,15 +125,29 @@ Deno.test("create-pricing-rule: should default pricing_context to customer", () 
 Deno.test("create-pricing-rule: should reject worker pricing_context with worker_payment_type", () => {
   const pricingContext = "worker";
   const workerPaymentType = "same_structure";
-  const isValid = pricingContext !== "worker" || !workerPaymentType;
-  assertEquals(isValid, false);
+  // Worker pricing context cannot have worker_payment_type
+  // The validation should reject this combination
+  // Valid if: NOT (worker context AND has worker_payment_type)
+  const isValid = pricingContext !== "worker" ||
+    workerPaymentType === undefined;
+  assertEquals(
+    isValid,
+    false,
+    "Worker pricing context should not allow worker_payment_type",
+  );
 });
 
 Deno.test("create-pricing-rule: should allow customer pricing_context with worker_payment_type", () => {
   const pricingContext = "customer";
   const workerPaymentType = "same_structure";
-  const isValid = pricingContext !== "worker" || !workerPaymentType;
-  assertEquals(isValid, true);
+  // Customer pricing context can have worker_payment_type
+  // Worker pricing context cannot have worker_payment_type
+  const isValid = pricingContext === "customer" || !workerPaymentType;
+  assertEquals(
+    isValid,
+    true,
+    "Customer pricing context should allow worker_payment_type",
+  );
 });
 
 /**
@@ -183,7 +207,8 @@ Deno.test("create-pricing-rule: should set priority to 0 by default", () => {
 Deno.test("create-pricing-rule: should set effective_at to current time by default", () => {
   const effectiveAt: string | undefined = undefined;
   const defaultEffectiveAt = effectiveAt || new Date().toISOString();
-  const isValid = typeof defaultEffectiveAt === "string" && defaultEffectiveAt.length > 0;
+  const isValid = typeof defaultEffectiveAt === "string" &&
+    defaultEffectiveAt.length > 0;
   assertEquals(isValid, true);
 });
 
@@ -215,4 +240,3 @@ Deno.test("create-pricing-rule: should validate condition field_config_id", () =
   const isValid = isValidUuid(condition.condition_field_config_id);
   assertEquals(isValid, true);
 });
-

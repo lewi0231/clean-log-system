@@ -16,6 +16,7 @@
  */
 
 import { assertEquals, assertExists } from "@std/assert";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   cleanupTestDatabase,
   createTestJob,
@@ -34,9 +35,8 @@ async function getSupabaseClient() {
     );
   }
 
-  const { createClient } = await import(
-    "npm:@supabase/supabase-js@2.39.3"
-  );
+  // Use the import from deno.json
+  const { createClient } = await import("@supabase/supabase-js");
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: {
       autoRefreshToken: false,
@@ -45,9 +45,9 @@ async function getSupabaseClient() {
   });
 }
 
-async function invokeCreateJob(
-  token: string,
-  submissionData: Record<string, unknown>,
+async function _invokeCreateJob(
+  _token: string,
+  _submissionData: Record<string, unknown>,
 ): Promise<Response> {
   if (!SUPABASE_URL) {
     throw new Error("SUPABASE_URL environment variable is required");
@@ -59,18 +59,18 @@ async function invokeCreateJob(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
+      "Authorization": `Bearer ${_token}`,
     },
-    body: JSON.stringify({ submissionData }),
+    body: JSON.stringify({ submissionData: _submissionData }),
   });
 
   return response;
 }
 
-async function invokeUpdateJob(
-  token: string,
-  jobId: string,
-  updates: Record<string, unknown>,
+async function _invokeUpdateJob(
+  _token: string,
+  _jobId: string,
+  _updates: Record<string, unknown>,
 ): Promise<Response> {
   if (!SUPABASE_URL) {
     throw new Error("SUPABASE_URL environment variable is required");
@@ -81,43 +81,25 @@ async function invokeUpdateJob(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
+      "Authorization": `Bearer ${_token}`,
     },
     body: JSON.stringify({
-      id: jobId,
-      ...updates,
+      id: _jobId,
+      ..._updates,
     }),
   });
 
   return response;
 }
 
-async function getAuthToken(
-  supabase: ReturnType<typeof await getSupabaseClient>,
-  userEmail: string,
-): Promise<string> {
-  // Create a test user and get auth token
-  // Note: In a real test, you'd use Supabase Auth API
-  // For now, we'll use service role to create the user and get a token
-  // This is a simplified version - you may need to adjust based on your auth setup
-
-  const { data: { user } } = await supabase.auth.admin.createUser({
-    email: userEmail,
-    email_confirm: true,
-  });
-
-  if (!user) {
-    throw new Error("Failed to create test user");
-  }
-
-  const { data: { session } } = await supabase.auth.admin.generateLink({
-    type: "magiclink",
-    email: userEmail,
-  });
-
-  // Extract token from session or use service role for testing
-  // For integration tests with service role, we can use a mock token approach
-  // or use the service role key directly
+function _getAuthToken(
+  _supabase: SupabaseClient,
+  _userEmail: string,
+): string {
+  // Note: This function is not currently used in the tests
+  // For integration tests, we use the service role key directly
+  // In a real implementation, you would generate an auth token for the user
+  // For now, return the service role key for testing purposes
   return SUPABASE_SERVICE_ROLE_KEY || "";
 }
 
@@ -178,7 +160,8 @@ Deno.test("AI-IM-1: should auto-generate invoice when job is created with auto_g
     await wait(1000);
 
     // Verify invoice was created with pending_review status
-    const { data: invoices, error: invoiceError } = await supabase
+    // Note: We're just checking for errors, not using the invoice data in this test
+    const { error: invoiceError } = await supabase
       .from("invoice")
       .select("*")
       .eq("organization_id", testData.organizationId);
@@ -334,10 +317,12 @@ Deno.test("AI-IM-4: should skip org-level auto-generate when location hierarchy 
 
     assertExists(hierarchyNode, "Hierarchy node should exist");
     const metadata = hierarchyNode.metadata as Record<string, unknown>;
-    const autoGenerate = metadata.auto_generate_invoices as Record<
-      string,
-      unknown
-    > | null;
+    const autoGenerate = metadata.auto_generate_invoices as
+      | Record<
+        string,
+        unknown
+      >
+      | null;
     assertExists(autoGenerate, "Auto-generate config should exist");
     assertEquals(
       autoGenerate.enabled,
@@ -351,4 +336,3 @@ Deno.test("AI-IM-4: should skip org-level auto-generate when location hierarchy 
     if (testData) await cleanupTestDatabase(testData);
   }
 });
-

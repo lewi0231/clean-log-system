@@ -64,7 +64,7 @@ Created comprehensive unit tests for:
 Created comprehensive integration tests that directly test the `autoGenerateInvoiceForJob` utility function:
 
 - **AIG-1**: Should generate invoice when setting is enabled and no hierarchy
-- **AIG-2**: Should skip when setting is disabled  
+- **AIG-2**: Should skip when setting is disabled
 - **AIG-3**: Should skip when hierarchy auto-generate is enabled (precedence)
 
 These tests use the real database and test the actual utility function logic.
@@ -113,7 +113,7 @@ To verify the functionality works correctly:
    ```bash
    # Unit tests (logic only, no database needed)
    deno test --allow-all database/supabase/functions/__tests__/auto-invoice-immediate.test.ts
-   
+
    # Integration tests (requires local Supabase running)
    # First: cd database && supabase start
    # Then set env vars: export SUPABASE_URL="http://localhost:54321" && export SUPABASE_SERVICE_ROLE_KEY="<key>"

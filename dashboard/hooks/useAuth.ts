@@ -12,38 +12,63 @@ function useAuth() {
   useEffect(() => {
     log.debug("useAuth: Initializing auth state");
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        log.info("useAuth: Session found", {
-          userId: session.user.id,
-          email: session.user.email,
+    // Use getUser() instead of getSession() to verify with server
+    supabase.auth.getUser().then(({ data: { user: authUser }, error }) => {
+      if (error) {
+        log.debug("useAuth: Error getting user", {
+          error: error.message,
         });
-      } else {
-        log.debug("useAuth: No active session");
+        setUser(null);
+        setLoading(false);
+        return;
       }
-      setUser(session?.user ?? null);
+
+      if (authUser) {
+        log.info("useAuth: User found", {
+          userId: authUser.id,
+          email: authUser.email,
+        });
+        setUser(authUser);
+      } else {
+        log.debug("useAuth: No authenticated user");
+        setUser(null);
+      }
       setLoading(false);
     });
 
+    // Keep onAuthStateChange for reactive updates, but verify with getUser()
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       log.debug("useAuth: Auth state changed", {
         event,
         hasSession: !!session,
       });
 
-      if (session?.user) {
-        log.info("useAuth: User authenticated", {
-          userId: session.user.id,
-          email: session.user.email,
+      // Verify with getUser() to ensure authenticity
+      const { data: { user: authUser }, error } = await supabase.auth.getUser();
+
+      if (error) {
+        log.debug("useAuth: Error verifying user on state change", {
+          error: error.message,
           event,
         });
-      } else {
-        log.info("useAuth: User signed out", { event });
+        setUser(null);
+        setLoading(false);
+        return;
       }
 
-      setUser(session?.user ?? null);
+      if (authUser) {
+        log.info("useAuth: User authenticated", {
+          userId: authUser.id,
+          email: authUser.email,
+          event,
+        });
+        setUser(authUser);
+      } else {
+        log.info("useAuth: User signed out", { event });
+        setUser(null);
+      }
       setLoading(false);
     });
 

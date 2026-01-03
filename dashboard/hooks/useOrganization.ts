@@ -27,6 +27,7 @@ function useOrganization() {
       try {
         log.debug("useOrganization: Fetching organization for user", {
           email: user.email,
+          userId: user.id,
         });
 
         // Call Edge Function to get organization_id
@@ -35,10 +36,15 @@ function useOrganization() {
           "get-organization-id",
           {
             body: { email: user.email },
-          }
+          },
         );
 
         if (fetchError) {
+          log.error("useOrganization: Edge function error", {
+            error: fetchError,
+            message: fetchError.message || "Unknown edge function error",
+            context: fetchError.context || {},
+          });
           throw fetchError;
         }
 
@@ -47,17 +53,34 @@ function useOrganization() {
             organizationId: data.organization_id,
           });
           setOrganizationId(data.organization_id);
+          setError(null);
         } else {
-          log.warn("useOrganization: No organization found for user");
+          log.warn("useOrganization: No organization found for user", {
+            email: user.email,
+            userId: user.id,
+            responseData: data,
+          });
           setError("No organization found");
         }
       } catch (err) {
+        const errorMessage = err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : "Unknown error";
+
+        const errorDetails = err && typeof err === "object"
+          ? { ...err }
+          : { originalError: err };
+
         log.error("useOrganization: Failed to fetch organization", {
-          error: err instanceof Error ? err.message : "Unknown error",
+          error: errorMessage,
+          details: errorDetails,
+          userEmail: user?.email,
+          userId: user?.id,
         });
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch organization"
-        );
+
+        setError(errorMessage || "Failed to fetch organization");
       } finally {
         setLoading(false);
       }

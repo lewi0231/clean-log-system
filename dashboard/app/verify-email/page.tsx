@@ -198,87 +198,40 @@ function VerifyEmailContent() {
           }
         }
 
-        // Get the current session
+        // Use getUser() first to verify with server (more secure than getSession)
+        let user = null;
         const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+          data: { user: userData },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-        if (sessionError) {
+        if (userError) {
           // Only log if it's not the expected "no session" case
-          if (sessionError.message !== "Auth session missing!") {
-            log.error("VerifyEmail: Error getting session", {
-              error: sessionError.message,
+          if (userError.message !== "Auth session missing!") {
+            log.error("VerifyEmail: Error getting user", {
+              error: userError.message,
             });
           } else {
             log.debug(
-              "VerifyEmail: No session yet (expected for unverified users)"
+              "VerifyEmail: No user session (expected for unverified users)"
             );
           }
-        }
-
-        // Also check user directly (only if we have a session)
-        let user = null;
-        if (session) {
-          const {
-            data: { user: userData },
-            error: userError,
-          } = await supabase.auth.getUser();
-
-          if (userError) {
-            // Only log if it's not the expected "no session" case
-            if (userError.message !== "Auth session missing!") {
-              log.error("VerifyEmail: Error getting user", {
-                error: userError.message,
-              });
-            } else {
-              log.debug(
-                "VerifyEmail: No user session (expected for unverified users)"
-              );
-            }
-          } else {
-            user = userData;
-          }
-        } else {
-          // Try getUser anyway in case session exists but getSession didn't find it
-          // This can happen during the transition period
-          try {
-            const {
-              data: { user: userData },
-              error: userError,
-            } = await supabase.auth.getUser();
-
-            if (!userError && userData) {
-              user = userData;
-              log.debug(
-                "VerifyEmail: Found user via getUser even though getSession returned no session"
-              );
-            } else if (
-              userError &&
-              userError.message !== "Auth session missing!"
-            ) {
-              log.debug(
-                "VerifyEmail: No user found (expected for unverified users)",
-                {
-                  error: userError.message,
-                }
-              );
-            }
-          } catch {
-            // Silently ignore - expected when no session exists
-            log.debug("VerifyEmail: No user session available (expected)");
-          }
+        } else if (userData) {
+          user = userData;
+          log.debug("VerifyEmail: User found", {
+            userId: userData.id,
+            email: userData.email,
+            emailConfirmed: !!userData.email_confirmed_at,
+          });
         }
 
         log.debug("VerifyEmail: Verification status check", {
-          hasSession: !!session,
           hasUser: !!user,
-          emailConfirmed:
-            user?.email_confirmed_at || session?.user?.email_confirmed_at,
-          userId: user?.id || session?.user?.id,
+          emailConfirmed: !!user?.email_confirmed_at,
+          userId: user?.id,
         });
 
-        if (user?.email_confirmed_at || session?.user?.email_confirmed_at) {
+        if (user?.email_confirmed_at) {
           setIsVerified(true);
           setIsChecking(false);
 

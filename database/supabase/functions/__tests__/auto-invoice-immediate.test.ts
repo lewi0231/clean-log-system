@@ -103,7 +103,9 @@ Deno.test("Skip condition: should skip if invoice already exists", () => {
 });
 
 Deno.test("Skip condition: should proceed if invoice doesn't exist", () => {
+  // When invoice doesn't exist, we should not skip auto-generation
   const invoiceExists = false;
-  const shouldSkip = invoiceExists === true;
-  assertEquals(shouldSkip, false);
+  // In the actual code: if (invoiceExists) return { skipped: true, ... }
+  // So when invoiceExists is false, we proceed with auto-generation
+  assertEquals(invoiceExists, false, "Invoice should not exist");
 });
