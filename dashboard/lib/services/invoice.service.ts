@@ -130,11 +130,20 @@ export class InvoiceService {
       );
 
       if (error) {
-        throw error;
+        // Extract error message from Supabase Functions error
+        const errorMessage =
+          error.message ||
+          (typeof error === "object" && "message" in error
+            ? String(error.message)
+            : "Unknown error");
+        throw new Error(errorMessage);
       }
 
       if (!data || !data.success || !data.invoice) {
-        throw new Error("Failed to create invoice");
+        // Check if there's a more specific error message in the response
+        const errorMessage =
+          (data as { error?: string })?.error || "Failed to create invoice";
+        throw new Error(errorMessage);
       }
 
       log.info("InvoiceService: Invoice created successfully");
