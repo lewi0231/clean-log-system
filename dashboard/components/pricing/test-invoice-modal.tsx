@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -67,6 +68,10 @@ export default function TestInvoiceModal({
   const isLocationRequired = settings?.use_predefined_locations ?? true;
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [startDateTime, setStartDateTime] = useState<string>("");
+  const [finishDateTime, setFinishDateTime] = useState<string>(
+    new Date().toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm format
+  );
   const [fieldValues, setFieldValues] = useState<
     Record<string, string | number | boolean | string[]>
   >({});
@@ -144,6 +149,8 @@ export default function TestInvoiceModal({
   useEffect(() => {
     if (!open) {
       setSelectedLocationId("");
+      setStartDateTime("");
+      setFinishDateTime(new Date().toISOString().slice(0, 16));
       setFieldValues({});
       setCalculation(null);
       setCreatedJobId(null);
@@ -232,16 +239,41 @@ export default function TestInvoiceModal({
       const builtSubmissionData = buildSubmissionData(formFields, fieldValues);
       Object.assign(submissionData, builtSubmissionData);
 
+      // Add start_time if provided (store as ISO datetime string)
+      if (startDateTime && startDateTime.trim() !== "") {
+        const startDate = new Date(startDateTime);
+        if (!isNaN(startDate.getTime())) {
+          submissionData.start_time = startDate.toISOString();
+        }
+      }
+
+      // Add finish_time if provided (store as ISO datetime string)
+      if (finishDateTime && finishDateTime.trim() !== "") {
+        const finishDate = new Date(finishDateTime);
+        if (!isNaN(finishDate.getTime())) {
+          submissionData.finish_time = finishDate.toISOString();
+        }
+      }
+
       // Create test job
       // Use first available worker if any exist, otherwise pass empty array (workers are optional)
       const workerIds = workers.length > 0 ? [workers[0].id] : [];
+
+      // Use finishDateTime for completed_at, or current time if not provided
+      const completedAtDate = finishDateTime
+        ? new Date(finishDateTime)
+        : new Date();
+      if (isNaN(completedAtDate.getTime())) {
+        // Fallback to current time if finishDateTime is invalid
+        completedAtDate.setTime(Date.now());
+      }
 
       const jobResponse = await JobsService.create({
         organization_id: organizationId,
         location_id: isLocationRequired ? selectedLocationId : null,
         worker_ids: workerIds.length > 0 ? workerIds : undefined,
         submission_data: submissionData,
-        completed_at: new Date().toISOString(),
+        completed_at: completedAtDate.toISOString(),
       });
 
       if (!jobResponse.job) {
@@ -274,6 +306,8 @@ export default function TestInvoiceModal({
     calculateInvoice,
     formFields,
     isLocationRequired,
+    startDateTime,
+    finishDateTime,
   ]);
 
   // Create invoice from test job
@@ -402,6 +436,50 @@ export default function TestInvoiceModal({
                     )}
                   </div>
                 )}
+
+                {/* Start and Finish Time */}
+                <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                  <div className="space-y-1">
+                    <Label className="text-base font-semibold">
+                      Job Timing
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Optional: Set when the job started and finished
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="start-time"
+                        className="text-sm font-medium"
+                      >
+                        Start Time
+                      </Label>
+                      <Input
+                        id="start-time"
+                        type="datetime-local"
+                        value={startDateTime}
+                        onChange={(e) => setStartDateTime(e.target.value)}
+                        placeholder="Start time (optional)"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="finish-time"
+                        className="text-sm font-medium"
+                      >
+                        Finish Time
+                      </Label>
+                      <Input
+                        id="finish-time"
+                        type="datetime-local"
+                        value={finishDateTime}
+                        onChange={(e) => setFinishDateTime(e.target.value)}
+                        placeholder="Finish time (optional)"
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {formFields.length > 0 ? (
                   <div className="space-y-6">

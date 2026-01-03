@@ -125,7 +125,7 @@ export default function CompletedJobsPage() {
   }
 
   return (
-    <div className=" w-full max-w-5xl mx-auto">
+    <div className=" w-screen pr-6 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Completed Jobs</h1>
@@ -139,11 +139,11 @@ export default function CompletedJobsPage() {
               variant="outline"
               onClick={() => setIsCalculatePaymentDialogOpen(true)}
             >
-              <Calculator className="mr-2 h-4 w-4" />
+              <Calculator className="mr-2 h-4 w-4 cursor-pointer" />
               Calculate Payments
             </Button>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4 cursor-pointer" />
               Create Job
             </Button>
           </div>

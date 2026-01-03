@@ -338,7 +338,7 @@ export default function CompletedJobsList({
   return (
     <div className="w-full overflow-x-auto">
       <div className="rounded-md border w-full">
-        <Table className="w-full min-w-[960px]">
+        <Table className="w-full">
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[120px]">Status</TableHead>
