@@ -115,6 +115,7 @@ function useOrganization() {
 
     // We intentionally use user?.id and user?.email instead of user to avoid
     // re-fetching when the user object reference changes but the data hasn't
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email, authLoading]);
 
   return { organizationId, loading, error };
