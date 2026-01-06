@@ -1,4 +1,5 @@
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -53,6 +54,20 @@ serve(async (req) => {
       return errorResponse("Invoice not found", 404);
     }
 
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      invoice.organization_id,
+      supabase,
+      body as Record<string, unknown>,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this invoice",
+        403,
+      );
+    }
+
     // Extract job IDs from invoice_job relationships
     const jobIds: string[] = [];
     if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
@@ -68,11 +83,13 @@ serve(async (req) => {
     }
 
     // Call calculate-invoice function to get line items and calculations
+    // Pass email for nested function auth (service role key doesn't carry user context)
     const { data: calculationData, error: calcError } = await supabase.functions
       .invoke("calculate-invoice", {
         body: {
           organization_id: invoice.organization_id,
           job_ids: jobIds,
+          email: membershipCheck.userEmail || body.email, // Use JWT email first, fallback to body.email
         },
       });
 

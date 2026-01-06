@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   PricingCondition,
   PricingRule,
@@ -73,20 +73,17 @@ export class PricingService {
         scopes: request.scopes,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "list-pricing-rules",
-        {
-          body: request,
-        },
-      );
-
-      if (error) throw error;
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        pricing_rules?: PricingRule[];
+        error?: string;
+      }>("list-pricing-rules", request as unknown as Record<string, unknown>);
 
       if (!data || !data.success) {
         throw new Error("Failed to list pricing rules");
       }
 
-      return data.pricing_rules as PricingRule[];
+      return (data.pricing_rules || []) as PricingRule[];
     } catch (err) {
       log.error("PricingService: Failed to list pricing rules", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -110,88 +107,11 @@ export class PricingService {
         hasId: Boolean(request.id),
       });
 
-      const { data, error } = await supabase.functions.invoke(functionName, {
-        body: request,
-      });
-
-      // Handle Supabase FunctionsHttpError - when edge function returns non-2xx
-      if (error) {
-        // Try to extract error message from multiple sources
-        let errorMessage = "Failed to upsert pricing rule";
-
-        // First, check if data contains error information (sometimes Supabase puts error response in data)
-        if (data && typeof data === "object" && "error" in data) {
-          if (typeof data.error === "string") {
-            errorMessage = data.error;
-          }
-        }
-
-        // Check if error has a context with response data
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "context" in error &&
-          typeof error.context === "object" &&
-          error.context !== null
-        ) {
-          const context = error.context as Record<string, unknown>;
-          // Check for response body
-          if ("body" in context) {
-            try {
-              const body = typeof context.body === "string"
-                ? JSON.parse(context.body)
-                : context.body;
-              if (
-                typeof body === "object" &&
-                body !== null &&
-                "error" in body &&
-                typeof body.error === "string"
-              ) {
-                errorMessage = body.error;
-              }
-            } catch {
-              // Ignore JSON parse errors
-            }
-          }
-          // Check for response data directly
-          if ("data" in context && typeof context.data === "object") {
-            const responseData = context.data as Record<string, unknown>;
-            if (
-              "error" in responseData &&
-              typeof responseData.error === "string"
-            ) {
-              errorMessage = responseData.error;
-            }
-          }
-        }
-
-        // Check if error has message property
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "message" in error &&
-          typeof error.message === "string" &&
-          errorMessage === "Failed to upsert pricing rule"
-        ) {
-          errorMessage = error.message;
-        } else if (
-          error instanceof Error &&
-          errorMessage === "Failed to upsert pricing rule"
-        ) {
-          errorMessage = error.message;
-        } else if (typeof error === "string") {
-          errorMessage = error;
-        }
-
-        log.error("PricingService: Supabase function invoke error", {
-          error: errorMessage,
-          errorObject: error,
-          errorType: error?.constructor?.name,
-          hasContext: error && typeof error === "object" && "context" in error,
-          data,
-        });
-        throw new Error(errorMessage);
-      }
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        pricing_rule?: PricingRule;
+        error?: string;
+      }>(functionName, request as unknown as Record<string, unknown>);
 
       // Check for error in response data (edge functions return errors in data.error)
       if (data && typeof data === "object" && "error" in data) {
@@ -240,14 +160,12 @@ export class PricingService {
     try {
       log.debug("PricingService: deleting pricing rule", { id });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<
+        { success: boolean; error?: string }
+      >(
         "delete-pricing-rule",
-        {
-          body: { id },
-        },
+        { id },
       );
-
-      if (error) throw error;
       if (!data || !data.success) {
         throw new Error("Failed to delete pricing rule");
       }
@@ -275,28 +193,16 @@ export class PricingService {
         pricingContext: options?.pricingContext,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "list-pricing-history",
-        {
-          body: {
-            organization_id: organizationId,
-            date_from: options?.dateFrom,
-            date_to: options?.dateTo,
-            pricing_context: options?.pricingContext,
-          },
-        },
-      );
-
-      if (error) {
-        const errorMessage = error instanceof Error
-          ? error.message
-          : typeof error === "object" && error !== null && "message" in error
-          ? String(error.message)
-          : typeof error === "string"
-          ? error
-          : JSON.stringify(error);
-        throw new Error(`Edge function error: ${errorMessage}`);
-      }
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        pricing_history?: PricingHistoryEntry[];
+        error?: string;
+      }>("list-pricing-history", {
+        organization_id: organizationId,
+        date_from: options?.dateFrom,
+        date_to: options?.dateTo,
+        pricing_context: options?.pricingContext,
+      });
 
       if (!data) {
         throw new Error("No data returned from edge function");
@@ -326,7 +232,7 @@ export class PricingService {
         error: errorMessage,
         errorObject: err,
       });
-      throw new Error(errorMessage);
+      throw err instanceof Error ? err : new Error(errorMessage);
     }
   }
 }

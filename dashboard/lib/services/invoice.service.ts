@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   CreateInvoiceRequest,
   InvoiceWithJobs,
@@ -87,16 +87,10 @@ export class InvoiceService {
         jobCount: request.job_ids.length,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<CalculateInvoiceResponse>(
         "calculate-invoice",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success || !data.calculation) {
         throw new Error("Failed to calculate invoice");
@@ -122,27 +116,15 @@ export class InvoiceService {
         jobCount: request.job_ids.length,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<CreateInvoiceResponse>(
         "create-invoice",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        // Extract error message from Supabase Functions error
-        const errorMessage =
-          error.message ||
-          (typeof error === "object" && "message" in error
-            ? String(error.message)
-            : "Unknown error");
-        throw new Error(errorMessage);
-      }
 
       if (!data || !data.success || !data.invoice) {
         // Check if there's a more specific error message in the response
-        const errorMessage =
-          (data as { error?: string })?.error || "Failed to create invoice";
+        const errorMessage = (data as { error?: string })?.error ||
+          "Failed to create invoice";
         throw new Error(errorMessage);
       }
 
@@ -167,13 +149,10 @@ export class InvoiceService {
         endDate: request.end_date,
       });
 
-      const { data, error } = await supabase.functions.invoke("list-invoices", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<ListInvoicesResponse>(
+        "list-invoices",
+        request as unknown as Record<string, unknown>,
+      );
 
       if (!data || !data.success || !data.invoices) {
         throw new Error("Failed to list invoices");
@@ -204,18 +183,10 @@ export class InvoiceService {
         invoiceId,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<GetInvoiceDetailsResponse>(
         "get-invoice-details",
-        {
-          body: {
-            invoice_id: invoiceId,
-          },
-        },
+        { invoice_id: invoiceId },
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success || !data.invoice || !data.calculation) {
         throw new Error("Failed to get invoice details");
@@ -257,19 +228,12 @@ export class InvoiceService {
         status,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<
+        { success: boolean; invoice?: InvoiceWithJobs }
+      >(
         "update-invoice-status",
-        {
-          body: {
-            invoice_id: invoiceId,
-            status: status,
-          },
-        },
+        { invoice_id: invoiceId, status },
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success || !data.invoice) {
         throw new Error("Failed to update invoice status");
@@ -294,20 +258,16 @@ export class InvoiceService {
         invoiceId,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<
+        { success: boolean; invoice?: InvoiceWithJobs }
+      >(
         "update-invoice-status",
         {
-          body: {
-            invoice_id: invoiceId,
-            status: "sent",
-            resend: true, // Flag to force resend with new payment link
-          },
+          invoice_id: invoiceId,
+          status: "sent",
+          resend: true, // Flag to force resend with new payment link
         },
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success || !data.invoice) {
         throw new Error("Failed to resend invoice");

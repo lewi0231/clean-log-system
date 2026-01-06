@@ -1,5 +1,6 @@
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { supabase } from "@/lib/supabase";
+import { EdgeFunctionError } from "@/lib/supabase/invoke-edge-function";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/supabase", () => ({
@@ -83,7 +84,13 @@ describe("InvoiceService", () => {
           organization_id: "org-1",
           job_ids: ["job-1"],
         }),
-      ).rejects.toEqual(mockError);
+      ).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(
+        InvoiceService.calculate({
+          organization_id: "org-1",
+          job_ids: ["job-1"],
+        }),
+      ).rejects.toThrow("Network error");
     });
 
     it("should throw error when calculation is missing", async () => {
@@ -164,7 +171,13 @@ describe("InvoiceService", () => {
           organization_id: "org-1",
           job_ids: ["job-1"],
         }),
-      ).rejects.toEqual(mockError);
+      ).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(
+        InvoiceService.create({
+          organization_id: "org-1",
+          job_ids: ["job-1"],
+        }),
+      ).rejects.toThrow("Network error");
     });
 
     it("should throw error when invoice is missing", async () => {
@@ -263,7 +276,12 @@ describe("InvoiceService", () => {
         InvoiceService.list({
           organization_id: "org-1",
         }),
-      ).rejects.toEqual(mockError);
+      ).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(
+        InvoiceService.list({
+          organization_id: "org-1",
+        }),
+      ).rejects.toThrow("Network error");
     });
 
     it("should throw error when invoices are missing", async () => {
@@ -336,7 +354,10 @@ describe("InvoiceService", () => {
 
       await expect(
         InvoiceService.getInvoiceDetails("inv-1"),
-      ).rejects.toEqual(mockError);
+      ).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(InvoiceService.getInvoiceDetails("inv-1")).rejects.toThrow(
+        "Network error",
+      );
     });
 
     it("should throw error when invoice or calculation is missing", async () => {
@@ -394,7 +415,10 @@ describe("InvoiceService", () => {
 
       await expect(
         InvoiceService.updateStatus("inv-1", "paid"),
-      ).rejects.toEqual(mockError);
+      ).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(
+        InvoiceService.updateStatus("inv-1", "paid"),
+      ).rejects.toThrow("Network error");
     });
 
     it("should throw error when invoice is missing", async () => {
@@ -451,8 +475,11 @@ describe("InvoiceService", () => {
         error: mockError,
       });
 
-      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toEqual(
-        mockError,
+      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toBeInstanceOf(
+        EdgeFunctionError,
+      );
+      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toThrow(
+        "Network error",
       );
     });
 

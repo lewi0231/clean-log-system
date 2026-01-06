@@ -71,7 +71,9 @@ interface OrganizationInfo {
   name: string;
   abn: string | null;
   logo_url: string | null;
+  business_address: string | null;
   primary_contact_email: string | null;
+  primary_contact_phone: string | null;
   bank_transfer_bsb: string | null;
   bank_transfer_account_number: string | null;
   bank_transfer_account_name: string | null;
@@ -136,7 +138,9 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
             name: data.settings.name ?? "",
             abn: data.settings.abn ?? null,
             logo_url: data.settings.logo_url ?? null,
+            business_address: data.settings.business_address ?? null,
             primary_contact_email: data.settings.primary_contact_email ?? null,
+            primary_contact_phone: data.settings.primary_contact_phone ?? null,
             bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
             bank_transfer_account_number:
               data.settings.bank_transfer_account_number ?? null,
@@ -361,12 +365,22 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
           <h1 className="text-2xl font-bold">
             {orgInfo?.name || "Company Name"}
           </h1>
+          {orgInfo?.business_address && (
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {orgInfo.business_address}
+            </p>
+          )}
           {invoice.template_config?.show_abn !== false && orgInfo?.abn && (
             <p className="text-sm text-muted-foreground">ABN: {orgInfo.abn}</p>
           )}
           {orgInfo?.primary_contact_email && (
             <p className="text-sm text-muted-foreground">
               {orgInfo.primary_contact_email}
+            </p>
+          )}
+          {orgInfo?.primary_contact_phone && (
+            <p className="text-sm text-muted-foreground">
+              {orgInfo.primary_contact_phone}
             </p>
           )}
         </div>
@@ -531,14 +545,14 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                     );
                   })}
 
-                  {/* Pricing Rules Applied (only adjustments, not line items) */}
+                  {/* Pricing Rules Applied (only adjustments, not line items or base price) */}
                   {calculation.applied_rules
                     .filter(
                       (rule) =>
-                        // Only show adjustments: base, global, or conditional rules
+                        // Only show global or conditional adjustments
+                        // Exclude base scope (already shown as "Base Price" line item above)
                         // Exclude field and option scope rules as they're already shown as line items
-                        (rule.scope === "base" ||
-                          rule.scope === "global" ||
+                        (rule.scope === "global" ||
                           rule.pricing_type === "conditional") &&
                         rule.amount !== 0
                     )
@@ -548,9 +562,7 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                           colSpan={3}
                           className="text-sm text-muted-foreground"
                         >
-                          {rule.scope === "base"
-                            ? "Base Price"
-                            : rule.scope === "global"
+                          {rule.scope === "global"
                             ? "Adjustment"
                             : "Conditional Adjustment"}
                         </TableCell>

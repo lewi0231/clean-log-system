@@ -1,4 +1,3 @@
-import { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
@@ -52,56 +51,6 @@ interface JobWithLocation {
 interface HierarchyNode {
   id: string;
   metadata: Record<string, unknown> | null;
-}
-
-async function generateInvoiceNumber(
-  supabase: SupabaseClient,
-  organizationId: string,
-): Promise<string> {
-  // Get organization to get org_code
-  const { data: org, error: orgError } = await supabase
-    .from("organization")
-    .select("org_code")
-    .eq("id", organizationId)
-    .single();
-
-  if (orgError || !org) {
-    throw new Error("Failed to fetch organization");
-  }
-
-  const orgCode = org.org_code;
-  const year = new Date().getFullYear();
-
-  // Find the highest invoice number for this org and year
-  const { data: existingInvoices, error: invoiceError } = await supabase
-    .from("invoice")
-    .select("invoice_number")
-    .eq("organization_id", organizationId)
-    .like("invoice_number", `${orgCode}-${year}-%`)
-    .order("invoice_number", { ascending: false })
-    .limit(1);
-
-  if (invoiceError) {
-    throw invoiceError;
-  }
-
-  let nextNumber = 1;
-  if (existingInvoices && existingInvoices.length > 0) {
-    const lastInvoice = existingInvoices[0].invoice_number;
-    const match = lastInvoice.match(/-(\d+)$/);
-    if (match) {
-      nextNumber = parseInt(match[1], 10) + 1;
-    }
-  }
-
-  // Format: ORG-YYYY-#### (e.g., ACME-2024-0001)
-  const invoiceNumber = `${orgCode}-${year}-${
-    nextNumber
-      .toString()
-      .padStart(4, "0")
-  }`;
-
-  return invoiceNumber;
 }
 
 serve(async (req) => {
@@ -214,12 +163,13 @@ serve(async (req) => {
 
     // Calculate invoice totals by calling calculate-invoice function
     // IMPORTANT: Pass email for nested function auth (service role key doesn't carry user context)
+    // Use membershipCheck.userEmail which is extracted from JWT token, not body.email
     const { data: calculationData, error: calcError } = await supabase.functions
       .invoke("calculate-invoice", {
         body: {
           organization_id,
           job_ids,
-          email: body.email, // Pass email for membership verification in nested call
+          email: membershipCheck.userEmail || body.email, // Use JWT email first, fallback to body.email
         },
       });
 
@@ -320,48 +270,11 @@ serve(async (req) => {
     }
 
     // Generate invoice number
-    const invoiceNumber = await generateInvoiceNumber(
-      supabase,
-      organization_id,
-    );
-
-    // Create invoice with appropriate status
     const initialStatus = shouldSendImmediately ? "sent" : "draft";
-
-    const { data: invoice, error: invoiceError } = await supabase
-      .from("invoice")
-      .insert({
-        organization_id,
-        invoice_number: invoiceNumber,
-        status: initialStatus,
-        subtotal: calculation.total_subtotal,
-        total: calculation.total,
-        currency: currency,
-        due_date: due_date,
-        notes: notes || null,
-      })
-      .select()
-      .single();
-
-    if (invoiceError) throw invoiceError;
-
-    // Create invoice_job records
-    const invoiceJobRecords = job_ids.map((jobId: string) => ({
-      invoice_id: invoice.id,
-      job_id: jobId,
-    }));
-
-    const { error: invoiceJobError } = await supabase
-      .from("invoice_job")
-      .insert(invoiceJobRecords);
-
-    if (invoiceJobError) throw invoiceJobError;
 
     const snapshotRecords =
       calculation.job_calculations?.flatMap((jobCalc: InvoiceCalculation) =>
         (jobCalc.applied_rules || []).map((rule: AppliedRule) => ({
-          organization_id,
-          invoice_id: invoice.id,
           job_id: jobCalc.job_id,
           pricing_rule_id: rule.pricing_rule_id,
           field_config_id: rule.field_config_id,
@@ -370,12 +283,38 @@ serve(async (req) => {
         }))
       ) || [];
 
-    if (snapshotRecords.length > 0) {
-      const { error: snapshotError } = await supabase
-        .from("pricing_snapshot")
-        .insert(snapshotRecords);
+    // Create invoice + invoice_job + pricing_snapshot atomically (RPC)
+    const { data: invoiceId, error: atomicError } = await supabase.rpc(
+      "create_invoice_atomic",
+      {
+        p_organization_id: organization_id,
+        p_job_ids: job_ids,
+        p_due_date: due_date,
+        p_notes: notes || null,
+        p_subtotal: calculation.total_subtotal,
+        p_total: calculation.total,
+        p_currency: currency,
+        p_status: initialStatus,
+        p_snapshot_records: snapshotRecords,
+      },
+    );
 
-      if (snapshotError) throw snapshotError;
+    if (atomicError) {
+      // Friendly message for the most common atomic failure (job already invoiced)
+      const msg = typeof atomicError.message === "string"
+        ? atomicError.message
+        : "Failed to create invoice";
+      if (msg.toLowerCase().includes("idx_invoice_job_job_id_unique")) {
+        return errorResponse(
+          "Cannot create invoice: one or more jobs are already included in another invoice. Each job can only be invoiced once.",
+          400,
+        );
+      }
+      throw atomicError;
+    }
+
+    if (!invoiceId) {
+      return errorResponse("Failed to create invoice", 500);
     }
 
     // Fetch invoice with related jobs and location info
@@ -400,7 +339,7 @@ serve(async (req) => {
         )
         `,
       )
-      .eq("id", invoice.id)
+      .eq("id", invoiceId)
       .single();
 
     if (fetchError) throw fetchError;

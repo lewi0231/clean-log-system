@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   CreateJobRequest,
   CreateJobResponse,
@@ -21,13 +21,10 @@ export class JobsService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke("list-jobs", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<ListJobsResponse>(
+        "list-jobs",
+        request as unknown as Record<string, unknown>,
+      );
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch jobs");
@@ -56,16 +53,10 @@ export class JobsService {
         workerIdsCount: request.worker_ids?.length || 0,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<CreateJobResponse>(
         "admin-create-job",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success) {
         throw new Error("Failed to create job");
@@ -96,13 +87,10 @@ export class JobsService {
         hasCompletedAt: !!request.completed_at,
       });
 
-      const { data, error } = await supabase.functions.invoke("update-job", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<UpdateJobResponse>(
+        "update-job",
+        request as unknown as Record<string, unknown>,
+      );
 
       if (!data || !data.success) {
         throw new Error("Failed to update job");

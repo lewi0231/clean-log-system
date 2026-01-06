@@ -32,6 +32,7 @@ import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { JobsService } from "@/lib/services/jobs.service";
+import { supabase } from "@/lib/supabase";
 import { validateFields } from "@/lib/utils/field-validation";
 import { buildSubmissionData } from "@/lib/utils/submission-data-builder";
 import type { FieldConfig } from "@clean-log/shared/types";
@@ -69,8 +70,18 @@ export default function TestInvoiceModal({
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [startDateTime, setStartDateTime] = useState<string>("");
+  // Use local timezone for datetime-local input (not UTC)
+  const getLocalDateTimeString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
   const [finishDateTime, setFinishDateTime] = useState<string>(
-    new Date().toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm format
+    getLocalDateTimeString()
   );
   const [fieldValues, setFieldValues] = useState<
     Record<string, string | number | boolean | string[]>
@@ -84,6 +95,7 @@ export default function TestInvoiceModal({
     line_items: Array<{
       field_name: string;
       field_label: string;
+      option_value?: string;
       quantity: number;
       unit_price: number;
       total: number;
@@ -145,18 +157,51 @@ export default function TestInvoiceModal({
     return [...sectionedFields, ...unsectionedFields];
   }, [fieldConfigs, sections]);
 
-  // Reset when modal opens/closes
+  // Reset when modal opens/closes, and cleanup test data
   useEffect(() => {
     if (!open) {
+      // Capture current IDs before they're reset to avoid race condition
+      const jobIdToDelete = createdJobId;
+      const invoiceIdToDelete = createdInvoiceId;
+
+      // Cleanup test data asynchronously
+      if (organizationId && (jobIdToDelete || invoiceIdToDelete)) {
+        (async () => {
+          try {
+            log.debug("Cleaning up test data", {
+              jobId: jobIdToDelete,
+              invoiceId: invoiceIdToDelete,
+            });
+
+            await supabase.functions.invoke("delete-test-data", {
+              body: {
+                organization_id: organizationId,
+                job_id: jobIdToDelete,
+                invoice_id: invoiceIdToDelete,
+              },
+            });
+
+            log.info("Test data cleaned up successfully");
+          } catch (err) {
+            // Don't show error to user, just log it
+            log.warn("Failed to cleanup test data", {
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          }
+        })();
+      }
+
+      // Reset state immediately
       setSelectedLocationId("");
       setStartDateTime("");
-      setFinishDateTime(new Date().toISOString().slice(0, 16));
+      setFinishDateTime(getLocalDateTimeString());
       setFieldValues({});
       setCalculation(null);
       setCreatedJobId(null);
       setCreatedInvoiceId(null);
       setActiveTab("input");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Calculate invoice for a job
@@ -593,7 +638,15 @@ export default function TestInvoiceModal({
                           className="flex items-center justify-between p-3"
                         >
                           <div>
-                            <p className="font-medium">{item.field_label}</p>
+                            <p className="font-medium">
+                              {item.field_label}
+                              {item.option_value && (
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}
+                                  — {item.option_value}
+                                </span>
+                              )}
+                            </p>
                             {item.quantity > 1 && (
                               <p className="text-sm text-muted-foreground">
                                 {item.quantity} ×{" "}
@@ -648,11 +701,27 @@ export default function TestInvoiceModal({
                     <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                     <div className="flex-1">
                       <p className="font-medium text-green-900 dark:text-green-100">
-                        Invoice Created Successfully!
+                        Test Invoice Preview Ready!
                       </p>
                       <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                        Your test invoice has been created. You can now view it
-                        in full detail.
+                        Your pricing configuration is working correctly. You can
+                        view the full invoice preview below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-amber-900 dark:text-amber-100">
+                        Test Data - Auto Cleanup
+                      </p>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                        This test job and invoice will be automatically deleted
+                        when you close this dialog. They are for preview
+                        purposes only and cannot be sent to customers.
                       </p>
                     </div>
                   </div>
@@ -661,10 +730,11 @@ export default function TestInvoiceModal({
                 <div className="flex gap-2">
                   <Button asChild className="flex-1">
                     <Link
-                      href={`/dashboard/invoicing?invoice=${createdInvoiceId}`}
+                      href={`/dashboard/invoicing/${createdInvoiceId}`}
+                      target="_blank"
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      View Full Invoice
+                      Preview Full Invoice
                     </Link>
                   </Button>
                   <Button
@@ -673,7 +743,7 @@ export default function TestInvoiceModal({
                       onOpenChange(false);
                     }}
                   >
-                    Close
+                    Close & Cleanup
                   </Button>
                 </div>
               </div>
