@@ -276,23 +276,35 @@ function VerifyEmailContent() {
 
       log.debug("VerifyEmail: Resending verification email", { email });
 
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: email,
-        options: {
-          emailRedirectTo: `${
-            window.location.origin
-          }/verify-email?email=${encodeURIComponent(email)}`,
-        },
-      });
+      // Use the custom edge function that sends the same email template as signup
+      const { data, error } = await supabase.functions.invoke(
+        "resend-activation-link",
+        {
+          body: { email },
+        }
+      );
 
       if (error) {
+        // Handle different error types from Supabase functions
+        const errorMessage =
+          error.message ||
+          (error as { context?: { message?: string } }).context?.message ||
+          "Failed to resend verification email. Please try again.";
         log.error("VerifyEmail: Failed to resend verification email", {
-          error: error.message,
+          error: errorMessage,
+          errorDetails: JSON.stringify(error),
         });
-        setResendError(error.message);
+        setResendError(errorMessage);
+      } else if (data?.error) {
+        // Check if the response contains an error from the edge function
+        log.error("VerifyEmail: Edge function returned error", {
+          error: data.error,
+        });
+        setResendError(data.error);
       } else {
-        log.info("VerifyEmail: Verification email resent successfully");
+        log.info("VerifyEmail: Verification email resent successfully", {
+          message: data?.message,
+        });
         setResendSuccess(true);
         // Clear success message after 5 seconds
         setTimeout(() => setResendSuccess(false), 5000);

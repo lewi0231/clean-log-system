@@ -121,8 +121,28 @@ export default function SignUp() {
     } catch (error) {
       // Errors are already set in validateInput via setErrors
       if (error instanceof Error && error.message !== "Validation failed") {
-        log.error("SignUp: Signup process failed", { error: error.message });
+        log.error("SignUp: Signup process failed", { 
+          error: error.message,
+          errorObject: error,
+          stack: error.stack 
+        });
         setGeneralError(error.message);
+      } else if (error && typeof error === "object" && "message" in error) {
+        // Handle error objects that aren't Error instances
+        const errorMessage = String(error.message);
+        log.error("SignUp: Signup process failed", { 
+          error: errorMessage,
+          errorObject: error 
+        });
+        setGeneralError(errorMessage);
+      } else {
+        // Handle unknown error types
+        const errorMessage = error ? String(error) : "An unknown error occurred";
+        log.error("SignUp: Signup process failed", { 
+          error: errorMessage,
+          errorObject: error 
+        });
+        setGeneralError(errorMessage);
       }
     } finally {
       setIsLoading(false);
