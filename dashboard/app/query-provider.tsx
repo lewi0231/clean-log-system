@@ -38,7 +38,10 @@ export const organizationUsersKey = (orgId: string | null): QueryKey => [
   orgId,
 ];
 
-export const jobsKey = (orgId: string | null): QueryKey => ["jobs", orgId];
+export const jobsKey = (
+  orgId: string | null,
+  includeTests?: boolean
+): QueryKey => ["jobs", orgId, includeTests ?? false];
 
 export const locationHierarchyKey = (orgId: string | null): QueryKey => [
   "location-hierarchy",
@@ -48,8 +51,9 @@ export const locationHierarchyKey = (orgId: string | null): QueryKey => [
 export const invoicesKey = (
   orgId: string | null,
   startDate?: string,
-  endDate?: string
-): QueryKey => ["invoices", orgId, startDate, endDate];
+  endDate?: string,
+  includeTests?: boolean
+): QueryKey => ["invoices", orgId, startDate, endDate, includeTests ?? false];
 
 export const invoiceDetailsKey = (invoiceId: string | null): QueryKey => [
   "invoice-details",

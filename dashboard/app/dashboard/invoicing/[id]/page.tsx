@@ -1,6 +1,7 @@
 "use client";
 
 import InvoicePreview from "@/components/invoicing/invoice-preview";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { Separator } from "@/components/ui/separator";
@@ -138,6 +139,18 @@ export default function InvoicePage({ params }: InvoicePageProps) {
           Print
         </Button>
       </div>
+
+      {invoice.is_test && (
+        <div className="mb-6">
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+            <AlertTitle>Test invoice</AlertTitle>
+            <AlertDescription>
+              This invoice was generated for testing and <b>cannot</b> be sent
+              to customers.
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       <Separator className="mb-6" />
 

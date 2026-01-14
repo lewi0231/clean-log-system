@@ -373,6 +373,14 @@ export default function CompletedJobsList({
                 >
                   <TableCell>
                     <div className="flex flex-col gap-1">
+                      {job.is_test && (
+                        <Badge
+                          variant="destructive"
+                          className="w-fit text-[10px] tracking-wide"
+                        >
+                          TEST
+                        </Badge>
+                      )}
                       <Badge variant={getJobStatus(job).variant}>
                         {getJobStatus(job).label}
                       </Badge>

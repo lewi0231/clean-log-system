@@ -43,7 +43,7 @@ async function toEdgeFunctionError(
                     : err.message) ||
                 `Edge Function '${functionName}' returned an error`;
             return new EdgeFunctionError(message, {
-                status: 500,
+                status: err.status,
                 details: body,
             });
         } catch {
@@ -81,16 +81,54 @@ async function toEdgeFunctionError(
     // Handle non-Error objects commonly returned by mocks or loosely typed callers
     if (typeof err === "object" && err !== null) {
         const maybe = err as Record<string, unknown>;
-        const message = typeof maybe.message === "string"
-            ? maybe.message
-            : `Unknown error calling '${functionName}'`;
+        // Best-effort extraction of message from common Supabase error-like shapes:
+        // { message, status, context: { json(), body, data } }
+        let extracted: unknown;
+        const ctx = maybe.context as Record<string, unknown> | undefined;
+        if (ctx && typeof ctx === "object") {
+            const jsonFn = (ctx as { json?: unknown }).json;
+            if (typeof jsonFn === "function") {
+                try {
+                    extracted = await (jsonFn as () => Promise<unknown>)();
+                } catch {
+                    // ignore
+                }
+            } else if (typeof (ctx as { body?: unknown }).body === "string") {
+                try {
+                    extracted = JSON.parse((ctx as { body: string }).body);
+                } catch {
+                    // ignore
+                }
+            } else if (typeof (ctx as { data?: unknown }).data === "object") {
+                extracted = (ctx as { data: unknown }).data;
+            }
+        }
+
+        const extractedMessage =
+            extracted && typeof extracted === "object" &&
+                ("error" in extracted || "message" in extracted)
+                ? (typeof (extracted as Record<string, unknown>).error === "string"
+                    ? (extracted as Record<string, unknown>).error
+                    : typeof (extracted as Record<string, unknown>).message === "string"
+                    ? (extracted as Record<string, unknown>).message
+                    : undefined)
+                : undefined;
+
+        const message = extractedMessage ||
+            (typeof maybe.message === "string"
+                ? maybe.message
+                : `Unknown error calling '${functionName}'`);
         const status = typeof maybe.status === "number"
             ? maybe.status
             : typeof maybe.statusCode === "number"
             ? maybe.statusCode
             : undefined;
         const code = typeof maybe.code === "string" ? maybe.code : undefined;
-        return new EdgeFunctionError(message, { status, code, details: err });
+        return new EdgeFunctionError(message, {
+            status,
+            code,
+            details: extracted ?? err,
+        });
     }
 
     return new EdgeFunctionError(`Unknown error calling '${functionName}'`, {

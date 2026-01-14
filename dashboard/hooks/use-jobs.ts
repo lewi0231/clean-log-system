@@ -24,21 +24,26 @@ interface UseJobsResult {
   sendFeedbackEmail: (jobId: string) => Promise<void>;
 }
 
-async function fetchJobs(organizationId: string): Promise<Job[]> {
+async function fetchJobs(
+  organizationId: string,
+  includeTests?: boolean,
+): Promise<Job[]> {
   const response = await JobsService.list({
     organization_id: organizationId,
+    include_tests: includeTests,
   });
   return response.jobs || [];
 }
 
-export function useJobs(): UseJobsResult {
+export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
   const { organizationId } = useOrganization();
   const queryClient = useQueryClient();
+  const includeTests = options?.includeTests ?? false;
 
   const query = useQuery({
-    queryKey: jobsKey(organizationId),
+    queryKey: jobsKey(organizationId, includeTests),
     enabled: !!organizationId,
-    queryFn: () => fetchJobs(organizationId as string),
+    queryFn: () => fetchJobs(organizationId as string, includeTests),
     select: (data) => data ?? [],
     placeholderData: (previous) => previous,
   });
@@ -49,7 +54,7 @@ export function useJobs(): UseJobsResult {
 
       // Invalidate and refetch jobs
       await queryClient.invalidateQueries({
-        queryKey: jobsKey(organizationId),
+        queryKey: jobsKey(organizationId, includeTests),
       });
       await query.refetch();
 
@@ -66,7 +71,7 @@ export function useJobs(): UseJobsResult {
         workers: [],
       };
     },
-    [queryClient, organizationId, query],
+    [queryClient, organizationId, query, includeTests],
   );
 
   const updateJob = useCallback(
@@ -75,13 +80,13 @@ export function useJobs(): UseJobsResult {
 
       // Invalidate and refetch jobs
       await queryClient.invalidateQueries({
-        queryKey: jobsKey(organizationId),
+        queryKey: jobsKey(organizationId, includeTests),
       });
       await query.refetch();
 
       return response.job;
     },
-    [queryClient, organizationId, query],
+    [queryClient, organizationId, query, includeTests],
   );
 
   const getJobEdits = useCallback(
@@ -98,11 +103,11 @@ export function useJobs(): UseJobsResult {
 
       // Invalidate and refetch jobs to get updated feedback status
       await queryClient.invalidateQueries({
-        queryKey: jobsKey(organizationId),
+        queryKey: jobsKey(organizationId, includeTests),
       });
       await query.refetch();
     },
-    [queryClient, organizationId, query],
+    [queryClient, organizationId, query, includeTests],
   );
 
   return {
