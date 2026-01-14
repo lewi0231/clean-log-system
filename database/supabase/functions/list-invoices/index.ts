@@ -1,21 +1,26 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import { listInvoicesSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, ["organization_id"]);
-
-    if (!validation.valid) {
-      return errorResponse("Organization ID is required", 400);
+    const rawBody = await req.json();
+    const validation = validateRequest(listInvoicesSchema, rawBody);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    const { organization_id, start_date, end_date } = body;
+    const { organization_id, start_date, end_date, include_tests } = validation
+      .data as {
+        organization_id: string;
+        start_date?: string;
+        end_date?: string;
+        include_tests?: boolean;
+      };
 
     const supabase = createServiceRoleClient();
 
@@ -25,6 +30,7 @@ serve(async (req) => {
       .select(
         `
         *,
+        is_test,
         invoice_job:invoice_job (
           job:job_id (
             id,
@@ -40,9 +46,14 @@ serve(async (req) => {
             )
           )
         )
-        `
+        `,
       )
       .eq("organization_id", organization_id);
+
+    // Exclude test invoices by default
+    if (!include_tests) {
+      query = query.eq("is_test", false);
+    }
 
     // Apply date range filter if provided
     if (start_date) {
@@ -55,7 +66,7 @@ serve(async (req) => {
     // Order by created_at descending (most recent first)
     const { data: invoices, error: invoicesError } = await query.order(
       "created_at",
-      { ascending: false }
+      { ascending: false },
     );
 
     if (invoicesError) throw invoicesError;
@@ -67,7 +78,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("List invoices error:", error);
     return errorResponse(
-      error instanceof Error ? error : "Failed to list invoices"
+      error instanceof Error ? error : "Failed to list invoices",
     );
   }
 });

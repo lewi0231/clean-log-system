@@ -258,12 +258,19 @@ serve(async (req) => {
         ? completed_at
         : new Date().toISOString();
 
+    // Determine whether this is test data (server-derived, not a trusted client flag)
+    const isTestJob = typeof submission_data === "object" &&
+      submission_data !== null &&
+      "_is_test" in (submission_data as Record<string, unknown>) &&
+      (submission_data as Record<string, unknown>)._is_test === true;
+
     // Create the job
     const jobInsertData = {
       organization_id: organizationId,
       location_id: normalizedLocationId,
       submission_data: submission_data,
       completed_at: normalizedCompletedAt,
+      is_test: isTestJob,
     };
     logger.debug("Inserting job for admin", {
       organizationId,

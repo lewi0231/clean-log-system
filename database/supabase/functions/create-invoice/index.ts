@@ -161,6 +161,17 @@ serve(async (req) => {
       }
     }
 
+    // Detect if any job is a test job (server-side)
+    const { data: testJobs, error: testJobsError } = await supabase
+      .from("job")
+      .select("id, is_test")
+      .eq("organization_id", organization_id)
+      .in("id", job_ids);
+
+    if (testJobsError) throw testJobsError;
+
+    const isTestInvoice = (testJobs || []).some((j) => j.is_test === true);
+
     // Calculate invoice totals by calling calculate-invoice function
     // IMPORTANT: Pass email for nested function auth (service role key doesn't carry user context)
     // Use membershipCheck.userEmail which is extracted from JWT token, not body.email
@@ -217,6 +228,11 @@ serve(async (req) => {
     // Check if we should send immediately, but first check for location hierarchy auto-send override
     // If any job's location has a hierarchy parent with auto-send enabled, we should create as draft
     let shouldSendImmediately = organization?.invoice_send_immediately || false;
+
+    // Never auto-send test invoices
+    if (isTestInvoice) {
+      shouldSendImmediately = false;
+    }
 
     if (shouldSendImmediately) {
       // Check if any job locations belong to a hierarchy with auto-send enabled
@@ -315,6 +331,20 @@ serve(async (req) => {
 
     if (!invoiceId) {
       return errorResponse("Failed to create invoice", 500);
+    }
+
+    // If this is a test invoice, persist the flag (separate update, but safe even if it fails)
+    if (isTestInvoice) {
+      const { error: markTestError } = await supabase
+        .from("invoice")
+        .update({ is_test: true })
+        .eq("id", invoiceId);
+      if (markTestError) {
+        logger.warn("Failed to mark invoice as test", {
+          invoice_id: invoiceId,
+          error: markTestError,
+        });
+      }
     }
 
     // Fetch invoice with related jobs and location info

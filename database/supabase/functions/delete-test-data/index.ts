@@ -3,7 +3,10 @@ import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  deleteTestDataSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 /**
  * Delete test job and associated invoice data
@@ -16,21 +19,17 @@ serve(async (req) => {
   const logger = createLogger(req, { functionName: "delete-test-data" });
 
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, ["organization_id"]);
-
-    if (!validation.valid) {
-      return errorResponse("Organization ID is required", 400);
+    const rawBody = await req.json();
+    const validation = validateRequest(deleteTestDataSchema, rawBody);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    const { organization_id, job_id, invoice_id } = body;
-
-    if (!job_id && !invoice_id) {
-      return errorResponse(
-        "Either job_id or invoice_id is required",
-        400,
-      );
-    }
+    const { organization_id, job_id, invoice_id } = validation.data as {
+      organization_id: string;
+      job_id?: string;
+      invoice_id?: string;
+    };
 
     const supabase = createServiceRoleClient();
 
@@ -39,7 +38,7 @@ serve(async (req) => {
       req,
       organization_id,
       supabase,
-      body as Record<string, unknown>,
+      rawBody as Record<string, unknown>,
     );
     if (!membershipCheck) {
       return errorResponse(
@@ -53,7 +52,7 @@ serve(async (req) => {
       // Verify the invoice belongs to the organization and is a test invoice
       const { data: invoice, error: invoiceError } = await supabase
         .from("invoice")
-        .select("id, organization_id")
+        .select("id, organization_id, is_test")
         .eq("id", invoice_id)
         .eq("organization_id", organization_id)
         .single();
@@ -63,6 +62,12 @@ serve(async (req) => {
       }
 
       if (invoice) {
+        if (invoice.is_test !== true) {
+          return errorResponse(
+            "Cannot delete non-test invoices. Only invoices marked as is_test can be deleted.",
+            400,
+          );
+        }
         // Delete pricing_snapshot records for this invoice
         const { error: snapshotError } = await supabase
           .from("pricing_snapshot")
@@ -111,7 +116,7 @@ serve(async (req) => {
       // Verify the job belongs to the organization
       const { data: job, error: jobError } = await supabase
         .from("job")
-        .select("id, organization_id, submission_data")
+        .select("id, organization_id, submission_data, is_test")
         .eq("id", job_id)
         .eq("organization_id", organization_id)
         .single();
@@ -121,12 +126,10 @@ serve(async (req) => {
       }
 
       if (job) {
-        // Verify it's a test job by checking submission_data._is_test
-        const submissionData = job.submission_data as Record<
-          string,
-          unknown
-        >;
-        if (!submissionData?._is_test) {
+        // Verify it's a test job via is_test first, fallback to legacy JSON flag
+        const submissionData = job.submission_data as Record<string, unknown>;
+        const legacyFlag = submissionData?._is_test === true;
+        if (job.is_test !== true && !legacyFlag) {
           return errorResponse(
             "Cannot delete non-test jobs. Only jobs marked with _is_test can be deleted.",
             400,

@@ -1,7 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import { listJobsSchema, validateRequest } from "../_utils/zod-schemas.ts";
 import type { JobWorker, JobWorkerQueryResult, Worker } from "../types.ts";
 
 serve(async (req) => {
@@ -9,25 +9,28 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, ["organization_id"]);
-
-    if (!validation.valid) {
-      return errorResponse("Organization ID is required", 400);
+    const rawBody = await req.json();
+    const validation = validateRequest(listJobsSchema, rawBody);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    const { organization_id } = body;
+    const { organization_id, include_tests } = validation.data as {
+      organization_id: string;
+      include_tests?: boolean;
+    };
 
     const supabase = createServiceRoleClient();
 
     // Fetch jobs with location info and invoice data
-    const { data: jobs, error: jobsError } = await supabase
+    let query = supabase
       .from("job")
       .select(
         `
         id,
         organization_id,
         location_id,
+        is_test,
         submission_data,
         completed_at,
         created_at,
@@ -52,8 +55,16 @@ serve(async (req) => {
         )
       `,
       )
-      .eq("organization_id", organization_id)
-      .order("completed_at", { ascending: false });
+      .eq("organization_id", organization_id);
+
+    // Exclude test jobs by default
+    if (!include_tests) {
+      query = query.eq("is_test", false);
+    }
+
+    const { data: jobs, error: jobsError } = await query.order("completed_at", {
+      ascending: false,
+    });
 
     if (jobsError) throw jobsError;
 

@@ -10,6 +10,7 @@ import type {
   UpdateJobRequest,
   UpdateJobResponse,
 } from "@/lib/types/api";
+import { supabase } from "../supabase";
 
 export class JobsService {
   /**

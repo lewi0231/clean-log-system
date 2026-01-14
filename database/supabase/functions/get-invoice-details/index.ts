@@ -2,21 +2,23 @@ import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  getInvoiceDetailsSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, ["invoice_id"]);
-
-    if (!validation.valid) {
-      return errorResponse("Invoice ID is required", 400);
+    const rawBody = await req.json();
+    const validation = validateRequest(getInvoiceDetailsSchema, rawBody);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    const { invoice_id } = body;
+    const { invoice_id } = validation.data as { invoice_id: string };
 
     const supabase = createServiceRoleClient();
 
@@ -59,7 +61,7 @@ serve(async (req) => {
       req,
       invoice.organization_id,
       supabase,
-      body as Record<string, unknown>,
+      rawBody as Record<string, unknown>,
     );
     if (!membershipCheck) {
       return errorResponse(
@@ -89,7 +91,7 @@ serve(async (req) => {
         body: {
           organization_id: invoice.organization_id,
           job_ids: jobIds,
-          email: membershipCheck.userEmail || body.email, // Use JWT email first, fallback to body.email
+          email: membershipCheck.userEmail, // Pass verified email for nested auth
         },
       });
 

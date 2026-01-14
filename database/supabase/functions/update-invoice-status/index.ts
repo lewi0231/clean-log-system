@@ -194,6 +194,7 @@ serve(async (req: Request) => {
           id,
           invoice_number,
           organization_id,
+          is_test,
           total,
           currency,
           due_date,
@@ -221,6 +222,35 @@ serve(async (req: Request) => {
 
       if (!invoice) {
         return errorResponse("Invoice not found", 404);
+      }
+
+      // Never allow sending/resending test invoices
+      if (invoice.is_test === true) {
+        return errorResponse(
+          "This is a test invoice and cannot be sent to customers.",
+          400,
+        );
+      }
+
+      // Create outbox record (audit + retry support)
+      const { data: outbox, error: outboxError } = await supabase
+        .from("invoice_send_outbox")
+        .insert({
+          invoice_id: invoice.id,
+          organization_id: invoice.organization_id,
+          resend,
+          status: "processing",
+          attempts: 1,
+          updated_at: now.toISOString(),
+        })
+        .select("id")
+        .single();
+
+      if (outboxError) {
+        logger.warn("Failed to create invoice send outbox record", {
+          invoice_id,
+          error: outboxError,
+        });
       }
 
       // Check if invoice is already sent (unless resending)
@@ -389,6 +419,21 @@ serve(async (req: Request) => {
           invoice_number: invoice.invoice_number,
           error: emailResult.error,
         });
+
+        // Mark outbox as failed (best-effort)
+        if (outbox?.id) {
+          await supabase
+            .from("invoice_send_outbox")
+            .update({
+              status: "failed",
+              last_error: emailResult.error || "Unknown email error",
+              updated_at: now.toISOString(),
+              next_retry_at: new Date(now.getTime() + 5 * 60 * 1000)
+                .toISOString(),
+            })
+            .eq("id", outbox.id);
+        }
+
         return errorResponse(
           `Failed to send invoice email: ${emailResult.error}`,
           500,
@@ -415,6 +460,21 @@ serve(async (req: Request) => {
         .single();
 
       if (updateError) throw updateError;
+
+      // Mark outbox as succeeded (best-effort)
+      if (outbox?.id) {
+        await supabase
+          .from("invoice_send_outbox")
+          .update({
+            status: "succeeded",
+            last_error: null,
+            processed_at: now.toISOString(),
+            updated_at: now.toISOString(),
+            recipients: emailRecipients,
+            email_id: emailResult.emailId || null,
+          })
+          .eq("id", outbox.id);
+      }
 
       return jsonResponse({
         success: true,
