@@ -54,10 +54,10 @@ When a worker accepts their invitation and becomes active, admins should be noti
 #### Notifications Table
 
 ```sql
-CREATE TABLE notifications (
+CREATE TABLE notification (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  receiver_id UUID REFERENCES organization_users(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
+  receiver_id UUID REFERENCES organization_user(id) ON DELETE CASCADE,
   type TEXT NOT NULL, -- e.g., 'worker_active', 'job_completed', 'invoice_generated'
   title TEXT NOT NULL,
   message TEXT NOT NULL,
@@ -67,33 +67,28 @@ CREATE TABLE notifications (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   read_at TIMESTAMP WITH TIME ZONE,
 
-  CONSTRAINT notifications_type_check CHECK (type IN ('worker_active', 'job_completed', 'invoice_generated', 'payment_received'))
+  CONSTRAINT notification_type_check CHECK (type IN ('worker_active', 'job_completed', 'invoice_generated', 'payment_received'))
 );
 
 -- Index for efficient queries
-CREATE INDEX idx_notifications_organization_receiver ON notifications(organization_id, receiver_id, read, created_at DESC);
-CREATE INDEX idx_notifications_related_entity ON notifications(related_entity_type, related_entity_id);
+CREATE INDEX idx_notification_organization_receiver ON notification(organization_id, receiver_id, read, created_at DESC);
+CREATE INDEX idx_notification_related_entity ON notification(related_entity_type, related_entity_id);
 
 -- RLS Policies
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification ENABLE ROW LEVEL SECURITY;
 
--- Admins can view all notifications for their organization
-CREATE POLICY "Admins can view organization notifications"
-  ON notifications FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM organization_users
-      WHERE organization_users.id = auth.uid()
-      AND organization_users.organization_id = notifications.organization_id
-      AND organization_users.role IN ('admin', 'owner')
-    )
-  );
+-- NOTE: This codebase primarily accesses data through Edge Functions using the
+-- service role key (see createServiceRoleClient()), following the existing pattern.
+-- The organization_user table has auth_user_id (not a direct mapping from id to auth.uid()).
 
--- System can create notifications (via service role)
-CREATE POLICY "Service role can create notifications"
-  ON notifications FOR INSERT
-  WITH CHECK (true);
+CREATE POLICY "Service role can manage notification"
+  ON notification
+  FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 ```
+
+> **Schema Note**: Table names follow the existing singular convention (`organization`, `worker`, `job`, etc.) rather than plural. The `organization_user` table uses `auth_user_id` to link to Supabase Auth users, not the `id` column directly.
 
 ### Implementation Steps
 
@@ -123,7 +118,7 @@ export async function createNotification(
   // If receiver_id is not specified, create notifications for all admins
   if (!params.receiver_id) {
     const { data: admins, error: adminError } = await supabase
-      .from("organization_users")
+      .from("organization_user")
       .select("id")
       .eq("organization_id", params.organization_id)
       .in("role", ["admin", "owner"]);
@@ -144,7 +139,7 @@ export async function createNotification(
     }));
 
     const { error } = await supabase
-      .from("notifications")
+      .from("notification")
       .insert(notifications);
 
     if (error) {
@@ -152,7 +147,7 @@ export async function createNotification(
     }
   } else {
     // Single notification for specific user
-    const { error } = await supabase.from("notifications").insert([params]);
+    const { error } = await supabase.from("notification").insert([params]);
 
     if (error) {
       return { success: false, error: error.message };

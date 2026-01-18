@@ -45,18 +45,34 @@ Admins need to view a complete history of all payment calculations and batches, 
 
 ### Payment Status Flow
 
+**Batch Status Flow:**
 ```
-calculated → approved → processing → paid
+calculated → approved → processing → completed
                 ↓
             cancelled
 ```
 
-Status meanings:
-- **calculated**: Payment calculated but not reviewed
+**Individual Payment Status Flow:**
+```
+calculated → pending → processing → paid
+                          ↓
+                      failed/cancelled
+```
+
+Status meanings (Batch):
+- **calculated**: Payment batch calculated but not reviewed
 - **approved**: Reviewed and approved, ready for payment
 - **processing**: Payments being processed (e.g., payroll system)
-- **paid**: All payments completed
+- **completed**: All individual payments in batch are paid
 - **cancelled**: Batch cancelled (e.g., calculation error)
+
+Status meanings (Individual Payment):
+- **calculated**: Payment calculated, part of a batch
+- **pending**: Approved and awaiting processing
+- **processing**: Payment being processed
+- **paid**: Payment completed
+- **failed**: Payment failed (can be retried)
+- **cancelled**: Payment cancelled
 
 ### Database Schema
 

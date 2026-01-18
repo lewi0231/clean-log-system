@@ -19,8 +19,8 @@ Admins need a comprehensive dashboard view showing worker payment summaries, inc
    - Total payment amount (sum of all payments)
    - Average payment per job
    - Last payment date (optional)
-3. Data is aggregated from all payment batches
-4. Workers with no payments are excluded (or shown with zero values)
+3. Data is aggregated from all completed/paid payment batches (excluding cancelled)
+4. Only workers with at least one payment record are shown (workers with no payment history are excluded from this view)
 5. Currency formatting matches organization settings
 6. Table supports sorting by:
    - Worker name (alphabetical)

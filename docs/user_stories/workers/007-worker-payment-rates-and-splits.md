@@ -68,18 +68,43 @@ CREATE TABLE worker_rate_card (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
   worker_id UUID NOT NULL REFERENCES worker(id) ON DELETE CASCADE,
-  hourly_rate DECIMAL(10, 2) NOT NULL,
+  hourly_rate DECIMAL(10, 2) NOT NULL CHECK (hourly_rate > 0),
   currency TEXT NOT NULL DEFAULT 'AUD',
-  effective_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  effective_to TIMESTAMPTZ,
-  rate_type TEXT DEFAULT 'standard', -- 'standard', 'overtime', 'holiday'
+  effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+  effective_to DATE,
+  rate_type TEXT DEFAULT 'standard' CHECK (rate_type IN ('standard', 'overtime', 'holiday')),
   role_title TEXT, -- 'Supervisor', 'Senior Technician', etc.
   notes TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(organization_id, worker_id, rate_type, effective_from)
+  
+  -- Ensure no overlapping active rate cards for same worker/rate_type
+  CONSTRAINT worker_rate_card_no_overlap EXCLUDE USING gist (
+    worker_id WITH =,
+    rate_type WITH =,
+    daterange(effective_from, effective_to, '[]') WITH &&
+  ) WHERE (is_active = TRUE)
 );
+
+-- Index for finding current active rate
+CREATE INDEX idx_worker_rate_card_lookup ON worker_rate_card(worker_id, rate_type, effective_from DESC) WHERE is_active = TRUE;
+
+-- RLS follows existing pattern
+ALTER TABLE worker_rate_card ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role can manage worker_rate_card"
+  ON worker_rate_card
+  FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
 ```
+
+> **Schema Notes**:
+> - Uses DATE instead of TIMESTAMPTZ for effective dates (rate changes typically happen on specific dates, not times)
+> - Added CHECK constraint ensuring hourly_rate > 0 (zero rates would break proportional calculations)
+> - Uses an EXCLUDE constraint to prevent overlapping active rate cards
+> - Added `is_active` flag for soft-delete capability
 
 **Worker Payment Allocation Table**:
 ```sql
@@ -111,19 +136,39 @@ function calculateRateBasedSplit(
   rateCards: Map<string, RateCard>
 ): Map<string, number> {
   const payments = new Map<string, number>();
-  const totalRate = workers.reduce((sum, worker) => {
-    const rate = rateCards.get(worker.id)?.hourly_rate || 0;
-    return sum + rate;
-  }, 0);
   
-  workers.forEach(worker => {
-    const rate = rateCards.get(worker.id)?.hourly_rate || 0;
-    payments.set(worker.id, (jobTotal * rate) / totalRate);
+  // Get rates for all workers, using default rate for those without rate cards
+  const workerRates = workers.map(worker => ({
+    workerId: worker.id,
+    rate: rateCards.get(worker.id)?.hourly_rate ?? null
+  }));
+  
+  // Check if all workers have rate cards
+  const allHaveRates = workerRates.every(wr => wr.rate !== null);
+  
+  if (!allHaveRates) {
+    // Fallback to equal split if any worker lacks a rate card
+    const equalShare = jobTotal / workers.length;
+    workers.forEach(worker => payments.set(worker.id, equalShare));
+    return payments;
+  }
+  
+  // All workers have rates - calculate proportional split
+  const totalRate = workerRates.reduce((sum, wr) => sum + (wr.rate as number), 0);
+  
+  if (totalRate === 0) {
+    throw new Error('Total rate cannot be zero');
+  }
+  
+  workerRates.forEach(wr => {
+    payments.set(wr.workerId, (jobTotal * (wr.rate as number)) / totalRate);
   });
   
   return payments;
 }
 ```
+
+> **Implementation Note**: The function falls back to equal split if ANY worker lacks a rate card. This ensures backward compatibility and prevents errors when rate cards are partially configured. The database constraint ensures rates are always > 0.
 
 **Allocation Override**:
 - Check for `worker_payment_allocation` records first
