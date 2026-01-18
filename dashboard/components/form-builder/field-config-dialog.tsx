@@ -25,11 +25,13 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import {
   FieldConfig,
   FieldType,
   FormSectionWithFields,
 } from "@clean-log/shared";
+import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface FieldConfigDialogProps {
@@ -385,50 +387,78 @@ export function FieldConfigDialog({
               </p>
 
               {restrictToLocations && (
-                <div className="space-y-2 pl-6 border-l-2 border-muted">
+                <div className="space-y-2">
                   {locations.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       No locations available. Create locations first.
                     </p>
                   ) : (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {locations
-                        .filter((loc) => loc.active)
-                        .map((location) => (
-                          <div
-                            key={location.id}
-                            className="flex items-center space-x-2"
-                          >
-                            <input
-                              type="checkbox"
-                              id={`dialog-location-${location.id}`}
-                              checked={selectedLocationIds.includes(
-                                location.id
-                              )}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedLocationIds([
-                                    ...selectedLocationIds,
-                                    location.id,
-                                  ]);
-                                } else {
-                                  setSelectedLocationIds(
-                                    selectedLocationIds.filter(
-                                      (id) => id !== location.id
-                                    )
-                                  );
-                                }
-                              }}
-                              className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <Label
-                              htmlFor={`dialog-location-${location.id}`}
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              {location.name}
-                            </Label>
-                          </div>
-                        ))}
+                    <div className="rounded-md border border-input bg-transparent shadow-sm">
+                      <div className="max-h-48 overflow-y-auto p-2">
+                        {locations
+                          .filter((loc) => loc.active)
+                          .map((location) => {
+                            const isSelected = selectedLocationIds.includes(
+                              location.id
+                            );
+                            return (
+                              <div
+                                key={location.id}
+                                className={cn(
+                                  "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                  isSelected && "bg-accent/50"
+                                )}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedLocationIds(
+                                      selectedLocationIds.filter(
+                                        (id) => id !== location.id
+                                      )
+                                    );
+                                  } else {
+                                    setSelectedLocationIds([
+                                      ...selectedLocationIds,
+                                      location.id,
+                                    ]);
+                                  }
+                                }}
+                              >
+                                <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                                  {isSelected && (
+                                    <Check className="h-4 w-4 text-primary" />
+                                  )}
+                                </span>
+                                <Label
+                                  htmlFor={`dialog-location-${location.id}`}
+                                  className="text-sm font-normal cursor-pointer flex-1"
+                                >
+                                  {location.name}
+                                </Label>
+                                <input
+                                  type="checkbox"
+                                  id={`dialog-location-${location.id}`}
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedLocationIds([
+                                        ...selectedLocationIds,
+                                        location.id,
+                                      ]);
+                                    } else {
+                                      setSelectedLocationIds(
+                                        selectedLocationIds.filter(
+                                          (id) => id !== location.id
+                                        )
+                                      );
+                                    }
+                                  }}
+                                  className="sr-only"
+                                  aria-hidden="true"
+                                />
+                              </div>
+                            );
+                          })}
+                      </div>
                     </div>
                   )}
                 </div>

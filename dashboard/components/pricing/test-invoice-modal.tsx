@@ -43,10 +43,236 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Plus,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+interface GroupedBreakdownItem {
+  brand: string;
+  quantity: number;
+}
+
+interface GroupedBreakdownFieldProps {
+  field: FieldConfig;
+  value: GroupedBreakdownItem[];
+  onChange: (items: GroupedBreakdownItem[]) => void;
+  error?: string;
+}
+
+// Grouped Breakdown Field Component for test invoice
+function GroupedBreakdownField({
+  field,
+  value = [],
+  onChange,
+  error,
+}: GroupedBreakdownFieldProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [quantity, setQuantity] = useState("");
+
+  const options = field.options || [];
+  const validationRules = field.validation_rules;
+  const maxItems = validationRules?.max_items ?? options.length;
+  const minItems = validationRules?.min_items ?? 0;
+  const allowZeroQuantities = validationRules?.allow_zero_quantities ?? false;
+
+  // Get available brands (not already selected)
+  const availableBrands = options.filter(
+    (option) => !value.some((item) => item.brand === option)
+  );
+
+  const handleAddItem = () => {
+    if (!selectedBrand || !quantity) return;
+
+    const quantityNum = parseInt(quantity, 10);
+    if (isNaN(quantityNum) || quantityNum < 0) return;
+    if (!allowZeroQuantities && quantityNum === 0) return;
+
+    // Check if we've reached max items
+    if (value.length >= maxItems) return;
+
+    const newItems = [
+      ...value,
+      { brand: selectedBrand, quantity: quantityNum },
+    ];
+    onChange(newItems);
+    setSelectedBrand("");
+    setQuantity("");
+    setIsAddDialogOpen(false);
+  };
+
+  const handleRemoveItem = (brand: string) => {
+    onChange(value.filter((item) => item.brand !== brand));
+  };
+
+  const handleUpdateQuantity = (brand: string, newQuantity: number) => {
+    if (newQuantity < 0) return;
+    if (!allowZeroQuantities && newQuantity === 0) {
+      // Remove item instead of setting to 0
+      handleRemoveItem(brand);
+      return;
+    }
+
+    onChange(
+      value.map((item) =>
+        item.brand === brand ? { ...item, quantity: newQuantity } : item
+      )
+    );
+  };
+
+  const canAddMore = value.length < maxItems && availableBrands.length > 0;
+
+  return (
+    <div className="space-y-3">
+      <Label>
+        {field.label}
+        {field.required && <span className="text-destructive"> *</span>}
+      </Label>
+
+      {/* Display added items */}
+      {value.length > 0 && (
+        <div className="space-y-2">
+          {value.map((item) => (
+            <div
+              key={item.brand}
+              className="flex items-center justify-between gap-3 border rounded-md p-3 bg-muted/50"
+            >
+              <span className="font-medium flex-1">{item.brand}</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={String(item.quantity)}
+                  onChange={(e) => {
+                    const num =
+                      e.target.value === ""
+                        ? 0
+                        : parseInt(e.target.value, 10) || 0;
+                    handleUpdateQuantity(item.brand, num);
+                  }}
+                  className="w-20 text-center"
+                  min="0"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemoveItem(item.brand)}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Entry button */}
+      {canAddMore && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsAddDialogOpen(true)}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Entry
+        </Button>
+      )}
+
+      {/* Validation messages */}
+      {value.length < minItems && (
+        <p className="text-sm text-orange-500">
+          At least {minItems} item(s) required
+        </p>
+      )}
+      {value.length >= maxItems && (
+        <p className="text-sm text-muted-foreground">
+          Maximum {maxItems} item(s) reached
+        </p>
+      )}
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {field.description && !error && (
+        <p className="text-xs text-muted-foreground">{field.description}</p>
+      )}
+
+      {/* Add Item Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add {field.label}</DialogTitle>
+            <DialogDescription>
+              Select a brand and enter the quantity
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Option Select */}
+            <div className="space-y-2">
+              <Label htmlFor="add-brand">Option</Label>
+              <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                <SelectTrigger id="add-brand">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBrands.map((brand: string) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Quantity Input */}
+            <div className="space-y-2">
+              <Label htmlFor="add-quantity">Quantity</Label>
+              <Input
+                id="add-quantity"
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="Enter quantity"
+                min="0"
+              />
+              {!allowZeroQuantities && (
+                <p className="text-xs text-muted-foreground">
+                  Zero quantities are not allowed
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDialogOpen(false);
+                setSelectedBrand("");
+                setQuantity("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddItem}
+              disabled={
+                !selectedBrand ||
+                !quantity ||
+                parseInt(quantity, 10) < 0 ||
+                (!allowZeroQuantities && parseInt(quantity, 10) === 0)
+              }
+            >
+              Add
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 interface TestInvoiceModalProps {
   open: boolean;
@@ -84,7 +310,10 @@ export default function TestInvoiceModal({
     getLocalDateTimeString()
   );
   const [fieldValues, setFieldValues] = useState<
-    Record<string, string | number | boolean | string[]>
+    Record<
+      string,
+      string | number | boolean | string[] | GroupedBreakdownItem[]
+    >
   >({});
   const [calculation, setCalculation] = useState<{
     total: number;
@@ -109,30 +338,21 @@ export default function TestInvoiceModal({
     "input"
   );
 
-  // Get fields that should be shown in the form (exclude system fields and complex types)
-  // Order fields to match mobile config: sections sorted by order_position, fields within sections by field_ids order, then unsectioned fields by order_position
+  // Get fields that should be shown in the form (exclude system fields only)
+  // Order fields to match mobile config: sections sorted by order_position, fields within sections by field_ids order
+  // Note: Fields must be sectioned to appear on mobile app, so we only include sectioned fields
   const formFields = useMemo(() => {
     const allFields = fieldConfigs.filter(
-      (field) =>
-        !field.name.startsWith("_") && field.field_type !== "grouped_breakdown" // Skip grouped_breakdown for simplicity
+      (field) => !field.name.startsWith("_") // Include grouped_breakdown for true test
     );
 
     // Create a map of section_id to fields
     const sectionedFields: FieldConfig[] = [];
-    const unsectionedFields: FieldConfig[] = [];
 
     // Sort sections by order_position
     const sortedSections = [...sections].sort(
       (a, b) => a.order_position - b.order_position
     );
-
-    // Create a set of all field IDs that are in sections
-    const sectionedFieldIds = new Set<string>();
-    sortedSections.forEach((section) => {
-      section.field_ids.forEach((fieldId) => {
-        sectionedFieldIds.add(fieldId);
-      });
-    });
 
     // Process fields in section order
     sortedSections.forEach((section) => {
@@ -145,16 +365,7 @@ export default function TestInvoiceModal({
       });
     });
 
-    // Collect unsectioned fields and sort by order_position
-    allFields.forEach((field) => {
-      if (!sectionedFieldIds.has(field.id)) {
-        unsectionedFields.push(field);
-      }
-    });
-    unsectionedFields.sort((a, b) => a.order_position - b.order_position);
-
-    // Return: sectioned fields first, then unsectioned fields
-    return [...sectionedFields, ...unsectionedFields];
+    return sectionedFields;
   }, [fieldConfigs, sections]);
 
   // Reset when modal opens/closes, and cleanup test data
@@ -220,11 +431,14 @@ export default function TestInvoiceModal({
 
         if (result.job_calculations.length > 0) {
           const calc = result.job_calculations[0];
+          // Use the job-level worker_payment_total (for single job, should match aggregated total_worker_payment)
+          const workerPayment = calc.worker_payment_total ?? 0;
+
           setCalculation({
             total: calc.total,
             subtotal: calc.subtotal,
             total_adjustments: calc.total_adjustments,
-            total_worker_payment: calc.worker_payment_total,
+            total_worker_payment: workerPayment,
             margin: calc.margin,
             line_items: calc.line_items,
           });
@@ -542,16 +756,47 @@ export default function TestInvoiceModal({
                           key={field.id}
                           className="space-y-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
                         >
-                          <FieldRenderer
-                            field={field}
-                            value={fieldValues[field.id]}
-                            onChange={(val) =>
-                              setFieldValues((prev) => ({
-                                ...prev,
-                                [field.id]: val,
-                              }))
-                            }
-                          />
+                          {field.field_type === "grouped_breakdown" ? (
+                            <GroupedBreakdownField
+                              field={field}
+                              value={
+                                (fieldValues[
+                                  field.id
+                                ] as GroupedBreakdownItem[]) || []
+                              }
+                              onChange={(items) =>
+                                setFieldValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: items,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <FieldRenderer
+                              field={field}
+                              value={(() => {
+                                const val = fieldValues[field.id];
+                                // Exclude GroupedBreakdownItem[] for non-grouped_breakdown fields
+                                return Array.isArray(val) &&
+                                  val.length > 0 &&
+                                  typeof val[0] === "object" &&
+                                  "brand" in val[0]
+                                  ? undefined
+                                  : (val as
+                                      | string
+                                      | number
+                                      | boolean
+                                      | string[]
+                                      | undefined);
+                              })()}
+                              onChange={(val) =>
+                                setFieldValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: val,
+                                }))
+                              }
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
@@ -608,14 +853,14 @@ export default function TestInvoiceModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Total</p>
+                      <p className="text-muted-foreground">Invoice Total</p>
                       <p className="text-2xl font-bold">
                         {formatCurrency(calculation.total)}
                       </p>
                     </div>
-                    {/* Only show worker payment if there are workers and payment is set */}
-                    {workers.length > 0 &&
-                      calculation.total_worker_payment > 0 && (
+                    {/* Show worker payment and margin if there are workers assigned */}
+                    {workers.length > 0 && (
+                      <>
                         <div>
                           <p className="text-muted-foreground">
                             Worker Payment
@@ -623,8 +868,24 @@ export default function TestInvoiceModal({
                           <p className="text-lg font-semibold">
                             {formatCurrency(calculation.total_worker_payment)}
                           </p>
+                          {calculation.total_worker_payment ===
+                            calculation.total && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              ⚠️ Same as invoice total (check pricing rules)
+                            </p>
+                          )}
                         </div>
-                      )}
+                        <div>
+                          <p className="text-muted-foreground">Margin</p>
+                          <p className="text-lg font-semibold">
+                            {formatCurrency(calculation.margin)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            (Total - Worker Payment)
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 

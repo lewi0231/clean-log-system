@@ -48,7 +48,7 @@ serve(async (req) => {
         `,
       )
       .eq("id", invoice_id)
-      .single();
+      .maybeSingle();
 
     if (invoiceError) throw invoiceError;
 

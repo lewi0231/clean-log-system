@@ -329,7 +329,7 @@ export const createInvoiceSchema = z.object({
   organization_id: uuidSchema,
   job_ids: z.array(uuidSchema).min(1, "At least one job ID is required"),
   due_date: z.string().datetime("Invalid due date format"),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
   email: emailSchema.optional(), // Optional email for organization membership verification
 });
 

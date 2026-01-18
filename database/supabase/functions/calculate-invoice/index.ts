@@ -261,19 +261,32 @@ serve(async (req) => {
     if (servicePricingError) throw servicePricingError;
 
     const nowIso = new Date().toISOString();
-    // Filter pricing rules to only customer pricing (for invoicing)
-    // Worker pricing rules will be used separately for worker payment calculations
+    // Fetch both customer and worker pricing rules
+    // Customer rules are used for invoice line items, worker rules for worker payment calculations
     // Query pricing_rule without embedded conditions to avoid reverse relationship issues
     const { data: pricingRules, error: pricingRulesError } = await supabase
       .from("pricing_rule")
       .select("*")
       .eq("organization_id", organization_id)
       .eq("active", true)
-      .eq("pricing_context", "customer") // Only customer pricing for invoicing
+      .eq("pricing_context", "customer") // Customer pricing for invoice totals
       .lte("effective_at", nowIso)
       .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
 
     if (pricingRulesError) throw pricingRulesError;
+
+    // Also fetch worker pricing rules for calculating worker payments
+    const { data: workerPricingRules, error: workerPricingRulesError } =
+      await supabase
+        .from("pricing_rule")
+        .select("*")
+        .eq("organization_id", organization_id)
+        .eq("active", true)
+        .eq("pricing_context", "worker") // Worker pricing for worker payment calculations
+        .lte("effective_at", nowIso)
+        .or(`expires_at.is.null,expires_at.gt.${nowIso}`);
+
+    if (workerPricingRulesError) throw workerPricingRulesError;
 
     // Query pricing_condition separately to avoid reverse relationship issues
     const pricingConditionsMap = new Map<string, PricingConditionRow[]>();
@@ -326,6 +339,7 @@ serve(async (req) => {
         job,
         fieldConfigMap,
         pricingRules: pricingRulesWithConditions as PricingRuleRow[],
+        workerPricingRules: (workerPricingRules || []) as PricingRuleRow[],
         hierarchyNodes: (hierarchyNodes || []) as LocationHierarchyNode[],
         servicePricingModes:
           (servicePricingModes || []) as ServicePricingModeRow[],
@@ -370,12 +384,14 @@ function calculateJobPricing({
   job,
   fieldConfigMap,
   pricingRules,
+  workerPricingRules,
   hierarchyNodes,
   servicePricingModes,
 }: {
   job: JobRecord;
   fieldConfigMap: Map<string, FieldConfig>;
   pricingRules: PricingRuleRow[];
+  workerPricingRules: PricingRuleRow[];
   hierarchyNodes: LocationHierarchyNode[];
   servicePricingModes: ServicePricingModeRow[];
 }): InvoiceCalculation {
@@ -480,9 +496,44 @@ function calculateJobPricing({
     nodeParentMap,
   );
 
+  // Filter customer rules for invoice amounts
   const applicableRules = pricingRules.filter((rule) =>
     ruleMatchesLocation(rule, locationContext)
   );
+
+  // Filter worker rules for worker payment amounts
+  const applicableWorkerRules = workerPricingRules.filter((rule) =>
+    ruleMatchesLocation(rule, locationContext)
+  );
+
+  // Create lookup maps for worker pricing rules by field/option key
+  const workerFieldRuleMap = new Map<string, PricingRuleRow>();
+  const workerOptionRuleMap = new Map<string, PricingRuleRow>();
+
+  // Group and select best worker rules for fields
+  const workerFieldRuleGroups = groupRules(
+    applicableWorkerRules.filter((rule) => rule.scope === "field"),
+    (rule) => rule.field_config_id || "default",
+  );
+  for (const [fieldId, rules] of workerFieldRuleGroups.entries()) {
+    if (!fieldId || fieldId === "default") continue;
+    const bestRule = selectBestRule(rules, locationContext);
+    if (bestRule) {
+      workerFieldRuleMap.set(fieldId, bestRule);
+    }
+  }
+
+  // Group and select best worker rules for options
+  const workerOptionRuleGroups = groupRules(
+    applicableWorkerRules.filter((rule) => rule.scope === "option"),
+    (rule) => `${rule.field_config_id || "default"}:${rule.option_value || ""}`,
+  );
+  for (const [key, rules] of workerOptionRuleGroups.entries()) {
+    const bestRule = selectBestRule(rules, locationContext);
+    if (bestRule) {
+      workerOptionRuleMap.set(key, bestRule);
+    }
+  }
 
   const lineItems: LineItem[] = [];
   const appliedRules: AppliedRule[] = [];
@@ -501,10 +552,14 @@ function calculateJobPricing({
     const fieldConfig = fieldConfigMap.get(fieldId);
     if (!fieldConfig) continue;
 
+    // Look up the corresponding worker rule for this field
+    const workerRule = workerFieldRuleMap.get(fieldId);
+
     const result = evaluateFieldRule(
       bestRule,
       fieldConfig,
       submissionData[fieldConfig.name],
+      workerRule,
     );
 
     if (result) {
@@ -527,10 +582,14 @@ function calculateJobPricing({
     const fieldConfig = fieldConfigMap.get(fieldId);
     if (!fieldConfig) continue;
 
+    // Look up the corresponding worker rule for this option
+    const workerRule = workerOptionRuleMap.get(key);
+
     const result = evaluateOptionRule(
       bestRule,
       fieldConfig,
       submissionData[fieldConfig.name],
+      workerRule,
     );
 
     if (result) {
@@ -734,6 +793,7 @@ function evaluateFieldRule(
   rule: PricingRuleRow,
   fieldConfig: FieldConfig,
   fieldValue: unknown,
+  workerRule?: PricingRuleRow,
 ): { lineItem: LineItem; appliedRule: AppliedRule } | null {
   const quantity = getFieldQuantity(fieldConfig.field_type, fieldValue);
   if (quantity <= 0) return null;
@@ -760,7 +820,10 @@ function evaluateFieldRule(
 
   if (total <= 0) return null;
 
-  const workerPayment = computeWorkerPayment(rule, total);
+  // Calculate worker payment: use separate worker rule if available, otherwise fall back to customer rule
+  const workerPayment = workerRule
+    ? calculateWorkerPaymentFromRule(workerRule, quantity)
+    : computeWorkerPayment(rule, total);
   const lineItemKey = `${rule.field_config_id}:${rule.option_value || "field"}`;
 
   return {
@@ -798,6 +861,7 @@ function evaluateOptionRule(
   rule: PricingRuleRow,
   fieldConfig: FieldConfig,
   fieldValue: unknown,
+  workerRule?: PricingRuleRow,
 ): { lineItem: LineItem; appliedRule: AppliedRule } | null {
   if (!rule.option_value) return null;
   const quantity = getOptionQuantity(fieldValue, rule.option_value);
@@ -807,7 +871,10 @@ function evaluateOptionRule(
   const total = quantity * unitPrice;
   if (total <= 0) return null;
 
-  const workerPayment = computeWorkerPayment(rule, total);
+  // Calculate worker payment: use separate worker rule if available, otherwise fall back to customer rule
+  const workerPayment = workerRule
+    ? calculateWorkerPaymentFromRule(workerRule, quantity)
+    : computeWorkerPayment(rule, total);
   const lineItemKey = `${rule.field_config_id}:${rule.option_value}`;
 
   return {
@@ -918,6 +985,24 @@ function calculateTieredTotal(quantity: number, definition: unknown): number {
   return total;
 }
 
+/**
+ * Calculate worker payment from a separate worker pricing rule.
+ * This is used when organizations have separate pricing rules for customer vs worker contexts.
+ * The worker rule's base_price is used directly (unit price * quantity for option/field rules).
+ */
+function calculateWorkerPaymentFromRule(
+  workerRule: PricingRuleRow,
+  quantity: number,
+): number {
+  const workerUnitPrice = workerRule.base_price ?? 0;
+  return quantity * workerUnitPrice;
+}
+
+/**
+ * Compute worker payment from the customer pricing rule itself.
+ * This is the fallback when there's no separate worker pricing rule.
+ * Uses worker_payment_type/worker_payment_value on the customer rule.
+ */
 function computeWorkerPayment(rule: PricingRuleRow, amount: number): number {
   if (
     !rule.worker_payment_type ||
