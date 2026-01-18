@@ -9,6 +9,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PaymentHistoryList from "@/components/worker-payments/payment-history-list";
 import PaymentOverview from "@/components/worker-payments/payment-overview";
+import RateCardManager from "@/components/worker-payments/rate-card-manager";
 import WorkerPaymentSummary from "@/components/worker-payments/worker-payment-summary";
 import useOrganization from "@/hooks/useOrganization";
 
@@ -64,6 +65,7 @@ function WorkerPaymentsPageContent() {
           <TabsTrigger value="overview">Payment Overview</TabsTrigger>
           <TabsTrigger value="history">Payment History</TabsTrigger>
           <TabsTrigger value="worker-summary">Worker Summary</TabsTrigger>
+          <TabsTrigger value="rate-cards">Rate Cards</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -76,6 +78,10 @@ function WorkerPaymentsPageContent() {
 
         <TabsContent value="worker-summary" className="space-y-6">
           <WorkerPaymentSummary />
+        </TabsContent>
+
+        <TabsContent value="rate-cards" className="space-y-6">
+          <RateCardManager />
         </TabsContent>
       </Tabs>
     </>

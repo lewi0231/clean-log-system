@@ -23,17 +23,88 @@ import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
+import useOrganization from "@/hooks/useOrganization";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Calendar, CheckCircle2, Download } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle2,
+  Clock,
+  Download,
+  Loader2,
+  XCircle,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import CalculatePaymentDialog from "./calculate-payment-dialog";
 import MarkPaymentPaidDialog from "./mark-payment-paid-dialog";
 import PaymentDetailDialog from "./payment-detail-dialog";
 
+type PaymentStatus =
+  | "calculated"
+  | "approved"
+  | "processing"
+  | "completed"
+  | "paid"
+  | "failed"
+  | "cancelled";
+
+const statusConfig: Record<
+  PaymentStatus,
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    icon?: React.ReactNode;
+    className?: string;
+  }
+> = {
+  calculated: {
+    label: "Calculated",
+    variant: "outline",
+    icon: <Clock className="h-3 w-3 mr-1" />,
+  },
+  approved: {
+    label: "Approved",
+    variant: "secondary",
+    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
+    className: "bg-blue-500/10 text-blue-700 border-blue-200",
+  },
+  processing: {
+    label: "Processing",
+    variant: "secondary",
+    icon: <Loader2 className="h-3 w-3 mr-1 animate-spin" />,
+    className: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
+  },
+  completed: {
+    label: "Completed",
+    variant: "default",
+    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
+    className: "bg-green-500/10 text-green-700 border-green-200",
+  },
+  paid: {
+    label: "Paid",
+    variant: "default",
+    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
+    className: "bg-green-500/10 text-green-700 border-green-200",
+  },
+  failed: {
+    label: "Failed",
+    variant: "destructive",
+    icon: <XCircle className="h-3 w-3 mr-1" />,
+  },
+  cancelled: {
+    label: "Cancelled",
+    variant: "outline",
+    icon: <XCircle className="h-3 w-3 mr-1" />,
+    className: "text-muted-foreground",
+  },
+};
+
 export default function PaymentHistoryList() {
   const { formatCurrency } = useOrganizationCurrency();
+  const { organizationId } = useOrganization();
   const { jobs } = useJobs();
   const { calculatePayments } = useWorkerPayments();
   const { paymentHistory, addPayment, filterByDateRange, invalidate } =
@@ -47,6 +118,7 @@ export default function PaymentHistoryList() {
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [isMarkPaidDialogOpen, setIsMarkPaidDialogOpen] = useState(false);
+  const [approvingBatchId, setApprovingBatchId] = useState<string | null>(null);
 
   const handleCalculatePayments = async (jobIds: string[]) => {
     const result = await calculatePayments(jobIds);
@@ -73,6 +145,41 @@ export default function PaymentHistoryList() {
     a.download = `worker-payments-${payment.id}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleApprove = async (batchId: string) => {
+    if (!organizationId) return;
+
+    setApprovingBatchId(batchId);
+    try {
+      await WorkerPaymentService.updatePaymentStatus(organizationId, {
+        batchId,
+        status: "approved",
+      });
+      toast.success("Payment batch approved");
+      invalidate();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to approve payment"
+      );
+    } finally {
+      setApprovingBatchId(null);
+    }
+  };
+
+  const getStatusBadge = (status?: string) => {
+    const statusKey = (status || "calculated") as PaymentStatus;
+    const config = statusConfig[statusKey] || statusConfig.calculated;
+
+    return (
+      <Badge
+        variant={config.variant}
+        className={cn("font-medium", config.className)}
+      >
+        {config.icon}
+        {config.label}
+      </Badge>
+    );
   };
 
   return (
@@ -161,27 +268,7 @@ export default function PaymentHistoryList() {
                       <TableCell className="text-right font-medium">
                         {formatCurrency(payment.totalPayment)}
                       </TableCell>
-                      <TableCell>
-                        {payment.status ? (
-                          <Badge
-                            variant={
-                              payment.status === "paid"
-                                ? "default"
-                                : payment.status === "approved"
-                                ? "secondary"
-                                : "outline"
-                            }
-                          >
-                            {payment.status === "paid" && (
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                            )}
-                            {payment.status.charAt(0).toUpperCase() +
-                              payment.status.slice(1)}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Calculated</Badge>
-                        )}
-                      </TableCell>
+                      <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
                         {format(
                           new Date(payment.calculatedAt),
@@ -197,8 +284,29 @@ export default function PaymentHistoryList() {
                           >
                             View Details
                           </Button>
+                          {/* Approve button - only for calculated status */}
                           {payment.batch_id &&
-                            (!payment.status || payment.status !== "paid") && (
+                            (!payment.status ||
+                              payment.status === "calculated") && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => handleApprove(payment.batch_id!)}
+                                disabled={approvingBatchId === payment.batch_id}
+                              >
+                                {approvingBatchId === payment.batch_id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  "Approve"
+                                )}
+                              </Button>
+                            )}
+                          {/* Mark as Paid button - for approved or processing status */}
+                          {payment.batch_id &&
+                            payment.status &&
+                            ["approved", "processing"].includes(
+                              payment.status
+                            ) && (
                               <Button
                                 variant="default"
                                 size="sm"
@@ -214,6 +322,7 @@ export default function PaymentHistoryList() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleExport(payment)}
+                            title="Export to CSV"
                           >
                             <Download className="h-4 w-4" />
                           </Button>

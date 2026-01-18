@@ -36,6 +36,14 @@ interface AppliedRule {
   snapshot_data: Record<string, unknown>;
 }
 
+interface WorkerPaymentSplit {
+  worker_id: string;
+  worker_name: string;
+  amount: number;
+  rate_card_id?: string;
+  allocation_type?: string;
+}
+
 interface WorkerPaymentCalculation {
   job_id: string;
   line_items: WorkerPaymentLineItem[];
@@ -43,6 +51,7 @@ interface WorkerPaymentCalculation {
   subtotal: number;
   total_adjustments: number;
   total_worker_payment: number;
+  worker_splits?: WorkerPaymentSplit[];
 }
 
 type FieldConfig = {
@@ -124,6 +133,37 @@ type LocationContext = {
   locationId: string | null;
   ancestors: Set<string>;
   depthMap: Map<string, number>;
+};
+
+type WorkerRateCard = {
+  id: string;
+  worker_id: string;
+  hourly_rate: number;
+  currency: string;
+  rate_type: string;
+  role_title: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  is_active: boolean;
+};
+
+type WorkerPaymentAllocation = {
+  id: string;
+  job_id: string;
+  worker_id: string;
+  allocation_type: "percentage" | "amount" | "hours";
+  percentage: number | null;
+  fixed_amount: number | null;
+  hours_worked: number | null;
+};
+
+type JobWorker = {
+  worker_id: string;
+  worker: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
 };
 
 serve(async (req) => {
@@ -311,6 +351,70 @@ serve(async (req) => {
       (fieldConfigs || []).map((config) => [config.id, config as FieldConfig]),
     );
 
+    // Fetch worker rate cards for rate-based splits
+    const { data: rateCards, error: rateCardsError } = await supabase
+      .from("worker_rate_card")
+      .select("*")
+      .eq("organization_id", organization_id)
+      .eq("is_active", true)
+      .eq("rate_type", "standard")
+      .lte("effective_from", new Date().toISOString().split("T")[0])
+      .or(
+        `effective_to.is.null,effective_to.gte.${
+          new Date().toISOString().split("T")[0]
+        }`,
+      );
+
+    if (rateCardsError) {
+      logger.warn("Failed to fetch rate cards, proceeding with equal split", {
+        error: rateCardsError.message,
+      });
+    }
+
+    const rateCardMap = new Map<string, WorkerRateCard>();
+    (rateCards || []).forEach((card) => {
+      rateCardMap.set(card.worker_id, card as WorkerRateCard);
+    });
+
+    // Fetch custom allocations for the jobs
+    const { data: allocations, error: allocationsError } = await supabase
+      .from("worker_payment_allocation")
+      .select("*")
+      .eq("organization_id", organization_id)
+      .in("job_id", job_ids);
+
+    if (allocationsError) {
+      logger.warn("Failed to fetch allocations, proceeding without", {
+        error: allocationsError.message,
+      });
+    }
+
+    const allocationsByJob = new Map<string, WorkerPaymentAllocation[]>();
+    (allocations || []).forEach((alloc) => {
+      const jobAllocs = allocationsByJob.get(alloc.job_id) || [];
+      jobAllocs.push(alloc as WorkerPaymentAllocation);
+      allocationsByJob.set(alloc.job_id, jobAllocs);
+    });
+
+    // Fetch job workers for split calculations
+    const { data: jobWorkers, error: jobWorkersError } = await supabase
+      .from("job_worker")
+      .select("job_id, worker_id, worker:worker_id(id, first_name, last_name)")
+      .in("job_id", job_ids);
+
+    if (jobWorkersError) {
+      logger.warn("Failed to fetch job workers", {
+        error: jobWorkersError.message,
+      });
+    }
+
+    const workersByJob = new Map<string, JobWorker[]>();
+    (jobWorkers || []).forEach((jw) => {
+      const workers = workersByJob.get(jw.job_id) || [];
+      workers.push(jw as unknown as JobWorker);
+      workersByJob.set(jw.job_id, workers);
+    });
+
     const calculations: WorkerPaymentCalculation[] = [];
 
     for (const job of jobs as JobRecord[]) {
@@ -322,6 +426,20 @@ serve(async (req) => {
         servicePricingModes:
           (servicePricingModes || []) as ServicePricingModeRow[],
       });
+
+      // Calculate worker splits
+      const workers = workersByJob.get(job.id) || [];
+      const jobAllocations = allocationsByJob.get(job.id) || [];
+
+      if (workers.length > 0) {
+        calculation.worker_splits = calculateWorkerSplits({
+          totalPayment: calculation.total_worker_payment,
+          workers,
+          rateCardMap,
+          allocations: jobAllocations,
+        });
+      }
+
       calculations.push(calculation);
     }
 
@@ -1100,4 +1218,159 @@ function evaluateCondition(
     default:
       return false;
   }
+}
+
+/**
+ * Calculate how to split the total payment among workers.
+ *
+ * Priority:
+ * 1. Custom allocations (if set for this job)
+ * 2. Rate-based split (if all workers have rate cards)
+ * 3. Equal split (fallback)
+ */
+function calculateWorkerSplits({
+  totalPayment,
+  workers,
+  rateCardMap,
+  allocations,
+}: {
+  totalPayment: number;
+  workers: JobWorker[];
+  rateCardMap: Map<string, WorkerRateCard>;
+  allocations: WorkerPaymentAllocation[];
+}): WorkerPaymentSplit[] {
+  if (workers.length === 0) return [];
+  if (workers.length === 1) {
+    const worker = workers[0];
+    const workerName = worker.worker
+      ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+      : "Unknown";
+    return [
+      {
+        worker_id: worker.worker_id,
+        worker_name: workerName,
+        amount: totalPayment,
+        allocation_type: "single_worker",
+      },
+    ];
+  }
+
+  // Strategy 1: Custom allocations
+  if (allocations.length > 0) {
+    // Check if all workers have allocations
+    const workerIds = new Set(workers.map((w) => w.worker_id));
+    const allocatedWorkerIds = new Set(allocations.map((a) => a.worker_id));
+    const allWorkersAllocated = [...workerIds].every((id) =>
+      allocatedWorkerIds.has(id)
+    );
+
+    if (allWorkersAllocated) {
+      const allocationType = allocations[0].allocation_type;
+
+      if (allocationType === "percentage") {
+        return workers.map((worker) => {
+          const allocation = allocations.find(
+            (a) => a.worker_id === worker.worker_id,
+          );
+          const percentage = allocation?.percentage || 0;
+          const workerName = worker.worker
+            ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+            : "Unknown";
+          return {
+            worker_id: worker.worker_id,
+            worker_name: workerName,
+            amount: Math.round((totalPayment * percentage) / 100 * 100) / 100,
+            allocation_type: "percentage",
+          };
+        });
+      }
+
+      if (allocationType === "amount") {
+        return workers.map((worker) => {
+          const allocation = allocations.find(
+            (a) => a.worker_id === worker.worker_id,
+          );
+          const workerName = worker.worker
+            ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+            : "Unknown";
+          return {
+            worker_id: worker.worker_id,
+            worker_name: workerName,
+            amount: allocation?.fixed_amount || 0,
+            allocation_type: "fixed_amount",
+          };
+        });
+      }
+
+      if (allocationType === "hours") {
+        const totalHours = allocations.reduce(
+          (sum, a) => sum + (a.hours_worked || 0),
+          0,
+        );
+        if (totalHours > 0) {
+          return workers.map((worker) => {
+            const allocation = allocations.find(
+              (a) => a.worker_id === worker.worker_id,
+            );
+            const hours = allocation?.hours_worked || 0;
+            const workerName = worker.worker
+              ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+              : "Unknown";
+            return {
+              worker_id: worker.worker_id,
+              worker_name: workerName,
+              amount: Math.round((totalPayment * hours) / totalHours * 100) /
+                100,
+              allocation_type: "hours",
+            };
+          });
+        }
+      }
+    }
+  }
+
+  // Strategy 2: Rate-based split (if all workers have rate cards)
+  const workerRates = workers.map((worker) => ({
+    worker,
+    rateCard: rateCardMap.get(worker.worker_id),
+  }));
+
+  const allHaveRates = workerRates.every((wr) => wr.rateCard !== undefined);
+
+  if (allHaveRates) {
+    const totalRate = workerRates.reduce(
+      (sum, wr) => sum + (wr.rateCard?.hourly_rate || 0),
+      0,
+    );
+
+    if (totalRate > 0) {
+      return workerRates.map(({ worker, rateCard }) => {
+        const rate = rateCard?.hourly_rate || 0;
+        const workerName = worker.worker
+          ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+          : "Unknown";
+        return {
+          worker_id: worker.worker_id,
+          worker_name: workerName,
+          amount: Math.round((totalPayment * rate) / totalRate * 100) / 100,
+          rate_card_id: rateCard?.id,
+          allocation_type: "rate_based",
+        };
+      });
+    }
+  }
+
+  // Strategy 3: Equal split (fallback)
+  const equalShare = Math.round((totalPayment / workers.length) * 100) / 100;
+  return workers.map((worker) => {
+    const workerName = worker.worker
+      ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+      : "Unknown";
+    return {
+      worker_id: worker.worker_id,
+      worker_name: workerName,
+      amount: equalShare,
+      allocation_type: "equal_split",
+    };
+  });
 }

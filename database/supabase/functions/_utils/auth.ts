@@ -65,6 +65,26 @@ export async function getOrganizationIdFromAdmin(
 }
 
 /**
+ * Get organization user details (id, organization_id, role) by email
+ */
+export async function getOrganizationUserByEmail(
+  supabase: SupabaseClient,
+  email: string,
+): Promise<{ id: string; organization_id: string; role: string } | null> {
+  const { data: orgUser, error: orgUserError } = await supabase
+    .from("organization_user")
+    .select("id, organization_id, role")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (orgUserError || !orgUser) {
+    return null;
+  }
+
+  return orgUser;
+}
+
+/**
  * Get organization ID from worker (by auth_user_id in worker table)
  */
 export async function getOrganizationIdFromWorker(

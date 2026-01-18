@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -93,6 +94,32 @@ serve(async (req) => {
       if (acceptError) {
         console.error("Accept invitation error:", acceptError);
         return errorResponse("Failed to mark invitation as accepted", 500);
+      }
+
+      // Step 5: Create notification for admins (non-blocking)
+      // Get worker name for notification message
+      const { data: workerData } = await supabase
+        .from("worker")
+        .select("first_name, last_name")
+        .eq("id", invitation.worker.id)
+        .single();
+
+      const workerName = workerData
+        ? `${workerData.first_name} ${workerData.last_name}`.trim()
+        : invitation.worker_email;
+
+      const notificationResult = await createNotification(supabase, {
+        organization_id: invitation.organization_id,
+        type: "worker_active",
+        title: "Worker Activated",
+        message: `${workerName} has completed onboarding and is now active.`,
+        related_entity_type: "worker",
+        related_entity_id: invitation.worker.id,
+      });
+
+      if (!notificationResult.success) {
+        // Log but don't fail the request - notification is non-critical
+        console.warn("Failed to create notification:", notificationResult.error);
       }
 
       return jsonResponse({

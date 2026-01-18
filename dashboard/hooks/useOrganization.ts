@@ -8,6 +8,8 @@ import useAuth from "./useAuth";
 function useOrganization() {
   const { user, loading: authLoading } = useAuth();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organizationUserId, setOrganizationUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchedUserIdRef = useRef<string | null>(null);
@@ -21,12 +23,14 @@ function useOrganization() {
     if (!user?.email || !user?.id) {
       setLoading(false);
       // Reset if user is no longer available
-      if (!user) {
-        setOrganizationId(null);
-        fetchedUserIdRef.current = null;
+        if (!user) {
+          setOrganizationId(null);
+          setOrganizationUserId(null);
+          setUserRole(null);
+          fetchedUserIdRef.current = null;
+        }
+        return;
       }
-      return;
-    }
 
     // Skip if we've already fetched for this user
     if (fetchedUserIdRef.current === user.id) {
@@ -72,8 +76,12 @@ function useOrganization() {
         if (data?.organization_id) {
           log.info("useOrganization: Organization found", {
             organizationId: data.organization_id,
+            organizationUserId: data.organization_user_id,
+            role: data.role,
           });
           setOrganizationId(data.organization_id);
+          setOrganizationUserId(data.organization_user_id || null);
+          setUserRole(data.role || null);
           fetchedUserIdRef.current = user.id;
           setError(null);
         } else {
@@ -118,7 +126,7 @@ function useOrganization() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.email, authLoading]);
 
-  return { organizationId, loading, error };
+  return { organizationId, organizationUserId, userRole, loading, error };
 }
 
 export default useOrganization;

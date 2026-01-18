@@ -42,6 +42,9 @@ export default function MarkPaymentPaidDialog({
     "bank_transfer" | "cash" | "check" | "payroll_system" | "other" | ""
   >("");
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -73,6 +76,7 @@ export default function MarkPaymentPaidDialog({
       // Reset form
       setPaymentMethod("");
       setPaymentReference("");
+      setPaymentDate(new Date().toISOString().split("T")[0]);
       setNotes("");
       onSuccess?.();
     } catch (error) {
@@ -129,6 +133,19 @@ export default function MarkPaymentPaidDialog({
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="payment-date">
+                Payment Date <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="payment-date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                required
+              />
             </div>
 
             <div className="space-y-2">
