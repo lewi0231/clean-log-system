@@ -1,21 +1,24 @@
 import { serve } from "server";
+import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  getInvoiceDetailsSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
   try {
-    const body = await req.json();
-    const validation = validateRequiredFields(body, ["invoice_id"]);
-
-    if (!validation.valid) {
-      return errorResponse("Invoice ID is required", 400);
+    const rawBody = await req.json();
+    const validation = validateRequest(getInvoiceDetailsSchema, rawBody);
+    if (!validation.success) {
+      return errorResponse(validation.error, 400);
     }
 
-    const { invoice_id } = body;
+    const { invoice_id } = validation.data as { invoice_id: string };
 
     const supabase = createServiceRoleClient();
 
@@ -45,12 +48,26 @@ serve(async (req) => {
         `,
       )
       .eq("id", invoice_id)
-      .single();
+      .maybeSingle();
 
     if (invoiceError) throw invoiceError;
 
     if (!invoice) {
       return errorResponse("Invoice not found", 404);
+    }
+
+    // Verify organization membership
+    const membershipCheck = await verifyOrganizationMembershipFromRequest(
+      req,
+      invoice.organization_id,
+      supabase,
+      rawBody as Record<string, unknown>,
+    );
+    if (!membershipCheck) {
+      return errorResponse(
+        "You do not have permission to access this invoice",
+        403,
+      );
     }
 
     // Extract job IDs from invoice_job relationships
@@ -68,11 +85,13 @@ serve(async (req) => {
     }
 
     // Call calculate-invoice function to get line items and calculations
+    // Pass email for nested function auth (service role key doesn't carry user context)
     const { data: calculationData, error: calcError } = await supabase.functions
       .invoke("calculate-invoice", {
         body: {
           organization_id: invoice.organization_id,
           job_ids: jobIds,
+          email: membershipCheck.userEmail, // Pass verified email for nested auth
         },
       });
 

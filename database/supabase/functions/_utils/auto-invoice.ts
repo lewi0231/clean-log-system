@@ -48,10 +48,18 @@ export async function isAutoGenerateEnabled(
     .eq("organization_id", organizationId)
     .maybeSingle();
 
-  if (error || !orgSettings) {
+  if (error) {
+    // Log error but return false to be safe
+    console.error("Error checking auto_generate_invoices_immediately:", error);
     return false;
   }
 
+  if (!orgSettings) {
+    // No settings record exists, auto-generate is disabled
+    return false;
+  }
+
+  // Explicitly check for true (handles null, undefined, false)
   return orgSettings.auto_generate_invoices_immediately === true;
 }
 
@@ -218,7 +226,17 @@ export async function autoGenerateInvoiceForJob(
       organizationId,
     );
 
+    logger.debug("Checking auto-generate invoices setting", {
+      jobId,
+      organizationId,
+      autoGenerateEnabled,
+    });
+
     if (!autoGenerateEnabled) {
+      logger.debug("Auto-generate invoices disabled or not configured", {
+        jobId,
+        organizationId,
+      });
       return {
         success: true,
         skipped: true,

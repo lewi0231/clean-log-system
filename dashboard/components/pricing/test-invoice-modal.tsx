@@ -1,5 +1,6 @@
 "use client";
 
+import { FieldRenderer } from "@/components/shared/field-renderer";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,12 +24,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
+import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { JobsService } from "@/lib/services/jobs.service";
+import { supabase } from "@/lib/supabase";
+import { validateFields } from "@/lib/utils/field-validation";
+import { buildSubmissionData } from "@/lib/utils/submission-data-builder";
 import type { FieldConfig } from "@clean-log/shared/types";
 import {
   AlertCircle,
@@ -37,10 +43,236 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Plus,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+
+interface GroupedBreakdownItem {
+  brand: string;
+  quantity: number;
+}
+
+interface GroupedBreakdownFieldProps {
+  field: FieldConfig;
+  value: GroupedBreakdownItem[];
+  onChange: (items: GroupedBreakdownItem[]) => void;
+  error?: string;
+}
+
+// Grouped Breakdown Field Component for test invoice
+function GroupedBreakdownField({
+  field,
+  value = [],
+  onChange,
+  error,
+}: GroupedBreakdownFieldProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState("");
+  const [quantity, setQuantity] = useState("");
+
+  const options = field.options || [];
+  const validationRules = field.validation_rules;
+  const maxItems = validationRules?.max_items ?? options.length;
+  const minItems = validationRules?.min_items ?? 0;
+  const allowZeroQuantities = validationRules?.allow_zero_quantities ?? false;
+
+  // Get available brands (not already selected)
+  const availableBrands = options.filter(
+    (option) => !value.some((item) => item.brand === option)
+  );
+
+  const handleAddItem = () => {
+    if (!selectedBrand || !quantity) return;
+
+    const quantityNum = parseInt(quantity, 10);
+    if (isNaN(quantityNum) || quantityNum < 0) return;
+    if (!allowZeroQuantities && quantityNum === 0) return;
+
+    // Check if we've reached max items
+    if (value.length >= maxItems) return;
+
+    const newItems = [
+      ...value,
+      { brand: selectedBrand, quantity: quantityNum },
+    ];
+    onChange(newItems);
+    setSelectedBrand("");
+    setQuantity("");
+    setIsAddDialogOpen(false);
+  };
+
+  const handleRemoveItem = (brand: string) => {
+    onChange(value.filter((item) => item.brand !== brand));
+  };
+
+  const handleUpdateQuantity = (brand: string, newQuantity: number) => {
+    if (newQuantity < 0) return;
+    if (!allowZeroQuantities && newQuantity === 0) {
+      // Remove item instead of setting to 0
+      handleRemoveItem(brand);
+      return;
+    }
+
+    onChange(
+      value.map((item) =>
+        item.brand === brand ? { ...item, quantity: newQuantity } : item
+      )
+    );
+  };
+
+  const canAddMore = value.length < maxItems && availableBrands.length > 0;
+
+  return (
+    <div className="space-y-3">
+      <Label>
+        {field.label}
+        {field.required && <span className="text-destructive"> *</span>}
+      </Label>
+
+      {/* Display added items */}
+      {value.length > 0 && (
+        <div className="space-y-2">
+          {value.map((item) => (
+            <div
+              key={item.brand}
+              className="flex items-center justify-between gap-3 border rounded-md p-3 bg-muted/50"
+            >
+              <span className="font-medium flex-1">{item.brand}</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  value={String(item.quantity)}
+                  onChange={(e) => {
+                    const num =
+                      e.target.value === ""
+                        ? 0
+                        : parseInt(e.target.value, 10) || 0;
+                    handleUpdateQuantity(item.brand, num);
+                  }}
+                  className="w-20 text-center"
+                  min="0"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleRemoveItem(item.brand)}
+                  className="h-8 w-8 text-destructive hover:text-destructive"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add Entry button */}
+      {canAddMore && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setIsAddDialogOpen(true)}
+          className="w-full"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Entry
+        </Button>
+      )}
+
+      {/* Validation messages */}
+      {value.length < minItems && (
+        <p className="text-sm text-orange-500">
+          At least {minItems} item(s) required
+        </p>
+      )}
+      {value.length >= maxItems && (
+        <p className="text-sm text-muted-foreground">
+          Maximum {maxItems} item(s) reached
+        </p>
+      )}
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {field.description && !error && (
+        <p className="text-xs text-muted-foreground">{field.description}</p>
+      )}
+
+      {/* Add Item Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add {field.label}</DialogTitle>
+            <DialogDescription>
+              Select a brand and enter the quantity
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Option Select */}
+            <div className="space-y-2">
+              <Label htmlFor="add-brand">Option</Label>
+              <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+                <SelectTrigger id="add-brand">
+                  <SelectValue placeholder="Select an option" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBrands.map((brand: string) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Quantity Input */}
+            <div className="space-y-2">
+              <Label htmlFor="add-quantity">Quantity</Label>
+              <Input
+                id="add-quantity"
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="Enter quantity"
+                min="0"
+              />
+              {!allowZeroQuantities && (
+                <p className="text-xs text-muted-foreground">
+                  Zero quantities are not allowed
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDialogOpen(false);
+                setSelectedBrand("");
+                setQuantity("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddItem}
+              disabled={
+                !selectedBrand ||
+                !quantity ||
+                parseInt(quantity, 10) < 0 ||
+                (!allowZeroQuantities && parseInt(quantity, 10) === 0)
+              }
+            >
+              Add
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 interface TestInvoiceModalProps {
   open: boolean;
@@ -53,13 +285,35 @@ export default function TestInvoiceModal({
 }: TestInvoiceModalProps) {
   const { organizationId } = useOrganization();
   const { fieldConfigs, loading: fieldsLoading } = useFieldConfigs();
+  const { sections } = useMobileConfig(organizationId);
   const { locations, loading: locationsLoading } = useLocations();
+  const { settings, loading: settingsLoading } = useOrganizationSettings();
   const { workers, loading: workersLoading } = useWorkers();
   const { formatCurrency } = useOrganizationCurrency();
 
+  // Location is only required if use_predefined_locations is enabled
+  const isLocationRequired = settings?.use_predefined_locations ?? true;
+
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [startDateTime, setStartDateTime] = useState<string>("");
+  // Use local timezone for datetime-local input (not UTC)
+  const getLocalDateTimeString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+  const [finishDateTime, setFinishDateTime] = useState<string>(
+    getLocalDateTimeString()
+  );
   const [fieldValues, setFieldValues] = useState<
-    Record<string, string | number | boolean>
+    Record<
+      string,
+      string | number | boolean | string[] | GroupedBreakdownItem[]
+    >
   >({});
   const [calculation, setCalculation] = useState<{
     total: number;
@@ -70,6 +324,7 @@ export default function TestInvoiceModal({
     line_items: Array<{
       field_name: string;
       field_label: string;
+      option_value?: string;
       quantity: number;
       unit_price: number;
       total: number;
@@ -83,24 +338,81 @@ export default function TestInvoiceModal({
     "input"
   );
 
-  // Get fields that should be shown in the form (exclude system fields and complex types)
+  // Get fields that should be shown in the form (exclude system fields only)
+  // Order fields to match mobile config: sections sorted by order_position, fields within sections by field_ids order
+  // Note: Fields must be sectioned to appear on mobile app, so we only include sectioned fields
   const formFields = useMemo(() => {
-    return fieldConfigs.filter(
-      (field) =>
-        !field.name.startsWith("_") && field.field_type !== "grouped_breakdown" // Skip grouped_breakdown for simplicity
+    const allFields = fieldConfigs.filter(
+      (field) => !field.name.startsWith("_") // Include grouped_breakdown for true test
     );
-  }, [fieldConfigs]);
 
-  // Reset when modal opens/closes
+    // Create a map of section_id to fields
+    const sectionedFields: FieldConfig[] = [];
+
+    // Sort sections by order_position
+    const sortedSections = [...sections].sort(
+      (a, b) => a.order_position - b.order_position
+    );
+
+    // Process fields in section order
+    sortedSections.forEach((section) => {
+      // Process fields in the order specified by field_ids
+      section.field_ids.forEach((fieldId) => {
+        const fieldConfig = allFields.find((fc) => fc.id === fieldId);
+        if (fieldConfig) {
+          sectionedFields.push(fieldConfig);
+        }
+      });
+    });
+
+    return sectionedFields;
+  }, [fieldConfigs, sections]);
+
+  // Reset when modal opens/closes, and cleanup test data
   useEffect(() => {
     if (!open) {
+      // Capture current IDs before they're reset to avoid race condition
+      const jobIdToDelete = createdJobId;
+      const invoiceIdToDelete = createdInvoiceId;
+
+      // Cleanup test data asynchronously
+      if (organizationId && (jobIdToDelete || invoiceIdToDelete)) {
+        (async () => {
+          try {
+            log.debug("Cleaning up test data", {
+              jobId: jobIdToDelete,
+              invoiceId: invoiceIdToDelete,
+            });
+
+            await supabase.functions.invoke("delete-test-data", {
+              body: {
+                organization_id: organizationId,
+                job_id: jobIdToDelete,
+                invoice_id: invoiceIdToDelete,
+              },
+            });
+
+            log.info("Test data cleaned up successfully");
+          } catch (err) {
+            // Don't show error to user, just log it
+            log.warn("Failed to cleanup test data", {
+              error: err instanceof Error ? err.message : "Unknown error",
+            });
+          }
+        })();
+      }
+
+      // Reset state immediately
       setSelectedLocationId("");
+      setStartDateTime("");
+      setFinishDateTime(getLocalDateTimeString());
       setFieldValues({});
       setCalculation(null);
       setCreatedJobId(null);
       setCreatedInvoiceId(null);
       setActiveTab("input");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Calculate invoice for a job
@@ -119,11 +431,14 @@ export default function TestInvoiceModal({
 
         if (result.job_calculations.length > 0) {
           const calc = result.job_calculations[0];
+          // Use the job-level worker_payment_total (for single job, should match aggregated total_worker_payment)
+          const workerPayment = calc.worker_payment_total ?? 0;
+
           setCalculation({
             total: calc.total,
             subtotal: calc.subtotal,
             total_adjustments: calc.total_adjustments,
-            total_worker_payment: calc.worker_payment_total,
+            total_worker_payment: workerPayment,
             margin: calc.margin,
             line_items: calc.line_items,
           });
@@ -145,17 +460,19 @@ export default function TestInvoiceModal({
 
   // Create test job
   const handleCreateTestJob = useCallback(async () => {
-    if (!organizationId || !selectedLocationId) {
+    if (!organizationId) {
+      toast.error("Organization not found");
+      return;
+    }
+
+    // Only require location if use_predefined_locations is enabled
+    if (isLocationRequired && !selectedLocationId) {
       toast.error("Please select a location");
       return;
     }
 
-    if (workers.length === 0) {
-      toast.error(
-        "No workers available. Please add at least one worker first."
-      );
-      return;
-    }
+    // Workers are optional - for sole traders, the admin user may be the only worker
+    // and they might not have workers set up yet
 
     try {
       setCreatingJob(true);
@@ -167,35 +484,55 @@ export default function TestInvoiceModal({
         _test_created_at: new Date().toISOString(),
       };
 
-      // Process field values according to their types
-      formFields.forEach((field) => {
-        const value = fieldValues[field.id];
-        if (field.field_type === "grouped_breakdown") {
-          // Ensure grouped_breakdown is always an array
-          submissionData[field.name] = Array.isArray(value) ? value : [];
-        } else if (field.field_type === "time") {
-          // Ensure time is always a string in HH:mm format
-          if (typeof value === "string" && value !== "") {
-            submissionData[field.name] = value;
-          } else {
-            // If no value, use current time
-            const now = new Date();
-            const hours = now.getHours().toString().padStart(2, "0");
-            const minutes = now.getMinutes().toString().padStart(2, "0");
-            submissionData[field.name] = `${hours}:${minutes}`;
-          }
-        } else {
-          submissionData[field.name] = value ?? (field.required ? null : "");
+      // Validate required fields using shared utility
+      const validationErrors = validateFields(formFields, fieldValues);
+      if (Object.keys(validationErrors).length > 0) {
+        const missingFields = Object.values(validationErrors);
+        toast.error(
+          `Please fill in required fields: ${missingFields.join(", ")}`
+        );
+        return;
+      }
+
+      // Build submission data using shared utility
+      const builtSubmissionData = buildSubmissionData(formFields, fieldValues);
+      Object.assign(submissionData, builtSubmissionData);
+
+      // Add start_time if provided (store as ISO datetime string)
+      if (startDateTime && startDateTime.trim() !== "") {
+        const startDate = new Date(startDateTime);
+        if (!isNaN(startDate.getTime())) {
+          submissionData.start_time = startDate.toISOString();
         }
-      });
+      }
+
+      // Add finish_time if provided (store as ISO datetime string)
+      if (finishDateTime && finishDateTime.trim() !== "") {
+        const finishDate = new Date(finishDateTime);
+        if (!isNaN(finishDate.getTime())) {
+          submissionData.finish_time = finishDate.toISOString();
+        }
+      }
 
       // Create test job
+      // Use first available worker if any exist, otherwise pass empty array (workers are optional)
+      const workerIds = workers.length > 0 ? [workers[0].id] : [];
+
+      // Use finishDateTime for completed_at, or current time if not provided
+      const completedAtDate = finishDateTime
+        ? new Date(finishDateTime)
+        : new Date();
+      if (isNaN(completedAtDate.getTime())) {
+        // Fallback to current time if finishDateTime is invalid
+        completedAtDate.setTime(Date.now());
+      }
+
       const jobResponse = await JobsService.create({
         organization_id: organizationId,
-        location_id: selectedLocationId,
-        worker_ids: [workers[0].id], // Use first available worker
+        location_id: isLocationRequired ? selectedLocationId : null,
+        worker_ids: workerIds.length > 0 ? workerIds : undefined,
         submission_data: submissionData,
-        completed_at: new Date().toISOString(),
+        completed_at: completedAtDate.toISOString(),
       });
 
       if (!jobResponse.job) {
@@ -227,6 +564,9 @@ export default function TestInvoiceModal({
     workers,
     calculateInvoice,
     formFields,
+    isLocationRequired,
+    startDateTime,
+    finishDateTime,
   ]);
 
   // Create invoice from test job
@@ -238,9 +578,10 @@ export default function TestInvoiceModal({
     try {
       setCreatingJob(true);
       // Calculate due date (30 days from now by default)
+      // API expects ISO 8601 datetime string, not just date
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 30);
-      const dueDateString = dueDate.toISOString().split("T")[0];
+      const dueDateString = dueDate.toISOString();
 
       const invoice = await InvoiceService.create({
         organization_id: organizationId,
@@ -254,132 +595,36 @@ export default function TestInvoiceModal({
     } catch (err) {
       log.error("Failed to create invoice", {
         error: err instanceof Error ? err.message : "Unknown error",
+        jobId: createdJobId,
       });
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to create invoice. Please try again."
-      );
+
+      // Provide more helpful error message
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      if (
+        errorMessage.includes("already") ||
+        errorMessage.includes("invoiced")
+      ) {
+        toast.error(
+          "This test job has already been invoiced. Please create a new test job to generate another invoice."
+        );
+      } else {
+        toast.error(
+          errorMessage || "Failed to create invoice. Please try again."
+        );
+      }
     } finally {
       setCreatingJob(false);
     }
   }, [organizationId, createdJobId]);
 
-  // Render field input based on field type
-  const renderFieldInput = (field: FieldConfig) => {
-    const value = fieldValues[field.id] ?? "";
+  // Use shared field renderer component
 
-    switch (field.field_type) {
-      case "text":
-      case "textarea":
-        return (
-          <Input
-            id={field.id}
-            value={value as string}
-            onChange={(e) =>
-              setFieldValues((prev) => ({
-                ...prev,
-                [field.id]: e.target.value,
-              }))
-            }
-            placeholder={
-              field.description || `Enter ${field.label.toLowerCase()}`
-            }
-          />
-        );
-
-      case "number":
-        return (
-          <Input
-            id={field.id}
-            type="number"
-            value={value as number}
-            onChange={(e) =>
-              setFieldValues((prev) => ({
-                ...prev,
-                [field.id]: parseFloat(e.target.value) || 0,
-              }))
-            }
-            placeholder="0"
-          />
-        );
-
-      case "boolean":
-        return (
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id={field.id}
-              checked={value === true}
-              onChange={(e) =>
-                setFieldValues((prev) => ({
-                  ...prev,
-                  [field.id]: e.target.checked,
-                }))
-              }
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            <Label htmlFor={field.id} className="font-normal">
-              {field.label}
-            </Label>
-          </div>
-        );
-
-      case "select":
-        return (
-          <Select
-            value={value as string}
-            onValueChange={(val) =>
-              setFieldValues((prev) => ({ ...prev, [field.id]: val }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue
-                placeholder={`Select ${field.label.toLowerCase()}`}
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {field.options?.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-
-      case "grouped_breakdown":
-        // For test purposes, skip grouped_breakdown fields as they require complex input
-        // Users can test these through the actual mobile app
-        return (
-          <div className="text-sm text-muted-foreground italic">
-            Grouped breakdown fields are skipped in test mode. Test these
-            through the mobile app.
-          </div>
-        );
-
-      default:
-        return (
-          <Input
-            id={field.id}
-            value={value as string}
-            onChange={(e) =>
-              setFieldValues((prev) => ({
-                ...prev,
-                [field.id]: e.target.value,
-              }))
-            }
-            placeholder={`Enter ${field.label.toLowerCase()}`}
-          />
-        );
-    }
-  };
-
-  const loading = fieldsLoading || locationsLoading || workersLoading;
+  const loading =
+    fieldsLoading || locationsLoading || workersLoading || settingsLoading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
@@ -395,6 +640,7 @@ export default function TestInvoiceModal({
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as typeof activeTab)}
+          className="flex flex-col flex-1 min-h-0"
         >
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="input">Input Data</TabsTrigger>
@@ -406,7 +652,10 @@ export default function TestInvoiceModal({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="input" className="space-y-6 mt-4">
+          <TabsContent
+            value="input"
+            className="space-y-6 mt-4 flex-1 overflow-y-auto pr-1"
+          >
             {loading ? (
               <div className="space-y-4">
                 <Skeleton className="h-10 w-full" />
@@ -415,69 +664,157 @@ export default function TestInvoiceModal({
               </div>
             ) : (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location *</Label>
-                  <Select
-                    value={selectedLocationId}
-                    onValueChange={setSelectedLocationId}
-                  >
-                    <SelectTrigger id="location">
-                      <SelectValue placeholder="Select a location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((location) => (
-                        <SelectItem key={location.id} value={location.id}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {locations.length === 0 && (
+                {/* Location Selection - Only show if use_predefined_locations is enabled */}
+                {isLocationRequired && (
+                  <div className="space-y-2 p-4 bg-muted/30 rounded-lg border">
+                    <Label htmlFor="location" className="text-sm font-medium">
+                      Location
+                      {isLocationRequired && (
+                        <span className="text-destructive ml-1">*</span>
+                      )}
+                    </Label>
+                    <Select
+                      value={selectedLocationId}
+                      onValueChange={setSelectedLocationId}
+                    >
+                      <SelectTrigger id="location">
+                        <SelectValue placeholder="Select a location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {locations.length === 0 && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        No locations available. Please add a location first.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Start and Finish Time */}
+                <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
+                  <div className="space-y-1">
+                    <Label className="text-base font-semibold">
+                      Job Timing
+                    </Label>
                     <p className="text-sm text-muted-foreground">
-                      No locations available. Please add a location first.
+                      Optional: Set when the job started and finished
                     </p>
-                  )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="start-time"
+                        className="text-sm font-medium"
+                      >
+                        Start Time
+                      </Label>
+                      <Input
+                        id="start-time"
+                        type="datetime-local"
+                        value={startDateTime}
+                        onChange={(e) => setStartDateTime(e.target.value)}
+                        placeholder="Start time (optional)"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="finish-time"
+                        className="text-sm font-medium"
+                      >
+                        Finish Time
+                      </Label>
+                      <Input
+                        id="finish-time"
+                        type="datetime-local"
+                        value={finishDateTime}
+                        onChange={(e) => setFinishDateTime(e.target.value)}
+                        placeholder="Finish time (optional)"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {formFields.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label>Field Values</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Enter sample values to test your pricing
+                  <div className="space-y-6">
+                    <div className="space-y-1">
+                      <Label className="text-base font-semibold">
+                        Field Values
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Enter sample values to test your pricing configuration
                       </p>
                     </div>
-                    {formFields.map((field) => (
-                      <div key={field.id} className="space-y-2">
-                        <Label htmlFor={field.id}>
-                          {field.label}
-                          {field.required && (
-                            <span className="text-destructive ml-1">*</span>
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                      {formFields.map((field) => (
+                        <div
+                          key={field.id}
+                          className="space-y-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+                        >
+                          {field.field_type === "grouped_breakdown" ? (
+                            <GroupedBreakdownField
+                              field={field}
+                              value={
+                                (fieldValues[
+                                  field.id
+                                ] as GroupedBreakdownItem[]) || []
+                              }
+                              onChange={(items) =>
+                                setFieldValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: items,
+                                }))
+                              }
+                            />
+                          ) : (
+                            <FieldRenderer
+                              field={field}
+                              value={(() => {
+                                const val = fieldValues[field.id];
+                                // Exclude GroupedBreakdownItem[] for non-grouped_breakdown fields
+                                return Array.isArray(val) &&
+                                  val.length > 0 &&
+                                  typeof val[0] === "object" &&
+                                  "brand" in val[0]
+                                  ? undefined
+                                  : (val as
+                                      | string
+                                      | number
+                                      | boolean
+                                      | string[]
+                                      | undefined);
+                              })()}
+                              onChange={(val) =>
+                                setFieldValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: val,
+                                }))
+                              }
+                            />
                           )}
-                        </Label>
-                        {renderFieldInput(field)}
-                        {field.description && (
-                          <p className="text-xs text-muted-foreground">
-                            {field.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                    <p>No fields configured yet.</p>
+                  <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted/30">
+                    <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium mb-1">No fields configured yet</p>
                     <p className="text-sm">
                       Configure fields in Mobile Application settings first.
                     </p>
                   </div>
                 )}
 
-                <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 p-4 rounded-lg space-y-2">
                   <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="text-sm text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                    <div className="text-sm text-blue-900 dark:text-blue-100">
                       <p className="font-medium mb-1">Test Mode</p>
                       <p>
                         This will create a test job marked with a special flag.
@@ -491,7 +828,10 @@ export default function TestInvoiceModal({
             )}
           </TabsContent>
 
-          <TabsContent value="preview" className="mt-4">
+          <TabsContent
+            value="preview"
+            className="mt-4 flex-1 overflow-y-auto pr-1"
+          >
             {calculating ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -513,17 +853,39 @@ export default function TestInvoiceModal({
                       </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Total</p>
+                      <p className="text-muted-foreground">Invoice Total</p>
                       <p className="text-2xl font-bold">
                         {formatCurrency(calculation.total)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground">Worker Payment</p>
-                      <p className="text-lg font-semibold">
-                        {formatCurrency(calculation.total_worker_payment)}
-                      </p>
-                    </div>
+                    {/* Show worker payment and margin if there are workers assigned */}
+                    {workers.length > 0 && (
+                      <>
+                        <div>
+                          <p className="text-muted-foreground">
+                            Worker Payment
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {formatCurrency(calculation.total_worker_payment)}
+                          </p>
+                          {calculation.total_worker_payment ===
+                            calculation.total && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                              ⚠️ Same as invoice total (check pricing rules)
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Margin</p>
+                          <p className="text-lg font-semibold">
+                            {formatCurrency(calculation.margin)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            (Total - Worker Payment)
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -537,7 +899,15 @@ export default function TestInvoiceModal({
                           className="flex items-center justify-between p-3"
                         >
                           <div>
-                            <p className="font-medium">{item.field_label}</p>
+                            <p className="font-medium">
+                              {item.field_label}
+                              {item.option_value && (
+                                <span className="text-muted-foreground font-normal">
+                                  {" "}
+                                  — {item.option_value}
+                                </span>
+                              )}
+                            </p>
                             {item.quantity > 1 && (
                               <p className="text-sm text-muted-foreground">
                                 {item.quantity} ×{" "}
@@ -558,7 +928,7 @@ export default function TestInvoiceModal({
                   <Button
                     onClick={handleCreateInvoice}
                     disabled={creatingJob}
-                    className="flex-1"
+                    className="flex-1 cursor-pointer"
                   >
                     {creatingJob ? (
                       <>
@@ -581,7 +951,10 @@ export default function TestInvoiceModal({
             )}
           </TabsContent>
 
-          <TabsContent value="result" className="mt-4">
+          <TabsContent
+            value="result"
+            className="mt-4 flex-1 overflow-y-auto pr-1"
+          >
             {createdInvoiceId ? (
               <div className="space-y-4">
                 <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
@@ -589,11 +962,27 @@ export default function TestInvoiceModal({
                     <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                     <div className="flex-1">
                       <p className="font-medium text-green-900 dark:text-green-100">
-                        Invoice Created Successfully!
+                        Test Invoice Preview Ready!
                       </p>
                       <p className="text-sm text-green-700 dark:text-green-300 mt-1">
-                        Your test invoice has been created. You can now view it
-                        in full detail.
+                        Your pricing configuration is working correctly. You can
+                        view the full invoice preview below.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-medium text-amber-900 dark:text-amber-100">
+                        Test Data - Auto Cleanup
+                      </p>
+                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                        This test job and invoice will be automatically deleted
+                        when you close this dialog. They are for preview
+                        purposes only and cannot be sent to customers.
                       </p>
                     </div>
                   </div>
@@ -602,10 +991,11 @@ export default function TestInvoiceModal({
                 <div className="flex gap-2">
                   <Button asChild className="flex-1">
                     <Link
-                      href={`/dashboard/invoicing?invoice=${createdInvoiceId}`}
+                      href={`/dashboard/invoicing/${createdInvoiceId}`}
+                      target="_blank"
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
-                      View Full Invoice
+                      Preview Full Invoice
                     </Link>
                   </Button>
                   <Button
@@ -614,7 +1004,7 @@ export default function TestInvoiceModal({
                       onOpenChange(false);
                     }}
                   >
-                    Close
+                    Close & Cleanup
                   </Button>
                 </div>
               </div>
@@ -637,11 +1027,11 @@ export default function TestInvoiceModal({
               <Button
                 onClick={handleCreateTestJob}
                 disabled={
-                  !selectedLocationId ||
-                  workers.length === 0 ||
+                  (isLocationRequired && !selectedLocationId) ||
                   creatingJob ||
                   loading
                 }
+                className="cursor-pointer"
               >
                 {creatingJob ? (
                   <>

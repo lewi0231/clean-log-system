@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -43,17 +44,21 @@ import { toast } from "sonner";
 interface InvoiceListProps {
   onInvoiceClick?: (invoice: InvoiceWithJobs) => void;
   statusFilter?: string;
+  isAdmin?: boolean;
 }
 
 export default function InvoiceList({
   onInvoiceClick,
   statusFilter,
+  isAdmin = false,
 }: InvoiceListProps) {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [showTests, setShowTests] = useState(false);
   const { invoices, loading, error, refetch } = useInvoices(
     startDate || undefined,
-    endDate || undefined
+    endDate || undefined,
+    showTests
   );
 
   // Filter invoices by status if statusFilter is provided
@@ -95,6 +100,11 @@ export default function InvoiceList({
 
     return (
       <div className="flex items-center gap-2">
+        {invoice.is_test && (
+          <Badge variant="destructive" className="text-[10px] tracking-wide">
+            TEST
+          </Badge>
+        )}
         <Badge variant={variants[status] || "default"}>{statusDisplay}</Badge>
         {isPaid && (
           <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Paid" />
@@ -150,6 +160,8 @@ export default function InvoiceList({
       setSendingInvoiceId(null);
     }
   };
+
+  const isTestInvoice = (invoice: InvoiceWithJobs) => invoice.is_test === true;
 
   const openResendDialog = (e: React.MouseEvent, invoice: InvoiceWithJobs) => {
     e.stopPropagation(); // Prevent row click
@@ -307,6 +319,19 @@ export default function InvoiceList({
               Clear Filters
             </Button>
           )}
+
+          {isAdmin && (
+            <div className="flex items-center gap-2 sm:ml-auto">
+              <Label htmlFor="show-test-invoices" className="text-sm">
+                Show test data
+              </Label>
+              <Switch
+                id="show-test-invoices"
+                checked={showTests}
+                onCheckedChange={setShowTests}
+              />
+            </div>
+          )}
         </div>
 
         {/* Invoice Table */}
@@ -406,8 +431,16 @@ export default function InvoiceList({
                             variant="outline"
                             size="sm"
                             onClick={(e) => handleSendInvoice(e, invoice.id)}
-                            disabled={sendingInvoiceId === invoice.id}
+                            disabled={
+                              sendingInvoiceId === invoice.id ||
+                              isTestInvoice(invoice)
+                            }
                             className="cursor-pointer"
+                            title={
+                              isTestInvoice(invoice)
+                                ? "Test invoices cannot be sent"
+                                : undefined
+                            }
                           >
                             <Mail className="mr-1 h-3 w-3" />
                             {sendingInvoiceId === invoice.id
@@ -420,8 +453,16 @@ export default function InvoiceList({
                             variant="outline"
                             size="sm"
                             onClick={(e) => openResendDialog(e, invoice)}
-                            disabled={sendingInvoiceId === invoice.id}
+                            disabled={
+                              sendingInvoiceId === invoice.id ||
+                              isTestInvoice(invoice)
+                            }
                             className="cursor-pointer"
+                            title={
+                              isTestInvoice(invoice)
+                                ? "Test invoices cannot be resent"
+                                : undefined
+                            }
                           >
                             <RefreshCw className="mr-1 h-3 w-3" />
                             {sendingInvoiceId === invoice.id

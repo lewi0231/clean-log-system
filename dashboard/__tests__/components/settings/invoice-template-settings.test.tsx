@@ -7,6 +7,9 @@
 import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
+import { useLocations } from "@/hooks/use-locations";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
+import useOrganization from "@/hooks/useOrganization";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockFieldConfig } from "../../lib/fixtures";
@@ -14,9 +17,15 @@ import { createMockFieldConfig } from "../../lib/fixtures";
 // Mock the hooks
 vi.mock("@/hooks/use-invoice-template-config");
 vi.mock("@/hooks/use-field-configs");
+vi.mock("@/hooks/use-locations");
+vi.mock("@/hooks/use-organization-settings");
+vi.mock("@/hooks/useOrganization");
 
 const mockUseInvoiceTemplateConfig = vi.mocked(useInvoiceTemplateConfig);
 const mockUseFieldConfigs = vi.mocked(useFieldConfigs);
+const mockUseLocations = vi.mocked(useLocations);
+const mockUseOrganizationSettings = vi.mocked(useOrganizationSettings);
+const mockUseOrganization = vi.mocked(useOrganization);
 
 describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
   const mockUpdateConfig = vi.fn();
@@ -43,6 +52,27 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       loading: false,
       error: null,
       refetch: mockRefetch,
+    });
+    mockUseLocations.mockReturnValue({
+      locations: [],
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+      createLocation: vi.fn(),
+      updateLocation: vi.fn(),
+      deleteLocation: vi.fn(),
+    });
+    mockUseOrganizationSettings.mockReturnValue({
+      settings: null,
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+      updateSettings: vi.fn(),
+    });
+    mockUseOrganization.mockReturnValue({
+      organizationId: "org-1",
+      loading: false,
+      error: null,
     });
   });
 

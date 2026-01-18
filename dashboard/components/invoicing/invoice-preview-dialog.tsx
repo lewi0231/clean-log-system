@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -133,6 +134,15 @@ export default function InvoicePreviewDialog({
         {!loading && !error && invoice && (
           <>
             <div className="p-6 pb-0">
+              {invoice.is_test && (
+                <Alert className="mb-4 border-amber-200 bg-amber-50 text-amber-900">
+                  <AlertTitle>Test invoice</AlertTitle>
+                  <AlertDescription>
+                    This invoice was generated for testing and <b>cannot</b> be
+                    sent to customers.
+                  </AlertDescription>
+                </Alert>
+              )}
               <Tabs defaultValue="preview" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="preview">Invoice Preview</TabsTrigger>
@@ -234,7 +244,13 @@ export default function InvoicePreviewDialog({
                 Print
               </Button>
               {invoice.status === "draft" && (
-                <Button onClick={handleSend} disabled={sending}>
+                <Button
+                  onClick={handleSend}
+                  disabled={sending || invoice.is_test === true}
+                  title={
+                    invoice.is_test ? "Test invoices cannot be sent" : undefined
+                  }
+                >
                   <Mail className="mr-2 h-4 w-4" />
                   {sending ? "Sending..." : "Send Invoice"}
                 </Button>

@@ -71,6 +71,7 @@
     "@types/stripe": "^8.0.417",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.16",
+    "baseline-browser-mapping": "^2.9.11",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
     "jsdom": "24.1.3",

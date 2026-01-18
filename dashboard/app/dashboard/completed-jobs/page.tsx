@@ -4,7 +4,9 @@ import CompletedJobsList from "@/components/completed-jobs/completed-jobs-list";
 import CreateJobDialog from "@/components/completed-jobs/create-job-dialog";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
+import { Label } from "@/components/ui/label";
 import { CompletedJobsSkeleton } from "@/components/ui/skeleton-loaders";
+import { Switch } from "@/components/ui/switch";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
@@ -27,7 +29,10 @@ export default function CompletedJobsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
-  const { jobs, loading, error, refetch } = useJobs();
+  const [showTests, setShowTests] = useState(false);
+  const { jobs, loading, error, refetch } = useJobs({
+    includeTests: showTests,
+  });
   const { user } = useAuth();
   const { organizationUsers } = useOrganizationUsers();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -125,7 +130,7 @@ export default function CompletedJobsPage() {
   }
 
   return (
-    <div className=" w-full max-w-5xl mx-auto">
+    <div className=" w-screen pr-6 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Completed Jobs</h1>
@@ -139,11 +144,11 @@ export default function CompletedJobsPage() {
               variant="outline"
               onClick={() => setIsCalculatePaymentDialogOpen(true)}
             >
-              <Calculator className="mr-2 h-4 w-4" />
+              <Calculator className="mr-2 h-4 w-4 cursor-pointer" />
               Calculate Payments
             </Button>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-4 w-4 cursor-pointer" />
               Create Job
             </Button>
           </div>
@@ -152,43 +157,58 @@ export default function CompletedJobsPage() {
 
       <div className="space-y-4">
         {/* Sort controls */}
-        <div className="flex gap-2 flex-wrap">
-          <Button
-            variant={sortBy === "date" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSort("date")}
-          >
-            <Calendar className="mr-2 h-4 w-4" />
-            Sort by Date{" "}
-            {sortBy === "date" && (sortOrder === "desc" ? "↓" : "↑")}
-          </Button>
-          <Button
-            variant={sortBy === "location" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSort("location")}
-          >
-            <MapPin className="mr-2 h-4 w-4" />
-            Sort by Location{" "}
-            {sortBy === "location" && (sortOrder === "desc" ? "↓" : "↑")}
-          </Button>
-          <Button
-            variant={sortBy === "worker" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSort("worker")}
-          >
-            <User className="mr-2 h-4 w-4" />
-            Sort by Worker{" "}
-            {sortBy === "worker" && (sortOrder === "desc" ? "↓" : "↑")}
-          </Button>
-          <Button
-            variant={sortBy === "status" ? "default" : "outline"}
-            size="sm"
-            onClick={() => handleSort("status")}
-          >
-            <ArrowUpDown className="mr-2 h-4 w-4" />
-            Sort by Status{" "}
-            {sortBy === "status" && (sortOrder === "desc" ? "↓" : "↑")}
-          </Button>
+        <div className="flex gap-2 flex-wrap items-center justify-between">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={sortBy === "date" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("date")}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              Sort by Date{" "}
+              {sortBy === "date" && (sortOrder === "desc" ? "↓" : "↑")}
+            </Button>
+            <Button
+              variant={sortBy === "location" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("location")}
+            >
+              <MapPin className="mr-2 h-4 w-4" />
+              Sort by Location{" "}
+              {sortBy === "location" && (sortOrder === "desc" ? "↓" : "↑")}
+            </Button>
+            <Button
+              variant={sortBy === "worker" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("worker")}
+            >
+              <User className="mr-2 h-4 w-4" />
+              Sort by Worker{" "}
+              {sortBy === "worker" && (sortOrder === "desc" ? "↓" : "↑")}
+            </Button>
+            <Button
+              variant={sortBy === "status" ? "default" : "outline"}
+              size="sm"
+              onClick={() => handleSort("status")}
+            >
+              <ArrowUpDown className="mr-2 h-4 w-4" />
+              Sort by Status{" "}
+              {sortBy === "status" && (sortOrder === "desc" ? "↓" : "↑")}
+            </Button>
+          </div>
+
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="show-test-jobs" className="text-sm">
+                Show test data
+              </Label>
+              <Switch
+                id="show-test-jobs"
+                checked={showTests}
+                onCheckedChange={setShowTests}
+              />
+            </div>
+          )}
         </div>
 
         <CompletedJobsList

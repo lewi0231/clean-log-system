@@ -338,7 +338,7 @@ export default function CompletedJobsList({
   return (
     <div className="w-full overflow-x-auto">
       <div className="rounded-md border w-full">
-        <Table className="w-full min-w-[960px]">
+        <Table className="w-full">
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[120px]">Status</TableHead>
@@ -373,6 +373,14 @@ export default function CompletedJobsList({
                 >
                   <TableCell>
                     <div className="flex flex-col gap-1">
+                      {job.is_test && (
+                        <Badge
+                          variant="destructive"
+                          className="w-fit text-[10px] tracking-wide"
+                        >
+                          TEST
+                        </Badge>
+                      )}
                       <Badge variant={getJobStatus(job).variant}>
                         {getJobStatus(job).label}
                       </Badge>

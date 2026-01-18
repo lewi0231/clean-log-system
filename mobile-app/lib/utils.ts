@@ -108,14 +108,39 @@ export function createSchemaFromFieldConfig(fieldConfigs: FieldConfig[]) {
         break;
       case "select":
         if (field.options && field.options.length > 0) {
-          zodType = z.enum(field.options as [string, ...string[]], {
+          const enumType = z.enum(field.options as [string, ...string[]], {
             error: () => ({
               message: validationRules?.customMessage ||
                 `${field.label} must be one of ${field.options?.join(", ")}`,
             }),
           });
+          // Handle multi-select: if allow_multiple is true, use array of enum values
+          if (validationRules?.allow_multiple) {
+            const arrayType = z.array(enumType);
+            // Only require min 1 if field is required
+            zodType = field.required
+              ? arrayType.min(1, {
+                message: validationRules?.customMessage ||
+                  `${field.label} requires at least one selection`,
+              })
+              : arrayType;
+          } else {
+            zodType = enumType;
+          }
         } else {
-          zodType = z.string();
+          // No options defined - handle multi-select vs single-select
+          if (validationRules?.allow_multiple) {
+            const arrayType = z.array(z.string());
+            // Only require min 1 if field is required
+            zodType = field.required
+              ? arrayType.min(1, {
+                message: validationRules?.customMessage ||
+                  `${field.label} requires at least one selection`,
+              })
+              : arrayType;
+          } else {
+            zodType = z.string();
+          }
         }
         break;
       case "date":

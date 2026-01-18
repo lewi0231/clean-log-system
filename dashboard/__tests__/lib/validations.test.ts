@@ -273,7 +273,8 @@ describe("signUpSchema", () => {
 describe("workerSchema", () => {
   it("should validate valid worker data", () => {
     const result = workerSchema.safeParse({
-      name: "John Doe",
+      first_name: "John",
+      last_name: "Doe",
       email: "john@example.com",
       phone: "1234567890",
     });
@@ -283,20 +284,22 @@ describe("workerSchema", () => {
 
   it("should reject missing name", () => {
     const result = workerSchema.safeParse({
-      name: "",
+      first_name: "",
+      last_name: "Doe",
       email: "john@example.com",
       phone: "1234567890",
     });
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe("Name is required");
+      expect(result.error.issues[0].message).toBe("First name is required");
     }
   });
 
   it("should reject invalid email format", () => {
     const result = workerSchema.safeParse({
-      name: "John Doe",
+      first_name: "John",
+      last_name: "Doe",
       email: "invalid-email",
       phone: "1234567890",
     });
@@ -309,7 +312,8 @@ describe("workerSchema", () => {
 
   it("should reject empty phone", () => {
     const result = workerSchema.safeParse({
-      name: "John Doe",
+      first_name: "John",
+      last_name: "Doe",
       email: "john@example.com",
       phone: "",
     });

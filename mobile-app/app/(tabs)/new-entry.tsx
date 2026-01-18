@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectItem } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TimePicker } from "@/components/ui/time-picker";
+import { useAlertDialog } from "@/hooks/use-alert-dialog";
 import { useColleagues } from "@/hooks/use-colleagues";
 import { useCurrentWorker } from "@/hooks/use-current-worker";
 import { useEntryForm } from "@/hooks/use-entry-form";
@@ -26,6 +27,7 @@ import {
 } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
+import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
@@ -33,10 +35,10 @@ import { ConditionalLogic, FieldConfig } from "@clean-log/shared/types";
 import { FormSectionWithFields } from "@clean-log/shared/types/form-section";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -98,13 +100,28 @@ function evaluateCondition(
 }
 
 export default function NewEntryScreen() {
-  const router = useRouter();
+  // #region agent log
+  fetch("http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "new-entry.tsx:102",
+      message: "Component rendering/mounting",
+      data: {},
+      timestamp: Date.now(),
+      sessionId: "debug-session",
+      runId: "run1",
+      hypothesisId: "A",
+    }),
+  }).catch(() => {});
+  // #endregion
   const scrollViewRef = useRef<any>(null);
   const fieldPositions = useRef<Record<string, number>>({});
   const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings(organizationId);
   const { user } = useAuth();
   const { worker } = useCurrentWorker();
+  const { isAdmin } = useUserRole();
   const { locations } = useLocations(organizationId);
   const { colleagues } = useColleagues(organizationId);
   const [selectedColleagues, setSelectedColleagues] = useState<string[]>([]);
@@ -125,15 +142,32 @@ export default function NewEntryScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
-  // Alert dialog state
-  const [alertOpen, setAlertOpen] = useState(false);
-  const [alertTitle, setAlertTitle] = useState("");
-  const [alertMessage, setAlertMessage] = useState("");
-  const [alertOnConfirm, setAlertOnConfirm] = useState<(() => void) | null>(
-    null
-  );
-  const okButtonPressedRef = useRef(false);
+  // Alert dialog management
+  const {
+    alertOpen,
+    alertTitle,
+    alertMessage,
+    showAlert,
+    showSuccessAndNavigate,
+    handleDialogChange,
+    handleOkPress,
+  } = useAlertDialog();
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      setIsKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Time states
   const [startTime, setStartTime] = useState<Date | undefined>(undefined);
@@ -230,39 +264,46 @@ export default function NewEntryScreen() {
     if (currentStep === 0) {
       // Step 0: Validate start time is required
       if (!startTime) {
-        setAlertTitle("Required Field");
-        setAlertMessage("Please select a start time to continue.");
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
+        showAlert("Required Field", "Please select a start time to continue.");
         return;
       }
       // Validate location is required if predefined locations are enabled
       if (settings?.use_predefined_locations && !selectedLocation) {
-        setAlertTitle("Required Field");
-        setAlertMessage("Please select a location to continue.");
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
+        showAlert("Required Field", "Please select a location to continue.");
         return;
       }
       // Validate finish time is not in the future
       if (finishTime && finishTime > new Date()) {
-        setAlertTitle("Invalid Time");
-        setAlertMessage(
+        showAlert(
+          "Invalid Time",
           "Finish time cannot be in the future. Please select a valid finish time."
         );
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
         return;
       }
       // Validate start time is not after finish time
       if (startTime && finishTime && startTime > finishTime) {
-        setAlertTitle("Invalid Time");
-        setAlertMessage(
+        showAlert(
+          "Invalid Time",
           "Start time cannot be after finish time. Please select a valid start time."
         );
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
         return;
+      }
+      // Validate required fields in step 0 (fields with section_id === null)
+      const basicInfoFields = organizedFields.get(null) || [];
+      const visibleBasicFields = basicInfoFields.filter(isFieldVisible);
+      for (const config of visibleBasicFields) {
+        if (config.required) {
+          const value = fieldValues[config.id];
+          if (!hasValue(value, config.field_type, config)) {
+            // Mark field as touched to show error
+            markFieldAsTouched(config.id);
+            showAlert(
+              "Required Field",
+              `Please fill in ${config.label} to continue.`
+            );
+            return;
+          }
+        }
       }
     } else if (currentStep > 0 && currentStep < totalSteps - 1) {
       // Validate section steps: Check if mutual exclusion groups have selections
@@ -291,11 +332,30 @@ export default function NewEntryScreen() {
                   )
                   .join(" ") || "an option";
 
-          setAlertTitle("Required Field");
-          setAlertMessage(`Please select ${groupLabel} to continue.`);
-          setAlertOnConfirm(null);
-          setAlertOpen(true);
+          showAlert(
+            "Required Field",
+            `Please select ${groupLabel} to continue.`
+          );
           return;
+        }
+      }
+
+      // Validate required fields in the current section (ungrouped fields)
+      for (const config of visibleFields) {
+        // Skip fields that are in mutual exclusion groups (already validated above)
+        if (config.mutually_exclusive_group) continue;
+
+        if (config.required) {
+          const value = fieldValues[config.id];
+          if (!hasValue(value, config.field_type, config)) {
+            // Mark field as touched to show error
+            markFieldAsTouched(config.id);
+            showAlert(
+              "Required Field",
+              `Please fill in ${config.label} to continue.`
+            );
+            return;
+          }
         }
       }
     }
@@ -349,21 +409,16 @@ export default function NewEntryScreen() {
 
       if (fetchError) {
         setIsSubmitting(false);
-        setAlertTitle("Error");
-        setAlertMessage(
+        showAlert(
+          "Error",
           "There was a problem on the server! Please try again later."
         );
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
         return;
       }
 
       if (data?.error) {
         setIsSubmitting(false);
-        setAlertTitle("Error");
-        setAlertMessage(data.error);
-        setAlertOnConfirm(null);
-        setAlertOpen(true);
+        showAlert("Error", data.error);
         return;
       }
 
@@ -376,42 +431,32 @@ export default function NewEntryScreen() {
           }
         } catch (err) {}
 
-        // Show success alert first, then navigate on OK click
+        // Reset form state immediately (before showing dialog)
         setIsSubmitting(false);
-        setAlertTitle("Success");
-        setAlertMessage("Entry submitted successfully!");
-        setAlertOnConfirm(() => {
-          // Reset form state
-          resetForm();
-          if (currentUserColleagueId) {
-            setSelectedColleagues([currentUserColleagueId]);
-          } else {
-            setSelectedColleagues([]);
-          }
-          setSelectedLocation("");
-          setStartTime(undefined);
-          setFinishTime(new Date());
-          setCurrentStep(0);
-          setSelectedClusters({});
-          setTouchedFields(new Set()); // Reset touched fields
-          // Navigate back to home after alert is dismissed
-          // Use setTimeout to defer navigation to avoid React render warnings
-          setTimeout(() => {
-            router.replace("./");
-          }, 100);
-        });
-        setAlertOpen(true);
+        resetForm();
+        if (currentUserColleagueId) {
+          setSelectedColleagues([currentUserColleagueId]);
+        } else {
+          setSelectedColleagues([]);
+        }
+        setSelectedLocation("");
+        setStartTime(undefined);
+        setFinishTime(new Date());
+        setCurrentStep(0);
+        setSelectedClusters({});
+        setTouchedFields(new Set()); // Reset touched fields
+
+        // Show success alert and navigate after OK is clicked
+        showSuccessAndNavigate("Entry submitted successfully!");
       }
     } catch (err) {
       setIsSubmitting(false);
-      setAlertTitle("Error");
-      setAlertMessage(
+      showAlert(
+        "Error",
         err instanceof Error
           ? err.message
           : "An unexpected error occurred. Please try again."
       );
-      setAlertOnConfirm(null);
-      setAlertOpen(true);
     }
   };
 
@@ -480,6 +525,21 @@ export default function NewEntryScreen() {
           }}
           onErrorClear={() => clearFieldError(config.id)}
           disabled={disabled}
+          onFocus={(opts) => {
+            // Scroll to field when focused to ensure it's visible above keyboard
+            setTimeout(() => {
+              const fieldY = fieldPositions.current[config.id];
+              if (fieldY !== undefined && scrollViewRef.current) {
+                const subFieldYOffset = opts?.subFieldYOffset ?? 0;
+                scrollViewRef.current.scrollTo({
+                  // For compound fields (like address), include the sub-field y-offset.
+                  // Use a larger offset so the focused input sits comfortably above the keyboard.
+                  y: Math.max(0, fieldY + subFieldYOffset - 160),
+                  animated: true,
+                });
+              }
+            }, 100);
+          }}
         />
       </View>
     );
@@ -824,88 +884,94 @@ export default function NewEntryScreen() {
 
     return (
       <View className="flex-col gap-4">
-        <View className="mb-2">
-          <Text className="text-lg font-bold text-foreground mb-1">
-            {section.title}
-          </Text>
-          {section.description && (
-            <Text className="text-sm text-muted-foreground">
-              {section.description}
+        {/* Section Card - following mobile UX best practices */}
+        <View className="bg-gray-50 dark:bg-gray-900/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
+          <View className="mb-4">
+            <Text className="text-lg font-bold text-foreground mb-1">
+              {section.title}
             </Text>
-          )}
-        </View>
+            {section.description && (
+              <Text className="text-sm text-muted-foreground">
+                {section.description}
+              </Text>
+            )}
+          </View>
 
-        {/* Render mutual exclusion groups with select dropdowns */}
-        {Array.from(groupedFields.keys()).map((groupId) => {
-          const fields = groupedFields.get(groupId) || [];
-          const clusters = getClustersForGroup(groupId);
-          const selectedCluster = selectedClusters[groupId] || null;
+          {/* Render mutual exclusion groups with select dropdowns */}
+          {Array.from(groupedFields.keys()).map((groupId) => {
+            const fields = groupedFields.get(groupId) || [];
+            const clusters = getClustersForGroup(groupId);
+            const selectedCluster = selectedClusters[groupId] || null;
 
-          // Use custom label for default_exclusive_group if available, otherwise generate from group ID
-          const firstField = fields[0];
-          const isDefaultGroup = groupId === "default_exclusive_group";
-          const groupLabel =
-            isDefaultGroup && settings?.default_exclusive_group_label
-              ? settings.default_exclusive_group_label
-              : firstField.mutually_exclusive_group
-                  ?.split("_")
-                  .map(
-                    (word) =>
-                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                  )
-                  .join(" ") || "Select Option";
+            // Use custom label for default_exclusive_group if available, otherwise generate from group ID
+            const firstField = fields[0];
+            const isDefaultGroup = groupId === "default_exclusive_group";
+            const groupLabel =
+              isDefaultGroup && settings?.default_exclusive_group_label
+                ? settings.default_exclusive_group_label
+                : firstField.mutually_exclusive_group
+                    ?.split("_")
+                    .map(
+                      (word) =>
+                        word.charAt(0).toUpperCase() +
+                        word.slice(1).toLowerCase()
+                    )
+                    .join(" ") || "Select Option";
 
-          return (
-            <View key={groupId} className="mb-4">
-              <View className="mb-2">
-                <Text className="text-sm font-medium text-foreground">
-                  {groupLabel}
-                  <Text className="text-destructive ml-1">*</Text>
-                </Text>
-              </View>
-              <View
-                className={`rounded-xl h-12 bg-card border ${
-                  touchedFields.has(`mutual-exclusion-${groupId}`) &&
-                  !selectedCluster
-                    ? "border-destructive"
-                    : "border-border"
-                }`}
-              >
-                <Select
-                  value={selectedCluster || ""}
-                  onValueChange={(value) => {
-                    handleClusterSelect(groupId, value || null);
-                    markFieldAsTouched(`mutual-exclusion-${groupId}`);
-                  }}
-                  placeholder={`Choose ${groupLabel.toLowerCase()}`}
-                  size="medium"
-                  triggerClassName="border-0 h-12 pl-5"
-                >
-                  {clusters.map((clusterId) => (
-                    <SelectItem key={clusterId} value={clusterId}>
-                      {formatClusterName(clusterId)}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </View>
-              {touchedFields.has(`mutual-exclusion-${groupId}`) &&
-                !selectedCluster && (
-                  <Text className="text-sm text-destructive mt-1">
-                    {groupLabel} is required
+            return (
+              <View key={groupId} className="mb-4">
+                <View className="mb-2">
+                  <Text className="text-sm font-medium text-foreground">
+                    {groupLabel}
+                    <Text className="text-destructive ml-1">*</Text>
                   </Text>
-                )}
+                </View>
+                <View
+                  className={`rounded-xl h-12 bg-card border ${
+                    touchedFields.has(`mutual-exclusion-${groupId}`) &&
+                    !selectedCluster
+                      ? "border-destructive"
+                      : "border-border"
+                  }`}
+                >
+                  <Select
+                    value={selectedCluster || ""}
+                    onValueChange={(value) => {
+                      handleClusterSelect(groupId, value || null);
+                      markFieldAsTouched(`mutual-exclusion-${groupId}`);
+                    }}
+                    placeholder={`Choose ${groupLabel.toLowerCase()}`}
+                    size="medium"
+                    triggerClassName="border-0 h-12 pl-5"
+                  >
+                    {clusters.map((clusterId) => (
+                      <SelectItem key={clusterId} value={clusterId}>
+                        {formatClusterName(clusterId)}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </View>
+                {touchedFields.has(`mutual-exclusion-${groupId}`) &&
+                  !selectedCluster && (
+                    <Text className="text-sm text-destructive mt-1">
+                      {groupLabel} is required
+                    </Text>
+                  )}
 
-              {/* Render fields only for the selected cluster */}
-              {selectedCluster &&
-                fields
-                  .filter((field) => getFieldCluster(field) === selectedCluster)
-                  .map(renderField)}
-            </View>
-          );
-        })}
+                {/* Render fields only for the selected cluster */}
+                {selectedCluster &&
+                  fields
+                    .filter(
+                      (field) => getFieldCluster(field) === selectedCluster
+                    )
+                    .map(renderField)}
+              </View>
+            );
+          })}
 
-        {/* Render regular fields (not in mutual exclusion groups) */}
-        {regularFields.map(renderField)}
+          {/* Render regular fields (not in mutual exclusion groups) */}
+          {regularFields.map(renderField)}
+        </View>
       </View>
     );
   };
@@ -913,7 +979,13 @@ export default function NewEntryScreen() {
   // Format field value for display
   const formatFieldValue = (
     config: FieldConfig,
-    value: string | number | boolean | GroupedBreakdownItem[] | undefined
+    value:
+      | string
+      | number
+      | boolean
+      | string[]
+      | GroupedBreakdownItem[]
+      | undefined
   ): string => {
     if (value === undefined || value === null || value === "") {
       return "Not provided";
@@ -938,14 +1010,22 @@ export default function NewEntryScreen() {
         }
         return String(value);
       case "grouped_breakdown":
-        if (Array.isArray(value)) {
-          if (value.length === 0) return "None";
-          return value
+        if (
+          Array.isArray(value) &&
+          value.length > 0 &&
+          typeof value[0] !== "string"
+        ) {
+          return (value as GroupedBreakdownItem[])
             .map((item) => `${item.brand}: ${item.quantity}`)
             .join(", ");
         }
         return "None";
       case "select":
+        // Handle multi-select (array) and single-select (string)
+        if (config.validation_rules?.allow_multiple && Array.isArray(value)) {
+          if (value.length === 0) return "None";
+          return (value as string[]).join(", ");
+        }
         return String(value);
       default:
         return String(value);
@@ -1129,9 +1209,15 @@ export default function NewEntryScreen() {
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center gap-2">
                 <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
-                  {worker?.name ? (
+                  {worker?.name || (isAdmin && user?.email) ? (
                     <Text className="text-xs font-semibold text-primary">
-                      {worker.name
+                      {(
+                        worker?.name ||
+                        (isAdmin && user?.email
+                          ? user.email.split("@")[0]
+                          : "") ||
+                        ""
+                      )
                         .split(" ")
                         .map((n) => n[0])
                         .join("")
@@ -1144,7 +1230,7 @@ export default function NewEntryScreen() {
                 </View>
                 <View>
                   <Text className="text-sm font-medium text-foreground">
-                    {worker?.name || user.email?.split("@")[0] || "User"}
+                    {worker?.name || user?.email?.split("@")[0] || "User"}
                   </Text>
                 </View>
               </View>
@@ -1168,12 +1254,16 @@ export default function NewEntryScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
         >
           <ScrollView
             ref={scrollViewRef}
             className="flex-1 px-4 pt-4"
-            contentContainerStyle={{ paddingBottom: 100 }}
+            // Best practice: allow scrolling even when content is short, so focused inputs
+            // can always scroll above the keyboard (prevents "third field hidden" issue).
+            contentContainerStyle={{ flexGrow: 1, paddingBottom: 320 }}
+            // iOS best practice: let ScrollView automatically adjust for keyboard insets.
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={true}
             keyboardDismissMode="on-drag"
@@ -1238,120 +1328,101 @@ export default function NewEntryScreen() {
           </ScrollView>
 
           {/* Fixed Bottom Action Bar */}
-          <View className="absolute bottom-0 left-0 right-0 bg-card border-t border-border/50 px-4 py-4 shadow-2xl">
-            <View className="flex-row gap-3">
-              {/* Previous Button - shown on all steps except first */}
-              {currentStep > 0 && (
-                <Button
-                  onPress={handlePrevious}
-                  disabled={isSubmitting}
-                  variant="secondary"
-                  size="lg"
-                  className="flex-1 bg-secondary"
-                >
-                  <Ionicons
-                    name="chevron-back"
-                    size={20}
-                    color="rgb(var(--color-secondary-foreground))"
-                  />
-                  <Text className="text-secondary-foreground text-base font-semibold">
-                    Previous
-                  </Text>
-                </Button>
-              )}
-              {/* Next Button - shown on all steps except last */}
-              {!isLastStep && (
-                <Button
-                  onPress={async () => {
-                    if (Platform.OS === "ios") {
-                      try {
-                        await Haptics.impactAsync(
-                          Haptics.ImpactFeedbackStyle.Light
-                        );
-                      } catch (err) {
-                        // Haptics not available
+          {!isKeyboardVisible && (
+            <View className="absolute bottom-0 left-0 right-0 bg-card border-t border-border/50 px-4 py-4 shadow-2xl">
+              <View className="flex-row gap-3">
+                {/* Previous Button - shown on all steps except first */}
+                {currentStep > 0 && (
+                  <Button
+                    onPress={handlePrevious}
+                    disabled={isSubmitting}
+                    variant="secondary"
+                    size="lg"
+                    className="flex-1 bg-secondary"
+                  >
+                    <Ionicons
+                      name="chevron-back"
+                      size={20}
+                      color="rgb(var(--color-secondary-foreground))"
+                    />
+                    <Text className="text-secondary-foreground text-base font-semibold">
+                      Previous
+                    </Text>
+                  </Button>
+                )}
+                {/* Next Button - shown on all steps except last */}
+                {!isLastStep && (
+                  <Button
+                    onPress={async () => {
+                      if (Platform.OS === "ios") {
+                        try {
+                          await Haptics.impactAsync(
+                            Haptics.ImpactFeedbackStyle.Light
+                          );
+                        } catch (err) {
+                          // Haptics not available
+                        }
                       }
-                    }
-                    handleNext();
-                  }}
-                  disabled={isSubmitting}
-                  variant="default"
-                  size="lg"
-                  className="flex-1"
-                >
-                  <Text className="text-white text-base font-semibold">
-                    Next
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color="white" />
-                </Button>
-              )}
-              {/* Submit Button - shown only on last step */}
-              {isLastStep && (
-                <Button
-                  onPress={async () => {
-                    if (Platform.OS === "ios") {
-                      try {
-                        await Haptics.impactAsync(
-                          Haptics.ImpactFeedbackStyle.Medium
-                        );
-                      } catch (err) {
-                        // Haptics not available
+                      handleNext();
+                    }}
+                    disabled={isSubmitting}
+                    variant="default"
+                    size="lg"
+                    className="flex-1"
+                  >
+                    <Text className="text-white text-base font-semibold">
+                      Next
+                    </Text>
+                    <Ionicons name="chevron-forward" size={20} color="white" />
+                  </Button>
+                )}
+                {/* Submit Button - shown only on last step */}
+                {isLastStep && (
+                  <Button
+                    onPress={async () => {
+                      if (Platform.OS === "ios") {
+                        try {
+                          await Haptics.impactAsync(
+                            Haptics.ImpactFeedbackStyle.Medium
+                          );
+                        } catch (err) {
+                          // Haptics not available
+                        }
                       }
-                    }
-                    handleSubmit();
-                  }}
-                  disabled={isSubmitting}
-                  variant="default"
-                  size="lg"
-                  className="flex-1"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <Ionicons name="checkmark-circle" size={20} color="white" />
-                  )}
-                  <Text className="text-white text-base font-semibold">
-                    {isSubmitting ? "Submitting..." : "Submit Entry"}
-                  </Text>
-                </Button>
-              )}
+                      handleSubmit();
+                    }}
+                    disabled={isSubmitting}
+                    variant="default"
+                    size="lg"
+                    className="flex-1"
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={20}
+                        color="white"
+                      />
+                    )}
+                    <Text className="text-white text-base font-semibold">
+                      {isSubmitting ? "Submitting..." : "Submit Entry"}
+                    </Text>
+                  </Button>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
 
       {/* Alert Dialog */}
-      <AlertDialog
-        open={alertOpen}
-        onOpenChange={(open) => {
-          setAlertOpen(open);
-          // Reset flag when dialog opens
-          if (open) {
-            okButtonPressedRef.current = false;
-          }
-          // Only execute callback when dialog is closed AND OK button was pressed
-          if (!open && alertOnConfirm && okButtonPressedRef.current) {
-            // Wait for dialog animation to complete before executing callback
-            setTimeout(() => {
-              alertOnConfirm();
-              // Clear the callback and reset flag after execution
-              setAlertOnConfirm(null);
-              okButtonPressedRef.current = false;
-            }, 200);
-          } else if (!open) {
-            // Clear callback and reset flag if dialog is closed without OK press
-            setAlertOnConfirm(null);
-            okButtonPressedRef.current = false;
-          }
-        }}
-      >
+      <AlertDialog open={alertOpen} onOpenChange={handleDialogChange}>
         <AlertDialogContent
           className="bg-secondary border-border"
           onInteractOutside={() => {
             // Allow dismissing by clicking outside, but don't execute callback
-            okButtonPressedRef.current = false;
-            setAlertOpen(false);
-            setAlertOnConfirm(null);
+            handleDialogChange(false);
           }}
         >
           <AlertDialogHeader>
@@ -1367,10 +1438,7 @@ export default function NewEntryScreen() {
               <Pressable
                 onPress={(e) => {
                   e.stopPropagation();
-                  // Mark that OK button was pressed before closing
-                  okButtonPressedRef.current = true;
-                  // Close the dialog - the onOpenChange handler will execute the callback
-                  setAlertOpen(false);
+                  handleOkPress();
                 }}
                 className="bg-primary active:bg-primary-600 px-6 py-3 rounded-lg"
               >

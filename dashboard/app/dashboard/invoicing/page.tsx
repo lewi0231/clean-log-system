@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
+import { useOrganizationUsers } from "@/hooks/use-organization-users";
+import useAuth from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -33,7 +35,7 @@ import type { InvoiceWithJobs } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Plus, Settings } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export default function InvoicingPage() {
   const searchParams = useSearchParams();
@@ -43,7 +45,14 @@ export default function InvoicingPage() {
     error: orgError,
   } = useOrganization();
   const { settings, loading: settingsLoading } = useOrganizationSettings();
+  const { user } = useAuth();
+  const { organizationUsers } = useOrganizationUsers();
   const queryClient = useQueryClient();
+  const isAdmin = useMemo(() => {
+    if (!user?.email || !organizationUsers.length) return false;
+    const currentUser = organizationUsers.find((ou) => ou.email === user.email);
+    return currentUser?.role === "admin";
+  }, [user, organizationUsers]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
@@ -202,6 +211,7 @@ export default function InvoicingPage() {
       <InvoiceList
         onInvoiceClick={handleInvoiceClick}
         statusFilter={searchParams.get("status") || undefined}
+        isAdmin={isAdmin}
       />
 
       <CreateInvoiceDialog

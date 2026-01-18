@@ -26,6 +26,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false,
     lock: processLock,
+    flowType: "pkce",
+  },
+  global: {
+    headers: {
+      "x-client-info": `clean-log-mobile/${Platform.OS}`,
+    },
+  },
+  // Add retry logic for network failures
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
   },
 });
 

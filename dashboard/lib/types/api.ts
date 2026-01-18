@@ -100,6 +100,7 @@ export interface DeleteLocationRequest {
 // Jobs API
 export interface ListJobsRequest {
   organization_id: string;
+  include_tests?: boolean;
 }
 
 export interface ListJobsResponse {

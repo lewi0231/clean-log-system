@@ -584,6 +584,240 @@ describe("Full Payment Flow Integration Test", () => {
         );
 
         it(
+            "should return invoice details immediately after creation",
+            async () => {
+                const serviceTypeFieldConfig = testData.fieldConfigIds[0];
+                const quantityFieldConfig = testData.fieldConfigIds[1];
+
+                const { data: pricingRules, error: pricingError } =
+                    await supabase
+                        .from("pricing_rule")
+                        .insert([
+                            {
+                                organization_id: testData.organizationId,
+                                scope: "field",
+                                pricing_type: "unit",
+                                pricing_context: "customer",
+                                field_config_id: serviceTypeFieldConfig,
+                                option_value: "basic",
+                                currency: "AUD",
+                                base_price: 50.0,
+                                active: true,
+                                effective_at: new Date().toISOString(),
+                            },
+                        ] as never)
+                        .select();
+
+                if (pricingError) throw pricingError;
+                if (pricingRules) {
+                    testData.pricingRuleIds = [
+                        ...(testData.pricingRuleIds || []),
+                        ...pricingRules.map((r: { id: string }) => r.id),
+                    ];
+                }
+
+                const submissionData = {
+                    service_type: "basic",
+                    quantity: 1,
+                };
+
+                const jobId = await createTestJob(
+                    testData.organizationId,
+                    testData.locationId,
+                    [
+                        { id: serviceTypeFieldConfig, name: "service_type" },
+                        { id: quantityFieldConfig, name: "quantity" },
+                    ],
+                    submissionData,
+                );
+
+                testData.jobId = jobId;
+
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + 30);
+
+                const { data: invoiceData, error: invoiceError } =
+                    await supabase.functions.invoke("create-invoice", {
+                        body: addAuthEmail({
+                            organization_id: testData.organizationId,
+                            job_ids: [jobId],
+                            due_date: dueDate.toISOString(),
+                        }, testData),
+                    });
+
+                if (invoiceError) throw invoiceError;
+                expect(invoiceData?.success).toBe(true);
+
+                const invoiceId = invoiceData.invoice.id;
+                testData.invoiceId = invoiceId;
+
+                const { data: detailsData, error: detailsError } =
+                    await supabase.functions.invoke("get-invoice-details", {
+                        body: addAuthEmail({
+                            invoice_id: invoiceId,
+                        }, testData),
+                    });
+
+                if (detailsError) {
+                    const errorMsg = await extractFunctionError(detailsError);
+                    throw new Error(`Get invoice details failed: ${errorMsg}`);
+                }
+
+                expect(detailsData?.success).toBe(true);
+                expect(detailsData?.invoice?.id).toBe(invoiceId);
+                expect(detailsData?.calculation).toBeTruthy();
+                expect(Array.isArray(detailsData?.invoice?.invoice_job)).toBe(
+                    true,
+                );
+                expect(detailsData.invoice.invoice_job.length).toBeGreaterThan(
+                    0,
+                );
+                const jobIds = detailsData.invoice.invoice_job.map(
+                    (ij: { job?: { id?: string } }) => ij.job?.id,
+                );
+                expect(jobIds).toContain(jobId);
+            },
+            30000,
+        );
+
+        it(
+            "should return not found when invoice id is missing",
+            async () => {
+                const missingInvoiceId = "00000000-0000-0000-0000-000000000000";
+
+                const { data: detailsData, error: detailsError } =
+                    await supabase.functions.invoke("get-invoice-details", {
+                        body: addAuthEmail({
+                            invoice_id: missingInvoiceId,
+                        }, testData),
+                    });
+
+                expect(detailsData?.success).not.toBe(true);
+                expect(detailsError).toBeTruthy();
+
+                if (detailsError) {
+                    const errorMsg = await extractFunctionError(detailsError);
+                    expect(errorMsg.toLowerCase()).toContain(
+                        "invoice not found",
+                    );
+                }
+            },
+            30000,
+        );
+
+        it(
+            "should create multi-job invoice with linked jobs and snapshots",
+            async () => {
+                const serviceTypeFieldConfig = testData.fieldConfigIds[0];
+                const quantityFieldConfig = testData.fieldConfigIds[1];
+
+                const { data: pricingRules, error: pricingError } =
+                    await supabase
+                        .from("pricing_rule")
+                        .insert([
+                            {
+                                organization_id: testData.organizationId,
+                                scope: "field",
+                                pricing_type: "unit",
+                                pricing_context: "customer",
+                                field_config_id: serviceTypeFieldConfig,
+                                option_value: "basic",
+                                currency: "AUD",
+                                base_price: 50.0,
+                                active: true,
+                                effective_at: new Date().toISOString(),
+                            },
+                            {
+                                organization_id: testData.organizationId,
+                                scope: "field",
+                                pricing_type: "unit",
+                                pricing_context: "customer",
+                                field_config_id: quantityFieldConfig,
+                                currency: "AUD",
+                                base_price: 2.0,
+                                active: true,
+                                effective_at: new Date().toISOString(),
+                            },
+                        ] as never)
+                        .select();
+
+                if (pricingError) throw pricingError;
+                if (pricingRules) {
+                    testData.pricingRuleIds = [
+                        ...(testData.pricingRuleIds || []),
+                        ...pricingRules.map((r: { id: string }) => r.id),
+                    ];
+                }
+
+                const jobIdOne = await createTestJob(
+                    testData.organizationId,
+                    testData.locationId,
+                    [
+                        { id: serviceTypeFieldConfig, name: "service_type" },
+                        { id: quantityFieldConfig, name: "quantity" },
+                    ],
+                    { service_type: "basic", quantity: 1 },
+                );
+
+                const jobIdTwo = await createTestJob(
+                    testData.organizationId,
+                    testData.locationId,
+                    [
+                        { id: serviceTypeFieldConfig, name: "service_type" },
+                        { id: quantityFieldConfig, name: "quantity" },
+                    ],
+                    { service_type: "basic", quantity: 3 },
+                );
+
+                testData.jobId = jobIdOne;
+
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + 30);
+
+                const { data: invoiceData, error: invoiceError } =
+                    await supabase.functions.invoke("create-invoice", {
+                        body: addAuthEmail({
+                            organization_id: testData.organizationId,
+                            job_ids: [jobIdOne, jobIdTwo],
+                            due_date: dueDate.toISOString(),
+                        }, testData),
+                    });
+
+                if (invoiceError) throw invoiceError;
+                expect(invoiceData?.success).toBe(true);
+
+                const invoiceId = invoiceData.invoice.id;
+                testData.invoiceId = invoiceId;
+
+                const { data: invoiceJobs, error: invoiceJobsError } =
+                    await supabase
+                        .from("invoice_job")
+                        .select("job_id")
+                        .eq("invoice_id", invoiceId);
+
+                if (invoiceJobsError) throw invoiceJobsError;
+                expect(invoiceJobs?.length).toBe(2);
+
+                const linkedJobIds = (invoiceJobs || []).map(
+                    (row: { job_id: string }) => row.job_id,
+                );
+                expect(linkedJobIds).toContain(jobIdOne);
+                expect(linkedJobIds).toContain(jobIdTwo);
+
+                const { data: snapshots, error: snapshotError } = await supabase
+                    .from("pricing_snapshot")
+                    .select("id")
+                    .eq("invoice_id", invoiceId);
+
+                if (snapshotError) throw snapshotError;
+                expect((snapshots || []).length).toBeGreaterThan(0);
+
+                await supabase.from("job").delete().eq("id", jobIdTwo);
+            },
+            30000,
+        );
+
+        it(
             "should handle invoice with zero total (no pricing rules)",
             async () => {
                 // Create a job without any pricing rules

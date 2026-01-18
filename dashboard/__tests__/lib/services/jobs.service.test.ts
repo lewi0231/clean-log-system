@@ -2,6 +2,7 @@ import { JobsService } from "@/lib/services/jobs.service";
 import { supabase } from "@/lib/supabase";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockJob } from "../fixtures";
+import { EdgeFunctionError } from "@/lib/supabase/invoke-edge-function";
 
 vi.mock("@/lib/supabase", () => ({
   supabase: {
@@ -58,7 +59,12 @@ describe("JobsService", () => {
         JobsService.list({
           organization_id: "org-1",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(
+        JobsService.list({
+          organization_id: "org-1",
+        }),
+      ).rejects.toThrow("Network error");
     });
 
     it("should throw error when success flag is missing", async () => {

@@ -372,11 +372,26 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
   const positionStyles = getPositionStyles();
 
   // Ensure tooltip is always visible in viewport
-  const clampedStyles = {
+  // Clamp position to ensure tooltip doesn't overflow
+  const clampedStyles: React.CSSProperties = {
     ...positionStyles,
     maxWidth: "calc(100vw - 32px)",
     maxHeight: "calc(100vh - 32px)",
   };
+
+  // Additional clamping to ensure tooltip stays within viewport bounds
+  if (typeof positionStyles.top === "number") {
+    clampedStyles.top = Math.max(
+      16,
+      Math.min(positionStyles.top, window.innerHeight - (tooltipHeight + 16))
+    );
+  }
+  if (typeof positionStyles.left === "number") {
+    clampedStyles.left = Math.max(
+      16,
+      Math.min(positionStyles.left, window.innerWidth - (tooltipWidth + 16))
+    );
+  }
 
   return (
     <div className="fixed z-50 pointer-events-none" style={clampedStyles}>

@@ -60,6 +60,12 @@ export function useEntryForm({
       if (config.field_type === "grouped_breakdown") {
         // Ensure grouped_breakdown is always an array
         submissionData[config.name] = Array.isArray(value) ? value : [];
+      } else if (
+        config.field_type === "select" &&
+        config.validation_rules?.allow_multiple
+      ) {
+        // Multi-select: ensure it's always an array
+        submissionData[config.name] = Array.isArray(value) ? value : [];
       } else if (config.field_type === "time") {
         // Ensure time is always a string in HH:mm format
         if (typeof value === "string" && value !== "") {

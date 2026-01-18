@@ -198,87 +198,40 @@ function VerifyEmailContent() {
           }
         }
 
-        // Get the current session
+        // Use getUser() first to verify with server (more secure than getSession)
+        let user = null;
         const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+          data: { user: userData },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-        if (sessionError) {
+        if (userError) {
           // Only log if it's not the expected "no session" case
-          if (sessionError.message !== "Auth session missing!") {
-            log.error("VerifyEmail: Error getting session", {
-              error: sessionError.message,
+          if (userError.message !== "Auth session missing!") {
+            log.error("VerifyEmail: Error getting user", {
+              error: userError.message,
             });
           } else {
             log.debug(
-              "VerifyEmail: No session yet (expected for unverified users)"
+              "VerifyEmail: No user session (expected for unverified users)"
             );
           }
-        }
-
-        // Also check user directly (only if we have a session)
-        let user = null;
-        if (session) {
-          const {
-            data: { user: userData },
-            error: userError,
-          } = await supabase.auth.getUser();
-
-          if (userError) {
-            // Only log if it's not the expected "no session" case
-            if (userError.message !== "Auth session missing!") {
-              log.error("VerifyEmail: Error getting user", {
-                error: userError.message,
-              });
-            } else {
-              log.debug(
-                "VerifyEmail: No user session (expected for unverified users)"
-              );
-            }
-          } else {
-            user = userData;
-          }
-        } else {
-          // Try getUser anyway in case session exists but getSession didn't find it
-          // This can happen during the transition period
-          try {
-            const {
-              data: { user: userData },
-              error: userError,
-            } = await supabase.auth.getUser();
-
-            if (!userError && userData) {
-              user = userData;
-              log.debug(
-                "VerifyEmail: Found user via getUser even though getSession returned no session"
-              );
-            } else if (
-              userError &&
-              userError.message !== "Auth session missing!"
-            ) {
-              log.debug(
-                "VerifyEmail: No user found (expected for unverified users)",
-                {
-                  error: userError.message,
-                }
-              );
-            }
-          } catch {
-            // Silently ignore - expected when no session exists
-            log.debug("VerifyEmail: No user session available (expected)");
-          }
+        } else if (userData) {
+          user = userData;
+          log.debug("VerifyEmail: User found", {
+            userId: userData.id,
+            email: userData.email,
+            emailConfirmed: !!userData.email_confirmed_at,
+          });
         }
 
         log.debug("VerifyEmail: Verification status check", {
-          hasSession: !!session,
           hasUser: !!user,
-          emailConfirmed:
-            user?.email_confirmed_at || session?.user?.email_confirmed_at,
-          userId: user?.id || session?.user?.id,
+          emailConfirmed: !!user?.email_confirmed_at,
+          userId: user?.id,
         });
 
-        if (user?.email_confirmed_at || session?.user?.email_confirmed_at) {
+        if (user?.email_confirmed_at) {
           setIsVerified(true);
           setIsChecking(false);
 
@@ -323,23 +276,35 @@ function VerifyEmailContent() {
 
       log.debug("VerifyEmail: Resending verification email", { email });
 
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: email,
-        options: {
-          emailRedirectTo: `${
-            window.location.origin
-          }/verify-email?email=${encodeURIComponent(email)}`,
-        },
-      });
+      // Use the custom edge function that sends the same email template as signup
+      const { data, error } = await supabase.functions.invoke(
+        "resend-activation-link",
+        {
+          body: { email },
+        }
+      );
 
       if (error) {
+        // Handle different error types from Supabase functions
+        const errorMessage =
+          error.message ||
+          (error as { context?: { message?: string } }).context?.message ||
+          "Failed to resend verification email. Please try again.";
         log.error("VerifyEmail: Failed to resend verification email", {
-          error: error.message,
+          error: errorMessage,
+          errorDetails: JSON.stringify(error),
         });
-        setResendError(error.message);
+        setResendError(errorMessage);
+      } else if (data?.error) {
+        // Check if the response contains an error from the edge function
+        log.error("VerifyEmail: Edge function returned error", {
+          error: data.error,
+        });
+        setResendError(data.error);
       } else {
-        log.info("VerifyEmail: Verification email resent successfully");
+        log.info("VerifyEmail: Verification email resent successfully", {
+          message: data?.message,
+        });
         setResendSuccess(true);
         // Clear success message after 5 seconds
         setTimeout(() => setResendSuccess(false), 5000);

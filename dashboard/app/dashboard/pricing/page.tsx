@@ -719,7 +719,7 @@ function PricingPageContent({
         <Button
           onClick={() => setTestInvoiceOpen(true)}
           size="lg"
-          className="shadow-lg gap-2"
+          className="shadow-lg gap-2 cursor-pointer"
         >
           <TestTube className="h-4 w-4" />
           Test Invoice

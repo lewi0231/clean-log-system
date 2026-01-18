@@ -1,4 +1,5 @@
 import { useCurrentWorker } from "@/hooks/use-current-worker";
+import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
@@ -27,6 +28,7 @@ export default function JobsScreen() {
   const { user } = useAuth();
   const { worker } = useCurrentWorker();
   const { organizationId } = useOrganization();
+  const { isAdmin } = useUserRole();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,18 +62,21 @@ export default function JobsScreen() {
         }
 
         if (data?.jobs) {
-          // Filter jobs to only show those where this worker is assigned
-          const workerJobIds = new Set(
-            data.jobs
-              .filter((job: any) =>
-                job.workers?.some((w: any) => w.id === worker?.id)
-              )
-              .map((job: any) => job.id)
-          );
+          // If admin, show all jobs. If worker, filter to only assigned jobs
+          let filteredJobs = data.jobs;
+          if (!isAdmin && worker) {
+            const workerJobIds = new Set(
+              data.jobs
+                .filter((job: any) =>
+                  job.workers?.some((w: any) => w.id === worker.id)
+                )
+                .map((job: any) => job.id)
+            );
 
-          const filteredJobs = data.jobs.filter((job: any) =>
-            workerJobIds.has(job.id)
-          );
+            filteredJobs = data.jobs.filter((job: any) =>
+              workerJobIds.has(job.id)
+            );
+          }
 
           // Sort by created_at descending (newest first)
           const sortedJobs = filteredJobs.sort(
@@ -92,7 +97,7 @@ export default function JobsScreen() {
     }
 
     fetchJobs();
-  }, [user, organizationId, worker?.id]);
+  }, [user, organizationId, worker?.id, isAdmin]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -165,17 +170,23 @@ export default function JobsScreen() {
                     })
                     .then(({ data, error: fetchError }) => {
                       if (!fetchError && data?.jobs) {
-                        const workerJobIds = new Set(
-                          data.jobs
-                            .filter((job: any) =>
-                              job.workers?.some((w: any) => w.id === worker?.id)
-                            )
-                            .map((job: any) => job.id)
-                        );
+                        // If admin, show all jobs. If worker, filter to only assigned jobs
+                        let filteredJobs = data.jobs;
+                        if (!isAdmin && worker) {
+                          const workerJobIds = new Set(
+                            data.jobs
+                              .filter((job: any) =>
+                                job.workers?.some(
+                                  (w: any) => w.id === worker.id
+                                )
+                              )
+                              .map((job: any) => job.id)
+                          );
 
-                        const filteredJobs = data.jobs.filter((job: any) =>
-                          workerJobIds.has(job.id)
-                        );
+                          filteredJobs = data.jobs.filter((job: any) =>
+                            workerJobIds.has(job.id)
+                          );
+                        }
 
                         const sortedJobs = filteredJobs.sort(
                           (a: Job, b: Job) =>

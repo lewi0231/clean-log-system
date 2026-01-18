@@ -106,6 +106,7 @@ export interface Job {
   id: string;
   organization_id: string;
   location_id: string | null;
+  is_test?: boolean;
   submission_data: Record<string, unknown> | null;
   completed_at: string;
   created_at: string;
@@ -362,6 +363,7 @@ export interface Invoice {
   organization_id: string;
   invoice_number: string;
   status: InvoiceStatus;
+  is_test?: boolean;
   subtotal: number;
   total: number;
   currency: string;
@@ -412,6 +414,7 @@ export interface ListInvoicesRequest {
   organization_id: string;
   start_date?: string;
   end_date?: string;
+  include_tests?: boolean;
 }
 
 // Re-export payment types for convenience
@@ -420,7 +423,7 @@ export type {
   PaymentLink,
   PaymentLinkStatus,
   PaymentMethod,
-  PaymentStatus
+  PaymentStatus,
 } from "./types/payment";
 
 export interface LineItemDisplayConfig {

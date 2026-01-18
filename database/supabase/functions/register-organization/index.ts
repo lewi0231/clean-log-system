@@ -32,7 +32,7 @@ async function ensureUniqueOrgCode(
 
   while (true) {
     const { data } = await supabase
-      .from("organizations")
+      .from("organization")
       .select("id")
       .eq("org_code", code)
       .maybeSingle();

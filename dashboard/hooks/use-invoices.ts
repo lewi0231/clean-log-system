@@ -24,25 +24,35 @@ async function fetchInvoices(
   organizationId: string,
   startDate?: string,
   endDate?: string,
+  includeTests?: boolean,
 ): Promise<InvoiceWithJobs[]> {
   return InvoiceService.list({
     organization_id: organizationId,
     start_date: startDate,
     end_date: endDate,
+    include_tests: includeTests,
   });
 }
 
 export function useInvoices(
   startDate?: string,
   endDate?: string,
+  includeTests?: boolean,
 ): UseInvoicesResult {
   const { organizationId } = useOrganization();
   const queryClient = useQueryClient();
+  const includeTestsSafe = includeTests ?? false;
 
   const query = useQuery({
-    queryKey: invoicesKey(organizationId, startDate, endDate),
+    queryKey: invoicesKey(organizationId, startDate, endDate, includeTestsSafe),
     enabled: !!organizationId,
-    queryFn: () => fetchInvoices(organizationId as string, startDate, endDate),
+    queryFn: () =>
+      fetchInvoices(
+        organizationId as string,
+        startDate,
+        endDate,
+        includeTestsSafe,
+      ),
     select: (data) => data ?? [],
     placeholderData: (previous) => previous,
   });
@@ -51,7 +61,12 @@ export function useInvoices(
     mutationFn: InvoiceService.create,
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: invoicesKey(organizationId, startDate, endDate),
+        queryKey: invoicesKey(
+          organizationId,
+          startDate,
+          endDate,
+          includeTestsSafe,
+        ),
       });
     },
   });

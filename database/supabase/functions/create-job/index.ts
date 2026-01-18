@@ -1,5 +1,10 @@
 import { serve } from "server";
-import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import {
+  extractAuthToken,
+  getAuthUser,
+  getOrganizationIdFromAdmin,
+  getOrganizationIdFromWorker,
+} from "../_utils/auth.ts";
 import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import {
   type FeedbackEmailData,
@@ -47,36 +52,53 @@ serve(async (req) => {
     }
 
     const authUserId = authUser.id;
+    const userEmail = authUser.email ?? null;
     logger.debug("Token verified for job creation", {
       userId: authUserId,
-      email: authUser.email,
+      email: userEmail,
     });
 
-    // Get organization_id from worker table
-    const { data: worker, error: workerError } = await supabaseAdmin
-      .from("worker")
-      .select("organization_id")
-      .eq("auth_user_id", authUserId)
-      .maybeSingle();
+    // Get organization_id - try admin first, then worker
+    let organizationId: string | null = null;
 
-    if (workerError) {
-      logger.error("Error fetching worker", workerError, {
-        authUserId,
-      });
-      throw workerError;
+    // Try to get organization_id from admin (organization_user table)
+    if (userEmail) {
+      organizationId = await getOrganizationIdFromAdmin(
+        supabaseAdmin,
+        userEmail,
+      );
+      if (organizationId) {
+        logger.debug("Organization ID found from admin user", {
+          organizationId,
+          email: userEmail,
+        });
+      }
     }
 
-    if (!worker) {
-      logger.warn("Worker not found", {
+    // Fallback: try to get organization_id from worker table
+    if (!organizationId) {
+      organizationId = await getOrganizationIdFromWorker(
+        supabaseAdmin,
         authUserId,
-      });
-      return errorResponse("Worker not found", 404);
+      );
+      if (organizationId) {
+        logger.debug("Organization ID found from worker", {
+          organizationId,
+          authUserId,
+        });
+      }
     }
 
-    const organizationId = worker.organization_id;
-    logger.debug("Worker found for job creation", {
-      organizationId,
-    });
+    if (!organizationId) {
+      logger.warn("Organization ID not found for user", {
+        authUserId,
+        email: userEmail,
+      });
+      return errorResponse(
+        "User is not associated with any organization. Please contact your administrator.",
+        404,
+      );
+    }
 
     // Fetch organization settings to check if predefined locations are required
     logger.debug("Fetching organization settings", {

@@ -445,6 +445,185 @@ All tab triggers should use `cursor-pointer` to clearly indicate they are clicka
 
 ---
 
+## Info/Warning Banners
+
+### Contextual Information Banners
+
+Use colored banners to provide contextual information, warnings, or status messages within dialogs and pages.
+
+### Color Variants
+
+- **Info (Blue)**: For informational messages and tips
+
+  - Background: `bg-blue-50 dark:bg-blue-950/20`
+  - Border: `border-blue-200 dark:border-blue-900/30`
+  - Icon/Text: `text-blue-600 dark:text-blue-400` / `text-blue-900 dark:text-blue-100`
+
+- **Success (Green)**: For success confirmations
+
+  - Background: `bg-green-500/10`
+  - Border: `border-green-500/20`
+  - Icon/Text: `text-green-600` / `text-green-900 dark:text-green-100`
+
+- **Warning (Amber)**: For caution messages or important notices
+  - Background: `bg-amber-500/10`
+  - Border: `border-amber-500/20`
+  - Icon/Text: `text-amber-600` / `text-amber-900 dark:text-amber-100`
+
+### Implementation Example
+
+```tsx
+{
+  /* Info Banner */
+}
+<div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 p-4 rounded-lg">
+  <div className="flex items-start gap-3">
+    <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+    <div>
+      <p className="font-medium text-blue-900 dark:text-blue-100">Info Title</p>
+      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+        Description text here.
+      </p>
+    </div>
+  </div>
+</div>;
+
+{
+  /* Success Banner */
+}
+<div className="bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+  <div className="flex items-start gap-3">
+    <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+    <div>
+      <p className="font-medium text-green-900 dark:text-green-100">Success!</p>
+      <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+        Operation completed successfully.
+      </p>
+    </div>
+  </div>
+</div>;
+
+{
+  /* Warning Banner */
+}
+<div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg">
+  <div className="flex items-start gap-3">
+    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+    <div>
+      <p className="font-medium text-amber-900 dark:text-amber-100">Warning</p>
+      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+        Important notice text.
+      </p>
+    </div>
+  </div>
+</div>;
+```
+
+### Usage Guidelines
+
+- Use consistent icon + text layout with `flex items-start gap-3`
+- Always include dark mode variants for proper theming
+- Use `mt-0.5` on icons to align with text baseline
+- Keep banner messages concise and actionable
+
+---
+
+## Test/Preview Content
+
+### Visual Distinction for Test Data
+
+When displaying test or preview content that differs from production data, use clear visual indicators to prevent user confusion.
+
+### Implementation
+
+```tsx
+{
+  /* Test mode indicator */
+}
+<div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg">
+  <div className="flex items-start gap-3">
+    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+    <div>
+      <p className="font-medium text-amber-900 dark:text-amber-100">
+        Test Data - Auto Cleanup
+      </p>
+      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+        This test data will be automatically deleted when you close this dialog.
+      </p>
+    </div>
+  </div>
+</div>;
+```
+
+### Usage Guidelines
+
+- Clearly indicate when data is temporary or for testing purposes
+- Explain the lifecycle of test data (e.g., "will be deleted on close")
+- Prevent users from accidentally sending test invoices or taking actions on test data
+- Use amber/warning colors for test data notices
+
+---
+
+## Dynamic Route Pages
+
+### Invoice/Document Detail Pages
+
+When creating detail pages for invoices, jobs, or other documents accessed via dynamic routes (e.g., `/dashboard/invoicing/[id]`):
+
+### Structure
+
+```tsx
+// app/dashboard/invoicing/[id]/page.tsx
+export default function InvoicePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+
+  return (
+    <div className="container mx-auto py-8 px-4 max-w-4xl">
+      {/* Header with back navigation */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard/invoicing">
+            <Button variant="ghost" size="sm">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to List
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold">Page Title</h1>
+            <p className="text-sm text-muted-foreground">Subtitle</p>
+          </div>
+        </div>
+        {/* Action buttons */}
+        <Button variant="outline">
+          <Printer className="mr-2 h-4 w-4" />
+          Print
+        </Button>
+      </div>
+
+      <Separator className="mb-6" />
+
+      {/* Main content */}
+      <div className="bg-white dark:bg-card rounded-lg shadow-sm border p-6">
+        {/* Content */}
+      </div>
+    </div>
+  );
+}
+```
+
+### Usage Guidelines
+
+- Always include back navigation to the list view
+- Use `container mx-auto max-w-4xl` for readable content width
+- Wrap content in a card with `bg-white dark:bg-card rounded-lg shadow-sm border`
+- Include relevant action buttons in the header
+
+---
+
 ## Future Additions
 
 This document will be expanded as new styling patterns are established. When adding new patterns:

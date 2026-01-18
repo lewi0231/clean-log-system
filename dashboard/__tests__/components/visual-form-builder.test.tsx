@@ -2,6 +2,7 @@ import React from "react";
 
 import { createMockFieldConfig } from "@/__tests__/lib/fixtures";
 import { VisualFormBuilder } from "@/components/form-builder/visual-form-builder";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { FormSectionWithFields } from "@clean-log/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -11,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
       getSession: vi.fn().mockResolvedValue({
         data: { session: null },
         error: null,
@@ -41,7 +43,9 @@ function createWrapper() {
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>{children}</TooltipProvider>
+      </QueryClientProvider>
     );
   }
   Wrapper.displayName = "QueryClientWrapper";

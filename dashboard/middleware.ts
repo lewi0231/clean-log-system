@@ -85,10 +85,13 @@ export async function middleware(request: NextRequest) {
     const isPublicRoute = pathname === "/" ||
         publicRoutePrefixes.some((route) => pathname.startsWith(route));
 
-    // Get session to check authentication status
+    // Get user to check authentication status (verify with server)
     const {
-        data: { session },
-    } = await supabase.auth.getSession();
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    // Create session object for compatibility with existing code
+    const session = user ? { user } : null;
 
     // #region agent log - Debug middleware auth
     console.log("[MIDDLEWARE DEBUG]", {

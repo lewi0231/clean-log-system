@@ -329,7 +329,7 @@ export const createInvoiceSchema = z.object({
   organization_id: uuidSchema,
   job_ids: z.array(uuidSchema).min(1, "At least one job ID is required"),
   due_date: z.string().datetime("Invalid due date format"),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
   email: emailSchema.optional(), // Optional email for organization membership verification
 });
 
@@ -356,3 +356,41 @@ export const calculateInvoiceSchema = z.object({
   organization_id: uuidSchema,
   job_ids: z.array(uuidSchema).min(1, "At least one job ID is required"),
 });
+
+/**
+ * Schema for listing jobs (optionally include test data)
+ */
+export const listJobsSchema = z.object({
+  organization_id: uuidSchema,
+  include_tests: z.boolean().optional(),
+});
+
+/**
+ * Schema for listing invoices (optionally include test data)
+ */
+export const listInvoicesSchema = z.object({
+  organization_id: uuidSchema,
+  start_date: z.string().datetime().optional(),
+  end_date: z.string().datetime().optional(),
+  include_tests: z.boolean().optional(),
+});
+
+/**
+ * Schema for getting invoice details
+ */
+export const getInvoiceDetailsSchema = z.object({
+  invoice_id: uuidSchema,
+});
+
+/**
+ * Schema for deleting test data (job and/or invoice)
+ */
+export const deleteTestDataSchema = z
+  .object({
+    organization_id: uuidSchema,
+    job_id: uuidSchema.optional(),
+    invoice_id: uuidSchema.optional(),
+  })
+  .refine((data) => Boolean(data.job_id || data.invoice_id), {
+    message: "Either job_id or invoice_id is required",
+  });

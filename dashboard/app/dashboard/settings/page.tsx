@@ -439,13 +439,23 @@ export default function SettingsPage() {
       const previewUrl = URL.createObjectURL(file);
       setLogoPreview(normalizeLogoUrl(previewUrl));
 
-      // Get auth token
+      // Get authenticated user (verify with server)
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        throw new Error("Not authenticated");
+      }
+
+      // Get session for access token
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!session?.access_token) {
-        throw new Error("Not authenticated");
+        throw new Error("Not authenticated - no access token");
       }
 
       // Convert file to base64 for transmission
