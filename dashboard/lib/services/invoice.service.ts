@@ -148,7 +148,7 @@ export class InvoiceService {
    * List invoices for an organization with optional filtering and pagination
    */
   static async list(
-    request: ListInvoicesRequest
+    request: ListInvoicesRequest,
   ): Promise<{
     invoices: InvoiceWithJobs[];
     pagination?: ListInvoicesResponse["pagination"];
@@ -306,7 +306,7 @@ export class InvoiceService {
    */
   static async sendReminder(
     invoiceId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<{
     success: boolean;
     reminder_count: number;
@@ -356,7 +356,7 @@ export class InvoiceService {
    */
   static async generatePdfHtml(
     invoiceId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<{ html: string; invoiceNumber: string }> {
     try {
       log.debug("InvoiceService: Generating invoice PDF HTML", {
