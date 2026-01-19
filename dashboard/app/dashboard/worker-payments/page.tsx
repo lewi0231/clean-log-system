@@ -1,6 +1,7 @@
 "use client";
 
 import { PricingScopeProvider } from "@/components/pricing/pricing-scope-context";
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import {
   PageHeaderSkeleton,
@@ -11,7 +12,10 @@ import PaymentHistoryList from "@/components/worker-payments/payment-history-lis
 import PaymentOverview from "@/components/worker-payments/payment-overview";
 import RateCardManager from "@/components/worker-payments/rate-card-manager";
 import WorkerPaymentSummary from "@/components/worker-payments/worker-payment-summary";
+import { useJobs } from "@/hooks/use-jobs";
 import useOrganization from "@/hooks/useOrganization";
+import { Calculator } from "lucide-react";
+import { useCalculatePayments } from "./layout";
 
 export default function WorkerPaymentsPage() {
   const {
@@ -49,6 +53,12 @@ export default function WorkerPaymentsPage() {
 }
 
 function WorkerPaymentsPageContent() {
+  const { jobs } = useJobs();
+  const { openDialog } = useCalculatePayments();
+  
+  // Get jobs with workers
+  const jobsWithWorkers = jobs.filter((job) => job.workers.length > 0);
+
   return (
     <>
       <div className="mb-8">
@@ -58,6 +68,16 @@ function WorkerPaymentsPageContent() {
           payments are calculated based on the pricing rules configured in the
           Pricing section.
         </p>
+      </div>
+
+      <div className="flex items-center justify-end mb-6">
+        <Button
+          onClick={openDialog}
+          disabled={jobsWithWorkers.length === 0}
+        >
+          <Calculator className="mr-2 h-4 w-4" />
+          Calculate Payments
+        </Button>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-6">

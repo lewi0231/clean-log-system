@@ -22,14 +22,12 @@ import {
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
-import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import useOrganization from "@/hooks/useOrganization";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
-  Calendar,
   CheckCircle2,
   Clock,
   Download,
@@ -38,7 +36,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import CalculatePaymentDialog from "./calculate-payment-dialog";
 import MarkPaymentPaidDialog from "./mark-payment-paid-dialog";
 import PaymentDetailDialog from "./payment-detail-dialog";
 
@@ -106,12 +103,10 @@ export default function PaymentHistoryList() {
   const { formatCurrency } = useOrganizationCurrency();
   const { organizationId } = useOrganization();
   const { jobs } = useJobs();
-  const { calculatePayments } = useWorkerPayments();
-  const { paymentHistory, addPayment, filterByDateRange, invalidate } =
+  const { paymentHistory, filterByDateRange, invalidate } =
     useWorkerPaymentHistory();
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [isCalculateDialogOpen, setIsCalculateDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
     null
   );
@@ -119,13 +114,6 @@ export default function PaymentHistoryList() {
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [isMarkPaidDialogOpen, setIsMarkPaidDialogOpen] = useState(false);
   const [approvingBatchId, setApprovingBatchId] = useState<string | null>(null);
-
-  const handleCalculatePayments = async (jobIds: string[]) => {
-    const result = await calculatePayments(jobIds);
-    if (result?.calculation) {
-      addPayment(result, jobIds);
-    }
-  };
 
   const filteredHistory = useMemo(() => {
     return filterByDateRange(startDate || undefined, endDate || undefined);
@@ -184,14 +172,6 @@ export default function PaymentHistoryList() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1" />
-        <Button onClick={() => setIsCalculateDialogOpen(true)}>
-          <Calendar className="mr-2 h-4 w-4" />
-          Calculate Payments
-        </Button>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Payment History</CardTitle>
@@ -336,12 +316,6 @@ export default function PaymentHistoryList() {
           </div>
         </CardContent>
       </Card>
-
-      <CalculatePaymentDialog
-        open={isCalculateDialogOpen}
-        onOpenChange={setIsCalculateDialogOpen}
-        onCalculate={handleCalculatePayments}
-      />
 
       {selectedPayment && (
         <PaymentDetailDialog

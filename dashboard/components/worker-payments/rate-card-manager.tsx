@@ -11,6 +11,11 @@ import {
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,7 +50,7 @@ import {
 } from "@/hooks/use-worker-rate-cards";
 import { useWorkers } from "@/hooks/use-workers";
 import { format } from "date-fns";
-import { Edit2, Info, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Edit2, Info, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -101,6 +106,7 @@ export default function RateCardManager() {
   const [editingCard, setEditingCard] = useState<WorkerRateCard | null>(null);
   const [formData, setFormData] = useState<RateCardFormData>(emptyFormData);
   const [saving, setSaving] = useState(false);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const activeRateCards = rateCards.filter((card) => card.is_active);
 
@@ -259,6 +265,63 @@ export default function RateCardManager() {
 
   return (
     <>
+
+<div className="flex justify-between">
+      {/* Info Banner - Collapsible */}
+      <Collapsible open={isInfoOpen} onOpenChange={setIsInfoOpen}>
+        <Card className="mb-2 bg-muted/50">
+          <CollapsibleTrigger asChild>
+            <CardContent className=" cursor-pointer hover:bg-muted/70 transition-colors min-w-[700px]">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex gap-3 flex-1">
+                  <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">
+                      How Rate Cards Work
+                    </p>
+                    {!isInfoOpen && (
+                      <p className="text-xs mt-0.5">
+                        Rate cards define additive bonuses for workers
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+                    isInfoOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+            </CardContent>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 pb-6">
+              <div className="flex gap-3 pl-8">
+                <div className="text-sm text-muted-foreground">
+                  <p className="mb-2">
+                    Rate cards define <strong>additive bonuses</strong> for
+                    workers. When a job is completed:
+                  </p>
+                  <ol className="list-decimal ml-4 space-y-1">
+                    <li>
+                      The base worker payment (from pricing rules) is split among
+                      workers based on <strong>time worked</strong>
+                    </li>
+                    <li>
+                      <strong>Multipliers</strong> increase a worker&apos;s time
+                      share (e.g., 1.2x = 20% more)
+                    </li>
+                    <li>
+                      <strong>Per-unit</strong> and <strong>flat bonuses</strong>{" "}
+                      are added on top (not deducted from pool)
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
       <div className="flex items-center justify-between mb-6">
         <div className="flex-1" />
         <Button onClick={handleOpenCreate}>
@@ -266,38 +329,7 @@ export default function RateCardManager() {
           Add Rate Card
         </Button>
       </div>
-
-      {/* Info Banner */}
-      <Card className="mb-6 bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="flex gap-3">
-            <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div className="text-sm text-muted-foreground">
-              <p className="font-medium text-foreground mb-1">
-                How Rate Cards Work
-              </p>
-              <p>
-                Rate cards define <strong>additive bonuses</strong> for workers.
-                When a job is completed:
-              </p>
-              <ol className="list-decimal ml-4 mt-1 space-y-1">
-                <li>
-                  The base worker payment (from pricing rules) is split among
-                  workers based on <strong>time worked</strong>
-                </li>
-                <li>
-                  <strong>Multipliers</strong> increase a worker&apos;s time
-                  share (e.g., 1.2x = 20% more)
-                </li>
-                <li>
-                  <strong>Per-unit</strong> and <strong>flat bonuses</strong>{" "}
-                  are added on top (not deducted from pool)
-                </li>
-              </ol>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
       <Card>
         <CardHeader>

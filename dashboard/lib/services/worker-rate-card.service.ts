@@ -1,6 +1,7 @@
 /**
  * Worker Rate Card Service
  * Handles CRUD operations for worker payment rate cards with modifier types
+ * Uses edge function to bypass RLS (service_role only)
  */
 
 import { log } from "@/lib/logger";
@@ -63,23 +64,15 @@ export class WorkerRateCardService {
    * List all rate cards for an organization
    */
   static async list(organizationId: string): Promise<WorkerRateCard[]> {
-    const { data, error } = await supabase
-      .from("worker_rate_card")
-      .select(
-        `
-        *,
-        worker:worker_id (
-          id,
-          first_name,
-          last_name
-        ),
-        worker_rate_card_field (
-          field_config_id
-        )
-      `
-      )
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false });
+    const { data, error } = await supabase.functions.invoke(
+      "manage-worker-rate-card",
+      {
+        body: {
+          action: "list",
+          organization_id: organizationId,
+        },
+      }
+    );
 
     if (error) {
       log.error("WorkerRateCardService: Failed to list rate cards", {
@@ -88,52 +81,29 @@ export class WorkerRateCardService {
       throw new Error(error.message);
     }
 
-    // Transform field mappings to field_config_ids array
-    return (data || []).map((card) => ({
-      ...card,
-      field_config_ids:
-        card.worker_rate_card_field?.map(
-          (f: { field_config_id: string }) => f.field_config_id
-        ) || [],
-    })) as WorkerRateCard[];
+    if (!data?.success) {
+      throw new Error(data?.error || "Failed to list rate cards");
+    }
+
+    return (data.rate_cards || []) as WorkerRateCard[];
   }
 
   /**
    * Get rate cards for a specific worker
+   * Note: Uses list and filters client-side for now
    */
   static async getForWorker(
     organizationId: string,
     workerId: string
   ): Promise<WorkerRateCard[]> {
-    const { data, error } = await supabase
-      .from("worker_rate_card")
-      .select(
-        `
-        *,
-        worker_rate_card_field (
-          field_config_id
-        )
-      `
-      )
-      .eq("organization_id", organizationId)
-      .eq("worker_id", workerId)
-      .order("effective_from", { ascending: false });
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to get worker rate cards", {
-        error: error.message,
-        workerId,
-      });
-      throw new Error(error.message);
-    }
-
-    return (data || []).map((card) => ({
-      ...card,
-      field_config_ids:
-        card.worker_rate_card_field?.map(
-          (f: { field_config_id: string }) => f.field_config_id
-        ) || [],
-    })) as WorkerRateCard[];
+    const allCards = await this.list(organizationId);
+    return allCards
+      .filter((card) => card.worker_id === workerId)
+      .sort(
+        (a, b) =>
+          new Date(b.effective_from).getTime() -
+          new Date(a.effective_from).getTime()
+      );
   }
 
   /**
@@ -145,75 +115,41 @@ export class WorkerRateCardService {
     modifierType?: ModifierType
   ): Promise<WorkerRateCard | null> {
     const today = new Date().toISOString().split("T")[0];
+    const workerCards = await this.getForWorker(organizationId, workerId);
 
-    let query = supabase
-      .from("worker_rate_card")
-      .select(
-        `
-        *,
-        worker_rate_card_field (
-          field_config_id
-        )
-      `
-      )
-      .eq("organization_id", organizationId)
-      .eq("worker_id", workerId)
-      .eq("is_active", true)
-      .lte("effective_from", today)
-      .or(`effective_to.is.null,effective_to.gte.${today}`)
-      .order("effective_from", { ascending: false })
-      .limit(1);
+    const activeCard = workerCards.find((card) => {
+      if (!card.is_active) return false;
+      if (card.effective_from > today) return false;
+      if (card.effective_to && card.effective_to < today) return false;
+      if (modifierType && card.modifier_type !== modifierType) return false;
+      return true;
+    });
 
-    if (modifierType) {
-      query = query.eq("modifier_type", modifierType);
-    }
-
-    const { data, error } = await query.maybeSingle();
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to get current rate", {
-        error: error.message,
-        workerId,
-      });
-      throw new Error(error.message);
-    }
-
-    if (!data) return null;
-
-    return {
-      ...data,
-      field_config_ids:
-        data.worker_rate_card_field?.map(
-          (f: { field_config_id: string }) => f.field_config_id
-        ) || [],
-    } as WorkerRateCard;
+    return activeCard || null;
   }
 
   /**
    * Create a new rate card
    */
   static async create(request: CreateRateCardRequest): Promise<WorkerRateCard> {
-    const { field_config_ids, ...rateCardData } = request;
-
-    // Create the rate card
-    const { data, error } = await supabase
-      .from("worker_rate_card")
-      .insert({
-        organization_id: rateCardData.organization_id,
-        worker_id: rateCardData.worker_id,
-        modifier_type: rateCardData.modifier_type,
-        modifier_value: rateCardData.modifier_value,
-        currency: rateCardData.currency || "AUD",
-        effective_from:
-          rateCardData.effective_from ||
-          new Date().toISOString().split("T")[0],
-        effective_to: rateCardData.effective_to || null,
-        role_title: rateCardData.role_title || null,
-        notes: rateCardData.notes || null,
-        is_active: true,
-      })
-      .select()
-      .single();
+    const { data, error } = await supabase.functions.invoke(
+      "manage-worker-rate-card",
+      {
+        body: {
+          action: "create",
+          organization_id: request.organization_id,
+          worker_id: request.worker_id,
+          modifier_type: request.modifier_type,
+          modifier_value: request.modifier_value,
+          currency: request.currency,
+          effective_from: request.effective_from,
+          effective_to: request.effective_to,
+          role_title: request.role_title,
+          notes: request.notes,
+          field_config_ids: request.field_config_ids,
+        },
+      }
+    );
 
     if (error) {
       log.error("WorkerRateCardService: Failed to create rate card", {
@@ -222,111 +158,68 @@ export class WorkerRateCardService {
       throw new Error(error.message);
     }
 
-    // If per_unit type and field_config_ids provided, create field mappings
-    if (
-      rateCardData.modifier_type === "per_unit" &&
-      field_config_ids &&
-      field_config_ids.length > 0
-    ) {
-      const fieldMappings = field_config_ids.map((fieldConfigId) => ({
-        rate_card_id: data.id,
-        field_config_id: fieldConfigId,
-      }));
-
-      const { error: mappingError } = await supabase
-        .from("worker_rate_card_field")
-        .insert(fieldMappings);
-
-      if (mappingError) {
-        log.error(
-          "WorkerRateCardService: Failed to create field mappings",
-          {
-            error: mappingError.message,
-          }
-        );
-        // Don't throw - rate card was created, just log the error
-      }
+    if (!data?.success) {
+      throw new Error(data?.error || "Failed to create rate card");
     }
 
-    return {
-      ...data,
-      field_config_ids: field_config_ids || [],
-    } as WorkerRateCard;
+    return data.rate_card as WorkerRateCard;
   }
 
   /**
    * Update a rate card
    */
-  static async update(request: UpdateRateCardRequest): Promise<WorkerRateCard> {
-    const { id, field_config_ids, ...updateData } = request;
-
-    // Update the rate card
-    const { data, error } = await supabase
-      .from("worker_rate_card")
-      .update({
-        ...updateData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select()
-      .single();
+  static async update(
+    organizationId: string,
+    request: UpdateRateCardRequest
+  ): Promise<WorkerRateCard> {
+    const { data, error } = await supabase.functions.invoke(
+      "manage-worker-rate-card",
+      {
+        body: {
+          action: "update",
+          organization_id: organizationId,
+          id: request.id,
+          modifier_type: request.modifier_type,
+          modifier_value: request.modifier_value,
+          effective_from: request.effective_from,
+          effective_to: request.effective_to,
+          role_title: request.role_title,
+          is_active: request.is_active,
+          notes: request.notes,
+          field_config_ids: request.field_config_ids,
+        },
+      }
+    );
 
     if (error) {
       log.error("WorkerRateCardService: Failed to update rate card", {
         error: error.message,
-        id,
+        id: request.id,
       });
       throw new Error(error.message);
     }
 
-    // If field_config_ids provided, update field mappings
-    if (field_config_ids !== undefined) {
-      // Delete existing mappings
-      await supabase
-        .from("worker_rate_card_field")
-        .delete()
-        .eq("rate_card_id", id);
-
-      // Create new mappings if any
-      if (field_config_ids.length > 0) {
-        const fieldMappings = field_config_ids.map((fieldConfigId) => ({
-          rate_card_id: id,
-          field_config_id: fieldConfigId,
-        }));
-
-        const { error: mappingError } = await supabase
-          .from("worker_rate_card_field")
-          .insert(fieldMappings);
-
-        if (mappingError) {
-          log.error(
-            "WorkerRateCardService: Failed to update field mappings",
-            {
-              error: mappingError.message,
-            }
-          );
-        }
-      }
+    if (!data?.success) {
+      throw new Error(data?.error || "Failed to update rate card");
     }
 
-    return {
-      ...data,
-      field_config_ids: field_config_ids || [],
-    } as WorkerRateCard;
+    return data.rate_card as WorkerRateCard;
   }
 
   /**
    * Deactivate a rate card (soft delete)
    */
-  static async deactivate(id: string): Promise<void> {
-    const { error } = await supabase
-      .from("worker_rate_card")
-      .update({
-        is_active: false,
-        effective_to: new Date().toISOString().split("T")[0],
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+  static async deactivate(organizationId: string, id: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke(
+      "manage-worker-rate-card",
+      {
+        body: {
+          action: "deactivate",
+          organization_id: organizationId,
+          id,
+        },
+      }
+    );
 
     if (error) {
       log.error("WorkerRateCardService: Failed to deactivate rate card", {
@@ -335,17 +228,26 @@ export class WorkerRateCardService {
       });
       throw new Error(error.message);
     }
+
+    if (!data?.success) {
+      throw new Error(data?.error || "Failed to deactivate rate card");
+    }
   }
 
   /**
    * Delete a rate card (hard delete)
    */
-  static async delete(id: string): Promise<void> {
-    // Field mappings will be cascade deleted due to FK constraint
-    const { error } = await supabase
-      .from("worker_rate_card")
-      .delete()
-      .eq("id", id);
+  static async delete(organizationId: string, id: string): Promise<void> {
+    const { data, error } = await supabase.functions.invoke(
+      "manage-worker-rate-card",
+      {
+        body: {
+          action: "delete",
+          organization_id: organizationId,
+          id,
+        },
+      }
+    );
 
     if (error) {
       log.error("WorkerRateCardService: Failed to delete rate card", {
@@ -353,6 +255,10 @@ export class WorkerRateCardService {
         id,
       });
       throw new Error(error.message);
+    }
+
+    if (!data?.success) {
+      throw new Error(data?.error || "Failed to delete rate card");
     }
   }
 }

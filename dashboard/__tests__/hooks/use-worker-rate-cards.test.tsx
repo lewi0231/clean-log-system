@@ -20,9 +20,9 @@ vi.mock("@/lib/services/worker-rate-card.service", () => ({
     WorkerRateCardService: {
         list: vi.fn(),
         create: vi.fn(),
-        update: vi.fn(),
-        deactivate: vi.fn(),
-        delete: vi.fn(),
+        update: vi.fn(), // Now takes (organizationId, request)
+        deactivate: vi.fn(), // Now takes (organizationId, id)
+        delete: vi.fn(), // Now takes (organizationId, id)
     },
 }));
 
@@ -312,10 +312,13 @@ describe("useWorkerRateCards", () => {
                 modifier_value: 30,
             });
 
-            expect(WorkerRateCardService.update).toHaveBeenCalledWith({
-                id: "rate-1",
-                modifier_value: 30,
-            });
+            expect(WorkerRateCardService.update).toHaveBeenCalledWith(
+                "org-1",
+                {
+                    id: "rate-1",
+                    modifier_value: 30,
+                },
+            );
             expect(updatedCard.modifier_value).toBe(30);
         });
 
@@ -360,6 +363,7 @@ describe("useWorkerRateCards", () => {
             await result.current.deactivateRateCard("rate-1");
 
             expect(WorkerRateCardService.deactivate).toHaveBeenCalledWith(
+                "org-1",
                 "rate-1",
             );
             // Verify refetch was triggered
@@ -384,7 +388,10 @@ describe("useWorkerRateCards", () => {
 
             await result.current.deleteRateCard("rate-1");
 
-            expect(WorkerRateCardService.delete).toHaveBeenCalledWith("rate-1");
+            expect(WorkerRateCardService.delete).toHaveBeenCalledWith(
+                "org-1",
+                "rate-1",
+            );
             // Verify refetch was triggered
             expect(WorkerRateCardService.list).toHaveBeenCalledTimes(2);
         });
