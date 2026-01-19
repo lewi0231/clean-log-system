@@ -1,6 +1,7 @@
 import {
   NavigationHeader,
   HeroSection,
+  WorkflowSection,
   FeaturesSection,
   SocialProofSection,
   PricingSection,
@@ -17,6 +18,7 @@ export default function Home() {
       <NavigationHeader />
       <main>
         <HeroSection />
+        <WorkflowSection />
         <FeaturesSection />
         <SocialProofSection />
         <PricingSection />

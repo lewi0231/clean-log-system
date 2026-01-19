@@ -1,4 +1,5 @@
 export { HeroSection } from "./hero-section";
+export { WorkflowSection } from "./workflow-section";
 export { FeaturesSection } from "./features-section";
 export { SocialProofSection } from "./social-proof-section";
 export { PricingSection } from "./pricing-section";

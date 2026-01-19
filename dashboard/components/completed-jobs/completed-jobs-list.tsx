@@ -336,7 +336,7 @@ export default function CompletedJobsList({
   const totalColumns = 2 + orderedFields.length + 2; // Status, Location, Workers, ordered fields, Completed At
 
   return (
-    <div className="w-full overflow-x-auto">
+    <div className=" overflow-x-auto">
       <div className="rounded-md border w-full">
         <Table className="w-full">
           <TableHeader>
