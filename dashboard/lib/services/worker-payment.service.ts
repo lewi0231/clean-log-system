@@ -293,6 +293,7 @@ export class WorkerPaymentService {
                 | "payroll_system"
                 | "other";
             paymentReference?: string;
+            paymentDate?: string;
             notes?: string;
         },
     ): Promise<{ success: boolean }> {
@@ -312,6 +313,7 @@ export class WorkerPaymentService {
                         status: params.status,
                         payment_method: params.paymentMethod,
                         payment_reference: params.paymentReference,
+                        payment_date: params.paymentDate,
                         notes: params.notes,
                     },
                 },
