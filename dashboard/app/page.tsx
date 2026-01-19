@@ -1,15 +1,15 @@
 import {
-  NavigationHeader,
-  HeroSection,
-  WorkflowSection,
-  FeaturesSection,
-  SocialProofSection,
-  PricingSection,
-  MobileAppSection,
-  IndustrySections,
-  FAQSection,
-  FinalCTASection,
-  Footer,
+    FAQSection,
+    FeaturesSection,
+    FinalCTASection,
+    Footer,
+    HeroSection,
+    IndustrySections,
+    MobileAppSection,
+    NavigationHeader,
+    PricingSection,
+    SocialProofSection,
+    WorkflowSection,
 } from "@/components/landing-page";
 
 export default function Home() {

@@ -19,10 +19,7 @@ import {
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPaymentSummary } from "@/hooks/use-worker-payment-summary";
-import { useWorkerPayments } from "@/hooks/use-worker-payments";
-import useOrganization from "@/hooks/useOrganization";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
-import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
@@ -33,7 +30,6 @@ import {
   Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import CalculatePaymentDialog from "./calculate-payment-dialog";
 import PaymentDetailDialog from "./payment-detail-dialog";
 
 type SortField = "name" | "jobs" | "total" | "average";
@@ -59,12 +55,9 @@ function SortIcon({
 }
 
 export default function WorkerPaymentSummary() {
-  const { organizationId } = useOrganization();
   const { formatCurrency } = useOrganizationCurrency();
-  const { calculatePayments } = useWorkerPayments();
-  const { paymentHistory, addPayment } = useWorkerPaymentHistory();
+  const { paymentHistory } = useWorkerPaymentHistory();
   const { workerSummary } = useWorkerPaymentSummary();
-  const [isCalculateDialogOpen, setIsCalculateDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
     null
   );
@@ -118,23 +111,6 @@ export default function WorkerPaymentSummary() {
     };
   }, [workerSummary]);
 
-  const handleCalculatePayments = async (jobIds: string[]) => {
-    if (!organizationId) return;
-
-    const result = await calculatePayments(jobIds);
-    if (result?.calculation) {
-      // Save to database via service
-      try {
-        await WorkerPaymentService.savePayment(organizationId, result, jobIds);
-        addPayment(result, jobIds);
-      } catch (error) {
-        console.error("Failed to save payment:", error);
-        // Still add to local state for now, but log error
-        addPayment(result, jobIds);
-      }
-    }
-  };
-
   const handleViewDetails = (payment: PaymentRecord) => {
     setSelectedPayment(payment);
     setIsDetailDialogOpen(true);
@@ -142,14 +118,6 @@ export default function WorkerPaymentSummary() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1" />
-        <Button onClick={() => setIsCalculateDialogOpen(true)}>
-          <Calculator className="mr-2 h-4 w-4" />
-          Calculate Payments
-        </Button>
-      </div>
-
       {/* Summary Stats */}
       {workerSummary.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -327,12 +295,6 @@ export default function WorkerPaymentSummary() {
           )}
         </CardContent>
       </Card>
-
-      <CalculatePaymentDialog
-        open={isCalculateDialogOpen}
-        onOpenChange={setIsCalculateDialogOpen}
-        onCalculate={handleCalculatePayments}
-      />
 
       {selectedPayment && (
         <PaymentDetailDialog

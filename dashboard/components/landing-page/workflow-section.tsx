@@ -5,13 +5,13 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import {
-  Smartphone,
   ArrowRight,
-  Mail,
-  FileText,
-  Calculator,
   Bell,
+  Calculator,
   CheckCircle,
+  FileText,
+  Mail,
+  Smartphone,
   User,
 } from "lucide-react";
 
@@ -86,7 +86,7 @@ export function WorkflowSection() {
         <div className="hidden lg:block">
           <div className="relative">
             {/* Connecting line */}
-            <div className="absolute top-16 left-0 right-0 h-0.5 bg-linear-to-r from-blue-200 via-green-200 via-purple-200 via-orange-200 via-indigo-200 to-emerald-200"></div>
+            <div className="absolute top-16 left-0 right-0 h-0.5 bg-linear-to-r from-blue-200 via-orange-200 to-emerald-200"></div>
 
             <div className="grid grid-cols-7 gap-4 relative">
               {workflowSteps.map((step, index) => (

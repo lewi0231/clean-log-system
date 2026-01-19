@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,20 +10,13 @@ import {
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
-import { useWorkerPayments } from "@/hooks/use-worker-payments";
-import useOrganization from "@/hooks/useOrganization";
-import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
-import { Briefcase, Calculator, DollarSign, Users } from "lucide-react";
-import { useMemo, useState } from "react";
-import CalculatePaymentDialog from "./calculate-payment-dialog";
+import { Briefcase, DollarSign, Users } from "lucide-react";
+import { useMemo } from "react";
 
 export default function PaymentOverview() {
-  const { organizationId } = useOrganization();
   const { jobs } = useJobs();
   const { formatCurrency } = useOrganizationCurrency();
-  const { calculatePayments, loading: calculating } = useWorkerPayments();
-  const { paymentHistory, addPayment } = useWorkerPaymentHistory();
-  const [isCalculateDialogOpen, setIsCalculateDialogOpen] = useState(false);
+  const { paymentHistory } = useWorkerPaymentHistory();
 
   // Get unique workers from jobs
   const uniqueWorkers = useMemo(() => {
@@ -41,26 +33,6 @@ export default function PaymentOverview() {
   const jobsWithWorkers = useMemo(() => {
     return jobs.filter((job) => job.workers.length > 0);
   }, [jobs]);
-
-  const handleCalculatePayments = async (jobIds: string[]) => {
-    if (!organizationId) return;
-
-    const result = await calculatePayments(jobIds);
-    if (result?.calculation) {
-      // Save to database via service
-      try {
-        await WorkerPaymentService.savePayment(organizationId, result, jobIds);
-        // Payment saved to database with batch_id
-        // Payment history is now fetched from database via useWorkerPaymentHistory hook
-        // For now, localStorage records won't have batch_id, but database records will
-        addPayment(result, jobIds);
-      } catch (error) {
-        console.error("Failed to save payment:", error);
-        // Still add to local state for now, but log error
-        addPayment(result, jobIds);
-      }
-    }
-  };
 
   // Get latest payment calculation for display
   const latestPayment = useMemo(() => {
@@ -83,17 +55,6 @@ export default function PaymentOverview() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1" />
-        <Button
-          onClick={() => setIsCalculateDialogOpen(true)}
-          disabled={calculating || jobsWithWorkers.length === 0}
-        >
-          <Calculator className="mr-2 h-4 w-4" />
-          Calculate Payments
-        </Button>
-      </div>
-
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -204,12 +165,6 @@ export default function PaymentOverview() {
           </CardContent>
         </Card>
       )}
-
-      <CalculatePaymentDialog
-        open={isCalculateDialogOpen}
-        onOpenChange={setIsCalculateDialogOpen}
-        onCalculate={handleCalculatePayments}
-      />
     </>
   );
 }

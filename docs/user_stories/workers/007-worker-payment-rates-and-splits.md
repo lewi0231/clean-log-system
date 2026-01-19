@@ -21,7 +21,7 @@ The system handles a common real-world scenario where:
 
 **Important**: Pricing rules define the total worker payment for the job. This amount is distributed among workers. Bonuses are **additional** amounts paid to specific workers based on their role - they do not reduce what other workers receive.
 
-**Example Scenario**:
+**Example Scenario 1 (Per-Unit Bonus)**:
 ```
 Job: 100 cars cleaned × $5/car = $500 total worker payment (from pricing rules)
 Workers:
@@ -45,7 +45,32 @@ Final Payments:
 Total Payout: $550 ($500 base + $50 bonus)
 ```
 
-**Note**: The total payout ($550) exceeds the base worker payment ($500) because bonuses are additive. This is intentional - the organization pays extra for supervisory roles.
+**Example Scenario 2 (Team Percentage Bonus)**:
+```
+Job: 100 cars cleaned × $5/car = $500 total worker payment (from pricing rules)
+Workers:
+- Alice (Team Lead): 8 hours, team_percentage bonus = 10% of team earnings
+- Bob (Standard): 8 hours
+- Charlie (Standard): 6 hours
+
+Step 1: Time-based split of worker payment pool (22 total hours)
+  Alice: 8/22 = 36.4% × $500 = $181.82
+  Bob: 8/22 = 36.4% × $500 = $181.82
+  Charlie: 6/22 = 27.3% × $500 = $136.36
+
+Step 2: Calculate team percentage bonus
+  Team earnings (excluding Alice) = Bob ($181.82) + Charlie ($136.36) = $318.18
+  Alice bonus = 10% × $318.18 = $31.82
+
+Final Payments:
+  Alice: $181.82 + $31.82 = $213.64 (time share + team bonus)
+  Bob: $181.82
+  Charlie: $136.36
+
+Total Payout: $531.82 ($500 base + $31.82 bonus)
+```
+
+**Note**: The total payout exceeds the base worker payment because bonuses are additive. This is intentional - the organization pays extra for supervisory/leadership roles.
 
 ## Acceptance Criteria
 
@@ -66,9 +91,10 @@ Total Payout: $550 ($500 base + $50 bonus)
      - `per_unit` - Bonus per unit of output (e.g., $0.50/car)
      - `flat` - Fixed bonus per job (e.g., $20/job)
      - `multiplier` - Percentage boost to time-share (e.g., 1.2x = 20% more)
-   - **Modifier value**: The amount/rate/multiplier
+     - `team_percentage` - Percentage of other team members' earnings (e.g., 10% of team wages)
+   - **Modifier value**: The amount/rate/multiplier/percentage
    - **Applies to fields** (for per_unit): Which mobile config fields the bonus applies to (e.g., "cars_cleaned", "rooms_serviced")
-   - Role/title (e.g., "Supervisor", "Senior Technician")
+   - Role/title (e.g., "Supervisor", "Senior Technician", "Team Lead")
    - Effective date range (from/to)
    - Notes (optional)
 8. Admin can view all rate cards for a worker
@@ -84,14 +110,17 @@ Total Payout: $550 ($500 base + $50 bonus)
     2. **Multipliers**: Applied to each worker's time-share (multiplies their portion)
     3. **Per-unit bonuses**: Added on top of worker's share (not deducted from pool)
     4. **Flat bonuses**: Added on top of worker's share (not deducted from pool)
+    5. **Team percentage bonuses**: Calculated as percentage of other workers' time-shares (not including the bonus recipient's share)
 14. If no time tracking data, fall back to equal split of total worker payment
 15. Bonuses are **additive** - they increase total payout, not redistribute existing pool
-16. Calculation preview shows full breakdown:
+16. Team percentage bonus is calculated from the team's time-shares (after multipliers), excluding the recipient
+17. Calculation preview shows full breakdown:
     - Total worker payment (from pricing rules)
     - Time-share amounts per worker
     - Multiplier adjustments (if applicable)
     - Per-unit bonuses by worker
     - Flat bonuses by worker
+    - Team percentage bonuses by worker
     - Final payment per worker
     - Total payout (base + all bonuses)
 
@@ -128,7 +157,7 @@ CREATE TABLE worker_rate_card (
   
   -- Modifier Configuration
   modifier_type TEXT NOT NULL DEFAULT 'flat' CHECK (
-    modifier_type IN ('per_unit', 'flat', 'multiplier')
+    modifier_type IN ('per_unit', 'flat', 'multiplier', 'team_percentage')
   ),
   modifier_value DECIMAL(10, 4) NOT NULL CHECK (modifier_value > 0),
   currency TEXT NOT NULL DEFAULT 'AUD',
@@ -201,7 +230,7 @@ interface WorkerTimeEntry {
 
 interface RateCard {
   worker_id: string;
-  modifier_type: 'per_unit' | 'flat' | 'multiplier';
+  modifier_type: 'per_unit' | 'flat' | 'multiplier' | 'team_percentage';
   modifier_value: number;
   field_config_ids: string[]; // For per_unit type
 }
@@ -214,6 +243,7 @@ interface WorkerPaymentBreakdown {
   multiplier_adjustment: number; // Additional from multiplier (if any)
   per_unit_bonus: number;       // Additive bonus
   flat_bonus: number;           // Additive bonus
+  team_percentage_bonus: number; // Percentage of team's earnings
   final_payment: number;        // Total for this worker
 }
 
@@ -245,6 +275,7 @@ function calculateWorkerPayments(
       multiplier_adjustment: 0,
       per_unit_bonus: 0,
       flat_bonus: 0,
+      team_percentage_bonus: 0,
       final_payment: 0
     });
   });
@@ -296,17 +327,33 @@ function calculateWorkerPayments(
     }
   });
   
-  // Step 5: Calculate final payments (share + bonuses)
+  // Step 5: Calculate ADDITIVE team percentage bonuses
+  // This is calculated as a percentage of OTHER workers' time-shares (after multipliers)
+  breakdowns.forEach(breakdown => {
+    const rateCard = rateCards.get(breakdown.worker_id);
+    if (rateCard?.modifier_type === 'team_percentage') {
+      // Sum of all other workers' time-shares (excluding this worker)
+      const teamEarnings = breakdowns
+        .filter(b => b.worker_id !== breakdown.worker_id)
+        .reduce((sum, b) => sum + b.time_share, 0);
+      
+      // modifier_value is a percentage (e.g., 10 for 10%)
+      breakdown.team_percentage_bonus = teamEarnings * (rateCard.modifier_value / 100);
+    }
+  });
+  
+  // Step 6: Calculate final payments (share + all bonuses)
   breakdowns.forEach(breakdown => {
     breakdown.final_payment = 
-      breakdown.time_share +        // Their share of base payment
-      breakdown.per_unit_bonus +    // Additive bonus
-      breakdown.flat_bonus;         // Additive bonus
+      breakdown.time_share +           // Their share of base payment
+      breakdown.per_unit_bonus +       // Additive bonus
+      breakdown.flat_bonus +           // Additive bonus
+      breakdown.team_percentage_bonus; // Additive team bonus
   });
   
   // Calculate totals
   const totalBonuses = breakdowns.reduce(
-    (sum, b) => sum + b.per_unit_bonus + b.flat_bonus + b.multiplier_adjustment, 
+    (sum, b) => sum + b.per_unit_bonus + b.flat_bonus + b.multiplier_adjustment + b.team_percentage_bonus, 
     0
   );
   const totalPayout = baseWorkerPayment + totalBonuses;
@@ -398,17 +445,27 @@ interface WorkerTimeInput {
    - Correctly increases time-share (e.g., 1.2x = 20% more)
    - Only affects the worker with the multiplier
 
-5. **Combined Scenarios**:
+5. **Team Percentage Bonuses**:
+   - Calculated from sum of other workers' time-shares (not own share)
+   - Correctly applies percentage (e.g., 10% of $300 team earnings = $30)
+   - Does not include the bonus recipient's own time-share in calculation
+   - Multiple team percentage workers each calculate independently
+   - Team percentage applies AFTER multipliers are applied to time-shares
+
+6. **Combined Scenarios**:
    - Supervisor (per-unit) + standard workers (no modifier)
    - Senior (multiplier) + junior (no modifier) + supervisor (flat)
+   - Team lead (team_percentage) + standard workers
    - Worker arrives late (less hours) + supervisor bonus
    - Verify total payout = base payment + all bonuses
 
-6. **Edge Cases**:
+7. **Edge Cases**:
    - Zero hours worked (fallback to equal split)
    - Rate card effective date in future (should not apply)
    - Worker with no rate card (receives time share only, no penalty)
    - Very large bonuses (should still be additive, warn admin in UI)
+   - Solo worker with team_percentage (bonus = 0, no other team members)
+   - All workers have team_percentage (each calculates from others' shares)
 
 ## Priority
 
@@ -424,12 +481,18 @@ interface WorkerTimeInput {
   - This honors the pricing rules (workers receive what's defined per unit)
   - Organization pays extra for supervisory/senior roles
   - Future versions may add option to deduct bonuses from pool if needed
-- Modifier types (per_unit, flat, multiplier) cover common real-world scenarios
+- Modifier types (per_unit, flat, multiplier, team_percentage) cover common real-world scenarios:
+  - `per_unit`: Supervisors who earn extra per unit processed
+  - `flat`: Fixed job bonuses (e.g., safety officer allowance)
+  - `multiplier`: Senior workers who earn more per hour worked
+  - `team_percentage`: Team leads/supervisors who earn a percentage of their team's wages
 - Per-unit field mapping allows flexibility (bonus on cars, rooms, etc.)
+- Team percentage is calculated from time-shares AFTER multipliers, ensuring fair calculation
 - System remains backward compatible (no time data = equal split)
 - Future enhancement: Admin approval step for unusual splits
 - Future enhancement: Worker self-reporting time via mobile app check-in/out
 - Future enhancement: Option to configure bonuses as deductive vs additive
+- Future enhancement: Configure which workers are "team members" for team_percentage calculation
 
 ## Related Documents
 
