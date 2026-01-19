@@ -15,6 +15,19 @@ import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
+interface WorkerSplit {
+  worker_id: string;
+  worker_name: string;
+  hours_worked: number;
+  time_share: number;
+  multiplier_adjustment: number;
+  per_unit_bonus: number;
+  flat_bonus: number;
+  final_payment: number;
+  rate_card_id?: string;
+  allocation_type: string;
+}
+
 interface SaveWorkerPaymentRequest {
   organization_id: string;
   calculation: {
@@ -26,6 +39,7 @@ interface SaveWorkerPaymentRequest {
       subtotal: number;
       total_adjustments: number;
       total_worker_payment: number;
+      worker_splits?: WorkerSplit[];
     }>;
   };
   job_ids: string[];
@@ -194,50 +208,71 @@ serve(async (req: Request) => {
     // Create individual worker payment records
     // For each job calculation, create a payment record for each worker on that job
     //
-    // NOTE: Payment Split Assumption
-    // When multiple workers are assigned to a job, the total worker payment is
-    // split EQUALLY among all workers on that job.
-    //
-    // Example: Job pays $100 to workers, 2 workers assigned = $50 each
-    //
-    // This may not be appropriate for all business scenarios (e.g., different
-    // worker rates, different hours worked, different roles). Future enhancement
-    // could support configurable split strategies:
-    // - Equal split (current)
-    // - Per-worker rates from pricing rules
-    // - Custom split percentages per job
-    // - Hours-based proportional split
+    // Uses worker_splits from calculation if available (time-based + bonuses)
+    // Falls back to equal split if worker_splits not present
     //
     const workerPayments = [];
     for (const jobCalc of calculation.job_calculations) {
-      const workerIds = jobWorkersMap.get(jobCalc.job_id) || [];
+      // Use worker_splits from calculation if available
+      if (jobCalc.worker_splits && jobCalc.worker_splits.length > 0) {
+        for (const split of jobCalc.worker_splits) {
+          workerPayments.push({
+            organization_id,
+            batch_id: batch.id,
+            job_id: jobCalc.job_id,
+            worker_id: split.worker_id,
+            amount: split.final_payment,
+            currency,
+            status: "calculated",
+            calculation_details: {
+              job_total: jobCalc.total_worker_payment,
+              line_items: jobCalc.line_items,
+              applied_rules: jobCalc.applied_rules,
+              subtotal: jobCalc.subtotal,
+              total_adjustments: jobCalc.total_adjustments,
+              worker_split: {
+                hours_worked: split.hours_worked,
+                time_share: split.time_share,
+                multiplier_adjustment: split.multiplier_adjustment,
+                per_unit_bonus: split.per_unit_bonus,
+                flat_bonus: split.flat_bonus,
+                allocation_type: split.allocation_type,
+                rate_card_id: split.rate_card_id,
+              },
+            },
+          });
+        }
+      } else {
+        // Fallback: equal split among workers (legacy behavior)
+        const workerIds = jobWorkersMap.get(jobCalc.job_id) || [];
 
-      if (workerIds.length === 0) {
-        // No workers assigned, skip
-        continue;
-      }
+        if (workerIds.length === 0) {
+          // No workers assigned, skip
+          continue;
+        }
 
-      // Split payment equally among workers
-      const paymentPerWorker = jobCalc.total_worker_payment / workerIds.length;
+        // Split payment equally among workers
+        const paymentPerWorker = jobCalc.total_worker_payment / workerIds.length;
 
-      for (const workerId of workerIds) {
-        workerPayments.push({
-          organization_id,
-          batch_id: batch.id,
-          job_id: jobCalc.job_id,
-          worker_id: workerId,
-          amount: paymentPerWorker,
-          currency,
-          status: "calculated",
-          calculation_details: {
-            job_total: jobCalc.total_worker_payment,
-            line_items: jobCalc.line_items,
-            applied_rules: jobCalc.applied_rules,
-            subtotal: jobCalc.subtotal,
-            total_adjustments: jobCalc.total_adjustments,
-            split_among_workers: workerIds.length,
-          },
-        });
+        for (const workerId of workerIds) {
+          workerPayments.push({
+            organization_id,
+            batch_id: batch.id,
+            job_id: jobCalc.job_id,
+            worker_id: workerId,
+            amount: paymentPerWorker,
+            currency,
+            status: "calculated",
+            calculation_details: {
+              job_total: jobCalc.total_worker_payment,
+              line_items: jobCalc.line_items,
+              applied_rules: jobCalc.applied_rules,
+              subtotal: jobCalc.subtotal,
+              total_adjustments: jobCalc.total_adjustments,
+              split_among_workers: workerIds.length,
+            },
+          });
+        }
       }
     }
 

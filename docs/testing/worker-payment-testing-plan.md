@@ -1389,3 +1389,50 @@ Tests are considered successful when all user stories are fully tested:
 - Include performance benchmarks for data-heavy operations
 - Verify mobile app integration points regularly
 - Test status transitions with concurrent users to catch race conditions
+
+---
+
+## 12. Implementation Status
+
+### Implemented Tests (as of 2026-01-19):
+
+**Worker Rate Card Service Tests** (`__tests__/lib/services/worker-rate-card.service.test.ts`)
+- ✅ 26 tests covering all CRUD operations
+- ✅ Modifier type validation (per_unit, flat, multiplier)
+- ✅ Field mapping transformations
+- ✅ Error handling
+
+**Worker Rate Cards Hook Tests** (`__tests__/hooks/use-worker-rate-cards.test.tsx`)
+- ✅ State management and fetching
+- ✅ CRUD operations through hook
+- ✅ Organization context handling
+- ✅ Modifier type support
+
+**Time-Based Split Calculation Tests** (`__tests__/integration/worker-payment-time-splits.test.ts`)
+- ✅ 10 scenario-based tests covering:
+  - Single worker full payment
+  - Equal hours split
+  - Proportional hours split
+  - Per-unit bonus (additive)
+  - Multiplier modifier
+  - Flat bonus (additive)
+  - Equal split fallback (no time data)
+  - Combined modifiers
+  - Multiple field per-unit bonuses
+  - Worker split storage
+
+### Bug Fixes Applied:
+
+1. **save-worker-payment edge function** - Updated to use `worker_splits` from calculation response instead of doing its own equal split. Now correctly stores time-based distributions and all bonus breakdowns in `calculation_details`.
+
+2. **Database migration** (`20260119000003`) - Added `worker_rate_card_field` table for per-unit bonus field mappings and `start_time`/`end_time` columns to `job_worker` for time tracking.
+
+### Remaining Tests to Implement:
+
+- [ ] RateCardManager component tests (UI interactions, form validation)
+- [ ] Payment approval workflow integration tests
+- [ ] Payment history list component tests
+- [ ] Worker payment summary component tests
+- [ ] Edge function unit tests (calculate-worker-payment, update-worker-payment-status)
+- [ ] Mobile app time tracking integration tests
+- [ ] Performance and load testing
