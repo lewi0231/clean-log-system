@@ -210,7 +210,7 @@ export default function InvoicingPage() {
 
       <InvoiceList
         onInvoiceClick={handleInvoiceClick}
-        statusFilter={searchParams.get("status") || undefined}
+        initialStatusFilter={searchParams.get("status") || undefined}
         isAdmin={isAdmin}
       />
 

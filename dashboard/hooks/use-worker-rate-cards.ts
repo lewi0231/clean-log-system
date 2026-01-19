@@ -74,18 +74,30 @@ export function useWorkerRateCards(): UseWorkerRateCardsResult {
   const updateRateCard = async (
     request: UpdateRateCardRequest,
   ): Promise<WorkerRateCard> => {
-    const rateCard = await WorkerRateCardService.update(request);
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    const rateCard = await WorkerRateCardService.update(organizationId, request);
     await fetchRateCards();
     return rateCard;
   };
 
   const deactivateRateCard = async (id: string): Promise<void> => {
-    await WorkerRateCardService.deactivate(id);
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    await WorkerRateCardService.deactivate(organizationId, id);
     await fetchRateCards();
   };
 
   const deleteRateCard = async (id: string): Promise<void> => {
-    await WorkerRateCardService.delete(id);
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    await WorkerRateCardService.delete(organizationId, id);
     await fetchRateCards();
   };
 
