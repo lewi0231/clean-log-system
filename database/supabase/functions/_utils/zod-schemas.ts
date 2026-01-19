@@ -373,6 +373,10 @@ export const listInvoicesSchema = z.object({
   start_date: z.string().datetime().optional(),
   end_date: z.string().datetime().optional(),
   include_tests: z.boolean().optional(),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  page: z.number().int().min(1).optional(),
+  page_size: z.number().int().min(1).max(100).optional(),
 });
 
 /**

@@ -62,6 +62,12 @@ export interface CreateInvoiceResponse {
 export interface ListInvoicesResponse {
   success: boolean;
   invoices: InvoiceWithJobs[];
+  pagination?: {
+    page: number;
+    page_size: number;
+    total_count: number;
+    total_pages: number;
+  };
 }
 
 export interface GetInvoiceDetailsRequest {
@@ -139,14 +145,22 @@ export class InvoiceService {
   }
 
   /**
-   * List invoices for an organization with optional date filtering
+   * List invoices for an organization with optional filtering and pagination
    */
-  static async list(request: ListInvoicesRequest): Promise<InvoiceWithJobs[]> {
+  static async list(
+    request: ListInvoicesRequest
+  ): Promise<{
+    invoices: InvoiceWithJobs[];
+    pagination?: ListInvoicesResponse["pagination"];
+  }> {
     try {
       log.debug("InvoiceService: Listing invoices", {
         organizationId: request.organization_id,
         startDate: request.start_date,
         endDate: request.end_date,
+        search: request.search,
+        status: request.status,
+        page: request.page,
       });
 
       const data = await invokeEdgeFunction<ListInvoicesResponse>(
@@ -160,8 +174,12 @@ export class InvoiceService {
 
       log.info("InvoiceService: Invoices listed successfully", {
         invoiceCount: data.invoices.length,
+        totalCount: data.pagination?.total_count,
       });
-      return data.invoices as InvoiceWithJobs[];
+      return {
+        invoices: data.invoices as InvoiceWithJobs[],
+        pagination: data.pagination,
+      };
     } catch (err) {
       log.error("InvoiceService: Failed to list invoices", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -277,6 +295,96 @@ export class InvoiceService {
       return data.invoice as InvoiceWithJobs;
     } catch (err) {
       log.error("InvoiceService: Failed to resend invoice", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Send a payment reminder for an overdue invoice
+   */
+  static async sendReminder(
+    invoiceId: string,
+    organizationId: string
+  ): Promise<{
+    success: boolean;
+    reminder_count: number;
+    days_overdue: number;
+  }> {
+    try {
+      log.debug("InvoiceService: Sending invoice reminder", {
+        invoiceId,
+        organizationId,
+      });
+
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        reminder_count: number;
+        days_overdue: number;
+        message?: string;
+      }>("send-invoice-reminder", {
+        invoice_id: invoiceId,
+        organization_id: organizationId,
+      });
+
+      if (!data || !data.success) {
+        throw new Error(data?.message || "Failed to send reminder");
+      }
+
+      log.info("InvoiceService: Reminder sent successfully", {
+        reminder_count: data.reminder_count,
+        days_overdue: data.days_overdue,
+      });
+
+      return {
+        success: true,
+        reminder_count: data.reminder_count,
+        days_overdue: data.days_overdue,
+      };
+    } catch (err) {
+      log.error("InvoiceService: Failed to send invoice reminder", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Generate invoice PDF HTML
+   * Returns HTML that can be used for print/PDF generation
+   */
+  static async generatePdfHtml(
+    invoiceId: string,
+    organizationId: string
+  ): Promise<{ html: string; invoiceNumber: string }> {
+    try {
+      log.debug("InvoiceService: Generating invoice PDF HTML", {
+        invoiceId,
+        organizationId,
+      });
+
+      const response = await invokeEdgeFunction<{
+        success: boolean;
+        html: string;
+        invoice_number: string;
+      }>("generate-invoice-pdf", {
+        invoice_id: invoiceId,
+        organization_id: organizationId,
+      });
+
+      if (!response || !response.success || !response.html) {
+        throw new Error("Failed to generate invoice PDF");
+      }
+
+      log.info("InvoiceService: PDF HTML generated successfully");
+
+      return {
+        html: response.html,
+        invoiceNumber: response.invoice_number,
+      };
+    } catch (err) {
+      log.error("InvoiceService: Failed to generate PDF HTML", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       throw err;
