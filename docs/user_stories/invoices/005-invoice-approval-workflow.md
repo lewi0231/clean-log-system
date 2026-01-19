@@ -10,47 +10,57 @@ Admins need to review and approve auto-generated invoices before they are sent t
 **I want to** review and approve auto-generated invoices before they are sent  
 **So that** I can verify invoice accuracy and make adjustments before customers receive them
 
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | pending_review status for auto-generated invoices |
+| ✅ | Pending review badge in invoice list |
+| ✅ | Approve action (changes to "draft") |
+| ✅ | Reject action (changes to "cancelled") |
+| ✅ | Quick actions in invoice list |
+| ⬜ | Pending review count in dashboard |
+| ⬜ | Bulk approval UI |
+| ⬜ | Email notifications for pending reviews |
+| ⬜ | Audit trail (who approved/rejected) |
+
+**Overall: ~80% Complete**
+
 ## Acceptance Criteria
+
+### Core Features (Implemented)
 
 1. Auto-generated invoices are created with status "pending_review"
 2. Admin can view pending review invoices in invoice list:
-   - Filter by "pending_review" status
+   - Filter by "pending_review" status (via statusFilter prop)
    - Clear visual indicator (badge) for pending review
-   - Count of pending review invoices
 3. Admin can approve invoice:
    - Review invoice details and calculations
-   - Approve action changes status to "sent" (or "draft" if not auto-sending)
+   - **Approve action changes status to "draft"** (ready to send manually)
    - Invoice can then be sent to customer
-   - Approval timestamp recorded
 4. Admin can reject invoice:
-   - Reject action changes status to "draft" or "cancelled"
-   - Admin can add rejection reason/notes
-   - Rejected invoice can be edited and resent
-   - Rejection timestamp recorded
-5. Admin can edit pending review invoice:
-   - Modify due date
-   - Modify notes
-   - Cancel invoice
-   - Then approve or reject
-6. Bulk approval (optional):
+   - Reject action changes status to "cancelled"
+   - Rejected invoices are removed from active workflow
+
+### Enhancements (To Be Implemented)
+
+5. Dashboard notification:
+   - Count of pending review invoices displayed
+   - Quick link to filtered invoice list
+6. Bulk approval:
    - Select multiple pending review invoices
    - Approve all at once
-   - Bulk rejection with reason
-7. Notification system:
+   - Bulk rejection option
+7. Email notifications:
    - Admin notified when invoices are pending review
-   - Notification count in dashboard
-   - Email notification option
-8. Approval workflow respects organization settings:
-   - Auto-send after approval (if configured)
-   - Require approval for all auto-generated invoices
-9. Audit trail:
+   - Configurable notification preferences
+8. Audit trail:
    - Track who approved/rejected
    - Track when approved/rejected
    - Track approval/rejection reason
-10. Quick actions:
+9. Enhanced quick actions:
    - Approve and send (one action)
-   - Approve and keep as draft
-   - Reject and cancel
+   - Reject with reason dialog
 
 ## Technical Details
 
@@ -129,16 +139,19 @@ Reject → draft (or cancelled)
 
 **Priority**: High  
 **Complexity**: Medium  
-**Estimated Effort**: 2-3 days
+**Status**: ⚠️ Enhancements Needed
 
 ## Notes
 
-- Current implementation supports pending_review status
-- Approve/reject actions exist but may need UX improvements
-- Consider adding approval workflow customization (multi-level approval)
-- Consider adding approval deadlines (auto-approve after X days)
-- Future: Approval history/audit log
-- Consider adding email notifications for pending reviews
+- Core approval/reject functionality is working
+- **Priority enhancements:**
+  - Dashboard count of pending reviews
+  - Bulk approval for efficiency
+  - Email notifications
+- **Future enhancements:**
+  - Approval workflow customization (multi-level approval)
+  - Approval deadlines (auto-approve after X days)
+  - Full audit log with user tracking
 
 ## Research References
 

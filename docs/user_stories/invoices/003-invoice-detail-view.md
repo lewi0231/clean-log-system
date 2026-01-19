@@ -10,6 +10,26 @@ Admins and customers need to view detailed invoice information including line it
 **I want to** view detailed invoice information with line items and payment history  
 **So that** I can review invoice accuracy, track payment status, and understand what was billed
 
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | Invoice header display |
+| ✅ | Organization details |
+| ✅ | Bill to / Service address |
+| ✅ | Line items table |
+| ✅ | Pricing breakdown |
+| ✅ | Status badges |
+| ✅ | Print functionality |
+| ✅ | Send/Resend actions |
+| ✅ | Approve/Reject actions |
+| ✅ | Public invoice view |
+| ✅ | Bank transfer details |
+| ⬜ | Payment history display |
+| ⬜ | Mark as paid (manual) dialog |
+
+**Overall: ~90% Complete**
+
 ## Acceptance Criteria
 
 ### Admin View (Dashboard)
@@ -165,17 +185,21 @@ Invoice display respects template configuration:
 
 **Priority**: High  
 **Complexity**: Medium  
-**Estimated Effort**: 2-3 days (mostly implemented, needs refinement)
+**Status**: ⚠️ Enhancements Needed
 
 ## Notes
 
-- Current implementation exists but may need UX improvements
-- Consider adding "edit invoice" functionality for draft invoices
-- Consider adding "duplicate invoice" functionality
-- Consider adding invoice comments/notes history
-- Future: Real PDF generation (not just print)
-- Future: Invoice versioning (track changes)
-- Consider adding invoice sharing options (email, link)
+- Current implementation is comprehensive for invoice display
+- **Priority enhancements:**
+  - Payment history display component (see US-008)
+  - Mark as paid dialog for manual payments
+- **Future enhancements:**
+  - Edit invoice functionality for draft invoices
+  - Duplicate invoice functionality
+  - Invoice comments/notes history
+  - Real PDF generation (not just print)
+  - Invoice versioning (track changes)
+  - Invoice sharing options (email, link)
 
 ## Research References
 

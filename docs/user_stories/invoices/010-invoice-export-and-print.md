@@ -10,9 +10,22 @@ Admins and customers need to export and print invoices for record-keeping, accou
 **I want to** export and print invoices in professional formats  
 **So that** I can keep records, send to accounting, and provide customers with physical copies
 
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | Browser print functionality |
+| ✅ | Print-friendly layout |
+| ⬜ | Print styles optimization |
+| ⬜ | Server-side PDF generation |
+| ⬜ | PDF download button |
+| ⬜ | CSV export for invoice list |
+
+**Overall: ~40% Complete**
+
 ## Acceptance Criteria
 
-### Print Functionality
+### Print Functionality (Implemented)
 
 1. Admin and customers can print invoices:
    - Print button in invoice detail view
@@ -31,7 +44,7 @@ Admins and customers need to export and print invoices for record-keeping, accou
    - Optimize for A4/Letter paper size
    - Proper margins and spacing
 
-### PDF Export (Future Enhancement)
+### PDF Export (To Be Implemented)
 
 4. Admin can download invoice as PDF:
    - Download button in invoice detail view
@@ -143,17 +156,57 @@ Options for PDF generation:
 ## Priority
 
 **Priority**: Medium  
-**Complexity**: Low-Medium  
-**Estimated Effort**: 1-2 days (print exists, PDF export future)
+**Complexity**: Medium  
+**Status**: ⚠️ Enhancements Needed
+
+## Dependencies
+
+- Invoice preview component (✅ exists)
+- Edge function infrastructure (✅ exists)
+
+## Implementation Tasks
+
+### Phase 1: Print Improvements
+
+1. **Print Styles Enhancement**
+   - Review and improve `@media print` CSS rules
+   - Ensure proper page breaks for multi-page invoices
+   - Hide all navigation and action buttons
+   - Optimize for A4/Letter paper sizes
+
+### Phase 2: PDF Generation
+
+2. **Server-side PDF Generation** (Recommended approach)
+   - Create edge function `generate-invoice-pdf/index.ts`
+   - Use Puppeteer or similar for PDF rendering
+   - Generate from invoice HTML template
+   - Return PDF as downloadable file
+
+3. **PDF Download Button**
+   - Add "Download PDF" button to invoice detail view
+   - Show loading state during generation
+   - Trigger download on completion
+
+4. **Email PDF Attachment** (depends on PDF generation)
+   - Optionally attach PDF to invoice emails
+   - Configuration option in template settings
+
+### Phase 3: List Export (Future)
+
+5. **CSV Export for Invoice List**
+   - Export filtered invoice list to CSV
+   - Include: invoice number, date, amount, status, customer
+   - Useful for accounting software import
 
 ## Notes
 
-- Current implementation supports browser print
-- PDF export would be valuable addition
-- Consider adding email attachment option (attach PDF to invoice email)
-- Future: Batch PDF generation for multiple invoices
-- Consider adding custom PDF templates
-- Print functionality is essential for record-keeping
+- Browser print works but PDF generation is highly requested
+- **Priority: MEDIUM** - Important for professional workflows
+- Server-side PDF recommended over client-side for consistency
+- **Future enhancements:**
+  - Batch PDF generation for multiple invoices
+  - Custom PDF templates
+  - Excel export with formatting
 
 ## Research References
 

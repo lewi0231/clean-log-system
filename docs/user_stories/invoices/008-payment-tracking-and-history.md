@@ -10,6 +10,22 @@ Admins and customers need to track payments for invoices including payment statu
 **I want to** view payment history and track payment status for invoices  
 **So that** I can reconcile payments, track outstanding amounts, and understand payment status
 
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | Stripe payment link creation |
+| ✅ | Stripe webhook handlers |
+| ✅ | Invoice status update on payment |
+| ✅ | paid_at timestamp tracking |
+| ✅ | Payment table in database |
+| ⬜ | Payment history display component |
+| ⬜ | Manual payment recording dialog |
+| ⬜ | Remaining balance calculation display |
+| ⬜ | Payment status indicators in UI |
+
+**Overall: ~60% Complete**
+
 ## Acceptance Criteria
 
 ### Payment History Display
@@ -162,16 +178,44 @@ Invoice status updates based on payment totals:
 
 **Priority**: High  
 **Complexity**: Medium  
-**Estimated Effort**: 2-3 days (mostly implemented, needs refinement)
+**Status**: ❌ Needs Implementation
+
+## Dependencies
+
+- Stripe webhook integration (✅ exists)
+- Payment database table (✅ exists)
+
+## Implementation Tasks
+
+1. **Payment History Component** (`dashboard/components/invoicing/payment-history.tsx`)
+   - Display all payments for an invoice
+   - Show status, amount, method, date, reference
+   - Calculate totals and remaining balance
+
+2. **Manual Payment Dialog** (`dashboard/components/invoicing/record-payment-dialog.tsx`)
+   - Allow admin to record bank transfers, cash, checks
+   - Capture amount, method, reference, date
+   - Update invoice status if fully paid
+
+3. **Invoice Detail Integration**
+   - Add payment history section to invoice detail view
+   - Add "Record Payment" button for manual payments
+   - Show remaining balance prominently
+
+4. **Use Payments Hook** (`dashboard/hooks/use-payments.ts`)
+   - Fetch payments for an invoice
+   - Handle loading/error states
 
 ## Notes
 
-- Current implementation exists but may need improvements
-- Consider adding payment export (CSV/PDF)
-- Consider adding payment reminders based on history
-- Future: Payment analytics (average payment time, payment method trends)
-- Consider adding payment notes/comments
-- Future: Recurring payment support
+- Backend payment tracking via Stripe webhooks is functional
+- **Priority: HIGH** - Essential for accounts receivable management
+- **Future enhancements:**
+  - Payment export (CSV/PDF)
+  - Payment reminders based on history
+  - Payment analytics (average payment time, trends)
+  - Payment notes/comments
+  - Recurring payment support
 
 ## Research References
 

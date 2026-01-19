@@ -2,13 +2,29 @@
 
 ## Overview
 
-The system should automatically generate invoices for completed jobs based on configured schedules. This reduces manual work and ensures timely invoicing.
+The system should automatically generate invoices for completed jobs based on configured schedules or immediately upon job completion. This reduces manual work and ensures timely invoicing.
 
 ## User Story
 
 **As an** admin user  
 **I want to** configure automatic invoice generation for completed jobs  
-**So that** invoices are created automatically on a schedule without manual intervention
+**So that** invoices are created automatically without manual intervention
+
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | Immediate auto-generation on job completion |
+| ✅ | Auto-generate toggle in settings |
+| ✅ | Invoices created with "pending_review" status |
+| ✅ | Job grouping by location |
+| ✅ | Invoice calculation and number generation |
+| ✅ | Location-specific auto-generate settings |
+| ⬜ | Scheduled generation (daily/weekly/monthly) |
+| ⬜ | Admin notification on generation |
+| ⬜ | Auto-generation history/audit log |
+
+**Overall: ~85% Complete**
 
 ## Acceptance Criteria
 
@@ -164,17 +180,20 @@ Configuration stored in `location_hierarchy.metadata`:
 
 **Priority**: Medium-High  
 **Complexity**: High  
-**Estimated Effort**: 4-5 days
+**Status**: ✅ Core Complete (Scheduled generation is future)
 
 ## Notes
 
-- Current implementation exists but may need improvements
-- Consider adding UI for configuration (currently in metadata)
-- Consider adding manual trigger for testing
-- Consider adding dry-run mode (preview without creating)
-- Future: Support for multiple schedules per organization
-- Future: Support for custom grouping rules
-- Consider adding auto-generation logs/audit trail
+- **Immediate auto-generation** is fully functional via `auto_generate_invoices_immediately` setting
+- Location-specific overrides are supported
+- All auto-generated invoices require approval before sending
+- **Future enhancements:**
+  - Scheduled generation (daily/weekly/monthly batches)
+  - UI for schedule configuration
+  - Manual trigger for testing
+  - Dry-run mode (preview without creating)
+  - Multiple schedules per organization
+  - Auto-generation logs/audit trail
 
 ## Research References
 

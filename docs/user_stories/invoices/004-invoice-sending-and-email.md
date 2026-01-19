@@ -10,6 +10,22 @@ Admins need to send invoices to customers via email with payment links. The syst
 **I want to** send invoices to customers via email with payment links  
 **So that** customers receive invoices promptly and can pay easily through the included payment link
 
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | Send invoice from list/detail |
+| ✅ | Invoice validation before send |
+| ✅ | Email recipient configuration |
+| ✅ | Stripe payment link creation |
+| ✅ | Invoice email with payment link |
+| ✅ | Status update to "sent" |
+| ✅ | Resend functionality |
+| ✅ | Success/error feedback |
+| ⬜ | Email preview before sending |
+
+**Overall: ~90% Complete**
+
 ## Acceptance Criteria
 
 1. Admin can send invoice from invoice detail page or list
@@ -90,7 +106,8 @@ Email recipients are determined in this order:
 
 When resending:
 - `resend: true` flag passed to update-invoice-status
-- New payment link created (old one remains but new one is active)
+- New payment link created via Stripe
+- **Note**: Old Stripe payment links remain valid but the invoice references the new link
 - Email sent again with new payment link
 - Sent timestamp updated
 
@@ -143,17 +160,18 @@ When resending:
 
 **Priority**: High  
 **Complexity**: Medium  
-**Estimated Effort**: 2-3 days (mostly implemented, needs refinement)
+**Status**: ✅ Complete
 
 ## Notes
 
-- Current implementation exists but may need improvements
-- Consider adding email template customization
-- Consider adding email scheduling (send at specific time)
-- Consider adding email tracking (open rates, click rates)
-- Future: Support for multiple email templates
-- Future: Support for email attachments (PDF invoice)
-- Consider adding email preview before sending
+- Current implementation is robust with Stripe integration
+- **Future enhancements:**
+  - Email template customization
+  - Email scheduling (send at specific time)
+  - Email tracking (open rates, click rates)
+  - Multiple email templates
+  - Email attachments (PDF invoice) - depends on US-010
+  - Email preview before sending
 
 ## Research References
 

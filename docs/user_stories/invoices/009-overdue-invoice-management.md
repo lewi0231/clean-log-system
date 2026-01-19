@@ -10,7 +10,24 @@ Admins need to identify, track, and manage overdue invoices. The system should a
 **I want to** identify and manage overdue invoices with reminders and tracking  
 **So that** I can improve cash flow by following up on unpaid invoices
 
+## Implementation Status
+
+| Status | Feature |
+|--------|---------|
+| ✅ | "overdue" status in invoice enum |
+| ✅ | Overdue badge styling (destructive) |
+| ⬜ | Automatic overdue detection (cron job) |
+| ⬜ | Days overdue calculation/display |
+| ⬜ | Overdue count in dashboard |
+| ⬜ | Reminder email functionality |
+| ⬜ | Reminder history tracking |
+| ⬜ | Bulk overdue actions |
+
+**Overall: ~15% Complete**
+
 ## Acceptance Criteria
+
+### Core Features (To Be Implemented)
 
 1. System automatically marks invoices as overdue:
    - Invoice status changes to "overdue" when due date passes
@@ -155,18 +172,59 @@ Reminder settings (future):
 
 ## Priority
 
-**Priority**: Medium-High  
-**Complexity**: Medium  
-**Estimated Effort**: 3-4 days
+**Priority**: High  
+**Complexity**: High  
+**Status**: ❌ Needs Implementation
+
+## Dependencies
+
+- Invoice sending (✅ US-004)
+- Email infrastructure (✅ exists)
+
+## Implementation Tasks
+
+### Phase 1: Automatic Overdue Detection
+
+1. **Cron Job Edge Function** (`database/supabase/functions/mark-overdue-invoices/index.ts`)
+   - Query invoices where status = "sent" AND due_date < today AND paid_at IS NULL
+   - Update status to "overdue"
+   - Run daily via Supabase scheduled function
+
+2. **Days Overdue Display**
+   - Add `daysOverdue` calculation to invoice list
+   - Display in invoice list and detail view
+   - Color-code by severity (7 days, 14 days, 30+ days)
+
+3. **Dashboard Overdue Count**
+   - Add overdue invoice count to main dashboard
+   - Quick link to filtered invoice list
+
+### Phase 2: Reminder System
+
+4. **Reminder Email Template**
+   - Create reminder-specific email template
+   - Include days overdue, amount, payment link
+   - Urgent messaging
+
+5. **Send Reminder Action**
+   - Add "Send Reminder" button to overdue invoices
+   - Track reminder history (count, last sent date)
+   - Consider reminder_sent_at and reminder_count fields
+
+6. **Bulk Reminder Actions**
+   - Select multiple overdue invoices
+   - Send reminders to all selected
 
 ## Notes
 
-- Overdue status exists but automatic detection may need implementation
-- Consider adding automatic reminder system
-- Consider adding collection workflow
-- Future: Integration with collection agencies
-- Future: Payment plan options for overdue invoices
-- Consider adding overdue analytics dashboard
+- **Priority: HIGH** - Critical for cash flow management
+- Overdue status enum already exists, infrastructure is ready
+- **Future enhancements:**
+  - Automatic reminder system (scheduled reminders)
+  - Reminder frequency configuration
+  - Collection workflow
+  - Payment plan options for overdue invoices
+  - Overdue analytics dashboard
 
 ## Research References
 
