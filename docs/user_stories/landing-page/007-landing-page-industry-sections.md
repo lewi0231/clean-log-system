@@ -6,7 +6,7 @@ RivetUp serves multiple industries (car detailers, tradespeople, cleaning servic
 
 ## User Story
 
-**As a** car detailer (or tradesperson, or cleaning service owner)  
+**As a** small business owner (car detailer, tradesperson, or cleaning service)  
 **I want to** see how RivetUp works specifically for my type of business  
 **So that** I can understand that RivetUp is designed for businesses like mine, not just generic field service
 
@@ -37,15 +37,16 @@ RivetUp serves multiple industries (car detailers, tradespeople, cleaning servic
 - **Visual**: Tradesperson using mobile app on job site
 
 #### C. Cleaning Services Section
-- **Headline**: "Ideal for Cleaning Services"
+- **Headline**: "Streamlined Cleaning Service Management"
 - **Key Features**:
-  - Recurring job management
-  - Fixed location tracking
-  - Time tracking per area
-  - Service type tracking (deep clean, maintenance)
-  - Batch invoicing
-- **Use Case**: "Manage recurring cleaning jobs at fixed locations with time tracking and automated batch invoicing."
-- **Visual**: Cleaning service dashboard or mobile app
+  - Recurring job scheduling and management
+  - Fixed location tracking (offices, homes, facilities)
+  - Time tracking per room/area cleaned
+  - Service type differentiation (deep clean, maintenance, post-construction)
+  - Batch invoicing for multiple jobs
+  - Customer rating and feedback collection
+- **Use Case**: "Manage weekly office cleanings, monthly home maintenance, and one-time deep cleans with automated scheduling and batch invoicing."
+- **Visual**: Cleaning service dashboard showing recurring jobs schedule
 
 ### 2. Section Format Options
 
@@ -81,39 +82,42 @@ RivetUp serves multiple industries (car detailers, tradespeople, cleaning servic
 
 #### Car Detailing Example
 ```
-Headline: "Manage Car Yard Detailing with Ease"
+Headline: "Perfect for Car Yards and Mobile Detailing"
 
-Your workers complete detailing jobs at car yards using the mobile app. 
-They log car details, select service packages, and add photos. 
-Invoices are automatically generated and sent to customers monthly.
+"Before RivetUp, we spent hours each week on paperwork and chasing payments. Now our team completes jobs on-site, and invoices go out automatically. We've reduced admin time by 80%."
+
+— Sarah Chen, Premium Auto Detail, Melbourne
 
 Key Features:
-✓ Track car details (make, model, size)
-✓ Service package pricing
+✓ Track car details (make, model, size, service type)
+✓ Service packages (interior, exterior, full detail)
 ✓ Location-based pricing per car yard
-✓ Automated monthly invoicing
-✓ Worker performance tracking
+✓ Photo documentation of work completed
+✓ Automated monthly invoicing with payment links
+✓ Real-time job tracking across multiple locations
 
-[Visual: Mobile app showing car detailing form]
+[Visual: Mobile app showing car detailing form with service selection]
 [CTA: "See Car Detailing Features"]
 ```
 
 #### Tradesperson Example
 ```
-Headline: "Complete Jobs On-Site, Invoice Instantly"
+Headline: "Field Service Management for Tradespeople"
 
-Your workers use the mobile app to complete jobs, track time, and 
-document work with photos. Invoices are generated automatically 
-with flexible pricing rules that match how you charge.
+"As a solo electrician, I needed something that worked on my phone and handled complex pricing. RivetUp lets me track time, add materials, and send professional invoices—all from the job site."
+
+— Mike Thompson, Thompson Electrical Services, Brisbane
 
 Key Features:
-✓ Time tracking per job
-✓ Material and supply tracking
-✓ Job photo documentation
-✓ Flexible pricing (hourly, fixed, per job)
-✓ Instant invoice generation
+✓ Time tracking with start/stop functionality
+✓ Material and supply cost tracking
+✓ Before/after photo documentation
+✓ Flexible pricing (hourly rates, fixed quotes, per job)
+✓ Customer location management
+✓ Instant invoice generation with payment links
+✓ Job history and customer notes
 
-[Visual: Tradesperson using app on job site]
+[Visual: Electrician using mobile app at residential job site]
 [CTA: "See Tradesperson Features"]
 ```
 

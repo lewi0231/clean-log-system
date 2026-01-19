@@ -38,7 +38,7 @@ The hero section is the first thing visitors see when they land on the RivetUp w
 - Alternative: Animated illustration showing the workflow
 
 ### 5. Trust Indicators
-- Brief social proof near CTA: "Join 500+ service businesses" or similar
+- Brief social proof near CTA: "Join 100+ service businesses" or similar
 - Security badges if applicable (SSL, data protection)
 - "No credit card required" if offering free trial
 

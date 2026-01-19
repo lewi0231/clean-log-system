@@ -21,7 +21,7 @@ The final CTA section appears at the bottom of the landing page, providing one l
 ### 2. Headline Options
 - "Ready to Transform Your Service Business?"
 - "Start Managing Your Business Better Today"
-- "Join 500+ Service Businesses Using RivetUp"
+- "Join 100+ Service Businesses Using RivetUp"
 - "Get Started in Minutes, No Credit Card Required"
 
 ### 3. Objection Removal

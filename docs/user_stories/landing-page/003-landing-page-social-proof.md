@@ -47,9 +47,9 @@ Social proof builds trust and credibility, especially important for small busine
 
 ### 4. Usage Statistics
 - Display key metrics prominently:
-  - "500+ service businesses trust RivetUp"
-  - "10,000+ jobs completed monthly"
-  - "98% customer satisfaction"
+  - "100+ service businesses trust RivetUp"
+  - "2,500+ jobs completed monthly"
+  - "95% customer satisfaction"
   - "Average setup time: 15 minutes"
 
 ### 5. Customer Logos (If Available)

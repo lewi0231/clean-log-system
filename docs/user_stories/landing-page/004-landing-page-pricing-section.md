@@ -36,16 +36,16 @@ Pricing transparency builds trust and reduces friction in the signup process. Th
 
 **Single Tier Example:**
 ```
-$XX/month per business
+$79/month per business
 All features included
 14-day free trial
 No credit card required
 ```
 
 **Multi-Tier Example:**
-- Starter: $X/month (solo operators)
-- Professional: $XX/month (small teams) [RECOMMENDED]
-- Business: $XXX/month (larger teams)
+- Starter: $39/month (solo operators)
+- Professional: $79/month (small teams) [RECOMMENDED]
+- Business: $149/month (larger teams)
 
 ### 4. Value Proposition
 - What's included at each tier

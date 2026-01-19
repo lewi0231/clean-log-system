@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fieldly Dashboard",
+  title: "RivetUp - Field Service Management for Service Businesses",
   description:
-    "Flexible job forms for field teams — automate invoicing, payments, and reporting.",
+    "Manage your field workers, jobs, and invoicing in one place. Perfect for tradespeople, car detailers, and service contractors.",
 };
 
 export default function RootLayout({

@@ -1,0 +1,111 @@
+"use client";
+
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const faqs = [
+  {
+    question: "How much does RivetUp cost?",
+    answer: "RivetUp offers three pricing plans: Starter at $39/month for solo operators, Professional at $79/month for small teams (most popular), and Business at $149/month for growing companies. All plans include a 14-day free trial with no credit card required.",
+  },
+  {
+    question: "Is there a free trial?",
+    answer: "Yes! We offer a 14-day free trial with no credit card required. You can explore all features, set up your job forms, configure pricing rules, and invite workers to test the mobile app.",
+  },
+  {
+    question: "Can I cancel anytime?",
+    answer: "Absolutely. You can cancel your subscription at any time with no long-term contracts. Your data remains accessible for 30 days after cancellation, and you can export all your information.",
+  },
+  {
+    question: "How does the mobile app work?",
+    answer: "The RivetUp mobile app (coming soon) allows your workers to complete jobs on-site with custom forms tailored to your business. Jobs sync instantly to your dashboard, and invoices are generated automatically. The app works offline and syncs when connection is available.",
+  },
+  {
+    question: "Can I customize job forms for my business?",
+    answer: "Yes, that's one of RivetUp's key features. You can create custom job forms with fields like quantities, photos, checklists, time tracking, materials, and signatures. Forms are tailored to your specific industry and services.",
+  },
+  {
+    question: "How long does setup take?",
+    answer: "Most businesses are up and running in 15-30 minutes. Our onboarding wizard guides you through setting up workers, configuring job forms, and establishing pricing rules. Our support team is available if you need help.",
+  },
+  {
+    question: "Can I manage multiple locations?",
+    answer: "Yes, RivetUp supports multiple customer locations with location-specific pricing rules. This is perfect for businesses like car detailers with multiple yards or cleaning services with recurring jobs at different sites.",
+  },
+  {
+    question: "Is RivetUp good for solo operators?",
+    answer: "Definitely! Many of our customers are solo operators who love how RivetUp eliminates paperwork and automates invoicing. The Starter plan is specifically designed for solo businesses.",
+  },
+  {
+    question: "What payment methods do you accept?",
+    answer: "We accept all major credit cards (Visa, MasterCard, American Express) and use Stripe for secure payment processing. Customer payments are processed automatically when invoices are sent.",
+  },
+  {
+    question: "Do you offer annual billing discounts?",
+    answer: "Yes, we offer a 10% discount for annual billing on all plans. Contact our sales team for annual pricing options.",
+  },
+];
+
+export function FAQSection() {
+  const [openItems, setOpenItems] = useState<Set<number>>(new Set());
+
+  const toggleItem = (index: number) => {
+    const newOpenItems = new Set(openItems);
+    if (newOpenItems.has(index)) {
+      newOpenItems.delete(index);
+    } else {
+      newOpenItems.add(index);
+    }
+    setOpenItems(newOpenItems);
+  };
+
+  return (
+    <section id="faq" className="py-20 sm:py-28">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center mb-12">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Frequently Asked Questions
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Everything you need to know about getting started with RivetUp.
+          </p>
+        </div>
+
+        <div className="mx-auto max-w-3xl space-y-4">
+          {faqs.map((faq, index) => (
+            <div key={index} className="border-b border-border">
+              <button
+                onClick={() => toggleItem(index)}
+                className="flex w-full items-center justify-between py-4 text-left font-medium transition-colors hover:text-primary"
+              >
+                {faq.question}
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 shrink-0 transition-transform duration-200",
+                    openItems.has(index) && "rotate-180"
+                  )}
+                />
+              </button>
+              {openItems.has(index) && (
+                <div className="pb-4 text-muted-foreground">
+                  {faq.answer}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mx-auto mt-12 max-w-2xl text-center">
+          <p className="text-muted-foreground">
+            Still have questions?{" "}
+            <a href="/contact" className="text-primary hover:underline">
+              Contact our support team
+            </a>{" "}
+            and we'll be happy to help.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}

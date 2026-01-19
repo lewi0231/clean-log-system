@@ -6,7 +6,7 @@ RivetUp has a companion React Native mobile app that workers use in the field. T
 
 ## User Story
 
-**As a** business owner considering RivetUp  
+**As a** small business owner considering RivetUp  
 **I want to** understand how the mobile app works and how it benefits my workers and business  
 **So that** I can see that RivetUp is designed for field work, not just office management
 
@@ -50,11 +50,12 @@ RivetUp has a companion React Native mobile app that workers use in the field. T
 - Optional: Animated GIF showing app workflow
 
 ### 4. App Store Badges
-- Display app store badges (if published):
+- Display app store badges (when published):
   - "Download on the App Store" (iOS)
   - "Get it on Google Play" (Android)
 - Link to actual app store pages
-- If not yet published: "Coming soon" with email signup
+- Current Status: App is in development and testing phase
+- For now: "Mobile App Coming Soon" with email signup for launch notifications
 
 ### 5. Worker vs Admin Perspective
 - Show both sides:
