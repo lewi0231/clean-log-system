@@ -1,13 +1,16 @@
 "use client";
 
 import {
-  WorkerRateCardService,
-  type WorkerRateCard,
   type CreateRateCardRequest,
+  type ModifierType,
   type UpdateRateCardRequest,
+  type WorkerRateCard,
+  WorkerRateCardService,
 } from "@/lib/services/worker-rate-card.service";
 import { useCallback, useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
+
+export type { ModifierType, WorkerRateCard };
 
 interface UseWorkerRateCardsResult {
   rateCards: WorkerRateCard[];
@@ -15,7 +18,7 @@ interface UseWorkerRateCardsResult {
   error: string | null;
   refetch: () => Promise<void>;
   createRateCard: (
-    request: Omit<CreateRateCardRequest, "organization_id">
+    request: Omit<CreateRateCardRequest, "organization_id">,
   ) => Promise<WorkerRateCard>;
   updateRateCard: (request: UpdateRateCardRequest) => Promise<WorkerRateCard>;
   deactivateRateCard: (id: string) => Promise<void>;
@@ -40,7 +43,9 @@ export function useWorkerRateCards(): UseWorkerRateCardsResult {
       const data = await WorkerRateCardService.list(organizationId);
       setRateCards(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch rate cards");
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch rate cards",
+      );
     } finally {
       setLoading(false);
     }
@@ -51,7 +56,7 @@ export function useWorkerRateCards(): UseWorkerRateCardsResult {
   }, [fetchRateCards]);
 
   const createRateCard = async (
-    request: Omit<CreateRateCardRequest, "organization_id">
+    request: Omit<CreateRateCardRequest, "organization_id">,
   ): Promise<WorkerRateCard> => {
     if (!organizationId) {
       throw new Error("Organization ID is required");
@@ -67,7 +72,7 @@ export function useWorkerRateCards(): UseWorkerRateCardsResult {
   };
 
   const updateRateCard = async (
-    request: UpdateRateCardRequest
+    request: UpdateRateCardRequest,
   ): Promise<WorkerRateCard> => {
     const rateCard = await WorkerRateCardService.update(request);
     await fetchRateCards();

@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -35,38 +36,59 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
-import { useWorkerRateCards } from "@/hooks/use-worker-rate-cards";
+import {
+  useWorkerRateCards,
+  type ModifierType,
+  type WorkerRateCard,
+} from "@/hooks/use-worker-rate-cards";
 import { useWorkers } from "@/hooks/use-workers";
-import type { WorkerRateCard } from "@/lib/services/worker-rate-card.service";
 import { format } from "date-fns";
-import { Edit2, Plus, Trash2 } from "lucide-react";
+import { Edit2, Info, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 type RateCardFormData = {
   worker_id: string;
-  hourly_rate: string;
+  modifier_type: ModifierType;
+  modifier_value: string;
   effective_from: string;
   effective_to: string;
-  rate_type: "standard" | "overtime" | "holiday";
   role_title: string;
   notes: string;
+  field_config_ids: string[];
 };
 
 const emptyFormData: RateCardFormData = {
   worker_id: "",
-  hourly_rate: "",
+  modifier_type: "flat",
+  modifier_value: "",
   effective_from: new Date().toISOString().split("T")[0],
   effective_to: "",
-  rate_type: "standard",
   role_title: "",
   notes: "",
+  field_config_ids: [],
+};
+
+const modifierTypeLabels: Record<ModifierType, string> = {
+  per_unit: "Per Unit Bonus",
+  flat: "Flat Bonus",
+  multiplier: "Multiplier",
+};
+
+const modifierTypeDescriptions: Record<ModifierType, string> = {
+  per_unit:
+    "Bonus per unit of output (e.g., $0.50 per car). Added on top of time share.",
+  flat: "Fixed bonus per job (e.g., $20). Added on top of time share.",
+  multiplier:
+    "Multiplies the worker's time-share (e.g., 1.2 = 20% more of the base payment).",
 };
 
 export default function RateCardManager() {
   const { formatCurrency } = useOrganizationCurrency();
   const { workers } = useWorkers();
+  const { fieldConfigs } = useFieldConfigs();
   const {
     rateCards,
     loading,
@@ -82,6 +104,11 @@ export default function RateCardManager() {
 
   const activeRateCards = rateCards.filter((card) => card.is_active);
 
+  // Filter to numeric fields that could be used for per-unit bonuses
+  const numericFieldConfigs = fieldConfigs.filter(
+    (fc) => fc.field_type === "number" || fc.field_type === "grouped_breakdown"
+  );
+
   const handleOpenCreate = () => {
     setEditingCard(null);
     setFormData(emptyFormData);
@@ -92,25 +119,35 @@ export default function RateCardManager() {
     setEditingCard(card);
     setFormData({
       worker_id: card.worker_id,
-      hourly_rate: card.hourly_rate.toString(),
+      modifier_type: card.modifier_type,
+      modifier_value: card.modifier_value.toString(),
       effective_from: card.effective_from,
       effective_to: card.effective_to || "",
-      rate_type: card.rate_type as "standard" | "overtime" | "holiday",
       role_title: card.role_title || "",
       notes: card.notes || "",
+      field_config_ids: card.field_config_ids || [],
     });
     setIsDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!formData.worker_id || !formData.hourly_rate) {
+    if (!formData.worker_id || !formData.modifier_value) {
       toast.error("Please fill in required fields");
       return;
     }
 
-    const hourlyRate = parseFloat(formData.hourly_rate);
-    if (isNaN(hourlyRate) || hourlyRate <= 0) {
-      toast.error("Hourly rate must be a positive number");
+    const modifierValue = parseFloat(formData.modifier_value);
+    if (isNaN(modifierValue) || modifierValue <= 0) {
+      toast.error("Modifier value must be a positive number");
+      return;
+    }
+
+    // Validate per_unit type has at least one field selected
+    if (
+      formData.modifier_type === "per_unit" &&
+      formData.field_config_ids.length === 0
+    ) {
+      toast.error("Please select at least one field for per-unit bonus");
       return;
     }
 
@@ -119,23 +156,31 @@ export default function RateCardManager() {
       if (editingCard) {
         await updateRateCard({
           id: editingCard.id,
-          hourly_rate: hourlyRate,
+          modifier_type: formData.modifier_type,
+          modifier_value: modifierValue,
           effective_from: formData.effective_from,
           effective_to: formData.effective_to || null,
-          rate_type: formData.rate_type,
           role_title: formData.role_title || null,
           notes: formData.notes || null,
+          field_config_ids:
+            formData.modifier_type === "per_unit"
+              ? formData.field_config_ids
+              : [],
         });
         toast.success("Rate card updated");
       } else {
         await createRateCard({
           worker_id: formData.worker_id,
-          hourly_rate: hourlyRate,
+          modifier_type: formData.modifier_type,
+          modifier_value: modifierValue,
           effective_from: formData.effective_from,
           effective_to: formData.effective_to || null,
-          rate_type: formData.rate_type,
           role_title: formData.role_title || null,
           notes: formData.notes || null,
+          field_config_ids:
+            formData.modifier_type === "per_unit"
+              ? formData.field_config_ids
+              : [],
         });
         toast.success("Rate card created");
       }
@@ -165,8 +210,50 @@ export default function RateCardManager() {
       toast.success("Rate card deactivated");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to deactivate rate card"
+        error instanceof Error
+          ? error.message
+          : "Failed to deactivate rate card"
       );
+    }
+  };
+
+  const toggleFieldConfig = (fieldConfigId: string) => {
+    setFormData((prev) => {
+      const current = prev.field_config_ids;
+      if (current.includes(fieldConfigId)) {
+        return {
+          ...prev,
+          field_config_ids: current.filter((id) => id !== fieldConfigId),
+        };
+      } else {
+        return {
+          ...prev,
+          field_config_ids: [...current, fieldConfigId],
+        };
+      }
+    });
+  };
+
+  const formatModifierValue = (card: WorkerRateCard): string => {
+    if (card.modifier_type === "multiplier") {
+      return `${card.modifier_value}x`;
+    }
+    return `${formatCurrency(card.modifier_value)}`;
+  };
+
+  const getModifierDescription = (card: WorkerRateCard): string => {
+    switch (card.modifier_type) {
+      case "per_unit":
+        return `${formatCurrency(card.modifier_value)} per unit`;
+      case "flat":
+        return `${formatCurrency(card.modifier_value)} per job`;
+      case "multiplier":
+        const percentage = ((card.modifier_value - 1) * 100).toFixed(0);
+        return percentage.startsWith("-")
+          ? `${percentage}% of time share`
+          : `+${percentage}% of time share`;
+      default:
+        return "";
     }
   };
 
@@ -180,12 +267,43 @@ export default function RateCardManager() {
         </Button>
       </div>
 
+      {/* Info Banner */}
+      <Card className="mb-6 bg-muted/50">
+        <CardContent className="pt-6">
+          <div className="flex gap-3">
+            <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">
+                How Rate Cards Work
+              </p>
+              <p>
+                Rate cards define <strong>additive bonuses</strong> for workers.
+                When a job is completed:
+              </p>
+              <ol className="list-decimal ml-4 mt-1 space-y-1">
+                <li>
+                  The base worker payment (from pricing rules) is split among
+                  workers based on <strong>time worked</strong>
+                </li>
+                <li>
+                  <strong>Multipliers</strong> increase a worker&apos;s time
+                  share (e.g., 1.2x = 20% more)
+                </li>
+                <li>
+                  <strong>Per-unit</strong> and <strong>flat bonuses</strong>{" "}
+                  are added on top (not deducted from pool)
+                </li>
+              </ol>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Worker Rate Cards</CardTitle>
           <CardDescription>
-            Configure hourly rates for workers to enable rate-based payment
-            splits
+            Configure payment modifiers for workers to enable role-based bonuses
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -197,8 +315,7 @@ export default function RateCardManager() {
             <div className="py-8 text-center text-muted-foreground">
               <p>No rate cards configured yet.</p>
               <p className="text-sm mt-1">
-                Rate cards enable automatic payment splitting based on worker
-                rates.
+                Rate cards enable bonuses and multipliers for specific workers.
               </p>
             </div>
           ) : (
@@ -207,8 +324,8 @@ export default function RateCardManager() {
                 <TableRow>
                   <TableHead>Worker</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Hourly Rate</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Modifier Type</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
                   <TableHead>Effective From</TableHead>
                   <TableHead>Effective To</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -223,11 +340,18 @@ export default function RateCardManager() {
                         : "Unknown"}
                     </TableCell>
                     <TableCell>{card.role_title || "-"}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(card.hourly_rate)}/hr
-                    </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{card.rate_type}</Badge>
+                      <Badge variant="outline">
+                        {modifierTypeLabels[card.modifier_type]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="font-mono">
+                        {formatModifierValue(card)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {getModifierDescription(card)}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {format(new Date(card.effective_from), "MMM d, yyyy")}
@@ -264,7 +388,7 @@ export default function RateCardManager() {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {editingCard ? "Edit Rate Card" : "Create Rate Card"}
@@ -272,7 +396,7 @@ export default function RateCardManager() {
             <DialogDescription>
               {editingCard
                 ? "Update the rate card details below."
-                : "Configure a payment rate for a worker."}
+                : "Configure a payment modifier for a worker."}
             </DialogDescription>
           </DialogHeader>
 
@@ -301,46 +425,107 @@ export default function RateCardManager() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="hourly-rate">
-                  Hourly Rate <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="hourly-rate"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="0.00"
-                  value={formData.hourly_rate}
-                  onChange={(e) =>
-                    setFormData({ ...formData, hourly_rate: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="rate-type">Rate Type</Label>
-                <Select
-                  value={formData.rate_type}
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      rate_type: value as "standard" | "overtime" | "holiday",
-                    })
-                  }
-                >
-                  <SelectTrigger id="rate-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="standard">Standard</SelectItem>
-                    <SelectItem value="overtime">Overtime</SelectItem>
-                    <SelectItem value="holiday">Holiday</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="modifier-type">
+                Modifier Type <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={formData.modifier_type}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    modifier_type: value as ModifierType,
+                    field_config_ids:
+                      value !== "per_unit" ? [] : formData.field_config_ids,
+                  })
+                }
+              >
+                <SelectTrigger id="modifier-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="flat">Flat Bonus (per job)</SelectItem>
+                  <SelectItem value="per_unit">
+                    Per Unit Bonus (per output)
+                  </SelectItem>
+                  <SelectItem value="multiplier">
+                    Multiplier (time share)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {modifierTypeDescriptions[formData.modifier_type]}
+              </p>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="modifier-value">
+                {formData.modifier_type === "multiplier"
+                  ? "Multiplier"
+                  : "Amount"}{" "}
+                <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="modifier-value"
+                type="number"
+                step={formData.modifier_type === "multiplier" ? "0.1" : "0.01"}
+                min="0.01"
+                placeholder={
+                  formData.modifier_type === "multiplier" ? "1.2" : "0.00"
+                }
+                value={formData.modifier_value}
+                onChange={(e) =>
+                  setFormData({ ...formData, modifier_value: e.target.value })
+                }
+              />
+              {formData.modifier_type === "multiplier" && (
+                <p className="text-xs text-muted-foreground">
+                  1.0 = no change, 1.2 = 20% more, 0.8 = 20% less
+                </p>
+              )}
+            </div>
+
+            {/* Field selection for per_unit type */}
+            {formData.modifier_type === "per_unit" && (
+              <div className="space-y-2">
+                <Label>
+                  Applies to Fields{" "}
+                  <span className="text-destructive">*</span>
+                </Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select which fields this per-unit bonus applies to
+                </p>
+                <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                  {numericFieldConfigs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No numeric fields configured
+                    </p>
+                  ) : (
+                    numericFieldConfigs.map((fc) => (
+                      <div
+                        key={fc.id}
+                        className="flex items-center space-x-2"
+                      >
+                        <Checkbox
+                          id={`field-${fc.id}`}
+                          checked={formData.field_config_ids.includes(fc.id)}
+                          onCheckedChange={() => toggleFieldConfig(fc.id)}
+                        />
+                        <label
+                          htmlFor={`field-${fc.id}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {fc.label}{" "}
+                          <span className="text-muted-foreground">
+                            ({fc.name})
+                          </span>
+                        </label>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="role-title">Role / Title</Label>
