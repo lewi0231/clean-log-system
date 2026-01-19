@@ -79,13 +79,13 @@ serve(async (req: Request) => {
     }
 
     // Get authenticated user for created_by and membership verification
-    let userId: string | null = null;
+    let authUserId: string | null = null;
     let userEmail: string | null = null;
     const token = extractAuthToken(req);
     if (token) {
       const authUser = await getAuthUser(token);
       if (authUser?.id) {
-        userId = authUser.id;
+        authUserId = authUser.id;
         userEmail = authUser.email ?? null;
       }
     }
@@ -103,19 +103,32 @@ serve(async (req: Request) => {
       return errorResponse("Organization not found", 404);
     }
 
-    // Verify user belongs to this organization
-    if (userId || userEmail) {
+    // Verify user belongs to this organization and get organization_user.id
+    let organizationUserId: string | null = null;
+    if (authUserId || userEmail) {
       const isMember = await verifyOrganizationMembership(
         supabase,
         organization_id,
         userEmail,
-        userId,
+        authUserId,
       );
       if (!isMember) {
         return errorResponse(
           "You do not have permission to access this organization",
           403,
         );
+      }
+
+      // Get the organization_user.id for calculated_by FK
+      const { data: orgUser } = await supabase
+        .from("organization_user")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .eq("email", userEmail)
+        .maybeSingle();
+
+      if (orgUser?.id) {
+        organizationUserId = orgUser.id;
       }
     }
 
@@ -192,7 +205,7 @@ serve(async (req: Request) => {
       .from("worker_payment_batch")
       .insert({
         organization_id,
-        calculated_by: userId,
+        calculated_by: organizationUserId, // Use organization_user.id, not auth.user.id
         total_payment: calculation.total_worker_payment,
         currency,
         job_count: job_ids.length,
