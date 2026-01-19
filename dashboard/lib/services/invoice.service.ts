@@ -2,6 +2,7 @@ import { log } from "@/lib/logger";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   CreateInvoiceRequest,
+  InvoiceTemplateConfig,
   InvoiceWithJobs,
   ListInvoicesRequest,
 } from "@/lib/types";
@@ -78,6 +79,7 @@ export interface GetInvoiceDetailsResponse {
   success: boolean;
   invoice: InvoiceWithJobs;
   calculation: CalculateInvoiceResponse["calculation"];
+  template_config?: InvoiceTemplateConfig | null;
 }
 
 export class InvoiceService {
@@ -217,7 +219,7 @@ export class InvoiceService {
         template_config: data.template_config,
       } as InvoiceWithJobs & {
         calculation: CalculateInvoiceResponse["calculation"];
-        template_config: Record<string, unknown> | null; // Will be properly typed later
+        template_config?: InvoiceTemplateConfig | null;
       };
     } catch (err) {
       log.error("InvoiceService: Failed to get invoice details", {
