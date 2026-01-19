@@ -4,7 +4,6 @@ import { OnboardingChecklistButton } from "@/components/onboarding/onboarding-ch
 import { cn } from "@/lib/utils";
 import {
   Building2,
-  ChartBar,
   Clipboard,
   DollarSign,
   FileText,
@@ -12,7 +11,7 @@ import {
   Smartphone,
   Star,
   Users,
-  Wallet,
+  Wallet
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -61,11 +60,11 @@ const navigation = [
     href: "/dashboard/ratings",
     icon: Star,
   },
-  {
-    name: "Visualizations",
-    href: "/dashboard/visualizations",
-    icon: ChartBar,
-  },
+  // {
+  //   name: "Visualizations",
+  //   href: "/dashboard/visualizations",
+  //   icon: ChartBar,
+  // },
   // System Settings
   {
     name: "Settings",
