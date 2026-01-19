@@ -31,6 +31,7 @@ serve(async (req: Request) => {
       status: string;
       payment_method?: string;
       payment_reference?: string;
+      payment_date?: string;
       notes?: string;
     };
 
@@ -53,6 +54,7 @@ serve(async (req: Request) => {
       status,
       payment_method,
       payment_reference,
+      payment_date,
       notes,
     } = body;
 
@@ -125,7 +127,10 @@ serve(async (req: Request) => {
 
     // If marking as paid, set paid_at and paid_by
     if (status === "paid") {
-      updateData.paid_at = new Date().toISOString();
+      // Use provided payment_date or fall back to current timestamp
+      updateData.paid_at = payment_date
+        ? new Date(payment_date).toISOString()
+        : new Date().toISOString();
       if (userId) {
         updateData.paid_by = userId;
       }

@@ -650,6 +650,19 @@ export interface InvoiceEmailData {
   dueDate: string;
 }
 
+export interface InvoiceReminderEmailData {
+  invoiceNumber: string;
+  organizationName: string;
+  recipientEmails: string[];
+  invoiceUrl?: string;
+  paymentLinkUrl?: string;
+  total: number;
+  currency: string;
+  dueDate: string;
+  daysOverdue: number;
+  reminderCount: number;
+}
+
 export interface AdminInvoiceNotificationData {
   organizationName: string;
   recipientEmails: string[];
@@ -1594,6 +1607,287 @@ This is an automated notification from ${data.organizationName}.
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send admin notification email";
+    if (throwOnError) {
+      throw error;
+    }
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Send invoice reminder email via Resend API
+ * Used for overdue invoices with more urgent messaging
+ */
+export async function sendInvoiceReminderEmail(
+  data: InvoiceReminderEmailData,
+  throwOnError = false,
+): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  // Check if email sending should be skipped
+  const skipEmailSendingEnv = Deno.env.get("SKIP_EMAIL_SENDING");
+  const skipEmailSending = skipEmailSendingEnv === "true";
+
+  if (skipEmailSending) {
+    console.log("[SKIP EMAIL] Invoice reminder email skipped for integration tests", {
+      invoiceNumber: data.invoiceNumber,
+      recipients: data.recipientEmails,
+    });
+    return { success: true, emailId: `mock-reminder-email-${Date.now()}` };
+  }
+
+  // Validate configuration
+  const configResult = validateEmailConfig();
+  if (!configResult.valid || !configResult.config) {
+    const error = configResult.error || "Email configuration is invalid";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate recipient emails
+  if (!data.recipientEmails || data.recipientEmails.length === 0) {
+    const error = "No recipient emails provided";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate all recipient emails
+  for (const email of data.recipientEmails) {
+    if (!isValidEmail(email)) {
+      const error = `Invalid recipient email: ${email}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+  }
+
+  // Format currency
+  const currencySymbol = data.currency === "AUD"
+    ? "A$"
+    : data.currency === "USD"
+    ? "$"
+    : data.currency === "GBP"
+    ? "£"
+    : data.currency === "EUR"
+    ? "€"
+    : data.currency === "CAD"
+    ? "C$"
+    : data.currency === "NZD"
+    ? "NZ$"
+    : data.currency;
+
+  const formattedTotal = `${currencySymbol}${data.total.toFixed(2)}`;
+
+  // Format due date
+  const dueDate = new Date(data.dueDate);
+  const formattedDueDate = dueDate.toLocaleDateString("en-AU", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  const fromEmail =
+    `${data.organizationName} <invoices@${configResult.config.resendFromDomain}>`;
+
+  // Check if test mode is enabled
+  const testMode = isTestMode();
+
+  // Determine recipients based on test mode
+  const testRecipients = testMode
+    ? data.recipientEmails.map((email) =>
+      getTestModeRecipient("invoice", `reminder-${data.invoiceNumber}`, email)
+    )
+    : data.recipientEmails;
+
+  // Urgent subject line
+  const urgencyPrefix = data.daysOverdue > 14 ? "URGENT: " : "";
+  const reminderLabel = data.reminderCount > 1 ? `(Reminder #${data.reminderCount}) ` : "";
+  
+  const emailSubject = testMode
+    ? `[TEST] ${urgencyPrefix}${reminderLabel}Payment Overdue - Invoice ${data.invoiceNumber}`
+    : `${urgencyPrefix}${reminderLabel}Payment Overdue - Invoice ${data.invoiceNumber}`;
+
+  // Log test mode redirection if enabled
+  if (testMode) {
+    console.log("[TEST MODE] Invoice reminder email redirected to test addresses", {
+      testRecipients,
+      originalRecipients: data.recipientEmails,
+      invoiceNumber: data.invoiceNumber,
+      daysOverdue: data.daysOverdue,
+    });
+  }
+
+  // Build email HTML with urgent styling
+  const urgentBannerColor = data.daysOverdue > 14 ? "#dc2626" : data.daysOverdue > 7 ? "#ea580c" : "#f59e0b";
+  
+  const paymentLinkHtml = data.paymentLinkUrl
+    ? `<p style="margin-top: 20px; text-align: center;"><a href="${data.paymentLinkUrl}" style="background-color: #16a34a; color: white; padding: 14px 28px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">Pay Now - ${formattedTotal}</a></p>`
+    : "";
+
+  const invoiceUrlHtml = data.invoiceUrl
+    ? `<p style="text-align: center;"><a href="${data.invoiceUrl}" style="color: #6b7280; text-decoration: underline; font-size: 14px;">View Invoice Details</a></p>`
+    : "";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .urgent-banner { background-color: ${urgentBannerColor}; color: white; padding: 15px 20px; border-radius: 5px 5px 0 0; text-align: center; }
+          .urgent-banner h2 { margin: 0; font-size: 20px; }
+          .content { background-color: #fff; border: 1px solid #ddd; padding: 25px; border-radius: 0 0 5px 5px; }
+          .overdue-details { background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          .amount { font-size: 28px; font-weight: bold; color: ${urgentBannerColor}; text-align: center; margin: 20px 0; }
+          .footer { margin-top: 25px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="urgent-banner">
+            <h2>⚠️ Payment Overdue</h2>
+          </div>
+          <div class="content">
+            <p>Dear Customer,</p>
+            <p><strong>This is a reminder that payment for invoice ${data.invoiceNumber} is now overdue.</strong></p>
+            
+            <div class="overdue-details">
+              <p style="margin: 0;"><strong>Invoice:</strong> ${data.invoiceNumber}</p>
+              <p style="margin: 8px 0;"><strong>Original Due Date:</strong> ${formattedDueDate}</p>
+              <p style="margin: 8px 0;"><strong>Days Overdue:</strong> <span style="color: ${urgentBannerColor}; font-weight: bold;">${data.daysOverdue} days</span></p>
+            </div>
+
+            <div class="amount">Amount Due: ${formattedTotal}</div>
+
+            ${paymentLinkHtml}
+            ${invoiceUrlHtml}
+
+            <p style="margin-top: 25px;">If you have already made payment, please disregard this reminder. Otherwise, please arrange payment at your earliest convenience to avoid any further action.</p>
+            
+            <p>If you are experiencing difficulties with payment or have any questions regarding this invoice, please contact us immediately.</p>
+
+            <div class="footer">
+              <p>This is an automated reminder from ${data.organizationName}.</p>
+              <p>If you believe you have received this email in error, please contact us.</p>
+            </div>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const requestBody: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    tags?: Array<{ name: string; value: string }>;
+  } = {
+    from: fromEmail,
+    to: testRecipients,
+    subject: emailSubject,
+    html: html,
+  };
+
+  // Add test mode tags if in test mode
+  if (testMode && data.recipientEmails.length > 0) {
+    requestBody.tags = getTestModeTags(
+      "invoice",
+      `reminder-${data.invoiceNumber}`,
+      data.recipientEmails.join(","),
+    );
+  }
+
+  const requestBodyStr = JSON.stringify(requestBody);
+  if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
+    console.error("Request body contains null values:", requestBodyStr);
+    const error = "Request contains null values";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  try {
+    console.log("Sending invoice reminder email:", {
+      invoiceNumber: data.invoiceNumber,
+      daysOverdue: data.daysOverdue,
+      reminderCount: data.reminderCount,
+      recipients: testMode ? testRecipients : data.recipientEmails,
+    });
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${configResult.config.apiKey}`,
+      },
+      body: requestBodyStr,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorBody: unknown;
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = { message: errorText };
+      }
+
+      console.error("Resend API error:", {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorBody,
+      });
+
+      const errorMessage = (errorBody &&
+        typeof errorBody === "object" &&
+        "message" in errorBody &&
+        typeof errorBody.message === "string" &&
+        errorBody.message) ||
+        res.statusText ||
+        "Unknown error";
+
+      const error = `Failed to send invoice reminder email: ${errorMessage}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+
+    const emailResponse = await res.json();
+    const emailId = emailResponse.id;
+
+    if (emailId) {
+      if (testMode) {
+        console.log("[TEST MODE] Invoice reminder email sent to test addresses", {
+          mode: "test",
+          emailType: "invoice_reminder",
+          testRecipients,
+          originalRecipients: data.recipientEmails,
+          invoiceNumber: data.invoiceNumber,
+          daysOverdue: data.daysOverdue,
+          emailId,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.log("Invoice reminder email sent successfully:", emailId);
+      }
+      return { success: true, emailId };
+    } else {
+      console.warn("Resend response missing ID:", emailResponse);
+      return { success: true };
+    }
+  } catch (error) {
+    console.error("Failed to send invoice reminder email:", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to send invoice reminder email";
     if (throwOnError) {
       throw error;
     }

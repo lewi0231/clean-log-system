@@ -36,7 +36,7 @@ function Logo() {
         </svg>
       </span>
       <div className="text-2xl font-semibold tracking-tight">
-        <span>Fieldly</span>
+        <span>RivetUp</span>
       </div>
     </div>
   );

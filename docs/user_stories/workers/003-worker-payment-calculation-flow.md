@@ -68,9 +68,12 @@ Admins need a streamlined workflow to calculate worker payments for completed jo
 
 - `worker_payment_batch`: Groups related payments
   - Status: `calculated`, `approved`, `processing`, `completed`, `cancelled`
+  - Note: The `approved` status was added in migration `20251220140000`
 - `worker_payment`: Individual payment per job/worker
   - Status: `calculated`, `pending`, `processing`, `paid`, `failed`, `cancelled`
   - Includes `calculation_details` JSONB for audit trail
+
+> **Note**: The batch uses `completed` while individual payments use `paid` for the final state. This is intentional - a batch is "completed" when all its payments are "paid".
 
 ## Related Components
 

@@ -17,8 +17,9 @@ import { useInvoiceDetails } from "@/hooks/use-invoice-details";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
-import { Mail, Plus, Printer } from "lucide-react";
+import { Download, Mail, Plus, Printer } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import InvoicePreview from "./invoice-preview";
 import ManualPaymentDialog from "./manual-payment-dialog";
 import PaymentHistory from "./payment-history";
@@ -42,6 +43,52 @@ export default function InvoicePreviewDialog({
   const { organizationId } = useOrganization();
   const [sending, setSending] = useState(false);
   const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (!invoiceId || !organizationId || !invoice) return;
+
+    try {
+      setGeneratingPdf(true);
+      log.info("Generating invoice PDF", { invoiceId });
+
+      const { html, invoiceNumber } = await InvoiceService.generatePdfHtml(
+        invoiceId,
+        organizationId
+      );
+
+      // Open in new window for printing to PDF
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) {
+        toast.error("Please allow pop-ups to download PDF");
+        return;
+      }
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.document.title = `Invoice-${invoiceNumber}`;
+
+      // Wait for content to load then trigger print
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+
+      toast.success("PDF ready", {
+        description: "Use 'Save as PDF' in the print dialog",
+      });
+    } catch (err) {
+      log.error("Failed to generate PDF", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      toast.error("Failed to generate PDF", {
+        description: err instanceof Error ? err.message : "Please try again",
+      });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -238,6 +285,14 @@ export default function InvoicePreviewDialog({
             <DialogFooter className="p-6 pt-4 border-t">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadPdf}
+                disabled={generatingPdf}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {generatingPdf ? "Generating..." : "Download PDF"}
               </Button>
               <Button variant="outline" onClick={handlePrint}>
                 <Printer className="mr-2 h-4 w-4" />

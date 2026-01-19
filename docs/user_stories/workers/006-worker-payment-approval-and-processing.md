@@ -40,11 +40,17 @@ Admins need a workflow to review, approve, and mark payments as paid. This inclu
 
 ```
 Payment Batch Lifecycle:
-calculated → approved → processing → completed (all paid)
+calculated → approved → processing → completed
+     ↓
+ cancelled
 
 Individual Payment Lifecycle:
 calculated → pending → processing → paid
+                          ↓
+                    failed / cancelled
 ```
+
+> **Note**: A batch automatically transitions to `completed` when all its individual payments reach `paid` status.
 
 ### Status Update Endpoint
 

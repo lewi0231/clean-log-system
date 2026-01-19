@@ -18,6 +18,7 @@ import { User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "./logo";
+import { NotificationBell } from "./notifications";
 
 function Nav() {
   const { user, loading } = useAuth();
@@ -105,9 +106,11 @@ function Nav() {
           </Button>
         </div>
       ) : (
-        <NavigationMenu viewport={false}>
-          <NavigationMenuList>
-            <NavigationMenuItem>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <NavigationMenu viewport={false}>
+            <NavigationMenuList>
+              <NavigationMenuItem>
               <NavigationMenuTrigger className="h-auto rounded-full p-0 cursor-pointer hover:opacity-80 transition-opacity bg-transparent hover:bg-transparent focus:bg-transparent data-[state=open]:bg-transparent gap-1.5">
                 <Avatar className="h-9 w-9 rounded-full bg-primary/10 border-2 border-primary/20 shrink-0">
                   <AvatarFallback className="rounded-full bg-primary/10 text-primary flex items-center justify-center h-full w-full">
@@ -137,8 +140,9 @@ function Nav() {
                 </NavigationMenuLink>
               </NavigationMenuContent>
             </NavigationMenuItem>
-          </NavigationMenuList>
-        </NavigationMenu>
+            </NavigationMenuList>
+          </NavigationMenu>
+        </div>
       )}
     </nav>
   );

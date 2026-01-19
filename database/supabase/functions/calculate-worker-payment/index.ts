@@ -36,6 +36,19 @@ interface AppliedRule {
   snapshot_data: Record<string, unknown>;
 }
 
+interface WorkerPaymentSplit {
+  worker_id: string;
+  worker_name: string;
+  hours_worked: number;
+  time_share: number; // Their share of the base payment
+  multiplier_adjustment: number; // Additional from multiplier modifier
+  per_unit_bonus: number; // Additive bonus (per unit)
+  flat_bonus: number; // Additive bonus (flat)
+  final_payment: number; // Total for this worker
+  rate_card_id?: string;
+  allocation_type: string;
+}
+
 interface WorkerPaymentCalculation {
   job_id: string;
   line_items: WorkerPaymentLineItem[];
@@ -43,6 +56,7 @@ interface WorkerPaymentCalculation {
   subtotal: number;
   total_adjustments: number;
   total_worker_payment: number;
+  worker_splits?: WorkerPaymentSplit[];
 }
 
 type FieldConfig = {
@@ -124,6 +138,42 @@ type LocationContext = {
   locationId: string | null;
   ancestors: Set<string>;
   depthMap: Map<string, number>;
+};
+
+type WorkerRateCard = {
+  id: string;
+  worker_id: string;
+  modifier_type: "per_unit" | "flat" | "multiplier";
+  modifier_value: number;
+  currency: string;
+  role_title: string | null;
+  effective_from: string;
+  effective_to: string | null;
+  is_active: boolean;
+  // Joined field mappings (for per_unit type)
+  field_config_ids?: string[];
+};
+
+type WorkerPaymentAllocation = {
+  id: string;
+  job_id: string;
+  worker_id: string;
+  allocation_type: "percentage" | "amount" | "hours";
+  percentage: number | null;
+  fixed_amount: number | null;
+  hours_worked: number | null;
+};
+
+type JobWorker = {
+  job_id: string;
+  worker_id: string;
+  start_time: string | null;
+  end_time: string | null;
+  worker: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  };
 };
 
 serve(async (req) => {
@@ -311,6 +361,89 @@ serve(async (req) => {
       (fieldConfigs || []).map((config) => [config.id, config as FieldConfig]),
     );
 
+    // Fetch worker rate cards with modifier types
+    const todayDate = new Date().toISOString().split("T")[0];
+    const { data: rateCards, error: rateCardsError } = await supabase
+      .from("worker_rate_card")
+      .select(`
+        *,
+        worker_rate_card_field (
+          field_config_id
+        )
+      `)
+      .eq("organization_id", organization_id)
+      .eq("is_active", true)
+      .lte("effective_from", todayDate)
+      .or(`effective_to.is.null,effective_to.gte.${todayDate}`);
+
+    if (rateCardsError) {
+      logger.warn("Failed to fetch rate cards, proceeding without modifiers", {
+        error: rateCardsError.message,
+      });
+    }
+
+    // Map rate cards by worker_id, extracting field_config_ids for per_unit types
+    const rateCardMap = new Map<string, WorkerRateCard>();
+    (rateCards || []).forEach((card) => {
+      const fieldMappings = card.worker_rate_card_field as
+        | { field_config_id: string }[]
+        | null;
+      const rateCard: WorkerRateCard = {
+        id: card.id,
+        worker_id: card.worker_id,
+        modifier_type: card.modifier_type,
+        modifier_value: card.modifier_value,
+        currency: card.currency,
+        role_title: card.role_title,
+        effective_from: card.effective_from,
+        effective_to: card.effective_to,
+        is_active: card.is_active,
+        field_config_ids: fieldMappings?.map((f) => f.field_config_id) || [],
+      };
+      rateCardMap.set(card.worker_id, rateCard);
+    });
+
+    // Fetch custom allocations for the jobs
+    const { data: allocations, error: allocationsError } = await supabase
+      .from("worker_payment_allocation")
+      .select("*")
+      .eq("organization_id", organization_id)
+      .in("job_id", job_ids);
+
+    if (allocationsError) {
+      logger.warn("Failed to fetch allocations, proceeding without", {
+        error: allocationsError.message,
+      });
+    }
+
+    const allocationsByJob = new Map<string, WorkerPaymentAllocation[]>();
+    (allocations || []).forEach((alloc) => {
+      const jobAllocs = allocationsByJob.get(alloc.job_id) || [];
+      jobAllocs.push(alloc as WorkerPaymentAllocation);
+      allocationsByJob.set(alloc.job_id, jobAllocs);
+    });
+
+    // Fetch job workers for split calculations (including time tracking)
+    const { data: jobWorkers, error: jobWorkersError } = await supabase
+      .from("job_worker")
+      .select(
+        "job_id, worker_id, start_time, end_time, worker:worker_id(id, first_name, last_name)",
+      )
+      .in("job_id", job_ids);
+
+    if (jobWorkersError) {
+      logger.warn("Failed to fetch job workers", {
+        error: jobWorkersError.message,
+      });
+    }
+
+    const workersByJob = new Map<string, JobWorker[]>();
+    (jobWorkers || []).forEach((jw) => {
+      const workers = workersByJob.get(jw.job_id) || [];
+      workers.push(jw as unknown as JobWorker);
+      workersByJob.set(jw.job_id, workers);
+    });
+
     const calculations: WorkerPaymentCalculation[] = [];
 
     for (const job of jobs as JobRecord[]) {
@@ -322,6 +455,34 @@ serve(async (req) => {
         servicePricingModes:
           (servicePricingModes || []) as ServicePricingModeRow[],
       });
+
+      // Calculate worker splits with additive bonuses
+      const workers = workersByJob.get(job.id) || [];
+      const jobAllocations = allocationsByJob.get(job.id) || [];
+
+      if (workers.length > 0) {
+        calculation.worker_splits = calculateWorkerSplits({
+          baseWorkerPayment: calculation.total_worker_payment,
+          workers,
+          rateCardMap,
+          allocations: jobAllocations,
+          submissionData: (job.submission_data as Record<string, unknown>) ||
+            {},
+          fieldConfigMap,
+        });
+
+        // Update total_worker_payment to include additive bonuses
+        const totalBonuses = calculation.worker_splits.reduce(
+          (sum, split) =>
+            sum +
+            split.per_unit_bonus +
+            split.flat_bonus +
+            split.multiplier_adjustment,
+          0,
+        );
+        calculation.total_worker_payment += totalBonuses;
+      }
+
       calculations.push(calculation);
     }
 
@@ -1100,4 +1261,196 @@ function evaluateCondition(
     default:
       return false;
   }
+}
+
+/**
+ * Calculate how to split the total payment among workers.
+ *
+ * New model with ADDITIVE bonuses:
+ * 1. Time-based split: Base worker payment is split by hours worked
+ * 2. Multipliers: Applied to worker's time-share (increases their portion)
+ * 3. Per-unit bonuses: Added ON TOP of time share (not deducted from pool)
+ * 4. Flat bonuses: Added ON TOP of time share (not deducted from pool)
+ *
+ * Bonuses are ADDITIVE - they increase total payout, not redistribute existing pool.
+ * This honors the pricing rules (workers receive what's defined per unit).
+ */
+function calculateWorkerSplits({
+  baseWorkerPayment,
+  workers,
+  rateCardMap,
+  allocations,
+  submissionData,
+  fieldConfigMap,
+}: {
+  baseWorkerPayment: number;
+  workers: JobWorker[];
+  rateCardMap: Map<string, WorkerRateCard>;
+  allocations: WorkerPaymentAllocation[];
+  submissionData: Record<string, unknown>;
+  fieldConfigMap: Map<string, FieldConfig>;
+}): WorkerPaymentSplit[] {
+  if (workers.length === 0) return [];
+
+  // Initialize breakdown for each worker
+  const breakdowns: WorkerPaymentSplit[] = workers.map((worker) => {
+    const workerName = worker.worker
+      ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
+      : "Unknown";
+
+    // Calculate hours worked from time tracking
+    let hoursWorked = 0;
+    if (worker.start_time && worker.end_time) {
+      const start = new Date(worker.start_time);
+      const end = new Date(worker.end_time);
+      hoursWorked = Math.max(
+        0,
+        (end.getTime() - start.getTime()) / (1000 * 60 * 60),
+      );
+    }
+
+    return {
+      worker_id: worker.worker_id,
+      worker_name: workerName,
+      hours_worked: Math.round(hoursWorked * 100) / 100,
+      time_share: 0,
+      multiplier_adjustment: 0,
+      per_unit_bonus: 0,
+      flat_bonus: 0,
+      final_payment: 0,
+      allocation_type: "time_based",
+    };
+  });
+
+  // Single worker gets full base payment (no need to split)
+  if (workers.length === 1) {
+    breakdowns[0].time_share = baseWorkerPayment;
+    breakdowns[0].allocation_type = "single_worker";
+  } else {
+    // Step 1: Time-based split of the FULL base worker payment
+    const totalHours = breakdowns.reduce((sum, b) => sum + b.hours_worked, 0);
+
+    if (totalHours > 0) {
+      // Proportional split by hours worked
+      breakdowns.forEach((breakdown) => {
+        breakdown.time_share = Math.round(
+          ((breakdown.hours_worked / totalHours) * baseWorkerPayment) * 100,
+        ) / 100;
+        breakdown.allocation_type = "time_based";
+      });
+    } else {
+      // Fallback: equal split if no time tracking data
+      const equalShare =
+        Math.round((baseWorkerPayment / workers.length) * 100) / 100;
+      breakdowns.forEach((breakdown) => {
+        breakdown.time_share = equalShare;
+        breakdown.allocation_type = "equal_split";
+      });
+    }
+  }
+
+  // Step 2: Apply multipliers to time-share (increases their portion)
+  breakdowns.forEach((breakdown) => {
+    const rateCard = rateCardMap.get(breakdown.worker_id);
+    if (rateCard?.modifier_type === "multiplier") {
+      const originalShare = breakdown.time_share;
+      breakdown.time_share =
+        Math.round(originalShare * rateCard.modifier_value * 100) / 100;
+      breakdown.multiplier_adjustment =
+        Math.round((breakdown.time_share - originalShare) * 100) / 100;
+      breakdown.rate_card_id = rateCard.id;
+    }
+  });
+
+  // Step 3: Calculate ADDITIVE per-unit bonuses (on top of share)
+  breakdowns.forEach((breakdown) => {
+    const rateCard = rateCardMap.get(breakdown.worker_id);
+    if (rateCard?.modifier_type === "per_unit" && rateCard.field_config_ids) {
+      let bonus = 0;
+      rateCard.field_config_ids.forEach((fieldConfigId) => {
+        const fieldConfig = fieldConfigMap.get(fieldConfigId);
+        if (fieldConfig) {
+          const fieldValue = submissionData[fieldConfig.name];
+          // Get numeric value from field (could be number, array length, etc.)
+          const count = getNumericFieldValue(fieldValue);
+          bonus += count * rateCard.modifier_value;
+        }
+      });
+      breakdown.per_unit_bonus = Math.round(bonus * 100) / 100;
+      breakdown.rate_card_id = rateCard.id;
+    }
+  });
+
+  // Step 4: Calculate ADDITIVE flat bonuses (on top of share)
+  breakdowns.forEach((breakdown) => {
+    const rateCard = rateCardMap.get(breakdown.worker_id);
+    if (rateCard?.modifier_type === "flat") {
+      breakdown.flat_bonus = rateCard.modifier_value;
+      breakdown.rate_card_id = rateCard.id;
+    }
+  });
+
+  // Step 5: Calculate final payments (share + all bonuses)
+  breakdowns.forEach((breakdown) => {
+    breakdown.final_payment = Math.round(
+      (breakdown.time_share +
+        breakdown.per_unit_bonus +
+        breakdown.flat_bonus) *
+        100,
+    ) / 100;
+  });
+
+  return breakdowns;
+}
+
+/**
+ * Extract a numeric value from a field value for per-unit bonus calculation.
+ * Handles various field types: number, array (count), object with quantity, etc.
+ */
+function getNumericFieldValue(value: unknown): number {
+  if (value === null || value === undefined) return 0;
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  if (Array.isArray(value)) {
+    // For arrays, could be count of items or sum of quantities
+    let total = 0;
+    for (const item of value) {
+      if (typeof item === "number") {
+        total += item;
+      } else if (typeof item === "object" && item !== null) {
+        // Check for quantity field in object
+        const obj = item as Record<string, unknown>;
+        if (typeof obj.quantity === "number") {
+          total += obj.quantity;
+        } else if (typeof obj.count === "number") {
+          total += obj.count;
+        } else {
+          // Count the item itself
+          total += 1;
+        }
+      } else {
+        // Count non-numeric items
+        total += 1;
+      }
+    }
+    return total;
+  }
+
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    // Check common quantity field names
+    if (typeof obj.quantity === "number") return obj.quantity;
+    if (typeof obj.count === "number") return obj.count;
+    if (typeof obj.total === "number") return obj.total;
+  }
+
+  return 0;
 }

@@ -415,6 +415,17 @@ export interface ListInvoicesRequest {
   start_date?: string;
   end_date?: string;
   include_tests?: boolean;
+  search?: string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface PaginationInfo {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
 }
 
 // Re-export payment types for convenience

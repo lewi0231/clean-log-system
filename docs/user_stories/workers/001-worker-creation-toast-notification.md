@@ -38,14 +38,16 @@ When an admin creates a new worker, they should receive immediate feedback that 
 Suggested message:
 
 ```
-"Invitation email sent to {workerEmail}"
+"Worker created. Invitation will be sent to {workerEmail}"
 ```
 
 Or more detailed:
 
 ```
-"Worker created successfully. An invitation email has been sent to {workerEmail}"
+"Worker created successfully. An invitation email will be sent to {workerEmail}"
 ```
+
+> **Note**: The message uses "will be sent" rather than "has been sent" because worker creation and email sending are separate operations. The edge function creates the worker record and triggers the email asynchronously, so we cannot guarantee email delivery at the moment the toast appears.
 
 ### Example Implementation
 

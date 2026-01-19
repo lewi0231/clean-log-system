@@ -264,7 +264,7 @@ function AcceptInvitePage() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </CardContent>
-          <CardFooter className="flex flex-col space-y-4">
+          <CardFooter className="flex flex-col space-y-4 mt-4">
             <Button
               className="w-full cursor-pointer"
               type="submit"

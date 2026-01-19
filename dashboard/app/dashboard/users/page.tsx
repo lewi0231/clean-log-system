@@ -20,6 +20,7 @@ import useOrganization from "@/hooks/useOrganization";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function UsersPage() {
   const {
@@ -54,10 +55,19 @@ export default function UsersPage() {
     phone: string;
   }) => {
     if (!organizationId) return;
-    await createWorker({
-      organization_id: organizationId,
-      ...workerData,
-    });
+    try {
+      await createWorker({
+        organization_id: organizationId,
+        ...workerData,
+      });
+      toast.success(
+        `Worker created. Invitation will be sent to ${workerData.email}`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create worker"
+      );
+    }
   };
 
   const handleUpdateWorker = async (

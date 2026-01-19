@@ -14,15 +14,32 @@ serve(async (req) => {
       return errorResponse(validation.error, 400);
     }
 
-    const { organization_id, start_date, end_date, include_tests } = validation
-      .data as {
-        organization_id: string;
-        start_date?: string;
-        end_date?: string;
-        include_tests?: boolean;
-      };
+    const {
+      organization_id,
+      start_date,
+      end_date,
+      include_tests,
+      search,
+      status,
+      page,
+      page_size,
+    } = validation.data as {
+      organization_id: string;
+      start_date?: string;
+      end_date?: string;
+      include_tests?: boolean;
+      search?: string;
+      status?: string;
+      page?: number;
+      page_size?: number;
+    };
 
     const supabase = createServiceRoleClient();
+
+    // Default pagination values
+    const currentPage = page || 1;
+    const pageSize = page_size || 50;
+    const offset = (currentPage - 1) * pageSize;
 
     // Build query
     let query = supabase
@@ -47,6 +64,7 @@ serve(async (req) => {
           )
         )
         `,
+        { count: "exact" }
       )
       .eq("organization_id", organization_id);
 
@@ -63,8 +81,21 @@ serve(async (req) => {
       query = query.lte("created_at", end_date);
     }
 
+    // Apply search filter (invoice number)
+    if (search && search.trim()) {
+      query = query.ilike("invoice_number", `%${search.trim()}%`);
+    }
+
+    // Apply status filter
+    if (status && status !== "all") {
+      query = query.eq("status", status);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + pageSize - 1);
+
     // Order by created_at descending (most recent first)
-    const { data: invoices, error: invoicesError } = await query.order(
+    const { data: invoices, error: invoicesError, count } = await query.order(
       "created_at",
       { ascending: false },
     );
@@ -74,6 +105,12 @@ serve(async (req) => {
     return jsonResponse({
       success: true,
       invoices: invoices || [],
+      pagination: {
+        page: currentPage,
+        page_size: pageSize,
+        total_count: count || 0,
+        total_pages: Math.ceil((count || 0) / pageSize),
+      },
     });
   } catch (error) {
     console.error("List invoices error:", error);
