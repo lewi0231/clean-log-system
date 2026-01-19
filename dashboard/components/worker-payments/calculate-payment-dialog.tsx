@@ -269,7 +269,7 @@ export default function CalculatePaymentDialog({
                                   const job = jobs.find(
                                     (j) => j.id === calc.job_id
                                   );
-                                  return job?.workers.map((w) => w.id) || [];
+                                  return (job?.workers ?? []).map((w) => w.id);
                                 }
                               )
                             ).size
@@ -317,7 +317,9 @@ export default function CalculatePaymentDialog({
                                           )
                                         : "Unknown date"}{" "}
                                       •{" "}
-                                      {job?.workers.map((w) => w.name).join(", ")}
+                                      {(job?.workers ?? [])
+                                        .map((w) => w.name)
+                                        .join(", ")}
                                     </div>
                                   </div>
                                 </div>
