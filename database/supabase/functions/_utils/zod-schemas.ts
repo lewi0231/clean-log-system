@@ -398,3 +398,79 @@ export const deleteTestDataSchema = z
   .refine((data) => Boolean(data.job_id || data.invoice_id), {
     message: "Either job_id or invoice_id is required",
   });
+
+/**
+ * Worker rate card modifier type schema
+ */
+export const modifierTypeSchema = z.enum(["per_unit", "flat", "multiplier"]);
+
+/**
+ * Schema for listing worker rate cards
+ */
+export const listRateCardsSchema = z.object({
+  action: z.literal("list"),
+  organization_id: uuidSchema,
+});
+
+/**
+ * Schema for creating a worker rate card
+ */
+export const createRateCardSchema = z.object({
+  action: z.literal("create"),
+  organization_id: uuidSchema,
+  worker_id: uuidSchema,
+  modifier_type: modifierTypeSchema,
+  modifier_value: positiveNumberSchema,
+  currency: currencyCodeSchema.optional(),
+  effective_from: z.string().date().optional(),
+  effective_to: z.string().date().nullable().optional(),
+  role_title: z.string().min(1).nullable().optional(),
+  notes: z.string().nullable().optional(),
+  field_config_ids: z.array(uuidSchema).optional(),
+});
+
+/**
+ * Schema for updating a worker rate card
+ */
+export const updateRateCardSchema = z.object({
+  action: z.literal("update"),
+  organization_id: uuidSchema,
+  id: uuidSchema,
+  modifier_type: modifierTypeSchema.optional(),
+  modifier_value: positiveNumberSchema.optional(),
+  effective_from: z.string().date().optional(),
+  effective_to: z.string().date().nullable().optional(),
+  role_title: z.string().min(1).nullable().optional(),
+  is_active: z.boolean().optional(),
+  notes: z.string().nullable().optional(),
+  field_config_ids: z.array(uuidSchema).optional(),
+});
+
+/**
+ * Schema for deactivating a worker rate card
+ */
+export const deactivateRateCardSchema = z.object({
+  action: z.literal("deactivate"),
+  organization_id: uuidSchema,
+  id: uuidSchema,
+});
+
+/**
+ * Schema for deleting a worker rate card
+ */
+export const deleteRateCardSchema = z.object({
+  action: z.literal("delete"),
+  organization_id: uuidSchema,
+  id: uuidSchema,
+});
+
+/**
+ * Discriminated union schema for all rate card operations
+ */
+export const rateCardRequestSchema = z.discriminatedUnion("action", [
+  listRateCardsSchema,
+  createRateCardSchema,
+  updateRateCardSchema,
+  deactivateRateCardSchema,
+  deleteRateCardSchema,
+]);

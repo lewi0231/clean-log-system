@@ -4,8 +4,21 @@
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-api-version, x-idempotency-key",
 } as const;
+
+/**
+ * RFC 7807 Problem Details interface
+ * Standard format for HTTP API error responses
+ */
+export interface ProblemDetails {
+  type: string;
+  title: string;
+  status: number;
+  detail?: string;
+  instance?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Handle CORS preflight requests
@@ -24,28 +37,84 @@ export function jsonResponse(
   data: unknown,
   status = 200,
   additionalHeaders?: HeadersInit,
+  correlationId?: string,
 ): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       ...CORS_HEADERS,
       "Content-Type": "application/json",
+      ...(correlationId && { "x-correlation-id": correlationId }),
       ...additionalHeaders,
     },
   });
 }
 
 /**
+ * Get standard error title for HTTP status code
+ */
+function getErrorTitle(status: number): string {
+  const titles: Record<number, string> = {
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    409: "Conflict",
+    422: "Unprocessable Entity",
+    429: "Too Many Requests",
+    500: "Internal Server Error",
+    503: "Service Unavailable",
+  };
+  return titles[status] || "Error";
+}
+
+/**
  * Create an error response with CORS headers
+ * Supports both simple string errors and RFC 7807 Problem Details
  */
 export function errorResponse(
-  error: string | Error,
+  error: string | Error | ProblemDetails,
   status = 500,
   additionalHeaders?: HeadersInit,
+  correlationId?: string,
 ): Response {
-  const errorMessage = error instanceof Error ? error.message : error;
+  let problemDetails: ProblemDetails;
 
-  return jsonResponse({ error: errorMessage }, status, additionalHeaders);
+  if (typeof error === "string") {
+    // Simple string error - convert to Problem Details format
+    problemDetails = {
+      type: "about:blank",
+      title: getErrorTitle(status),
+      status,
+      detail: error,
+    };
+  } else if (error instanceof Error) {
+    // Error object - convert to Problem Details format
+    problemDetails = {
+      type: "about:blank",
+      title: getErrorTitle(status),
+      status,
+      detail: error.message,
+    };
+  } else {
+    // Already a ProblemDetails object
+    problemDetails = error;
+  }
+
+  // Use application/problem+json for RFC 7807 compliance when structured error
+  const contentType = typeof error === "object" && "type" in error
+    ? "application/problem+json"
+    : "application/json";
+
+  return new Response(JSON.stringify(problemDetails), {
+    status: problemDetails.status,
+    headers: {
+      ...CORS_HEADERS,
+      "Content-Type": contentType,
+      ...(correlationId && { "x-correlation-id": correlationId }),
+      ...additionalHeaders,
+    },
+  });
 }
 
 /**

@@ -811,10 +811,10 @@ export default function TestInvoiceModal({
                   </div>
                 )}
 
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30 p-4 rounded-lg space-y-2">
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg space-y-2">
                   <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                    <div className="text-sm text-blue-900 dark:text-blue-100">
+                    <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                    <div className="text-sm text-blue-900">
                       <p className="font-medium mb-1">Test Mode</p>
                       <p>
                         This will create a test job marked with a special flag.
@@ -870,7 +870,7 @@ export default function TestInvoiceModal({
                           </p>
                           {calculation.total_worker_payment ===
                             calculation.total && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            <p className="text-xs text-amber-600 mt-1">
                               ⚠️ Same as invoice total (check pricing rules)
                             </p>
                           )}
@@ -961,10 +961,10 @@ export default function TestInvoiceModal({
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-medium text-green-900 dark:text-green-100">
+                      <p className="font-medium text-green-900">
                         Test Invoice Preview Ready!
                       </p>
-                      <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                      <p className="text-sm text-green-700 mt-1">
                         Your pricing configuration is working correctly. You can
                         view the full invoice preview below.
                       </p>
@@ -976,10 +976,10 @@ export default function TestInvoiceModal({
                   <div className="flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-medium text-amber-900 dark:text-amber-100">
+                      <p className="font-medium text-amber-900">
                         Test Data - Auto Cleanup
                       </p>
-                      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      <p className="text-sm text-amber-700 mt-1">
                         This test job and invoice will be automatically deleted
                         when you close this dialog. They are for preview
                         purposes only and cannot be sent to customers.

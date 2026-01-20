@@ -106,9 +106,9 @@ function OverdueBadge({ daysOverdue }: { daysOverdue: number }) {
 
   // Map severity to Tailwind classes
   const colorClasses = {
-    warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    orange: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-    destructive: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    warning: "bg-yellow-100 text-yellow-800",
+    orange: "bg-orange-100 text-orange-800",
+    destructive: "bg-red-100 text-red-800",
   };
 
   return (

@@ -259,7 +259,7 @@ export default function PaymentHistory({
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg">Payment History</CardTitle>
           {isFullyPaid && (
-            <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Paid in Full
             </Badge>
@@ -278,7 +278,7 @@ export default function PaymentHistory({
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
               <p className="text-xs text-muted-foreground">Total Paid</p>
-              <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+              <p className="text-lg font-semibold text-green-600">
                 {formatCurrency(totalPaid, currency)}
               </p>
             </div>
@@ -287,8 +287,8 @@ export default function PaymentHistory({
               <p
                 className={`text-lg font-semibold ${
                   remainingBalance > 0
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-green-600 dark:text-green-400"
+                    ? "text-amber-600"
+                    : "text-green-600"
                 }`}
               >
                 {formatCurrency(remainingBalance, currency)}

@@ -95,43 +95,24 @@
   --sidebar-ring: oklch(0.55 0.18 264.542); /* #2563EB - Primary blue */
 }
 
-/* Dark mode removed - Clean & Professional style uses light theme only
-   If dark mode is needed in the future, uncomment and adjust colors below */
-/*
-.dark {
-  --foreground: oklch(1 0 0);
-  --background: oklch(0.13 0.028 261.692);
-  --card: oklch(0.21 0.034 264.665);
-  --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.21 0.034 264.665);
-  --popover-foreground: oklch(1 0 0);
-  --primary: oklch(0.928 0.006 264.531);
-  --primary-foreground: oklch(0.21 0.034 264.665);
-  --secondary: oklch(0.278 0.033 256.848);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.278 0.033 256.848);
-  --muted-foreground: oklch(0.78 0 0);
-  --accent: oklch(0.278 0.033 256.848);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.034 264.665);
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.278 0.033 256.848);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
-}
-*/
+/* 
+ * Dark Mode: Intentionally Excluded
+ * 
+ * Decision: Dark mode will not be implemented for the Clean Log System.
+ * 
+ * Rationale:
+ * 1. Brand identity optimized for light, professional aesthetic
+ * 2. Target users (business administrators) primarily work in well-lit environments
+ * 3. Development resources better allocated to core features
+ * 4. OKLCH color system calibrated for light backgrounds
+ * 
+ * For users requiring dark interfaces:
+ * - Use browser extensions like "Dark Reader"
+ * - Enable OS-level high contrast modes
+ * 
+ * See: docs/decisions/dark-mode-exclusion.md for full decision rationale
+ * This decision will be reviewed in Q3 2026 based on user feedback.
+ */
 
 @layer base {
   * {

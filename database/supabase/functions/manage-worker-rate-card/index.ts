@@ -9,7 +9,14 @@ import {
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  createRateCardSchema,
+  deactivateRateCardSchema,
+  deleteRateCardSchema,
+  rateCardRequestSchema,
+  updateRateCardSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
 
 type ModifierType = "per_unit" | "flat" | "multiplier";
 
@@ -70,23 +77,35 @@ serve(async (req: Request) => {
   if (corsResponse) return corsResponse;
 
   const logger = createLogger(req, { functionName: "manage-worker-rate-card" });
+  const correlationId = logger.getCorrelationId();
 
   try {
-    const body = (await req.json()) as RateCardRequest;
+    const rawBody = await req.json();
 
-    // Validate organization_id is present
-    const validation = validateRequiredFields(
-      body as unknown as Record<string, unknown>,
-      ["organization_id", "action"],
-    );
-
-    if (!validation.valid) {
-      logger.warn("Missing required fields for rate card operation", {
-        missingFields: validation.missingFields,
+    // Validate request body with Zod schema
+    const validation = validateRequest(rateCardRequestSchema, rawBody);
+    if (!validation.success) {
+      logger.warn("Validation failed for rate card operation", {
+        errors: validation.issues,
       });
-      return errorResponse("Missing required fields", 400);
+      return errorResponse(
+        {
+          type: "about:blank",
+          title: "Validation Failed",
+          status: 400,
+          detail: validation.error,
+          invalidFields: validation.issues.map((issue) => ({
+            field: issue.path.join("."),
+            error: issue.message,
+          })),
+        },
+        400,
+        {},
+        correlationId,
+      );
     }
 
+    const body = validation.data;
     const { organization_id, action } = body;
 
     const supabase = createServiceRoleClient();
@@ -104,6 +123,8 @@ serve(async (req: Request) => {
       return errorResponse(
         "You do not have permission to access this organization",
         403,
+        {},
+        correlationId,
       );
     }
 
@@ -137,35 +158,37 @@ serve(async (req: Request) => {
           ) || [],
         }));
 
-        return jsonResponse({ success: true, rate_cards: rateCards });
+        return jsonResponse(
+          { success: true, rate_cards: rateCards },
+          200,
+          {},
+          correlationId,
+        );
       }
 
       case "create": {
         const createReq = body as CreateRateCardRequest;
 
-        // Validate required fields for create
-        if (
-          !createReq.worker_id || !createReq.modifier_type ||
-          createReq.modifier_value === undefined
-        ) {
+        // Additional validation specific to create operation
+        const createValidation = validateRequest(createRateCardSchema, rawBody);
+        if (!createValidation.success) {
+          logger.warn("Create validation failed", {
+            errors: createValidation.issues,
+          });
           return errorResponse(
-            "worker_id, modifier_type, and modifier_value are required",
+            {
+              type: "about:blank",
+              title: "Validation Failed",
+              status: 400,
+              detail: createValidation.error,
+              invalidFields: createValidation.issues.map((issue) => ({
+                field: issue.path.join("."),
+                error: issue.message,
+              })),
+            },
             400,
-          );
-        }
-
-        // Validate modifier_value
-        if (createReq.modifier_value <= 0) {
-          return errorResponse("modifier_value must be greater than 0", 400);
-        }
-
-        // Validate modifier_type
-        if (
-          !["per_unit", "flat", "multiplier"].includes(createReq.modifier_type)
-        ) {
-          return errorResponse(
-            "modifier_type must be per_unit, flat, or multiplier",
-            400,
+            {},
+            correlationId,
           );
         }
 
@@ -220,38 +243,43 @@ serve(async (req: Request) => {
           worker_id: createReq.worker_id,
         });
 
-        return jsonResponse({
-          success: true,
-          rate_card: {
-            ...rateCard,
-            field_config_ids: createReq.field_config_ids || [],
+        return jsonResponse(
+          {
+            success: true,
+            rate_card: {
+              ...rateCard,
+              field_config_ids: createReq.field_config_ids || [],
+            },
           },
-        });
+          201,
+          {},
+          correlationId,
+        );
       }
 
       case "update": {
         const updateReq = body as UpdateRateCardRequest;
 
-        if (!updateReq.id) {
-          return errorResponse("id is required for update", 400);
-        }
-
-        // Validate modifier_value if provided
-        if (
-          updateReq.modifier_value !== undefined &&
-          updateReq.modifier_value <= 0
-        ) {
-          return errorResponse("modifier_value must be greater than 0", 400);
-        }
-
-        // Validate modifier_type if provided
-        if (
-          updateReq.modifier_type !== undefined &&
-          !["per_unit", "flat", "multiplier"].includes(updateReq.modifier_type)
-        ) {
+        // Additional validation specific to update operation
+        const updateValidation = validateRequest(updateRateCardSchema, rawBody);
+        if (!updateValidation.success) {
+          logger.warn("Update validation failed", {
+            errors: updateValidation.issues,
+          });
           return errorResponse(
-            "modifier_type must be per_unit, flat, or multiplier",
+            {
+              type: "about:blank",
+              title: "Validation Failed",
+              status: 400,
+              detail: updateValidation.error,
+              invalidFields: updateValidation.issues.map((issue) => ({
+                field: issue.path.join("."),
+                error: issue.message,
+              })),
+            },
             400,
+            {},
+            correlationId,
           );
         }
 
@@ -264,7 +292,17 @@ serve(async (req: Request) => {
           .single();
 
         if (fetchError || !existing) {
-          return errorResponse("Rate card not found", 404);
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Not Found",
+              status: 404,
+              detail: "Rate card not found or access denied",
+            },
+            404,
+            {},
+            correlationId,
+          );
         }
 
         // Build update object
@@ -363,20 +401,47 @@ serve(async (req: Request) => {
           organization_id,
         });
 
-        return jsonResponse({
-          success: true,
-          rate_card: {
-            ...updated,
-            field_config_ids: fieldConfigIds,
+        return jsonResponse(
+          {
+            success: true,
+            rate_card: {
+              ...updated,
+              field_config_ids: fieldConfigIds,
+            },
           },
-        });
+          200,
+          {},
+          correlationId,
+        );
       }
 
       case "deactivate": {
         const deactivateReq = body as DeactivateRateCardRequest;
 
-        if (!deactivateReq.id) {
-          return errorResponse("id is required for deactivate", 400);
+        // Additional validation specific to deactivate operation
+        const deactivateValidation = validateRequest(
+          deactivateRateCardSchema,
+          rawBody,
+        );
+        if (!deactivateValidation.success) {
+          logger.warn("Deactivate validation failed", {
+            errors: deactivateValidation.issues,
+          });
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Validation Failed",
+              status: 400,
+              detail: deactivateValidation.error,
+              invalidFields: deactivateValidation.issues.map((issue) => ({
+                field: issue.path.join("."),
+                error: issue.message,
+              })),
+            },
+            400,
+            {},
+            correlationId,
+          );
         }
 
         // Verify rate card belongs to organization
@@ -407,14 +472,33 @@ serve(async (req: Request) => {
           organization_id,
         });
 
-        return jsonResponse({ success: true });
+        return jsonResponse({ success: true }, 200, {}, correlationId);
       }
 
       case "delete": {
         const deleteReq = body as DeleteRateCardRequest;
 
-        if (!deleteReq.id) {
-          return errorResponse("id is required for delete", 400);
+        // Additional validation specific to delete operation
+        const deleteValidation = validateRequest(deleteRateCardSchema, rawBody);
+        if (!deleteValidation.success) {
+          logger.warn("Delete validation failed", {
+            errors: deleteValidation.issues,
+          });
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Validation Failed",
+              status: 400,
+              detail: deleteValidation.error,
+              invalidFields: deleteValidation.issues.map((issue) => ({
+                field: issue.path.join("."),
+                error: issue.message,
+              })),
+            },
+            400,
+            {},
+            correlationId,
+          );
         }
 
         // Verify rate card belongs to organization
@@ -426,7 +510,17 @@ serve(async (req: Request) => {
           .single();
 
         if (fetchError || !existing) {
-          return errorResponse("Rate card not found", 404);
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Not Found",
+              status: 404,
+              detail: "Rate card not found or access denied",
+            },
+            404,
+            {},
+            correlationId,
+          );
         }
 
         // Field mappings will be cascade deleted due to FK constraint
@@ -442,13 +536,21 @@ serve(async (req: Request) => {
           organization_id,
         });
 
-        return jsonResponse({ success: true });
+        return jsonResponse({ success: true }, 204, {}, correlationId);
       }
 
       default:
         return errorResponse(
-          "Invalid action. Must be list, create, update, deactivate, or delete",
+          {
+            type: "about:blank",
+            title: "Bad Request",
+            status: 400,
+            detail:
+              "Invalid action. Must be list, create, update, deactivate, or delete",
+          },
           400,
+          {},
+          correlationId,
         );
     }
   } catch (error) {
@@ -456,6 +558,8 @@ serve(async (req: Request) => {
     return errorResponse(
       extractErrorMessage(error, "Failed to manage rate card"),
       getErrorStatusCode(error),
+      {},
+      correlationId,
     );
   }
 });

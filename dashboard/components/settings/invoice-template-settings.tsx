@@ -465,13 +465,13 @@ export default function InvoiceTemplateSettings() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
-                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50">
+                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    <p className="text-sm font-medium text-amber-800">
                       No locations configured
                     </p>
-                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                    <p className="text-sm text-amber-700">
                       Service address will use form fields since no locations
                       have been set up. Configure locations in the{" "}
                       <a

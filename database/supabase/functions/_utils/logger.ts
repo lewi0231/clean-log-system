@@ -124,6 +124,13 @@ class EdgeFunctionLogger {
   }
 
   /**
+   * Get the correlation ID for this logger
+   */
+  getCorrelationId(): string {
+    return this.correlationId;
+  }
+
+  /**
    * Create a child logger with additional context
    */
   child(additionalContext: LogContext): EdgeFunctionLogger {
