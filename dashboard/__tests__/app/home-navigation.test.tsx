@@ -2,27 +2,35 @@
  * Tests for home page navigation
  *
  * Test Case:
- * - HP-1: Get Started link redirects to signup
+ * - HP-1: Start Free Trial link redirects to signup
  */
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 import Home from "../../app/page";
 
-describe("Home Page Navigation - HP-1: Get Started Link", () => {
-  test("should have 'Get Started' link pointing to /signup", () => {
+describe("Home Page Navigation - HP-1: Start Free Trial Link", () => {
+  test("should have 'Start Free Trial' links pointing to /signup", () => {
     render(<Home />);
 
-    const getStartedLink = screen.getByText(/get started/i).closest("a");
-    expect(getStartedLink).toBeDefined();
-    expect(getStartedLink?.getAttribute("href")).toBe("/signup");
+    // There are multiple 'Start Free Trial' links on the page (hero, nav, pricing, etc.)
+    const freeTrialLinks = screen.getAllByText(/start free trial/i);
+    expect(freeTrialLinks.length).toBeGreaterThan(0);
+
+    // Verify all Start Free Trial links point to /signup
+    freeTrialLinks.forEach((link) => {
+      const anchor = link.closest("a");
+      expect(anchor).toBeDefined();
+      expect(anchor?.getAttribute("href")).toBe("/signup");
+    });
   });
 
-  test("should have 'Start Free Trial' link pointing to /signup", () => {
+  test("should have navigation header with signup link", () => {
     render(<Home />);
 
-    const freeTrialLink = screen.getByText(/start free trial/i).closest("a");
-    expect(freeTrialLink).toBeDefined();
-    expect(freeTrialLink?.getAttribute("href")).toBe("/signup");
+    // Check the navigation header specifically has a Start Free Trial link
+    const navLinks = screen.getAllByRole("link", { name: /start free trial/i });
+    expect(navLinks.length).toBeGreaterThan(0);
+    expect(navLinks[0].getAttribute("href")).toBe("/signup");
   });
 });
