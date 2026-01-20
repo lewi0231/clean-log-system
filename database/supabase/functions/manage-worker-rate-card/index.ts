@@ -132,10 +132,9 @@ serve(async (req: Request) => {
         // Transform field mappings
         const rateCards = (data || []).map((card) => ({
           ...card,
-          field_config_ids:
-            card.worker_rate_card_field?.map(
-              (f: { field_config_id: string }) => f.field_config_id,
-            ) || [],
+          field_config_ids: card.worker_rate_card_field?.map(
+            (f: { field_config_id: string }) => f.field_config_id,
+          ) || [],
         }));
 
         return jsonResponse({ success: true, rate_cards: rateCards });
@@ -145,7 +144,10 @@ serve(async (req: Request) => {
         const createReq = body as CreateRateCardRequest;
 
         // Validate required fields for create
-        if (!createReq.worker_id || !createReq.modifier_type || createReq.modifier_value === undefined) {
+        if (
+          !createReq.worker_id || !createReq.modifier_type ||
+          createReq.modifier_value === undefined
+        ) {
           return errorResponse(
             "worker_id, modifier_type, and modifier_value are required",
             400,
@@ -158,7 +160,9 @@ serve(async (req: Request) => {
         }
 
         // Validate modifier_type
-        if (!["per_unit", "flat", "multiplier"].includes(createReq.modifier_type)) {
+        if (
+          !["per_unit", "flat", "multiplier"].includes(createReq.modifier_type)
+        ) {
           return errorResponse(
             "modifier_type must be per_unit, flat, or multiplier",
             400,
@@ -174,8 +178,7 @@ serve(async (req: Request) => {
             modifier_type: createReq.modifier_type,
             modifier_value: createReq.modifier_value,
             currency: createReq.currency || "AUD",
-            effective_from:
-              createReq.effective_from ||
+            effective_from: createReq.effective_from ||
               new Date().toISOString().split("T")[0],
             effective_to: createReq.effective_to || null,
             role_title: createReq.role_title || null,
@@ -233,6 +236,25 @@ serve(async (req: Request) => {
           return errorResponse("id is required for update", 400);
         }
 
+        // Validate modifier_value if provided
+        if (
+          updateReq.modifier_value !== undefined &&
+          updateReq.modifier_value <= 0
+        ) {
+          return errorResponse("modifier_value must be greater than 0", 400);
+        }
+
+        // Validate modifier_type if provided
+        if (
+          updateReq.modifier_type !== undefined &&
+          !["per_unit", "flat", "multiplier"].includes(updateReq.modifier_type)
+        ) {
+          return errorResponse(
+            "modifier_type must be per_unit, flat, or multiplier",
+            400,
+          );
+        }
+
         // Verify rate card belongs to organization
         const { data: existing, error: fetchError } = await supabase
           .from("worker_rate_card")
@@ -284,10 +306,18 @@ serve(async (req: Request) => {
         // Update field mappings if provided
         if (updateReq.field_config_ids !== undefined) {
           // Delete existing mappings
-          await supabase
+          const { error: deleteError } = await supabase
             .from("worker_rate_card_field")
             .delete()
             .eq("rate_card_id", updateReq.id);
+
+          if (deleteError) {
+            logger.error("Failed to delete existing field mappings", {
+              error: deleteError.message,
+              rate_card_id: updateReq.id,
+            });
+            throw deleteError;
+          }
 
           // Create new mappings if any
           if (updateReq.field_config_ids.length > 0) {
@@ -298,9 +328,35 @@ serve(async (req: Request) => {
               }),
             );
 
-            await supabase.from("worker_rate_card_field").insert(fieldMappings);
+            const { error: insertError } = await supabase
+              .from("worker_rate_card_field")
+              .insert(fieldMappings);
+
+            if (insertError) {
+              logger.error("Failed to create new field mappings", {
+                error: insertError.message,
+                rate_card_id: updateReq.id,
+              });
+              throw insertError;
+            }
           }
         }
+
+        // Fetch actual field mappings from database
+        const { data: fieldMappings, error: fieldError } = await supabase
+          .from("worker_rate_card_field")
+          .select("field_config_id")
+          .eq("rate_card_id", updateReq.id);
+
+        if (fieldError) {
+          logger.warn("Failed to fetch field mappings after update", {
+            error: fieldError.message,
+            rate_card_id: updateReq.id,
+          });
+        }
+
+        const fieldConfigIds = fieldMappings?.map((f) => f.field_config_id) ||
+          [];
 
         logger.info("Rate card updated successfully", {
           rate_card_id: updateReq.id,
@@ -311,7 +367,7 @@ serve(async (req: Request) => {
           success: true,
           rate_card: {
             ...updated,
-            field_config_ids: updateReq.field_config_ids || [],
+            field_config_ids: fieldConfigIds,
           },
         });
       }
