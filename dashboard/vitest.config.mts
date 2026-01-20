@@ -12,7 +12,16 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./vitest.setup.ts",
-    pool: "forks",
+    // Use 'threads' pool instead of 'forks' to avoid EPERM errors on macOS
+    // when cleaning up child processes
+    pool: "threads",
+    // Exclude integration tests by default - they require local Supabase
+    // Run integration tests explicitly with: pnpm test:integration
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/__tests__/integration/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
