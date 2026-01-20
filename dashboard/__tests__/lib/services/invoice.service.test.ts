@@ -230,7 +230,7 @@ describe("InvoiceService", () => {
         organization_id: "org-1",
       });
 
-      expect(result).toEqual(mockInvoices);
+      expect(result).toEqual({ invoices: mockInvoices, pagination: undefined });
       expect(supabase.functions.invoke).toHaveBeenCalledWith("list-invoices", {
         body: {
           organization_id: "org-1",
@@ -255,7 +255,7 @@ describe("InvoiceService", () => {
         end_date: "2024-01-31",
       });
 
-      expect(result).toEqual(mockInvoices);
+      expect(result).toEqual({ invoices: mockInvoices, pagination: undefined });
       expect(supabase.functions.invoke).toHaveBeenCalledWith("list-invoices", {
         body: {
           organization_id: "org-1",
@@ -475,9 +475,10 @@ describe("InvoiceService", () => {
         error: mockError,
       });
 
-      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toBeInstanceOf(
-        EdgeFunctionError,
-      );
+      await expect(InvoiceService.resendInvoice("inv-1")).rejects
+        .toBeInstanceOf(
+          EdgeFunctionError,
+        );
       await expect(InvoiceService.resendInvoice("inv-1")).rejects.toThrow(
         "Network error",
       );
@@ -495,4 +496,3 @@ describe("InvoiceService", () => {
     });
   });
 });
-
