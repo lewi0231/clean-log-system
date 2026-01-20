@@ -80,6 +80,7 @@ const modifierTypeLabels: Record<ModifierType, string> = {
   per_unit: "Per Unit Bonus",
   flat: "Flat Bonus",
   multiplier: "Multiplier",
+  team_percentage: "Team Percentage",
 };
 
 const modifierTypeDescriptions: Record<ModifierType, string> = {
@@ -88,6 +89,8 @@ const modifierTypeDescriptions: Record<ModifierType, string> = {
   flat: "Fixed bonus per job (e.g., $20). Added on top of time share.",
   multiplier:
     "Multiplies the worker's time-share (e.g., 1.2 = 20% more of the base payment).",
+  team_percentage:
+    "Percentage of other team members' earnings (e.g., 10% of team wages). Great for supervisors/team leads.",
 };
 
 export default function RateCardManager() {
@@ -244,6 +247,9 @@ export default function RateCardManager() {
     if (card.modifier_type === "multiplier") {
       return `${card.modifier_value}x`;
     }
+    if (card.modifier_type === "team_percentage") {
+      return `${card.modifier_value}%`;
+    }
     return `${formatCurrency(card.modifier_value)}`;
   };
 
@@ -253,11 +259,14 @@ export default function RateCardManager() {
         return `${formatCurrency(card.modifier_value)} per unit`;
       case "flat":
         return `${formatCurrency(card.modifier_value)} per job`;
-      case "multiplier":
+      case "multiplier": {
         const percentage = ((card.modifier_value - 1) * 100).toFixed(0);
         return percentage.startsWith("-")
           ? `${percentage}% of time share`
           : `+${percentage}% of time share`;
+      }
+      case "team_percentage":
+        return `${card.modifier_value}% of team earnings`;
       default:
         return "";
     }
@@ -314,6 +323,10 @@ export default function RateCardManager() {
                     <li>
                       <strong>Per-unit</strong> and <strong>flat bonuses</strong>{" "}
                       are added on top (not deducted from pool)
+                    </li>
+                    <li>
+                      <strong>Team percentage</strong> bonuses give supervisors a
+                      percentage of other workers&apos; earnings
                     </li>
                   </ol>
                 </div>
@@ -483,6 +496,9 @@ export default function RateCardManager() {
                   <SelectItem value="multiplier">
                     Multiplier (time share)
                   </SelectItem>
+                  <SelectItem value="team_percentage">
+                    Team Percentage (supervisor bonus)
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -494,16 +510,28 @@ export default function RateCardManager() {
               <Label htmlFor="modifier-value">
                 {formData.modifier_type === "multiplier"
                   ? "Multiplier"
-                  : "Amount"}{" "}
+                  : formData.modifier_type === "team_percentage"
+                    ? "Percentage"
+                    : "Amount"}{" "}
                 <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="modifier-value"
                 type="number"
-                step={formData.modifier_type === "multiplier" ? "0.1" : "0.01"}
+                step={
+                  formData.modifier_type === "multiplier"
+                    ? "0.1"
+                    : formData.modifier_type === "team_percentage"
+                      ? "1"
+                      : "0.01"
+                }
                 min="0.01"
                 placeholder={
-                  formData.modifier_type === "multiplier" ? "1.2" : "0.00"
+                  formData.modifier_type === "multiplier"
+                    ? "1.2"
+                    : formData.modifier_type === "team_percentage"
+                      ? "10"
+                      : "0.00"
                 }
                 value={formData.modifier_value}
                 onChange={(e) =>
@@ -513,6 +541,11 @@ export default function RateCardManager() {
               {formData.modifier_type === "multiplier" && (
                 <p className="text-xs text-muted-foreground">
                   1.0 = no change, 1.2 = 20% more, 0.8 = 20% less
+                </p>
+              )}
+              {formData.modifier_type === "team_percentage" && (
+                <p className="text-xs text-muted-foreground">
+                  10 = 10% of team earnings (excluding this worker)
                 </p>
               )}
             </div>

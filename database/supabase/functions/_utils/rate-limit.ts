@@ -6,6 +6,7 @@
  */
 
 import { createServiceRoleClient } from "./supabase.ts";
+import { CORS_HEADERS, ProblemDetails } from "./http.ts";
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -237,25 +238,35 @@ export async function checkRateLimit(
 }
 
 /**
- * Create a rate limit error response
+ * Create a rate limit error response with RFC 7807 Problem Details format
  */
-export function rateLimitResponse(result: RateLimitResult): Response {
+export function rateLimitResponse(
+  result: RateLimitResult,
+  maxRequests: number,
+  correlationId?: string,
+): Response {
+  const problemDetails: ProblemDetails = {
+    type: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429",
+    title: "Too Many Requests",
+    status: 429,
+    detail:
+      `Rate limit exceeded. Please try again after ${result.retryAfter} seconds.`,
+    retryAfter: result.retryAfter,
+    resetAt: result.resetAt.toISOString(),
+  };
+
   return new Response(
-    JSON.stringify({
-      error: "Rate limit exceeded",
-      message:
-        `Too many requests. Please try again after ${result.retryAfter} seconds.`,
-      retryAfter: result.retryAfter,
-      resetAt: result.resetAt.toISOString(),
-    }),
+    JSON.stringify(problemDetails),
     {
       status: 429,
       headers: {
-        "Content-Type": "application/json",
-        "X-RateLimit-Limit": "100", // Example, should match config
+        ...CORS_HEADERS,
+        "Content-Type": "application/problem+json",
+        "X-RateLimit-Limit": String(maxRequests),
         "X-RateLimit-Remaining": String(result.remaining),
         "X-RateLimit-Reset": String(Math.ceil(result.resetAt.getTime() / 1000)),
         "Retry-After": result.retryAfter ? String(result.retryAfter) : "60",
+        ...(correlationId && { "x-correlation-id": correlationId }),
       },
     },
   );

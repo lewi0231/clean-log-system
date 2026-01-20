@@ -352,4 +352,87 @@ setError(error.message);  // "NetworkError: fetch failed at line 42"
 
 ---
 
+## Database Migrations
+
+### Key Rules
+
+1. **NEVER modify existing migrations** - They may have already been applied to production
+2. **Always create new migrations** for schema changes
+3. **Use sequential timestamps** in format `YYYYMMDDHHMMSS_description.sql`
+4. **Test migrations locally** before committing
+
+### Creating a New Migration
+
+```bash
+# File naming pattern
+database/supabase/migrations/YYYYMMDDHHMMSS_descriptive_name.sql
+
+# Example: Adding a new column
+database/supabase/migrations/20260120143000_add_team_percentage_modifier.sql
+```
+
+### Migration File Structure
+
+```sql
+-- -*- mode: sql; sql-product: postgres -*-
+-- Brief description of what this migration does
+
+-- Step 1: Description
+ALTER TABLE table_name ...;
+
+-- Step 2: Description  
+CREATE INDEX ...;
+
+-- Step 3: Update comments
+COMMENT ON COLUMN table_name.column_name IS 'Description';
+```
+
+### Common Patterns
+
+```sql
+-- Adding a new enum value to a CHECK constraint
+ALTER TABLE worker_rate_card 
+  DROP CONSTRAINT IF EXISTS worker_rate_card_modifier_type_check;
+
+ALTER TABLE worker_rate_card 
+  ADD CONSTRAINT worker_rate_card_modifier_type_check 
+  CHECK (modifier_type IN ('existing', 'values', 'new_value'));
+
+-- Adding a new column
+ALTER TABLE table_name 
+  ADD COLUMN IF NOT EXISTS column_name TYPE DEFAULT value;
+
+-- Adding a new table with RLS
+CREATE TABLE new_table (...);
+ALTER TABLE new_table ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role can manage new_table" ON new_table
+  FOR ALL USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
+```
+
+### Running Migrations
+
+```bash
+# Local development - run from database directory
+cd database
+supabase db reset  # Resets and runs all migrations
+
+# Or run specific migration
+supabase migration up
+
+# Production - migrations run automatically on deploy
+# Or use Supabase dashboard to run manually
+```
+
+### What NOT to Do
+
+```sql
+-- ❌ NEVER modify an existing migration file
+-- ❌ NEVER change the order of migrations
+-- ❌ NEVER delete a migration that's been applied
+-- ❌ NEVER use migration names that sort incorrectly (use YYYYMMDDHHMMSS)
+```
+
+---
+
 *Last updated: January 20, 2026*

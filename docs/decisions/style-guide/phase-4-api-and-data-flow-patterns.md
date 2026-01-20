@@ -2791,6 +2791,199 @@ logger.info("User details", { email: "user@example.com", token: "secret123" });
 
 ---
 
+## 10. Database Migrations
+
+### Overview
+
+Database migrations in this project use Supabase migrations with raw SQL files. Migrations are versioned using timestamps and are applied sequentially.
+
+**Migration Location:** `database/supabase/migrations/`
+
+---
+
+### 10.1 Migration File Naming
+
+#### RULE-MIG-001: Timestamp-Based Naming
+**Requirement:** Migration files MUST use timestamp prefix format `YYYYMMDDHHMMSS_descriptive_name.sql`.
+
+```bash
+# ✅ Correct naming
+20260120143000_add_team_percentage_modifier.sql
+20260120150000_create_notification_table.sql
+20260121000001_add_invoice_reminder_columns.sql
+
+# ❌ Incorrect naming
+001_add_column.sql                    # No timestamp
+add_team_percentage.sql               # Missing timestamp
+2026-01-20_add_feature.sql           # Wrong format (hyphens)
+```
+
+**Rationale:** Timestamps ensure migrations run in the correct order across all environments.
+
+---
+
+### 10.2 Migration Immutability
+
+#### RULE-MIG-002: Never Modify Existing Migrations
+**Requirement:** Once a migration has been committed/deployed, it MUST NOT be modified.
+
+```sql
+-- ❌ NEVER do this: Editing an existing migration
+-- File: 20260119000003_refactor_worker_rate_card.sql (already deployed)
+-- Adding new functionality to this file = WRONG
+
+-- ✅ ALWAYS do this: Create a new migration
+-- File: 20260120143000_add_team_percentage_modifier.sql
+ALTER TABLE worker_rate_card 
+  DROP CONSTRAINT IF EXISTS worker_rate_card_modifier_type_check;
+
+ALTER TABLE worker_rate_card 
+  ADD CONSTRAINT worker_rate_card_modifier_type_check 
+  CHECK (modifier_type IN ('per_unit', 'flat', 'multiplier', 'team_percentage'));
+```
+
+**Rationale:** Migrations may have already been applied in production or other developer environments. Modifying them causes:
+- Migration hash mismatches
+- Failed deployments
+- Data inconsistencies across environments
+
+---
+
+### 10.3 Migration Structure
+
+#### RULE-MIG-003: Standard Migration Structure
+**Requirement:** Migrations SHOULD follow a consistent structure with comments.
+
+```sql
+-- -*- mode: sql; sql-product: postgres -*-
+-- Brief description of what this migration does
+-- 
+-- Context: Why this change is needed
+-- Related: Link to user story or issue if applicable
+
+-- Step 1: Drop existing constraints (if modifying)
+ALTER TABLE table_name 
+  DROP CONSTRAINT IF EXISTS constraint_name;
+
+-- Step 2: Add/modify columns or constraints
+ALTER TABLE table_name 
+  ADD CONSTRAINT constraint_name CHECK (...);
+
+-- Step 3: Create indexes (if needed)
+CREATE INDEX IF NOT EXISTS idx_name ON table_name(column);
+
+-- Step 4: Update comments
+COMMENT ON COLUMN table_name.column_name IS 'Description';
+
+-- Step 5: RLS policies (if creating new tables)
+ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "policy_name" ON table_name FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
+```
+
+---
+
+### 10.4 Common Migration Patterns
+
+#### Pattern: Adding an Enum Value to CHECK Constraint
+
+```sql
+-- Step 1: Drop existing constraint
+ALTER TABLE worker_rate_card 
+  DROP CONSTRAINT IF EXISTS worker_rate_card_modifier_type_check;
+
+-- Step 2: Re-create with new value
+ALTER TABLE worker_rate_card 
+  ADD CONSTRAINT worker_rate_card_modifier_type_check 
+  CHECK (modifier_type IN ('per_unit', 'flat', 'multiplier', 'team_percentage'));
+```
+
+#### Pattern: Adding a New Column
+
+```sql
+-- Use IF NOT EXISTS for idempotency
+ALTER TABLE table_name 
+  ADD COLUMN IF NOT EXISTS new_column TEXT DEFAULT 'value';
+
+COMMENT ON COLUMN table_name.new_column IS 'Description of the column';
+```
+
+#### Pattern: Creating a New Table with RLS
+
+```sql
+CREATE TABLE new_table (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
+  -- ... other columns
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE new_table ENABLE ROW LEVEL SECURITY;
+
+-- Service role policy (standard pattern in this codebase)
+CREATE POLICY "Service role can manage new_table"
+  ON new_table
+  FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role')
+  WITH CHECK (auth.jwt() ->> 'role' = 'service_role');
+
+-- Indexes
+CREATE INDEX idx_new_table_org ON new_table(organization_id);
+
+-- Trigger for updated_at
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON new_table
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+```
+
+---
+
+### 10.5 Running Migrations
+
+#### Local Development
+
+```bash
+# Navigate to database directory
+cd database
+
+# Reset database and run all migrations (destructive - clears all data)
+supabase db reset
+
+# Run pending migrations only
+supabase migration up
+
+# Check migration status
+supabase migration list
+```
+
+#### Production
+
+- Migrations run automatically during `supabase db push` or via CI/CD
+- Use Supabase Dashboard for manual execution if needed
+- Always backup before running migrations in production
+
+---
+
+### 10.6 Migration Checklist
+
+Before creating a migration, verify:
+
+- [ ] New file created (not modifying existing migration)
+- [ ] Timestamp format is correct (`YYYYMMDDHHMMSS`)
+- [ ] Descriptive name explains the change
+- [ ] `IF NOT EXISTS` / `IF EXISTS` used where appropriate (idempotency)
+- [ ] Comments explain the purpose
+- [ ] RLS policies added for new tables
+- [ ] Indexes added for frequently queried columns
+- [ ] COMMENT ON added for new columns/tables
+- [ ] Tested locally with `supabase db reset`
+
+---
+
 ## Deliverable Checklist
 
 - [x] ✅ Every recommendation is backed by research

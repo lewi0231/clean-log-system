@@ -7,7 +7,7 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 
-export type ModifierType = "per_unit" | "flat" | "multiplier";
+export type ModifierType = "per_unit" | "flat" | "multiplier" | "team_percentage";
 
 export interface WorkerRateCard {
   id: string;

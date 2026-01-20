@@ -1,14 +1,36 @@
 #!/bin/bash
 # Script to run integration tests with Stripe webhook forwarding
-# This script starts the Stripe webhook listener in the background,
-# runs the integration tests, then stops the webhook listener
+# This script:
+# 1. Checks that local Supabase is running
+# 2. Starts the Stripe webhook listener in the background
+# 3. Runs the integration tests
+# 4. Stops the webhook listener
 
 set -e
 
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+# Check if Supabase is running
+echo -e "${YELLOW}Checking if local Supabase is running...${NC}"
+
+# Navigate to database folder to check supabase status
+cd "$(dirname "$0")/../../database"
+if ! supabase status > /dev/null 2>&1; then
+    echo -e "${RED}╔════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║  ERROR: Local Supabase is not running!                            ║${NC}"
+    echo -e "${RED}╠════════════════════════════════════════════════════════════════════╣${NC}"
+    echo -e "${RED}║  Please start Supabase first:                                     ║${NC}"
+    echo -e "${RED}║    cd database && supabase start                                  ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════════════╝${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Supabase is running${NC}"
+cd - > /dev/null
 
 echo -e "${YELLOW}Starting Stripe webhook listener...${NC}"
 stripe listen --forward-to http://localhost:54321/functions/v1/stripe-webhook &

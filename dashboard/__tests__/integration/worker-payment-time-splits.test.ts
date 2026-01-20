@@ -6,6 +6,7 @@
  * 2. Multiplier modifiers (applied to time share)
  * 3. Per-unit bonuses (additive, not deducted)
  * 4. Flat bonuses (additive, not deducted)
+ * 5. Team percentage bonuses (percentage of other workers' time-shares)
  *
  * Key principle: Bonuses are ADDITIVE - they increase total payout,
  * not redistribute the existing pool.
@@ -66,6 +67,7 @@ describe("Time-Based Worker Payment Splits with Additive Bonuses", () => {
                                     multiplier_adjustment: 0,
                                     per_unit_bonus: 0,
                                     flat_bonus: 0,
+                                    team_percentage_bonus: 0,
                                     final_payment: 500,
                                     allocation_type: "single_worker",
                                 },
@@ -119,6 +121,7 @@ describe("Time-Based Worker Payment Splits with Additive Bonuses", () => {
                                     multiplier_adjustment: 0,
                                     per_unit_bonus: 0,
                                     flat_bonus: 0,
+                                    team_percentage_bonus: 0,
                                     final_payment: 200,
                                     allocation_type: "time_based",
                                 },
@@ -130,6 +133,7 @@ describe("Time-Based Worker Payment Splits with Additive Bonuses", () => {
                                     multiplier_adjustment: 0,
                                     per_unit_bonus: 0,
                                     flat_bonus: 0,
+                                    team_percentage_bonus: 0,
                                     final_payment: 200,
                                     allocation_type: "time_based",
                                 },
@@ -141,6 +145,7 @@ describe("Time-Based Worker Payment Splits with Additive Bonuses", () => {
                                     multiplier_adjustment: 0,
                                     per_unit_bonus: 0,
                                     flat_bonus: 0,
+                                    team_percentage_bonus: 0,
                                     final_payment: 200,
                                     allocation_type: "time_based",
                                 },
@@ -788,6 +793,159 @@ describe("Time-Based Worker Payment Splits with Additive Bonuses", () => {
                 allocation_type: "time_based",
                 rate_card_id: "rate-card-1",
             });
+        });
+    });
+
+    describe("Scenario 11: Team Percentage Bonus (Supervisor)", () => {
+        it("should calculate team percentage bonus from other workers' time shares", async () => {
+            // Given:
+            //   - Job: $500 base payment
+            //   - Workers:
+            //     - Team Lead: 8h, team_percentage 10% (of other workers' earnings)
+            //     - Worker B: 8h
+            //     - Worker C: 6h (arrived late)
+            // When: Calculate worker payment
+            // Then:
+            //   - Team Lead: $181.82 (time share) + $31.82 (10% of $318.18) = $213.64
+            //   - Worker B: $181.82 (time share)
+            //   - Worker C: $136.36 (time share)
+            //   - Total: $531.82 (base + team percentage bonus)
+
+            const mockResponse: CalculateWorkerPaymentsResponse = {
+                success: true,
+                calculation: {
+                    total_worker_payment: 531.82, // $500 base + $31.82 bonus
+                    job_calculations: [
+                        {
+                            job_id: "job-1",
+                            line_items: [],
+                            applied_rules: [],
+                            subtotal: 500,
+                            total_adjustments: 0,
+                            total_worker_payment: 531.82,
+                            worker_splits: [
+                                {
+                                    worker_id: "worker-1",
+                                    worker_name: "Team Lead",
+                                    hours_worked: 8, // 8/22 = 36.4%
+                                    time_share: 181.82,
+                                    multiplier_adjustment: 0,
+                                    per_unit_bonus: 0,
+                                    flat_bonus: 0,
+                                    team_percentage_bonus: 31.82, // 10% of ($181.82 + $136.36)
+                                    final_payment: 213.64,
+                                    rate_card_id: "rate-card-1",
+                                    allocation_type: "time_based",
+                                },
+                                {
+                                    worker_id: "worker-2",
+                                    worker_name: "Worker B",
+                                    hours_worked: 8, // 8/22 = 36.4%
+                                    time_share: 181.82,
+                                    multiplier_adjustment: 0,
+                                    per_unit_bonus: 0,
+                                    flat_bonus: 0,
+                                    team_percentage_bonus: 0,
+                                    final_payment: 181.82,
+                                    allocation_type: "time_based",
+                                },
+                                {
+                                    worker_id: "worker-3",
+                                    worker_name: "Worker C",
+                                    hours_worked: 6, // 6/22 = 27.3%
+                                    time_share: 136.36,
+                                    multiplier_adjustment: 0,
+                                    per_unit_bonus: 0,
+                                    flat_bonus: 0,
+                                    team_percentage_bonus: 0,
+                                    final_payment: 136.36,
+                                    allocation_type: "time_based",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            };
+
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: mockResponse,
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.calculatePayments({
+                organization_id: "org-1",
+                job_ids: ["job-1"],
+            });
+
+            const splits = result.calculation.job_calculations[0].worker_splits;
+            
+            // Team Lead gets time share + team percentage bonus
+            expect(splits?.[0].time_share).toBe(181.82);
+            expect(splits?.[0].team_percentage_bonus).toBe(31.82);
+            expect(splits?.[0].final_payment).toBe(213.64);
+            
+            // Workers B and C get only their time shares
+            expect(splits?.[1].team_percentage_bonus).toBe(0);
+            expect(splits?.[1].final_payment).toBe(181.82);
+            expect(splits?.[2].team_percentage_bonus).toBe(0);
+            expect(splits?.[2].final_payment).toBe(136.36);
+
+            // Total includes team percentage bonus
+            expect(result.calculation.total_worker_payment).toBe(531.82);
+        });
+    });
+
+    describe("Scenario 12: Solo Worker with Team Percentage", () => {
+        it("should give zero team bonus when worker is alone", async () => {
+            // Given: Job with 1 worker who has team_percentage modifier
+            // When: Calculate worker payment
+            // Then: Worker receives full base payment, team bonus is $0
+
+            const mockResponse: CalculateWorkerPaymentsResponse = {
+                success: true,
+                calculation: {
+                    total_worker_payment: 500,
+                    job_calculations: [
+                        {
+                            job_id: "job-1",
+                            line_items: [],
+                            applied_rules: [],
+                            subtotal: 500,
+                            total_adjustments: 0,
+                            total_worker_payment: 500,
+                            worker_splits: [
+                                {
+                                    worker_id: "worker-1",
+                                    worker_name: "Solo Team Lead",
+                                    hours_worked: 8,
+                                    time_share: 500,
+                                    multiplier_adjustment: 0,
+                                    per_unit_bonus: 0,
+                                    flat_bonus: 0,
+                                    team_percentage_bonus: 0, // No other workers
+                                    final_payment: 500,
+                                    rate_card_id: "rate-card-1",
+                                    allocation_type: "single_worker",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            };
+
+            vi.mocked(supabase.functions.invoke).mockResolvedValue({
+                data: mockResponse,
+                error: null,
+            });
+
+            const result = await WorkerPaymentService.calculatePayments({
+                organization_id: "org-1",
+                job_ids: ["job-1"],
+            });
+
+            const split = result.calculation.job_calculations[0].worker_splits?.[0];
+            expect(split?.team_percentage_bonus).toBe(0);
+            expect(split?.final_payment).toBe(500);
         });
     });
 });

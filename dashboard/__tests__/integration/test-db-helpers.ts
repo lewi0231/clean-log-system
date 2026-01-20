@@ -78,9 +78,66 @@ export function wait(ms: number): Promise<void> {
 }
 
 /**
+ * Check if local Supabase is running and accessible
+ * Throws an error with helpful message if not available
+ */
+export async function checkSupabaseAvailability(): Promise<void> {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    if (!supabaseUrl) {
+        throw new Error(
+            "NEXT_PUBLIC_SUPABASE_URL is not set. Please ensure .env.development is configured.",
+        );
+    }
+
+    try {
+        // Try to fetch the Supabase health endpoint
+        const healthUrl = `${supabaseUrl}/rest/v1/`;
+        const response = await fetch(healthUrl, {
+            method: "GET",
+            headers: {
+                apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+            },
+        });
+
+        if (!response.ok && response.status !== 400) {
+            throw new Error(`Supabase returned status ${response.status}`);
+        }
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Check if it's a connection error
+        if (
+            errorMessage.includes("ECONNREFUSED") ||
+            errorMessage.includes("fetch failed") ||
+            errorMessage.includes("EPERM")
+        ) {
+            throw new Error(
+                `\n╔════════════════════════════════════════════════════════════════════╗
+║  LOCAL SUPABASE IS NOT RUNNING                                     ║
+╠════════════════════════════════════════════════════════════════════╣
+║  Integration tests require a local Supabase instance.              ║
+║                                                                    ║
+║  To start Supabase:                                                ║
+║    cd database && supabase start                                   ║
+║                                                                    ║
+║  To run unit tests only (no Supabase needed):                      ║
+║    pnpm test:unit                                                  ║
+╚════════════════════════════════════════════════════════════════════╝\n`,
+            );
+        }
+
+        throw new Error(`Failed to connect to Supabase: ${errorMessage}`);
+    }
+}
+
+/**
  * Setup test database with organization, location, and field configs
  */
 export async function setupTestDatabase(): Promise<TestDataIds> {
+    // First, verify Supabase is running
+    await checkSupabaseAvailability();
+
     const supabase = createTestSupabaseClient();
     const testId = `test_${Date.now()}_${
         Math.random().toString(36).substring(7)

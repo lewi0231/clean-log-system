@@ -522,9 +522,9 @@ Use colored banners to provide contextual information, warnings, or status messa
 ### Usage Guidelines
 
 - Use consistent icon + text layout with `flex items-start gap-3`
-- Always include dark mode variants for proper theming
 - Use `mt-0.5` on icons to align with text baseline
 - Keep banner messages concise and actionable
+- **Note:** Dark mode is not supported. See `docs/decisions/dark-mode-exclusion.md`
 
 ---
 
@@ -544,10 +544,10 @@ When displaying test or preview content that differs from production data, use c
   <div className="flex items-start gap-3">
     <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
     <div>
-      <p className="font-medium text-amber-900 dark:text-amber-100">
+      <p className="font-medium text-amber-900">
         Test Data - Auto Cleanup
       </p>
-      <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+      <p className="text-sm text-amber-700 mt-1">
         This test data will be automatically deleted when you close this dialog.
       </p>
     </div>

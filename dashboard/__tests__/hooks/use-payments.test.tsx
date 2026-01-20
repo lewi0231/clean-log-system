@@ -55,7 +55,7 @@ describe("usePayments", () => {
 
     vi.mocked(PaymentService.list).mockResolvedValue(mockPayments);
 
-    const { result } = renderHook(() => usePayments(), {
+    const { result } = renderHook(() => usePayments("invoice-1"), {
       wrapper: createWrapper(),
     });
 
@@ -67,7 +67,7 @@ describe("usePayments", () => {
     expect(result.current.error).toBeNull();
     expect(PaymentService.list).toHaveBeenCalledWith({
       organization_id: "org-1",
-      invoice_id: undefined,
+      invoice_id: "invoice-1",
     });
   });
 
@@ -101,7 +101,7 @@ describe("usePayments", () => {
         })
     );
 
-    const { result } = renderHook(() => usePayments(), {
+    const { result } = renderHook(() => usePayments("invoice-1"), {
       wrapper: createWrapper(),
     });
 
@@ -116,7 +116,7 @@ describe("usePayments", () => {
     const mockError = new Error("Failed to fetch payments");
     vi.mocked(PaymentService.list).mockRejectedValue(mockError);
 
-    const { result } = renderHook(() => usePayments(), {
+    const { result } = renderHook(() => usePayments("invoice-1"), {
       wrapper: createWrapper(),
     });
 
@@ -131,7 +131,7 @@ describe("usePayments", () => {
   it("should handle empty payments array", async () => {
     vi.mocked(PaymentService.list).mockResolvedValue([]);
 
-    const { result } = renderHook(() => usePayments(), {
+    const { result } = renderHook(() => usePayments("invoice-1"), {
       wrapper: createWrapper(),
     });
 
@@ -150,7 +150,7 @@ describe("usePayments", () => {
       error: null,
     });
 
-    const { result } = renderHook(() => usePayments(), {
+    const { result } = renderHook(() => usePayments("invoice-1"), {
       wrapper: createWrapper(),
     });
 
@@ -161,7 +161,7 @@ describe("usePayments", () => {
   it("should refetch payments", async () => {
     vi.mocked(PaymentService.list).mockResolvedValue([]);
 
-    const { result } = renderHook(() => usePayments(), {
+    const { result } = renderHook(() => usePayments("invoice-1"), {
       wrapper: createWrapper(),
     });
 
@@ -174,10 +174,16 @@ describe("usePayments", () => {
     expect(PaymentService.list).toHaveBeenCalledTimes(2);
   });
 
-  it("should handle null invoiceId", async () => {
-    vi.mocked(PaymentService.list).mockResolvedValue([]);
+  it("should calculate totalPaid and remainingBalance", async () => {
+    const mockPayments = [
+      createMockPayment({ id: "payment-1", amount: 500.0, status: "succeeded" }),
+      createMockPayment({ id: "payment-2", amount: 300.0, status: "succeeded" }),
+      createMockPayment({ id: "payment-3", amount: 200.0, status: "pending" }),
+    ];
 
-    const { result } = renderHook(() => usePayments(null), {
+    vi.mocked(PaymentService.list).mockResolvedValue(mockPayments);
+
+    const { result } = renderHook(() => usePayments("invoice-1", 1000), {
       wrapper: createWrapper(),
     });
 
@@ -185,9 +191,9 @@ describe("usePayments", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(PaymentService.list).toHaveBeenCalledWith({
-      organization_id: "org-1",
-      invoice_id: undefined,
-    });
+    // Only succeeded payments should be counted (500 + 300 = 800)
+    expect(result.current.totalPaid).toBe(800);
+    // Remaining balance = invoiceTotal - totalPaid = 1000 - 800 = 200
+    expect(result.current.remainingBalance).toBe(200);
   });
 });

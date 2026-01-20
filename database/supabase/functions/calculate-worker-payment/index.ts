@@ -44,6 +44,7 @@ interface WorkerPaymentSplit {
   multiplier_adjustment: number; // Additional from multiplier modifier
   per_unit_bonus: number; // Additive bonus (per unit)
   flat_bonus: number; // Additive bonus (flat)
+  team_percentage_bonus: number; // Additive bonus (percentage of team earnings)
   final_payment: number; // Total for this worker
   rate_card_id?: string;
   allocation_type: string;
@@ -143,7 +144,7 @@ type LocationContext = {
 type WorkerRateCard = {
   id: string;
   worker_id: string;
-  modifier_type: "per_unit" | "flat" | "multiplier";
+  modifier_type: "per_unit" | "flat" | "multiplier" | "team_percentage";
   modifier_value: number;
   currency: string;
   role_title: string | null;
@@ -477,7 +478,8 @@ serve(async (req) => {
             sum +
             split.per_unit_bonus +
             split.flat_bonus +
-            split.multiplier_adjustment,
+            split.multiplier_adjustment +
+            split.team_percentage_bonus,
           0,
         );
         calculation.total_worker_payment += totalBonuses;
@@ -1271,6 +1273,7 @@ function evaluateCondition(
  * 2. Multipliers: Applied to worker's time-share (increases their portion)
  * 3. Per-unit bonuses: Added ON TOP of time share (not deducted from pool)
  * 4. Flat bonuses: Added ON TOP of time share (not deducted from pool)
+ * 5. Team percentage bonuses: Percentage of other workers' time-shares (after multipliers)
  *
  * Bonuses are ADDITIVE - they increase total payout, not redistribute existing pool.
  * This honors the pricing rules (workers receive what's defined per unit).
@@ -1279,7 +1282,7 @@ function calculateWorkerSplits({
   baseWorkerPayment,
   workers,
   rateCardMap,
-  allocations,
+  allocations: _allocations, // Reserved for future custom allocation support
   submissionData,
   fieldConfigMap,
 }: {
@@ -1317,6 +1320,7 @@ function calculateWorkerSplits({
       multiplier_adjustment: 0,
       per_unit_bonus: 0,
       flat_bonus: 0,
+      team_percentage_bonus: 0,
       final_payment: 0,
       allocation_type: "time_based",
     };
@@ -1390,12 +1394,30 @@ function calculateWorkerSplits({
     }
   });
 
-  // Step 5: Calculate final payments (share + all bonuses)
+  // Step 5: Calculate ADDITIVE team percentage bonuses
+  // This is calculated as a percentage of OTHER workers' time-shares (after multipliers)
+  breakdowns.forEach((breakdown) => {
+    const rateCard = rateCardMap.get(breakdown.worker_id);
+    if (rateCard?.modifier_type === "team_percentage") {
+      // Sum of all other workers' time-shares (excluding this worker)
+      const teamEarnings = breakdowns
+        .filter((b) => b.worker_id !== breakdown.worker_id)
+        .reduce((sum, b) => sum + b.time_share, 0);
+
+      // modifier_value is a percentage (e.g., 10 for 10%)
+      breakdown.team_percentage_bonus =
+        Math.round(teamEarnings * (rateCard.modifier_value / 100) * 100) / 100;
+      breakdown.rate_card_id = rateCard.id;
+    }
+  });
+
+  // Step 6: Calculate final payments (share + all bonuses)
   breakdowns.forEach((breakdown) => {
     breakdown.final_payment = Math.round(
       (breakdown.time_share +
         breakdown.per_unit_bonus +
-        breakdown.flat_bonus) *
+        breakdown.flat_bonus +
+        breakdown.team_percentage_bonus) *
         100,
     ) / 100;
   });
