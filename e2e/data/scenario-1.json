@@ -1,0 +1,357 @@
+{
+  "scenario": {
+    "id": "scenario-1",
+    "name": "Car Yard Detailer",
+    "description": "Fixed locations, multiple employees, fortnightly wages, monthly invoicing"
+  },
+  "organization": {
+    "name": "Pro Detail Services",
+    "org_code": "PDS",
+    "industry": "automotive_detailing",
+    "use_predefined_locations": true,
+    "settings": {
+      "currency": "AUD",
+      "invoice_frequency": "monthly",
+      "worker_payment_cycle": "fortnightly",
+      "auto_send_invoices": false,
+      "require_invoice_review": true
+    }
+  },
+  "admin": {
+    "email": "admin@prodetail.test",
+    "password": "TestPassword123!",
+    "first_name": "Test",
+    "last_name": "Admin",
+    "role": "admin"
+  },
+  "locationHierarchy": {
+    "name": "Metro Auto Group",
+    "type": "company",
+    "metadata": {
+      "auto_generate_invoices": {
+        "enabled": true,
+        "period": "monthly",
+        "day_of_month": 1,
+        "time": "09:00",
+        "grouping": "location",
+        "require_review": true
+      }
+    }
+  },
+  "locations": [
+    {
+      "id": "city-motors",
+      "name": "City Motors",
+      "email": "billing@citymotors.test",
+      "address": "123 CBD Street, Sydney NSW 2000",
+      "contact_person": "John Smith",
+      "phone": "0291234567",
+      "hierarchy_parent": "metro-auto-group",
+      "pricing_modifier": {
+        "type": "percentage",
+        "value": 20,
+        "description": "CBD premium pricing"
+      }
+    },
+    {
+      "id": "suburban-auto",
+      "name": "Suburban Auto",
+      "email": "accounts@suburbanauto.test",
+      "address": "456 Main Road, Parramatta NSW 2150",
+      "contact_person": "Jane Doe",
+      "phone": "0298765432",
+      "hierarchy_parent": "metro-auto-group",
+      "pricing_modifier": null
+    },
+    {
+      "id": "budget-cars",
+      "name": "Budget Cars",
+      "email": "finance@budgetcars.test",
+      "address": "789 Industrial Ave, Blacktown NSW 2148",
+      "contact_person": "Bob Wilson",
+      "phone": "0296543210",
+      "hierarchy_parent": null,
+      "pricing_modifier": null
+    }
+  ],
+  "workers": [
+    {
+      "id": "worker-1",
+      "first_name": "Sarah",
+      "last_name": "Mitchell",
+      "email": "sarah.mitchell@prodetail.test",
+      "phone": "0412345001",
+      "role": "supervisor",
+      "has_rate_card": true
+    },
+    {
+      "id": "worker-2",
+      "first_name": "Michael",
+      "last_name": "Chen",
+      "email": "michael.chen@prodetail.test",
+      "phone": "0412345002",
+      "role": "worker",
+      "has_rate_card": false
+    },
+    {
+      "id": "worker-3",
+      "first_name": "Emma",
+      "last_name": "Johnson",
+      "email": "emma.johnson@prodetail.test",
+      "phone": "0412345003",
+      "role": "worker",
+      "has_rate_card": false
+    },
+    {
+      "id": "worker-4",
+      "first_name": "David",
+      "last_name": "Williams",
+      "email": "david.williams@prodetail.test",
+      "phone": "0412345004",
+      "role": "worker",
+      "has_rate_card": false
+    },
+    {
+      "id": "worker-5",
+      "first_name": "Lisa",
+      "last_name": "Brown",
+      "email": "lisa.brown@prodetail.test",
+      "phone": "0412345005",
+      "role": "worker",
+      "has_rate_card": false
+    },
+    {
+      "id": "worker-6",
+      "first_name": "James",
+      "last_name": "Taylor",
+      "email": "james.taylor@prodetail.test",
+      "phone": "0412345006",
+      "role": "worker",
+      "has_rate_card": false
+    }
+  ],
+  "fieldConfigs": [
+    {
+      "id": "soaps-by-make",
+      "name": "soaps_by_make",
+      "label": "Soaps by Car Make",
+      "field_type": "grouped_breakdown",
+      "description": "Number of cars soaped, grouped by make",
+      "required": false,
+      "order_position": 0,
+      "mutually_exclusive_group": "detailing_work",
+      "options": [
+        { "value": "toyota", "label": "Toyota" },
+        { "value": "honda", "label": "Honda" },
+        { "value": "ford", "label": "Ford" },
+        { "value": "bmw", "label": "BMW" },
+        { "value": "other", "label": "Other" }
+      ]
+    },
+    {
+      "id": "wipes-by-make",
+      "name": "wipes_by_make",
+      "label": "Wipes by Car Make",
+      "field_type": "grouped_breakdown",
+      "description": "Number of cars wiped, grouped by make",
+      "required": false,
+      "order_position": 1,
+      "mutually_exclusive_group": "detailing_work",
+      "options": [
+        { "value": "toyota", "label": "Toyota" },
+        { "value": "honda", "label": "Honda" },
+        { "value": "ford", "label": "Ford" },
+        { "value": "bmw", "label": "BMW" },
+        { "value": "other", "label": "Other" }
+      ]
+    },
+    {
+      "id": "tender",
+      "name": "tender",
+      "label": "Tender Amount",
+      "field_type": "number",
+      "description": "Cash tender amount handled",
+      "required": false,
+      "order_position": 2,
+      "mutually_exclusive_group": "tender_work",
+      "options": null,
+      "validation_rules": {
+        "min": 0,
+        "max": 10000
+      }
+    },
+    {
+      "id": "warehouse",
+      "name": "warehouse",
+      "label": "Warehouse Duties",
+      "field_type": "boolean",
+      "description": "Performed warehouse duties",
+      "required": false,
+      "order_position": 3,
+      "mutually_exclusive_group": "warehouse_work",
+      "options": null
+    }
+  ],
+  "pricingRules": [
+    {
+      "id": "soap-per-car",
+      "name": "Soap per car",
+      "scope": "field",
+      "pricing_type": "unit",
+      "field_config_name": "soaps_by_make",
+      "base_price": 5.0,
+      "currency": "AUD",
+      "priority": 0,
+      "active": true,
+      "description": "$5.00 per car soaped"
+    },
+    {
+      "id": "wipe-per-car",
+      "name": "Wipe per car",
+      "scope": "field",
+      "pricing_type": "unit",
+      "field_config_name": "wipes_by_make",
+      "base_price": 3.0,
+      "currency": "AUD",
+      "priority": 0,
+      "active": true,
+      "description": "$3.00 per car wiped"
+    },
+    {
+      "id": "tender-handling",
+      "name": "Tender handling",
+      "scope": "field",
+      "pricing_type": "fixed",
+      "field_config_name": "tender",
+      "base_price": 10.0,
+      "currency": "AUD",
+      "priority": 0,
+      "active": true,
+      "description": "$10.00 flat fee for handling tender"
+    },
+    {
+      "id": "warehouse-flat",
+      "name": "Warehouse flat fee",
+      "scope": "field",
+      "pricing_type": "fixed",
+      "field_config_name": "warehouse",
+      "base_price": 25.0,
+      "currency": "AUD",
+      "priority": 0,
+      "active": true,
+      "description": "$25.00 flat fee for warehouse duties"
+    },
+    {
+      "id": "city-motors-premium",
+      "name": "City Motors Premium",
+      "scope": "location",
+      "pricing_type": "percentage",
+      "location_name": "City Motors",
+      "percentage_rate": 0.2,
+      "currency": "AUD",
+      "priority": 10,
+      "active": true,
+      "description": "+20% premium for City Motors location"
+    }
+  ],
+  "rateCards": {
+    "supervisor": {
+      "worker_name": "Sarah Mitchell",
+      "cards": [
+        {
+          "id": "supervisor-soap-bonus",
+          "name": "Soap Bonus",
+          "rate_type": "unit",
+          "field_config_name": "soaps_by_make",
+          "base_amount": 0.5,
+          "currency": "AUD",
+          "description": "$0.50 bonus per car soaped"
+        },
+        {
+          "id": "supervisor-shift-percentage",
+          "name": "Shift Percentage",
+          "rate_type": "percentage",
+          "modifier_type": "team_percentage",
+          "percentage_rate": 0.02,
+          "description": "2% of total shift earnings"
+        }
+      ]
+    }
+  },
+  "testJobs": [
+    {
+      "id": "job-1",
+      "description": "Detailing job at City Motors with premium pricing",
+      "location_name": "City Motors",
+      "worker_name": "Michael Chen",
+      "submission_data": {
+        "soaps_by_make": {
+          "toyota": 3,
+          "honda": 2
+        }
+      },
+      "expected": {
+        "invoice_subtotal": 25.0,
+        "location_modifier": 5.0,
+        "invoice_total": 30.0,
+        "calculation": "5 cars × $5.00 = $25.00, +20% = $30.00"
+      }
+    },
+    {
+      "id": "job-2",
+      "description": "Supervisor job with rate card bonuses",
+      "location_name": "Suburban Auto",
+      "worker_name": "Sarah Mitchell",
+      "submission_data": {
+        "soaps_by_make": {
+          "ford": 4
+        },
+        "wipes_by_make": {
+          "bmw": 2
+        }
+      },
+      "expected": {
+        "invoice_subtotal": 26.0,
+        "invoice_total": 26.0,
+        "worker_payment_base": 26.0,
+        "worker_payment_soap_bonus": 2.0,
+        "worker_payment_percentage_bonus": 0.52,
+        "worker_payment_total": 28.52,
+        "calculation": "(4 × $5.00) + (2 × $3.00) = $26.00; Worker: $26.00 + (4 × $0.50) + (2% × $26.00) = $28.52"
+      }
+    },
+    {
+      "id": "job-3",
+      "description": "Tender handling job",
+      "location_name": "Budget Cars",
+      "worker_name": "Emma Johnson",
+      "submission_data": {
+        "tender": 500
+      },
+      "expected": {
+        "invoice_subtotal": 10.0,
+        "invoice_total": 10.0,
+        "calculation": "$10.00 flat fee for tender handling"
+      }
+    },
+    {
+      "id": "job-4",
+      "description": "Warehouse job at City Motors with premium",
+      "location_name": "City Motors",
+      "worker_name": "David Williams",
+      "submission_data": {
+        "warehouse": true
+      },
+      "expected": {
+        "invoice_subtotal": 25.0,
+        "location_modifier": 5.0,
+        "invoice_total": 30.0,
+        "calculation": "$25.00 warehouse fee × 1.2 (CBD premium) = $30.00"
+      }
+    }
+  ],
+  "testCredentials": {
+    "defaultPassword": "TestPassword123!",
+    "testEmailDomain": "prodetail.test"
+  }
+}
