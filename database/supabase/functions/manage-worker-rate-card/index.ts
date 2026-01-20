@@ -18,7 +18,7 @@ import {
   validateRequest,
 } from "../_utils/zod-schemas.ts";
 
-type ModifierType = "per_unit" | "flat" | "multiplier";
+type ModifierType = "per_unit" | "flat" | "multiplier" | "team_percentage";
 
 interface CreateRateCardRequest {
   action: "create";

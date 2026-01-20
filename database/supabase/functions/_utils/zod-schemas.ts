@@ -401,8 +401,17 @@ export const deleteTestDataSchema = z
 
 /**
  * Worker rate card modifier type schema
+ * - per_unit: Bonus per unit of output (e.g., $0.50/car)
+ * - flat: Fixed bonus per job (e.g., $20/job)
+ * - multiplier: Percentage boost to time-share (e.g., 1.2 = 20% more)
+ * - team_percentage: Percentage of other team members' earnings (e.g., 10% of team wages)
  */
-export const modifierTypeSchema = z.enum(["per_unit", "flat", "multiplier"]);
+export const modifierTypeSchema = z.enum([
+  "per_unit",
+  "flat",
+  "multiplier",
+  "team_percentage",
+]);
 
 /**
  * Schema for listing worker rate cards

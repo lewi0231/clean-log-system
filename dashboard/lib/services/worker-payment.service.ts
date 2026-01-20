@@ -30,6 +30,20 @@ export interface AppliedRule {
     snapshot_data: Record<string, unknown>;
 }
 
+export interface WorkerPaymentSplit {
+    worker_id: string;
+    worker_name: string;
+    hours_worked: number;
+    time_share: number;
+    multiplier_adjustment: number;
+    per_unit_bonus: number;
+    flat_bonus: number;
+    team_percentage_bonus: number;
+    final_payment: number;
+    rate_card_id?: string;
+    allocation_type: string;
+}
+
 export interface WorkerPaymentCalculation {
     job_id: string;
     line_items: WorkerPaymentLineItem[];
@@ -37,6 +51,7 @@ export interface WorkerPaymentCalculation {
     subtotal: number;
     total_adjustments: number;
     total_worker_payment: number;
+    worker_splits?: WorkerPaymentSplit[];
 }
 
 export interface CalculateWorkerPaymentsResponse {
