@@ -453,7 +453,17 @@ serve(async (req: Request) => {
           .single();
 
         if (fetchError || !existing) {
-          return errorResponse("Rate card not found", 404);
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Not Found",
+              status: 404,
+              detail: "Rate card not found or access denied",
+            },
+            404,
+            {},
+            correlationId,
+          );
         }
 
         const { error: deactivateError } = await supabase
