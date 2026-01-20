@@ -265,6 +265,28 @@ await waitFor(() => expect(result.current.loading).toBe(false));
 
 ---
 
+## Running Tests
+
+```bash
+# Unit tests (default - no external dependencies)
+pnpm test                    # Run unit tests
+pnpm test -- --watch         # Watch mode
+pnpm test:coverage           # With coverage report
+
+# Integration tests (requires local Supabase)
+cd database && supabase start  # Start Supabase first
+pnpm test:integration          # Run integration tests
+pnpm test:integration:with-webhook  # With Stripe webhook
+
+# E2E tests (Playwright)
+pnpm test:e2e               # Run E2E tests
+pnpm test:e2e:ui            # Interactive UI mode
+```
+
+**Note:** `pnpm test` excludes integration tests by default. Integration tests require a running local Supabase instance.
+
+---
+
 ## Coverage Targets
 
 | Metric | Target |
