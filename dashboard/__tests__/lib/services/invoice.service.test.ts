@@ -145,6 +145,7 @@ describe("InvoiceService", () => {
       const result = await InvoiceService.create({
         organization_id: "org-1",
         job_ids: ["job-1"],
+        due_date: "2024-02-01",
       });
 
       expect(result).toEqual(mockInvoice);
@@ -154,6 +155,7 @@ describe("InvoiceService", () => {
           body: {
             organization_id: "org-1",
             job_ids: ["job-1"],
+            due_date: "2024-02-01",
           },
         },
       );
@@ -170,12 +172,14 @@ describe("InvoiceService", () => {
         InvoiceService.create({
           organization_id: "org-1",
           job_ids: ["job-1"],
+          due_date: "2024-02-01",
         }),
       ).rejects.toBeInstanceOf(EdgeFunctionError);
       await expect(
         InvoiceService.create({
           organization_id: "org-1",
           job_ids: ["job-1"],
+          due_date: "2024-02-01",
         }),
       ).rejects.toThrow("Network error");
     });
