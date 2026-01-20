@@ -1,7 +1,16 @@
 # Clean Log System - Style Guide Quick Reference
 
 > Single-page summary of the most critical patterns and rules.  
-> For detailed explanations, see the phase-specific documents.
+> For detailed explanations, see the modular guide docs.
+
+## Guide Navigation
+
+| Section | What to Reference |
+|---------|-------------------|
+| [Universal](./universal/) | TypeScript, naming, imports, constants, errors, testing |
+| [Dashboard](./dashboard/) | Next.js components, hooks, services, styling, testing |
+| [Mobile App](./mobile-app/) | React Native components, hooks, NativeWind |
+| [Edge Functions](./edge-functions/) | Function structure, validation, auth, testing |
 
 ---
 
@@ -300,6 +309,32 @@ pnpm test:e2e:ui            # Interactive UI mode
 
 ---
 
+## Constants & Magic Values
+
+```typescript
+// ✅ Use const objects with derived types
+export const INVOICE_STATUS = {
+    DRAFT: "draft",
+    SENT: "sent",
+    PAID: "paid",
+} as const;
+
+export type InvoiceStatus = (typeof INVOICE_STATUS)[keyof typeof INVOICE_STATUS];
+
+// ✅ Use named constants, not magic values
+if (invoice.status === INVOICE_STATUS.PAID) { }  // Good
+if (invoice.status === "paid") { }                // Bad
+
+// ✅ Name numeric constants
+const MAX_RETRY_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 5000;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+```
+
+**Constants location:** `lib/constants/[domain]-constants.ts`
+
+---
+
 ## File Naming Summary
 
 | Type | Pattern | Example |
@@ -307,6 +342,7 @@ pnpm test:e2e:ui            # Interactive UI mode
 | Component | `kebab-case.tsx` | `worker-card.tsx` |
 | Hook | `use-kebab-case.ts` | `use-workers.ts` |
 | Service | `kebab-case.service.ts` | `workers.service.ts` |
+| Constants | `kebab-case-constants.ts` | `invoice-constants.ts` |
 | Test | `*.test.{ts,tsx}` | `workers.service.test.ts` |
 | Edge Function | `kebab-case/index.ts` | `create-worker/index.ts` |
 
@@ -454,6 +490,19 @@ supabase migration up
 -- ❌ NEVER delete a migration that's been applied
 -- ❌ NEVER use migration names that sort incorrectly (use YYYYMMDDHHMMSS)
 ```
+
+---
+
+---
+
+## Detailed Documentation
+
+For comprehensive documentation, see the modular guides:
+
+- **[Universal](./universal/)** - Code-agnostic patterns (TypeScript, naming, imports, constants, errors, testing principles)
+- **[Dashboard](./dashboard/)** - Next.js 16 patterns (components, hooks, services, Tailwind v4, testing)
+- **[Mobile App](./mobile-app/)** - React Native patterns (components, hooks, NativeWind/Tailwind v3)
+- **[Edge Functions](./edge-functions/)** - Supabase/Deno patterns (structure, Zod validation, auth, testing)
 
 ---
 
