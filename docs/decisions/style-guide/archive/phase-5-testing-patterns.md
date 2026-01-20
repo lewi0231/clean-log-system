@@ -1801,7 +1801,16 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: "./vitest.setup.ts",
-    pool: "forks",
+    // Use 'threads' pool instead of 'forks' to avoid EPERM errors on macOS
+    // when cleaning up child processes
+    pool: "threads",
+    // Exclude integration tests by default - they require local Supabase
+    // Run integration tests explicitly with: pnpm test:integration
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/__tests__/integration/**",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -1813,6 +1822,7 @@ export default defineConfig({
         "**/*.config.{ts,js,mjs}",
         "**/vitest.setup.ts",
         "**/middleware.ts",
+        "**/next-env.d.ts",
       ],
       thresholds: {
         lines: 80,
@@ -1829,6 +1839,15 @@ export default defineConfig({
   },
 });
 ```
+
+**Key Configuration Notes:**
+
+| Setting | Value | Reason |
+|---------|-------|--------|
+| `pool` | `"threads"` | Avoids EPERM errors on macOS when terminating test workers |
+| `exclude` | `**/__tests__/integration/**` | Integration tests excluded by default (require Supabase) |
+| `environment` | `"jsdom"` | Browser-like environment for React component testing |
+| `globals` | `true` | Enables global test functions (`describe`, `it`, `expect`) |
 
 **Mobile:**
 
@@ -1865,17 +1884,105 @@ export default defineConfig({
 
 ### 4.2 Test Scripts
 
+**Root Package (Monorepo):**
+
 ```json:package.json
 {
   "scripts": {
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage",
-    "test:ui": "vitest --ui",
-    "test:e2e": "playwright test",
+    "test": "pnpm -r test",           // Run all tests across packages
+    "test:e2e": "playwright test",     // E2E tests (dashboard)
     "test:e2e:ui": "playwright test --ui"
   }
 }
+```
+
+**Dashboard Package:**
+
+```json:dashboard/package.json
+{
+  "scripts": {
+    "test": "vitest",                                    // Unit tests only (excludes integration)
+    "test:unit": "vitest --exclude **/integration/**",   // Explicit unit tests
+    "test:integration": "vitest integration",            // Integration tests (requires Supabase)
+    "test:integration:run": "vitest run integration",    // Integration tests (single run)
+    "test:integration:with-webhook": "bash scripts/test-integration-with-webhook.sh",
+    "test:coverage": "vitest run --coverage"
+  }
+}
+```
+
+### 4.3 Running Tests
+
+**Unit Tests (Default - No External Dependencies):**
+
+```bash
+# Run unit tests (excludes integration tests by default)
+pnpm test
+
+# Run in watch mode
+pnpm test -- --watch
+
+# Run with coverage report
+pnpm test:coverage
+```
+
+**Integration Tests (Requires Local Supabase):**
+
+```bash
+# 1. Start local Supabase first
+cd database && supabase start
+
+# 2. Run integration tests
+cd dashboard && pnpm test:integration
+
+# 3. Run with Stripe webhook listener (for payment flow tests)
+pnpm test:integration:with-webhook
+```
+
+**E2E Tests (Playwright):**
+
+```bash
+# Run E2E tests
+pnpm test:e2e
+
+# Run with UI mode
+pnpm test:e2e:ui
+
+# Run in headed mode (see browser)
+pnpm test:e2e:headed
+```
+
+### 4.4 Test Environment Prerequisites
+
+**Integration tests require:**
+1. Local Supabase running (`cd database && supabase start`)
+2. Environment variables in `.env.development`:
+   - `NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<from supabase status>`
+   - `SUPABASE_SERVICE_ROLE_KEY=<from supabase status>`
+   - `STRIPE_SECRET_KEY=sk_test_...` (test mode key)
+   - `RESEND_API_KEY=<your key>`
+   - `RESEND_FROM_DOMAIN=<your domain>`
+
+**The test setup automatically:**
+- Checks if Supabase is available before running integration tests
+- Shows helpful error messages if prerequisites are missing
+- Loads `.env.development` variables for test environment
+
+**If Supabase is not running, you'll see:**
+
+```
+╔════════════════════════════════════════════════════════════════════╗
+║  LOCAL SUPABASE IS NOT RUNNING                                     ║
+╠════════════════════════════════════════════════════════════════════╣
+║  Integration tests require a local Supabase instance.              ║
+║                                                                    ║
+║  To start Supabase:                                                ║
+║    cd database && supabase start                                   ║
+║                                                                    ║
+║  To run unit tests only (no Supabase needed):                      ║
+║    pnpm test:unit                                                  ║
+╚════════════════════════════════════════════════════════════════════╝
 ```
 
 ---

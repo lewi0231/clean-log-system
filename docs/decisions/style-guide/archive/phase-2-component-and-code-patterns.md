@@ -2512,6 +2512,301 @@ Is the data needed for initial render?
 
 ---
 
+## 10. CONSTANTS AND CONFIGURATION VALUES
+
+### 10.1 Overview
+
+Constants management prevents "magic strings" and "magic numbers" from being scattered throughout the codebase. Centralizing these values improves:
+- **Maintainability:** Change values in one place
+- **Type Safety:** TypeScript infers literal types from `as const`
+- **Discoverability:** Developers can find all valid values in one location
+- **Refactoring:** IDE can track all usages when renaming
+
+**Current Structure:**
+
+```
+dashboard/lib/constants/
+├── invoice-constants.ts       # Invoice status, titles, sources
+├── invoice-template-defaults.ts  # Default config values
+└── rating-config.ts           # Rating presets and labels
+
+database/supabase/functions/_utils/
+└── invoice-template-defaults.ts  # Backend defaults (mirrored)
+```
+
+### 10.2 ✅ Best Practice: Const Objects with Type Derivation
+
+**What it is:** Use `as const` objects with derived TypeScript types.
+
+**Where it's implemented:**
+
+```typescript:dashboard/lib/constants/invoice-constants.ts
+// Status values as const object
+export const INVOICE_STATUS = {
+    DRAFT: "draft",
+    SENT: "sent",
+    PAID: "paid",
+    OVERDUE: "overdue",
+    CANCELLED: "cancelled",
+} as const;
+
+// Type derived from const object
+export type InvoiceStatus =
+    (typeof INVOICE_STATUS)[keyof typeof INVOICE_STATUS];
+
+// Usage: type is "draft" | "sent" | "paid" | "overdue" | "cancelled"
+function updateStatus(status: InvoiceStatus) {
+    // TypeScript ensures only valid values are passed
+}
+```
+
+**Why it works:**
+- **Autocomplete:** IDE suggests `INVOICE_STATUS.DRAFT`, `INVOICE_STATUS.SENT`, etc.
+- **Type Safety:** `InvoiceStatus` type only allows defined values
+- **Single Source of Truth:** Value AND type defined together
+- **No Duplication:** Type automatically updates when constants change
+
+### 10.3 ✅ Best Practice: Configuration Defaults with Factory Functions
+
+**What it is:** Combine default values with factory functions for creating config objects.
+
+**Where it's implemented:**
+
+```typescript:dashboard/lib/constants/invoice-template-defaults.ts
+// Individual defaults for flexibility
+export const DEFAULT_INVOICE_TITLE = "Tax Invoice" as const;
+
+export const DEFAULT_SERVICE_ADDRESS_CONFIG: ServiceAddressConfig = {
+    source: "auto",
+    location_fields: ["name", "address", "contact_person", "email", "phone"],
+    form_fields: [],
+} as const;
+
+// Factory function combines defaults with required values
+export function getDefaultInvoiceTemplateConfig(
+    organizationId: string,
+): Omit<InvoiceTemplateConfig, "id" | "created_at" | "updated_at"> {
+    return {
+        organization_id: organizationId,
+        invoice_title: DEFAULT_INVOICE_TITLE,
+        show_logo: true,
+        show_abn: true,
+        bill_to_fields: [],
+        service_address_config: DEFAULT_SERVICE_ADDRESS_CONFIG,
+        billing_address_config: DEFAULT_BILLING_ADDRESS_CONFIG,
+        email_recipient_config: DEFAULT_EMAIL_RECIPIENT_CONFIG,
+        line_item_display: DEFAULT_LINE_ITEM_DISPLAY,
+    };
+}
+```
+
+**Why it works:**
+- **Composable:** Individual defaults can be used separately or together
+- **Type Safe:** Factory function return type is explicit
+- **Testable:** Defaults are importable for test assertions
+- **DRY:** No repeated default values across codebase
+
+### 10.4 ✅ Best Practice: Lookup Maps for Labels and Descriptions
+
+**What it is:** Use typed Record objects for human-readable labels and descriptions.
+
+**Where it's implemented:**
+
+```typescript:dashboard/lib/constants/rating-config.ts
+// Labels for UI display
+export const RATING_DIMENSION_LABELS: Record<string, string> = {
+    overall: "Overall Satisfaction",
+    quality: "Service Quality",
+    communication: "Communication",
+    value: "Value for Money",
+    reliability: "Reliability",
+};
+
+// Descriptions for tooltips/help text
+export const RATING_DIMENSION_DESCRIPTIONS: Record<string, string> = {
+    overall: "Your overall satisfaction with the service",
+    quality: "How would you rate the quality of work performed?",
+    communication: "How well did we communicate throughout the service?",
+};
+
+// Helper functions for safe access with fallbacks
+export function getRatingDimensionLabel(dimension: string): string {
+    return RATING_DIMENSION_LABELS[dimension] || dimension;
+}
+
+export function getRatingDimensionDescription(dimension: string): string {
+    return RATING_DIMENSION_DESCRIPTIONS[dimension] || "";
+}
+```
+
+**Why it works:**
+- **Separation of Concerns:** Business logic separate from display text
+- **i18n Ready:** Easy to swap for translation functions later
+- **Safe Fallbacks:** Helper functions handle missing keys gracefully
+- **Centralized Copy:** All user-facing text in one place
+
+### 10.5 When to Use Constants Files
+
+| Scenario | Use Constants File? | Example |
+|----------|---------------------|---------|
+| Status values, types, categories | ✅ Yes | `INVOICE_STATUS.DRAFT` |
+| Default configuration values | ✅ Yes | `DEFAULT_CURRENCY` |
+| UI labels and descriptions | ✅ Yes | `RATING_DIMENSION_LABELS` |
+| Validation limits (max length, etc.) | ✅ Yes | `MAX_FILE_SIZE` |
+| API endpoint paths | ✅ Yes | `API_ENDPOINTS.WORKERS` |
+| Environment-specific values | ❌ No - use `.env` | Database URLs, API keys |
+| Component-specific magic values | ⚠️ Maybe | Consider if reused elsewhere |
+| One-off numeric values | ⚠️ Maybe | Use descriptive variable name at minimum |
+
+### 10.6 Rules for Constants Management
+
+#### RULE-CONST-001: No Magic Strings in Business Logic
+**Requirement:** String literals used for comparison or status checks MUST be defined as constants.
+
+```typescript
+// ❌ Bad: Magic string
+if (invoice.status === "paid") { }
+
+// ✅ Good: Named constant
+import { INVOICE_STATUS } from "@/lib/constants/invoice-constants";
+if (invoice.status === INVOICE_STATUS.PAID) { }
+```
+
+---
+
+#### RULE-CONST-002: No Magic Numbers
+**Requirement:** Numeric values with business meaning MUST be named constants.
+
+```typescript
+// ❌ Bad: Magic numbers
+if (retryCount > 3) { }
+const timeout = 5000;
+const maxSize = 10485760;
+
+// ✅ Good: Named constants with context
+const MAX_RETRY_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 5000;
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+if (retryCount > MAX_RETRY_ATTEMPTS) { }
+```
+
+---
+
+#### RULE-CONST-003: Use `as const` for Literal Types
+**Requirement:** Constant objects MUST use `as const` assertion for type inference.
+
+```typescript
+// ❌ Bad: Types inferred as string
+export const STATUS = {
+    ACTIVE: "active",    // type: string
+    INACTIVE: "inactive" // type: string
+};
+
+// ✅ Good: Types inferred as literals
+export const STATUS = {
+    ACTIVE: "active",    // type: "active"
+    INACTIVE: "inactive" // type: "inactive"
+} as const;
+```
+
+---
+
+#### RULE-CONST-004: Derive Types from Constants
+**Requirement:** Types representing constant values SHOULD be derived from the const object, not defined separately.
+
+```typescript
+// ❌ Bad: Type defined separately (can drift)
+export const STATUS = { ACTIVE: "active", INACTIVE: "inactive" } as const;
+export type Status = "active" | "inactive"; // Manual duplication
+
+// ✅ Good: Type derived from const
+export const STATUS = { ACTIVE: "active", INACTIVE: "inactive" } as const;
+export type Status = (typeof STATUS)[keyof typeof STATUS]; // Auto-derived
+```
+
+---
+
+#### RULE-CONST-005: Constants File Naming
+**Requirement:** Constants files MUST use kebab-case and end with `-constants.ts` or describe their domain.
+
+```
+✅ Correct:
+lib/constants/invoice-constants.ts
+lib/constants/payment-status.ts
+lib/constants/validation-limits.ts
+
+❌ Incorrect:
+lib/constants/CONSTANTS.ts
+lib/constants/invoiceConstants.ts
+lib/constants/misc.ts
+```
+
+---
+
+#### RULE-CONST-006: Co-locate Related Constants
+**Requirement:** Related constants SHOULD be in the same file for discoverability.
+
+```typescript
+// ✅ Good: Related constants together in invoice-constants.ts
+export const INVOICE_STATUS = { ... } as const;
+export type InvoiceStatus = ...;
+
+export const INVOICE_TITLE_OPTIONS = { ... } as const;
+export type InvoiceTitleOption = ...;
+
+export const DEFAULT_DUE_DAYS = 14;
+export const MAX_LINE_ITEMS = 100;
+```
+
+---
+
+#### RULE-CONST-007: Mirror Constants in Backend When Needed
+**Requirement:** Constants used in both frontend and backend MUST be kept in sync or shared via the `shared` package.
+
+```
+Current approach (mirrored files):
+dashboard/lib/constants/invoice-template-defaults.ts
+database/supabase/functions/_utils/invoice-template-defaults.ts
+
+Better approach (when possible):
+shared/constants/invoice-template-defaults.ts
+→ Import in both dashboard and edge functions
+```
+
+**Note:** Edge functions using Deno have import constraints. Evaluate if sharing via `shared` package is feasible or if mirroring is acceptable for your use case.
+
+---
+
+### 10.7 Directory Structure Recommendation
+
+```
+lib/constants/
+├── index.ts                    # Barrel export for all constants
+├── invoice-constants.ts        # Invoice-related constants
+├── payment-constants.ts        # Payment status, methods
+├── validation-limits.ts        # Max lengths, sizes, counts
+├── api-endpoints.ts            # API route constants (if needed)
+└── [domain]-constants.ts       # Other domain-specific constants
+```
+
+**Barrel export pattern:**
+
+```typescript:lib/constants/index.ts
+export * from "./invoice-constants";
+export * from "./payment-constants";
+export * from "./validation-limits";
+// etc.
+```
+
+**Usage:**
+
+```typescript
+import { INVOICE_STATUS, PAYMENT_STATUS, MAX_FILE_SIZE } from "@/lib/constants";
+```
+
+---
+
 ## Summary
 
 **Phase 2 analyzed:**
