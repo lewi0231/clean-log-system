@@ -32,7 +32,7 @@ ALTER TABLE worker_rate_card
 
 ALTER TABLE worker_rate_card 
   ADD CONSTRAINT worker_rate_card_modifier_type_check 
-  CHECK (modifier_type IN ('per_unit', 'flat', 'multiplier', 'team_percentage'));
+  CHECK (modifier_type IN ('per_unit', 'flat', 'multiplier'));
 
 -- Step 4: Drop rate_type column (no longer needed - was standard/overtime/holiday)
 ALTER TABLE worker_rate_card 
@@ -48,7 +48,7 @@ ALTER TABLE worker_rate_card
   ) WHERE (is_active = TRUE);
 
 -- Step 6: Update comments
-COMMENT ON COLUMN worker_rate_card.modifier_type IS 'Type of modifier: per_unit (bonus per output unit), flat (fixed per job), multiplier (percentage boost), team_percentage (percentage of team earnings)';
+COMMENT ON COLUMN worker_rate_card.modifier_type IS 'Type of modifier: per_unit (bonus per output unit), flat (fixed per job), multiplier (percentage boost)';
 COMMENT ON COLUMN worker_rate_card.modifier_value IS 'The value of the modifier (amount for per_unit/flat, multiplier for multiplier type)';
 
 -- Step 7: Update index (remove rate_type reference)
