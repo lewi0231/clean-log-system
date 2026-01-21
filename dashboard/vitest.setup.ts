@@ -35,6 +35,13 @@ try {
     );
 }
 
+// Mock ResizeObserver (used by Radix UI components)
+global.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+} as unknown as typeof ResizeObserver;
+
 // Mock Supabase before any imports
 vi.mock("@/lib/supabase", () => ({
     supabase: {
