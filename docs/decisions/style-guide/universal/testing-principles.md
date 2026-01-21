@@ -232,6 +232,44 @@ describe("method", () => {
 });
 ```
 
+### Test Coverage Documentation
+
+When creating test coverage reports or analysis documents:
+
+**Location:**
+- Place coverage documents in the relevant test directory or documentation folder
+- For component/feature-specific coverage: `__tests__/components/[feature]/[FEATURE]_TEST_COVERAGE_YYYY-MM-DD.md`
+- For broader coverage analysis: `docs/[area]_test_coverage_YYYY-MM-DD.md`
+
+**Naming Convention:**
+- Include date in `YYYY-MM-DD` format in the filename
+- Use descriptive name indicating scope (feature, area, or component)
+- Format: `[SCOPE]_TEST_COVERAGE_YYYY-MM-DD.md` or `[SCOPE]_TEST_ANALYSIS_YYYY-MM-DD.md`
+
+**Examples:**
+```
+✅ Correct:
+dashboard/__tests__/components/locations/LOCATIONS_TEST_COVERAGE_2025-01-15.md
+docs/payment_test_coverage_2025-01-15.md
+dashboard/__tests__/hooks/HOOKS_TEST_ANALYSIS_2025-01-15.md
+
+❌ Incorrect:
+TEST_COVERAGE.md                    # No date, hard to identify outdated
+LOCATIONS_TEST_COVERAGE.md          # No date
+test-coverage-report.md             # No date, unclear scope
+```
+
+**Purpose:**
+- Document current test coverage status
+- Identify gaps and missing edge cases
+- Track test implementation progress
+- Provide actionable recommendations
+
+**Maintenance:**
+- Remove outdated coverage documents after addressing gaps
+- Update or replace when creating new coverage analysis
+- Date in filename makes it easy to identify and remove stale reports
+
 ---
 
 ## Test Descriptions
