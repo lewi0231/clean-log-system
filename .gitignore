@@ -1,3 +1,13 @@
 node_modules
 .pnpm-store/
 .pnpm-debug.log
+
+# E2E test artifacts
+e2e/.env.local
+e2e/.auth/
+e2e/.seeded-data.json
+playwright-report/
+test-results/
+
+# Track example env file (override global gitignore)
+!e2e/.env.example

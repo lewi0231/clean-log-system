@@ -1,4 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
+import * as path from "path";
+
+/**
+ * Load e2e environment variables from e2e/.env.local
+ * Falls back to defaults if file doesn't exist
+ */
+require("dotenv").config({ path: path.resolve(__dirname, "e2e/.env.local") });
 
 /**
  * E2E Testing Configuration
@@ -44,7 +51,7 @@ export default defineConfig({
 
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
+    baseURL: process.env.E2E_BASE_URL || "http://localhost:3001",
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -119,7 +126,7 @@ export default defineConfig({
   // Run your local dev server before starting the tests
   webServer: {
     command: "pnpm dev:dashboard",
-    url: "http://localhost:3000",
+    url: "http://localhost:3001",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

@@ -244,7 +244,7 @@
     {
       "id": "city-motors-premium",
       "name": "City Motors Premium",
-      "scope": "location",
+      "scope": "global",
       "pricing_type": "percentage",
       "location_name": "City Motors",
       "percentage_rate": 0.2,

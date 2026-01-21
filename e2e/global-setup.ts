@@ -55,10 +55,15 @@ async function globalSetup(config: FullConfig): Promise<void> {
   const page = await context.newPage();
 
   try {
-    const baseURL = config.projects[0]?.use?.baseURL || "http://localhost:3000";
+    // Get baseURL from config - check multiple sources
+    const baseURL = process.env.E2E_BASE_URL ||
+      config.projects[0]?.use?.baseURL ||
+      "http://localhost:3001";
 
-    // Navigate to sign-in page
-    await page.goto(`${baseURL}/sign-in`);
+    console.log(`  Using baseURL: ${baseURL}`);
+
+    // Navigate to login page
+    await page.goto(`${baseURL}/login`);
     await page.waitForLoadState("networkidle");
 
     // Fill in login form
