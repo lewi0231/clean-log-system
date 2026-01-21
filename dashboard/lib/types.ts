@@ -37,11 +37,20 @@ export interface Worker {
   created_at: string;
 }
 
+export type OrganizationUserStatus = "pending" | "active" | "inactive";
+
 export interface OrganizationUser {
   id: string;
   organization_id: string;
   email: string;
   role: "admin" | "viewer";
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  status: OrganizationUserStatus;
+  auth_user_id: string | null;
+  invited_at: string;
+  activated_at: string | null;
   created_at: string;
 }
 

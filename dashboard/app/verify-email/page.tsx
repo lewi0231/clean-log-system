@@ -41,6 +41,8 @@ function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const email = searchParams.get("email") || "";
+  const inviteType = searchParams.get("type") || ""; // 'admin_invite' for dashboard users
+  const isAdminInvite = inviteType === "admin_invite";
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
@@ -235,9 +237,45 @@ function VerifyEmailContent() {
           setIsVerified(true);
           setIsChecking(false);
 
-          // Redirect to onboarding after showing success message
+          // For admin invites, call the accept-admin-invitation endpoint
+          // to update the organization_user record
+          if (isAdminInvite && user.email) {
+            try {
+              log.debug("VerifyEmail: Accepting admin invitation", {
+                email: user.email,
+                userId: user.id,
+              });
+              
+              const { error: acceptError } = await supabase.functions.invoke(
+                "accept-admin-invitation",
+                {
+                  body: {
+                    email: user.email,
+                    auth_user_id: user.id,
+                  },
+                }
+              );
+
+              if (acceptError) {
+                log.warn("VerifyEmail: Failed to accept admin invitation", {
+                  error: acceptError.message,
+                });
+                // Don't block - user is verified, they can still use the system
+              } else {
+                log.info("VerifyEmail: Admin invitation accepted successfully");
+              }
+            } catch (err) {
+              log.warn("VerifyEmail: Error accepting admin invitation", {
+                error: err instanceof Error ? err.message : "Unknown error",
+              });
+            }
+          }
+
+          // Redirect based on user type
+          // Admin invites go to dashboard, new signups go to onboarding
+          const redirectPath = isAdminInvite ? "/dashboard" : "/onboarding";
           setTimeout(() => {
-            router.push("/onboarding");
+            router.push(redirectPath);
           }, 3000); // Give user time to see the success message
         } else {
           setIsVerified(false);
@@ -336,6 +374,9 @@ function VerifyEmailContent() {
   }
 
   if (isVerified) {
+    const redirectPath = isAdminInvite ? "/dashboard" : "/onboarding";
+    const redirectLabel = isAdminInvite ? "Dashboard" : "Onboarding";
+    
     return (
       <div className="h-screen w-full flex justify-center items-center px-4">
         <Card className="w-full max-w-md">
@@ -344,20 +385,21 @@ function VerifyEmailContent() {
               <CheckCircle2 className="h-16 w-16 text-green-500" />
             </div>
             <CardTitle className="text-center">
-              Email Verified Successfully!
+              {isAdminInvite ? "Account Activated!" : "Email Verified Successfully!"}
             </CardTitle>
             <CardDescription className="text-center">
-              Your email address has been confirmed. You&apos;re all set to get
-              started!
+              {isAdminInvite 
+                ? "Your account has been set up. You can now access the dashboard."
+                : "Your email address has been confirmed. You're all set to get started!"}
               <br />
               <span className="text-sm text-muted-foreground mt-2 block">
-                Redirecting you to onboarding...
+                Redirecting you to {redirectLabel.toLowerCase()}...
               </span>
             </CardDescription>
           </CardHeader>
           <CardFooter className="flex justify-center">
             <Button asChild>
-              <Link href="/onboarding">Continue to Onboarding</Link>
+              <Link href={redirectPath}>Continue to {redirectLabel}</Link>
             </Button>
           </CardFooter>
         </Card>
@@ -372,13 +414,27 @@ function VerifyEmailContent() {
           <div className="flex items-center justify-center mb-4">
             <Mail className="h-16 w-16 text-primary" />
           </div>
-          <CardTitle>Verify Your Email</CardTitle>
+          <CardTitle>
+            {isAdminInvite ? "Accept Your Invitation" : "Verify Your Email"}
+          </CardTitle>
           <CardDescription>
-            We&apos;ve sent a verification email to{" "}
-            <span className="font-semibold">
-              {email || "your email address"}
-            </span>
-            . Please check your inbox and click the verification link.
+            {isAdminInvite ? (
+              <>
+                We&apos;ve sent an invitation email to{" "}
+                <span className="font-semibold">
+                  {email || "your email address"}
+                </span>
+                . Please check your inbox and click the link to set up your account.
+              </>
+            ) : (
+              <>
+                We&apos;ve sent a verification email to{" "}
+                <span className="font-semibold">
+                  {email || "your email address"}
+                </span>
+                . Please check your inbox and click the verification link.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

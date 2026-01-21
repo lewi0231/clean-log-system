@@ -12,6 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { shouldSkipEmailVerification } from "@/lib/env";
 import { log } from "@/lib/logger";
 import { Worker } from "@/lib/types";
 import { workerSchema } from "@/lib/validations";
@@ -271,16 +272,21 @@ export default function WorkerForm({
                 <div className="space-y-0.5">
                   <Label htmlFor="active">Active Status</Label>
                   <p className="text-sm text-muted-foreground">
-                    {worker?.auth_user_id
+                    {worker?.auth_user_id || shouldSkipEmailVerification()
                       ? "Toggle whether this worker is authorized to access the system"
                       : "Worker must accept invitation before they can be activated"}
                   </p>
+                  {shouldSkipEmailVerification() && !worker?.auth_user_id && (
+                    <p className="text-xs text-amber-600">
+                      ⚠️ Dev mode: Email verification bypassed
+                    </p>
+                  )}
                 </div>
                 <Switch
                   id="active"
                   checked={active}
                   onCheckedChange={setActive}
-                  disabled={!worker?.auth_user_id}
+                  disabled={!worker?.auth_user_id && !shouldSkipEmailVerification()}
                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                 />
               </div>

@@ -47,12 +47,15 @@ serve(async (req: Request) => {
     }
 
     // Strategy 1: Check if user is an admin (in organization_user table)
+    // Note: If a user is both admin and worker (dual-role), admin takes precedence
+    // because dashboard permissions are checked here. Mobile app checks worker separately.
     if (userEmail && organizationId) {
       const { data: orgUser, error: orgUserError } = await supabase
         .from("organization_user")
-        .select("role")
+        .select("role, status")
         .eq("email", userEmail)
         .eq("organization_id", organizationId)
+        .eq("status", "active") // Only check active users
         .maybeSingle();
 
       if (!orgUserError && orgUser) {

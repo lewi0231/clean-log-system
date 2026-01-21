@@ -35,6 +35,8 @@ export default function UsersPage() {
     createOrganizationUser,
     updateOrganizationUser,
     deleteOrganizationUser,
+    resendInvitation: resendOrgUserInvitation,
+    convertToWorker,
   } = useOrganizationUsers();
   const {
     workers,
@@ -91,30 +93,95 @@ export default function UsersPage() {
   };
 
   const handleAddOrgUser = async (userData: {
-    email: string;
+    email?: string;
     role: "admin" | "viewer";
+    first_name?: string;
+    last_name?: string;
+    phone?: string | null;
   }) => {
     if (!organizationId) return;
-    await createOrganizationUser({
-      organization_id: organizationId,
-      ...userData,
-    });
+    if (!userData.email || !userData.first_name || !userData.last_name) {
+      toast.error("Email, first name, and last name are required");
+      return;
+    }
+    try {
+      await createOrganizationUser({
+        organization_id: organizationId,
+        email: userData.email,
+        role: userData.role,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        phone: userData.phone || undefined,
+      });
+      toast.success(
+        `Invitation sent to ${userData.email}`
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create user"
+      );
+    }
   };
 
   const handleUpdateOrgUser = async (
     userId: string,
     userData: {
       role: "admin" | "viewer";
+      first_name?: string;
+      last_name?: string;
+      phone?: string | null;
     }
   ) => {
-    await updateOrganizationUser({
-      id: userId,
-      ...userData,
-    });
+    try {
+      await updateOrganizationUser({
+        id: userId,
+        ...userData,
+      });
+      toast.success("User updated successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update user"
+      );
+    }
   };
 
   const handleDeleteOrgUser = async (userId: string) => {
-    await deleteOrganizationUser({ id: userId });
+    try {
+      await deleteOrganizationUser({ id: userId });
+      toast.success("User deleted");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete user"
+      );
+    }
+  };
+
+  const handleResendOrgUserInvitation = async (userId: string) => {
+    if (!organizationId) return;
+    try {
+      await resendOrgUserInvitation(userId, organizationId);
+      toast.success("Invitation resent");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resend invitation"
+      );
+    }
+  };
+
+  const handleConvertToWorker = async (userId: string) => {
+    if (!organizationId) return;
+    try {
+      const result = await convertToWorker(userId, organizationId);
+      if (result.alreadyWorker) {
+        toast.info("User is already a worker");
+      } else {
+        toast.success("User can now use the mobile app with their existing credentials");
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to convert user to worker"
+      );
+    }
   };
 
   if (orgLoading) {
@@ -179,6 +246,8 @@ export default function UsersPage() {
             error={orgUsersError}
             onDeleteUser={handleDeleteOrgUser}
             onUpdateUser={handleUpdateOrgUser}
+            onResendInvitation={handleResendOrgUserInvitation}
+            onConvertToWorker={handleConvertToWorker}
           />
         </TabsContent>
 

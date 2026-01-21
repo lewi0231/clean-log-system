@@ -52,15 +52,27 @@ export interface CreateOrganizationUserRequest {
   organization_id: string;
   email: string;
   role: "admin" | "viewer";
+  first_name: string;
+  last_name: string;
+  phone?: string;
 }
 
 export interface UpdateOrganizationUserRequest {
   id: string;
   role?: "admin" | "viewer";
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  status?: "active" | "inactive";
 }
 
 export interface DeleteOrganizationUserRequest {
   id: string;
+}
+
+export interface ResendAdminInvitationRequest {
+  organization_user_id: string;
+  organization_id: string;
 }
 
 // Locations API
