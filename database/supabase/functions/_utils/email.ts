@@ -1894,3 +1894,192 @@ export async function sendInvoiceReminderEmail(
     return { success: false, error: errorMessage };
   }
 }
+
+/**
+ * Admin invitation email data
+ */
+export interface AdminInvitationEmailData {
+  email: string;
+  firstName: string;
+  lastName: string;
+  organizationName: string;
+  invitationLink: string;
+  role: "admin" | "viewer";
+}
+
+/**
+ * Send admin user invitation email via Resend API
+ * This is for inviting dashboard users (admins/viewers), not workers
+ */
+export async function sendAdminInvitationEmail(
+  data: AdminInvitationEmailData,
+  throwOnError = false,
+): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  // Validate configuration
+  const configResult = validateEmailConfig();
+  if (!configResult.valid || !configResult.config) {
+    const error = configResult.error || "Email configuration is invalid";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Validate email data
+  if (!data.email || !data.invitationLink || !data.organizationName) {
+    const error = "Email, invitation link, and organization name are required";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  // Check if test mode is enabled
+  const testMode = isTestMode();
+
+  // Determine recipient based on test mode
+  const testRecipient = testMode
+    ? getTestModeRecipient("invitation", data.email, data.email)
+    : data.email;
+
+  const roleName = data.role === "admin" ? "Administrator" : "Viewer";
+  const emailSubject = testMode
+    ? `[TEST] You've been invited to join ${data.organizationName}`
+    : `You've been invited to join ${data.organizationName}`;
+
+  // Log test mode redirection if enabled
+  if (testMode) {
+    console.log(
+      "[TEST MODE] Admin invitation email redirected to test address",
+      {
+        testRecipient,
+        originalRecipient: data.email,
+      },
+    );
+  }
+
+  const userName = data.firstName
+    ? `${data.firstName}${data.lastName ? ` ${data.lastName}` : ""}`
+    : "there";
+
+  const html = `
+    <html>
+      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2563eb;">You're Invited to Join ${data.organizationName}</h2>
+          <p>Hi ${userName},</p>
+          <p>You've been invited to join <strong>${data.organizationName}</strong> as a <strong>${roleName}</strong> on the Clean Log dashboard.</p>
+          <p>${
+    data.role === "admin"
+      ? "As an Administrator, you'll be able to manage workers, jobs, invoices, and organization settings."
+      : "As a Viewer, you'll be able to view workers, jobs, invoices, and reports."
+  }</p>
+          <p>Click the button below to set up your account:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${data.invitationLink}" 
+               style="background-color: #2563eb; color: white; padding: 12px 24px; 
+                      text-decoration: none; border-radius: 5px; display: inline-block;">
+              Accept Invitation
+            </a>
+          </div>
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #666;">${data.invitationLink}</p>
+          <p style="color: #666; font-size: 12px; margin-top: 30px;">
+            This invitation link will expire in 7 days. If you didn't expect this invitation, you can safely ignore this email.
+          </p>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const requestBody: {
+    from: string;
+    to: string[];
+    subject: string;
+    html: string;
+    tags?: Array<{ name: string; value: string }>;
+  } = {
+    from: `${data.organizationName} <invitations@${configResult.config.resendFromDomain}>`,
+    to: [testRecipient],
+    subject: emailSubject,
+    html,
+  };
+
+  // Add test mode tags if in test mode
+  if (testMode) {
+    requestBody.tags = getTestModeTags("invitation", data.email, data.email);
+  }
+
+  try {
+    console.log("Sending admin invitation email to:", data.email);
+
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${configResult.config.apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      let errorBody: unknown;
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        errorBody = { message: errorText };
+      }
+
+      console.error("Resend API error:", {
+        status: res.status,
+        statusText: res.statusText,
+        error: errorBody,
+      });
+
+      const errorMessage = (errorBody &&
+        typeof errorBody === "object" &&
+        "message" in errorBody &&
+        typeof errorBody.message === "string" &&
+        errorBody.message) ||
+        res.statusText ||
+        "Unknown error";
+
+      const error = `Failed to send admin invitation email: ${errorMessage}`;
+      if (throwOnError) {
+        throw new Error(error);
+      }
+      return { success: false, error };
+    }
+
+    const emailResponse = await res.json();
+    const emailId = emailResponse.id;
+
+    if (emailId) {
+      if (testMode) {
+        console.log("[TEST MODE] Admin invitation email sent successfully:", {
+          emailType: "admin_invitation",
+          testRecipient,
+          originalRecipient: data.email,
+          emailId,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.log("Admin invitation email sent successfully:", emailId);
+      }
+      return { success: true, emailId };
+    } else {
+      console.warn("Resend response missing ID:", emailResponse);
+      return { success: true };
+    }
+  } catch (error) {
+    console.error("Failed to send admin invitation email:", error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "Failed to send admin invitation email";
+    if (throwOnError) {
+      throw error;
+    }
+    return { success: false, error: errorMessage };
+  }
+}

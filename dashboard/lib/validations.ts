@@ -209,6 +209,44 @@ export const signUpSchema = z.object({
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type SignUpFormData = z.infer<typeof signUpSchema>;
 
+// Phone validation - accepts common formats and normalizes to E.164
+export const phoneSchema = z
+  .string()
+  .optional()
+  .nullable()
+  .transform((val) => val || null)
+  .refine(
+    (val) => {
+      if (!val || val.trim() === "") return true; // Phone is optional
+      // Remove all non-digit characters except +
+      const cleaned = val.replace(/[^\d+]/g, "");
+      // Check for valid patterns (US/Canada/Australia focused)
+      const patterns = [
+        /^\+1\d{10}$/, // +15551234567
+        /^1\d{10}$/, // 15551234567
+        /^\d{10}$/, // 5551234567
+        /^\+61\d{9}$/, // Australian mobile +61412345678
+        /^\+\d{8,15}$/, // Generic international format
+      ];
+      return patterns.some((pattern) => pattern.test(cleaned));
+    },
+    {
+      message:
+        "Invalid phone number format. Use formats like +1 555 123 4567 or (555) 123-4567",
+    }
+  );
+
+// Organization User schema for form validation
+export const organizationUserSchema = z.object({
+  first_name: z.string().min(1, "First name is required"),
+  last_name: z.string().min(1, "Last name is required"),
+  email: z.string().email("Invalid email format"),
+  role: z.enum(["admin", "viewer"]),
+  phone: phoneSchema,
+});
+
+export type OrganizationUserFormData = z.infer<typeof organizationUserSchema>;
+
 /**
  * Convert Zod validation errors to a field errors object
  */

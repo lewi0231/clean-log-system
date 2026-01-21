@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { log } from "@/lib/logger";
 import { OrganizationUser } from "@/lib/types";
+import { organizationUserSchema } from "@/lib/validations";
 import { useEffect, useState } from "react";
 
 interface OrganizationUserFormProps {
@@ -29,6 +30,9 @@ interface OrganizationUserFormProps {
     userData: {
       email?: string;
       role: "admin" | "viewer";
+      first_name?: string;
+      last_name?: string;
+      phone?: string | null;
     },
     userId?: string
   ) => void | Promise<void>;
@@ -41,11 +45,17 @@ export default function OrganizationUserForm({
   onSuccess,
   user,
 }: OrganizationUserFormProps) {
+  const [firstName, setFirstName] = useState(user?.first_name || "");
+  const [lastName, setLastName] = useState(user?.last_name || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [phone, setPhone] = useState(user?.phone || "");
   const [role, setRole] = useState<"admin" | "viewer">(user?.role || "viewer");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
+    first_name?: string;
+    last_name?: string;
     email?: string;
+    phone?: string;
     role?: string;
   }>({});
 
@@ -54,20 +64,32 @@ export default function OrganizationUserForm({
   const validateInput = () => {
     log.debug("OrganizationUserForm: Validating form input");
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!isEditMode && (!email || !emailRegex.test(email))) {
-      setErrors({ email: "Please enter a valid email address" });
-      throw new Error("Validation failed");
-    }
+    const result = organizationUserSchema.safeParse({
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone: phone || null,
+      role,
+    });
 
-    if (!role || (role !== "admin" && role !== "viewer")) {
-      setErrors({ role: "Please select a valid role" });
+    if (!result.success) {
+      const fieldErrors: typeof errors = {};
+      result.error.issues.forEach((issue) => {
+        const path = issue.path[0] as keyof typeof errors;
+        if (path) {
+          fieldErrors[path] = issue.message;
+        }
+      });
+      log.warn("OrganizationUserForm: Form validation failed", {
+        errors: fieldErrors,
+      });
+      setErrors(fieldErrors);
       throw new Error("Validation failed");
     }
 
     log.debug("OrganizationUserForm: Form validation passed");
     setErrors({});
-    return { email: email.trim(), role };
+    return result.data;
   };
 
   const handleSubmit = async () => {
@@ -88,15 +110,29 @@ export default function OrganizationUserForm({
 
       // Reset form
       if (!isEditMode) {
+        setFirstName("");
+        setLastName("");
         setEmail("");
+        setPhone("");
       }
       setRole("viewer");
       setErrors({});
       onOpenChange(false);
 
       const dataToSend = isEditMode
-        ? { role: validatedData.role }
-        : { email: validatedData.email, role: validatedData.role };
+        ? {
+            role: validatedData.role,
+            first_name: validatedData.first_name,
+            last_name: validatedData.last_name,
+            phone: validatedData.phone,
+          }
+        : {
+            email: validatedData.email,
+            role: validatedData.role,
+            first_name: validatedData.first_name,
+            last_name: validatedData.last_name,
+            phone: validatedData.phone,
+          };
 
       await onSuccess(dataToSend, user?.id);
     } catch (error) {
@@ -117,7 +153,10 @@ export default function OrganizationUserForm({
   // Reset form when dialog opens/closes or user changes
   useEffect(() => {
     if (open) {
+      setFirstName(user?.first_name || "");
+      setLastName(user?.last_name || "");
       setEmail(user?.email || "");
+      setPhone(user?.phone || "");
       setRole(user?.role || "viewer");
       setErrors({});
     }
@@ -128,15 +167,59 @@ export default function OrganizationUserForm({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {isEditMode ? "Edit Dashboard User" : "Add Dashboard User"}
+            {isEditMode ? "Edit Dashboard User" : "Invite Dashboard User"}
           </DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? "Update user role. Email cannot be changed."
-              : "Add a new dashboard user to your organization. They will need to set up their password."}
+              ? "Update user information. Email cannot be changed."
+              : "Invite a new dashboard user to your organization. They will receive an email to set up their account."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="first_name">First Name</Label>
+              <Input
+                id="first_name"
+                name="first_name"
+                type="text"
+                value={firstName}
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  if (errors.first_name) {
+                    setErrors((prev) => ({ ...prev, first_name: undefined }));
+                  }
+                }}
+                placeholder="John"
+                aria-invalid={!!errors.first_name}
+                required
+              />
+              {errors.first_name && (
+                <p className="text-sm text-destructive">{errors.first_name}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="last_name">Last Name</Label>
+              <Input
+                id="last_name"
+                name="last_name"
+                type="text"
+                value={lastName}
+                onChange={(e) => {
+                  setLastName(e.target.value);
+                  if (errors.last_name) {
+                    setErrors((prev) => ({ ...prev, last_name: undefined }));
+                  }
+                }}
+                placeholder="Doe"
+                aria-invalid={!!errors.last_name}
+                required
+              />
+              {errors.last_name && (
+                <p className="text-sm text-destructive">{errors.last_name}</p>
+              )}
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -163,6 +246,29 @@ export default function OrganizationUserForm({
               <p className="text-xs text-muted-foreground">
                 Email cannot be changed after user creation
               </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">
+              Phone Number{" "}
+              <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="phone"
+              name="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                if (errors.phone) {
+                  setErrors((prev) => ({ ...prev, phone: undefined }));
+                }
+              }}
+              placeholder="+1 555 123 4567"
+              aria-invalid={!!errors.phone}
+            />
+            {errors.phone && (
+              <p className="text-sm text-destructive">{errors.phone}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -206,7 +312,11 @@ export default function OrganizationUserForm({
             onClick={handleSubmit}
             disabled={isLoading}
           >
-            {isLoading ? "Saving..." : isEditMode ? "Update" : "Create"}
+            {isLoading
+              ? "Saving..."
+              : isEditMode
+                ? "Update"
+                : "Send Invitation"}
           </Button>
         </DialogFooter>
       </DialogContent>

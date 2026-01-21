@@ -6,6 +6,7 @@ import type {
   DeleteOrganizationUserRequest,
   ListOrganizationUsersRequest,
   ListOrganizationUsersResponse,
+  ResendAdminInvitationRequest,
   UpdateOrganizationUserRequest,
 } from "@/lib/types/api";
 
@@ -170,6 +171,103 @@ export class OrganizationUsersService {
     } catch (err) {
       log.error(
         "OrganizationUsersService: Failed to delete organization user",
+        {
+          error: err instanceof Error ? err.message : "Unknown error",
+        }
+      );
+      throw err;
+    }
+  }
+
+  /**
+   * Resend invitation email for a pending organization user
+   */
+  static async resendInvitation(
+    request: ResendAdminInvitationRequest
+  ): Promise<void> {
+    try {
+      log.debug("OrganizationUsersService: Resending invitation", {
+        userId: request.organization_user_id,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "resend-admin-invitation",
+        {
+          body: request,
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to resend invitation");
+      }
+
+      log.info(
+        "OrganizationUsersService: Invitation resent successfully",
+        {
+          userId: request.organization_user_id,
+        }
+      );
+    } catch (err) {
+      log.error(
+        "OrganizationUsersService: Failed to resend invitation",
+        {
+          error: err instanceof Error ? err.message : "Unknown error",
+        }
+      );
+      throw err;
+    }
+  }
+
+  /**
+   * Convert an admin/viewer user to also be a worker
+   * Allows them to use the mobile app with existing credentials
+   */
+  static async convertToWorker(
+    organizationUserId: string,
+    organizationId: string
+  ): Promise<{ workerId: string; alreadyWorker: boolean }> {
+    try {
+      log.debug("OrganizationUsersService: Converting user to worker", {
+        userId: organizationUserId,
+      });
+
+      const { data, error } = await supabase.functions.invoke(
+        "convert-admin-to-worker",
+        {
+          body: {
+            organization_user_id: organizationUserId,
+            organization_id: organizationId,
+          },
+        }
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.success) {
+        throw new Error(data?.message || "Failed to convert user to worker");
+      }
+
+      log.info(
+        "OrganizationUsersService: User converted to worker successfully",
+        {
+          userId: organizationUserId,
+          workerId: data.worker?.id,
+        }
+      );
+
+      return {
+        workerId: data.worker?.id || data.worker_id,
+        alreadyWorker: data.already_worker || false,
+      };
+    } catch (err) {
+      log.error(
+        "OrganizationUsersService: Failed to convert user to worker",
         {
           error: err instanceof Error ? err.message : "Unknown error",
         }

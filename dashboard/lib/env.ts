@@ -11,6 +11,11 @@ const envSchema = z.object({
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
     NEXT_PUBLIC_APP_URL: z.string().url().optional(),
     NEXT_PUBLIC_GEOAPIFY_API_KEY: z.string().optional(),
+    // Feature flags for development
+    NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION: z
+        .string()
+        .optional()
+        .transform((val) => val === "true"),
 });
 
 type Env = z.infer<typeof envSchema>;
@@ -42,6 +47,8 @@ export function getEnv(): Env {
             process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
         NEXT_PUBLIC_GEOAPIFY_API_KEY: process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY,
+        NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION:
+            process.env.NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION,
     };
 
     const result = envSchema.safeParse(rawEnv);
@@ -70,6 +77,7 @@ export function getEnv(): Env {
                 NEXT_PUBLIC_APP_URL: rawEnv.NEXT_PUBLIC_APP_URL,
                 NEXT_PUBLIC_GEOAPIFY_API_KEY:
                     rawEnv.NEXT_PUBLIC_GEOAPIFY_API_KEY,
+                NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION: false, // Always false in production fallback
             };
             return validatedEnv;
         } else {
@@ -96,4 +104,18 @@ export function getSupabaseUrl(): string {
 export function getSupabaseAnonKey(): string {
     const env = getEnv();
     return env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+}
+
+/**
+ * Check if email verification should be skipped for workers (development only)
+ * This allows activating workers without them completing email verification
+ * WARNING: Should never be enabled in production
+ */
+export function shouldSkipEmailVerification(): boolean {
+    // Extra safety: never skip in production regardless of env var
+    if (process.env.NODE_ENV === "production") {
+        return false;
+    }
+    const env = getEnv();
+    return env.NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION ?? false;
 }
