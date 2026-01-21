@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { organizationUsersKey } from "@/app/query-provider";
+import { organizationUsersKey, workersLocationsKey } from "@/app/query-provider";
 import { OrganizationUsersService } from "@/lib/services";
 import type { OrganizationUser } from "@/lib/types";
 import type {
   CreateOrganizationUserRequest,
   DeleteOrganizationUserRequest,
+  ResendAdminInvitationRequest,
   UpdateOrganizationUserRequest,
 } from "@/lib/types/api";
 import { useCallback } from "react";
@@ -27,6 +28,14 @@ interface UseOrganizationUsersResult {
   deleteOrganizationUser: (
     request: DeleteOrganizationUserRequest,
   ) => Promise<void>;
+  resendInvitation: (
+    organizationUserId: string,
+    organizationId: string,
+  ) => Promise<void>;
+  convertToWorker: (
+    organizationUserId: string,
+    organizationId: string,
+  ) => Promise<{ workerId: string; alreadyWorker: boolean }>;
 }
 
 async function fetchOrganizationUsers(
@@ -77,6 +86,35 @@ export function useOrganizationUsers(): UseOrganizationUsersResult {
     },
   });
 
+  const resendInvitationMutation = useMutation({
+    mutationFn: (request: ResendAdminInvitationRequest) =>
+      OrganizationUsersService.resendInvitation(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: organizationUsersKey(organizationId),
+      });
+    },
+  });
+
+  const convertToWorkerMutation = useMutation({
+    mutationFn: ({
+      organizationUserId,
+      orgId,
+    }: {
+      organizationUserId: string;
+      orgId: string;
+    }) => OrganizationUsersService.convertToWorker(organizationUserId, orgId),
+    onSuccess: () => {
+      // Refresh both organization users and workers lists
+      queryClient.invalidateQueries({
+        queryKey: organizationUsersKey(organizationId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: workersLocationsKey(organizationId),
+      });
+    },
+  });
+
   const createOrganizationUser = useCallback(
     async (
       request: CreateOrganizationUserRequest,
@@ -107,6 +145,35 @@ export function useOrganizationUsers(): UseOrganizationUsersResult {
     [deleteMutation, query],
   );
 
+  const resendInvitation = useCallback(
+    async (
+      organizationUserId: string,
+      orgId: string,
+    ): Promise<void> => {
+      await resendInvitationMutation.mutateAsync({
+        organization_user_id: organizationUserId,
+        organization_id: orgId,
+      });
+      await query.refetch();
+    },
+    [resendInvitationMutation, query],
+  );
+
+  const convertToWorker = useCallback(
+    async (
+      organizationUserId: string,
+      orgId: string,
+    ): Promise<{ workerId: string; alreadyWorker: boolean }> => {
+      const result = await convertToWorkerMutation.mutateAsync({
+        organizationUserId,
+        orgId,
+      });
+      await query.refetch();
+      return result;
+    },
+    [convertToWorkerMutation, query],
+  );
+
   return {
     organizationUsers: query.data ?? [],
     loading: query.isLoading,
@@ -115,5 +182,7 @@ export function useOrganizationUsers(): UseOrganizationUsersResult {
     createOrganizationUser,
     updateOrganizationUser,
     deleteOrganizationUser,
+    resendInvitation,
+    convertToWorker,
   };
 }

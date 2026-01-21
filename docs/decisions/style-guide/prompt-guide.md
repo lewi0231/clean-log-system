@@ -1,8 +1,13 @@
 ## Project Structure
 This is a monorepo containing:
-- /database - Supabase edge functions
-- /dashboard - Next.js application
-- /mobile-app - React Native (Expo) application
+- `/database` - Supabase edge functions and database schema
+- `/dashboard` - Next.js application
+- `/mobile-app` - React Native (Expo) application
+
+### Key Reference Files
+- **Database Schema**: [`/database/schema.sql`](../../../database/schema.sql) - The current database schema (kept up-to-date)
+- **Migrations**: `/database/supabase/migrations/` - Database migration files
+- **Edge Functions**: `/database/supabase/functions/` - Supabase edge functions
 
 ## Required Reading: Style Guides
 Before undertaking ANY task, you MUST:

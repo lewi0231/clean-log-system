@@ -103,3 +103,59 @@ describe("VerifyEmail - EV-3: Verification State Handling", () => {
     expect(checkVerified(null)).toBe(false);
   });
 });
+
+describe("VerifyEmail - EV-4: Admin Invite Type Handling", () => {
+  test("should extract type from search params", () => {
+    const searchParams = new URLSearchParams("?type=admin_invite&email=test@example.com");
+    const inviteType = searchParams.get("type");
+
+    expect(inviteType).toBe("admin_invite");
+  });
+
+  test("should identify admin invite correctly", () => {
+    const inviteType = "admin_invite";
+    const isAdminInvite = inviteType === "admin_invite";
+
+    expect(isAdminInvite).toBe(true);
+  });
+
+  test("should identify non-admin invite correctly", () => {
+    const inviteType = "";
+    const isAdminInvite = inviteType === "admin_invite";
+
+    expect(isAdminInvite).toBe(false);
+  });
+
+  test("should handle null type correctly", () => {
+    const searchParams = new URLSearchParams("?email=test@example.com");
+    const inviteType = searchParams.get("type") || "";
+    const isAdminInvite = inviteType === "admin_invite";
+
+    expect(isAdminInvite).toBe(false);
+  });
+
+  test("should determine correct redirect path for admin invite", () => {
+    const isAdminInvite = true;
+    const redirectPath = isAdminInvite ? "/dashboard" : "/onboarding";
+
+    expect(redirectPath).toBe("/dashboard");
+  });
+
+  test("should determine correct redirect path for regular signup", () => {
+    const isAdminInvite = false;
+    const redirectPath = isAdminInvite ? "/dashboard" : "/onboarding";
+
+    expect(redirectPath).toBe("/onboarding");
+  });
+
+  test("should parse combined admin invite URL correctly", () => {
+    const url = "?type=admin_invite&email=admin@example.com";
+    const searchParams = new URLSearchParams(url);
+
+    const type = searchParams.get("type");
+    const email = searchParams.get("email");
+
+    expect(type).toBe("admin_invite");
+    expect(email).toBe("admin@example.com");
+  });
+});

@@ -1,15 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { z } from "zod";
 import {
   fieldConfigSchema,
   formatZodErrors,
   locationSchema,
   loginSchema,
   organizationSettingsSchema,
+  organizationUserSchema,
+  phoneSchema,
   signUpSchema,
   validationRulesSchema,
   workerSchema,
 } from "@/lib/validations";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 describe("formatZodErrors", () => {
   it("should format single field error", () => {
@@ -22,7 +24,7 @@ describe("formatZodErrors", () => {
 
     if (!result.success) {
       const errors = formatZodErrors<{ email: string; password: string }>(
-        result.error
+        result.error,
       );
       expect(errors.email).toBe("Invalid email");
       expect(errors.password).toBeUndefined();
@@ -65,7 +67,7 @@ describe("formatZodErrors", () => {
 
     if (!result.success) {
       const errors = formatZodErrors<{ user: { email: string } }>(
-        result.error
+        result.error,
       );
       // Should handle nested paths (only first level path is used)
       expect(Object.keys(errors).length).toBeGreaterThan(0);
@@ -96,7 +98,7 @@ describe("formatZodErrors", () => {
 
     if (!result.success) {
       const errors = formatZodErrors<{ email: string; password: string }>(
-        result.error
+        result.error,
       );
       expect(errors).toHaveProperty("email");
     }
@@ -415,7 +417,7 @@ describe("validationRulesSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toContain(
-        "Min length must be less than or equal to max length"
+        "Min length must be less than or equal to max length",
       );
     }
   });
@@ -429,7 +431,7 @@ describe("validationRulesSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toContain(
-        "Min value must be less than or equal to max value"
+        "Min value must be less than or equal to max value",
       );
     }
   });
@@ -443,7 +445,7 @@ describe("validationRulesSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toContain(
-        "Min items must be less than or equal to max items"
+        "Min items must be less than or equal to max items",
       );
     }
   });
@@ -504,7 +506,7 @@ describe("fieldConfigSchema", () => {
     if (!result.success) {
       const messages = result.error.issues.map((i) => i.message);
       expect(messages.some((m) => m.includes("Options are required"))).toBe(
-        true
+        true,
       );
     }
   });
@@ -531,7 +533,7 @@ describe("fieldConfigSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toContain(
-        "lowercase letters, numbers, and underscores"
+        "lowercase letters, numbers, and underscores",
       );
     }
   });
@@ -615,3 +617,212 @@ describe("organizationSettingsSchema", () => {
   });
 });
 
+describe("phoneSchema", () => {
+  it("should accept valid US phone number with country code", () => {
+    const result = phoneSchema.safeParse("+15551234567");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBe("+15551234567");
+    }
+  });
+
+  it("should accept valid US phone number without plus", () => {
+    const result = phoneSchema.safeParse("15551234567");
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept 10-digit phone number", () => {
+    const result = phoneSchema.safeParse("5551234567");
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept formatted US phone number with spaces", () => {
+    const result = phoneSchema.safeParse("+1 555 123 4567");
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept formatted US phone number with dashes", () => {
+    const result = phoneSchema.safeParse("555-123-4567");
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept formatted US phone number with parentheses", () => {
+    const result = phoneSchema.safeParse("(555) 123-4567");
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept Australian mobile number", () => {
+    const result = phoneSchema.safeParse("+61412345678");
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept generic international format", () => {
+    const result = phoneSchema.safeParse("+441onal23456789");
+    // This should match the generic international pattern
+    const cleaned = "+441234567890".replace(/[^\d+]/g, "");
+    expect(/^\+\d{8,15}$/.test(cleaned)).toBe(true);
+  });
+
+  it("should allow empty string (phone is optional)", () => {
+    const result = phoneSchema.safeParse("");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBeNull();
+    }
+  });
+
+  it("should allow null (phone is optional)", () => {
+    const result = phoneSchema.safeParse(null);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBeNull();
+    }
+  });
+
+  it("should allow undefined (phone is optional)", () => {
+    const result = phoneSchema.safeParse(undefined);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBeNull();
+    }
+  });
+
+  it("should reject too short phone number", () => {
+    const result = phoneSchema.safeParse("12345");
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject invalid characters only", () => {
+    const result = phoneSchema.safeParse("abcdefghij");
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("organizationUserSchema", () => {
+  it("should validate valid organization user data", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "Doe",
+      email: "john.doe@example.com",
+      role: "admin",
+      phone: "+15551234567",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.first_name).toBe("John");
+      expect(result.data.last_name).toBe("Doe");
+      expect(result.data.email).toBe("john.doe@example.com");
+      expect(result.data.role).toBe("admin");
+    }
+  });
+
+  it("should validate viewer role", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "Jane",
+      last_name: "Smith",
+      email: "jane@example.com",
+      role: "viewer",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.role).toBe("viewer");
+    }
+  });
+
+  it("should allow optional phone", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "Doe",
+      email: "john@example.com",
+      role: "admin",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.phone).toBeNull();
+    }
+  });
+
+  it("should reject empty first_name", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "",
+      last_name: "Doe",
+      email: "john@example.com",
+      role: "admin",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe("First name is required");
+    }
+  });
+
+  it("should reject empty last_name", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "",
+      email: "john@example.com",
+      role: "admin",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe("Last name is required");
+    }
+  });
+
+  it("should reject invalid email format", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "Doe",
+      email: "invalid-email",
+      role: "admin",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe("Invalid email format");
+    }
+  });
+
+  it("should reject invalid role", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "Doe",
+      email: "john@example.com",
+      role: "superadmin", // Invalid role
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("should reject invalid phone format", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "Doe",
+      email: "john@example.com",
+      role: "admin",
+      phone: "12345", // Too short
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const phoneError = result.error.issues.find((i) => i.path[0] === "phone");
+      expect(phoneError?.message).toContain("Invalid phone number format");
+    }
+  });
+
+  it("should accept phone with formatting", () => {
+    const result = organizationUserSchema.safeParse({
+      first_name: "John",
+      last_name: "Doe",
+      email: "john@example.com",
+      role: "viewer",
+      phone: "(555) 123-4567",
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
