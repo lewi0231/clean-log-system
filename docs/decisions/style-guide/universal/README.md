@@ -14,6 +14,7 @@
 | [Constants](./constants.md) | Magic values, `as const`, configuration |
 | [Error Handling](./error-handling.md) | Try-catch, error types, logging |
 | [Testing Principles](./testing-principles.md) | AAA pattern, fixtures, mocking, coverage |
+| [GitHub Workflow](./github-workflow.md) | Using `gh` CLI for issues and pull requests |
 
 ---
 

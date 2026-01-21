@@ -30,7 +30,8 @@ style-guide/
 │   ├── imports-and-exports.md
 │   ├── constants.md       # Magic values, as const
 │   ├── error-handling.md
-│   └── testing-principles.md
+│   ├── testing-principles.md
+│   └── github-workflow.md  # GitHub CLI for issues and PRs
 │
 ├── dashboard/             # Next.js dashboard
 │   ├── README.md
