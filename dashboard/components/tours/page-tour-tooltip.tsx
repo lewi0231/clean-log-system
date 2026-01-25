@@ -33,19 +33,29 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
 
   const currentStepData = steps[currentStep];
 
+  // Cleanup all tour highlights when tour ends
+  useEffect(() => {
+    if (!isTourActive) {
+      // Remove tour-highlight class from all elements when tour ends
+      const highlightedElements = document.querySelectorAll(".tour-highlight");
+      highlightedElements.forEach((el) => {
+        el.classList.remove("tour-highlight");
+      });
+      setTargetElement(null);
+    }
+  }, [isTourActive]);
+
   // Find and highlight target element
   useEffect(() => {
     if (!isTourActive || !currentStepData) {
-      // Only clear when tour is completely inactive
-      if (!isTourActive) {
-        requestAnimationFrame(() => {
-          setTargetElement(null);
-        });
-      }
       return;
     }
 
-    // Cleanup will handle removing highlight from previous element
+    // Cleanup previous highlight before finding new element
+    const previousHighlighted = document.querySelectorAll(".tour-highlight");
+    previousHighlighted.forEach((el) => {
+      el.classList.remove("tour-highlight");
+    });
 
     // Try to find element by data attribute first, then by selector
     let element: HTMLElement | null = null;
@@ -81,33 +91,17 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
             element.getAttribute("data-tour")?.includes("pricing")));
 
       if (isTabTrigger && element instanceof HTMLElement) {
-        // Use a small delay to ensure the element is ready, then click it
-        setTimeout(() => {
-          // Try to find the button inside if it's wrapped, or click the element itself
-          const button = element.querySelector("button") || element;
-          if (button instanceof HTMLElement) {
-            button.click();
-            // Also trigger a change event to ensure the tab state updates
-            const value =
-              button.getAttribute("data-value") ||
-              button.getAttribute("value") ||
-              button.textContent?.trim().toLowerCase().replace(/\s+/g, "-");
-            if (value) {
-              // Find the parent Tabs component and update its value
-              const tabsRoot =
-                element.closest('[role="tablist"]')?.parentElement;
-              if (tabsRoot) {
-                const tabsContent = tabsRoot.querySelector(
-                  `[data-value="${value}"]`
-                );
-                if (tabsContent) {
-                  // Ensure the content is visible
-                  tabsContent.setAttribute("data-state", "active");
-                }
-              }
+        // Wait for any ongoing scrolls to complete, then switch tabs
+        // Use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            // Try to find the button inside if it's wrapped, or click the element itself
+            const button = element.querySelector("button") || element;
+            if (button instanceof HTMLElement) {
+              button.click();
             }
-          }
-        }, 200);
+          }, 100);
+        });
       }
 
       // If element is a PopoverContent, try to open the popover by clicking its trigger
@@ -134,10 +128,13 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
             if (popoverContent) {
               clearInterval(checkForPopover);
               popoverContent.classList.add("tour-highlight");
-              popoverContent.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-                inline: "center",
+              // Use a single smooth scroll
+              requestAnimationFrame(() => {
+                popoverContent.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                  inline: "center",
+                });
               });
               setTargetElement(popoverContent);
             }
@@ -152,16 +149,22 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
       // Add highlight class immediately for smooth transition
       element.classList.add("tour-highlight");
 
-      // Scroll element into view (for large elements, scroll to top)
+      // Scroll element into view with optimized behavior
       // For mobile preview, ensure it's fully visible
       const isMobilePreview =
         element.hasAttribute("data-tour") &&
         element.getAttribute("data-tour") === "mobile-preview";
 
-      element.scrollIntoView({
-        behavior: "smooth",
-        block: isVeryLarge ? "start" : isMobilePreview ? "start" : "center",
-        inline: "center",
+      // Use requestAnimationFrame to batch DOM operations and prevent jumpiness
+      requestAnimationFrame(() => {
+        // Small delay to let tab switching complete if needed
+        setTimeout(() => {
+          element?.scrollIntoView({
+            behavior: "smooth",
+            block: isVeryLarge ? "start" : isMobilePreview ? "start" : "center",
+            inline: "center",
+          });
+        }, isTabTrigger ? 150 : 0);
       });
 
       // For mobile preview, add extra scroll to ensure it's not cut off at top
@@ -187,7 +190,7 @@ export function PageTourTooltip({ steps }: PageTourTooltipProps) {
               inline: "nearest",
             });
           }
-        }, 500);
+        }, 600);
       }
 
       // Update state after DOM operations (defer to avoid cascading renders)

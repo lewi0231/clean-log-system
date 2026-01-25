@@ -1,5 +1,0 @@
----
-alwaysApply: true
----
-
-A SaaS platform for service-based businesses to manage field workers, jobs, and customer invoicing. Businesses use a Next.js dashboard to: add workers/locations/admins, configure custom job fields with flexible pricing rules (per-unit, location-based, flat-rate), and generate automated invoices. Workers use a React Native mobile app to complete jobs by filling in custom fields, which stores data in Supabase. Upon job completion, the system auto-sends emails to customers with invoices, payment links, and review requests. The platform tracks worker ratings over time and will expand to include analytics dashboards and worker payment management. Target customers range from service contractors to businesses like car yards needing field service management.

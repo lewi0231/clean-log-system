@@ -129,6 +129,24 @@ export const createMockPaymentLink = (
   ...overrides,
 });
 
+export const createMockLocationHierarchyNode = (
+  overrides?: Partial<import("@/lib/types").LocationHierarchyNode>,
+): import("@/lib/types").LocationHierarchyNode => ({
+  id: "node-1",
+  organization_id: "org-1",
+  name: "Test Company",
+  type: "company",
+  parent_id: null,
+  code: null,
+  sort_order: 0,
+  metadata: null,
+  active: true,
+  created_at: "2024-01-01T00:00:00Z",
+  updated_at: "2024-01-01T00:00:00Z",
+  parent: null,
+  ...overrides,
+});
+
 /**
  * Mock Supabase response helpers
  */

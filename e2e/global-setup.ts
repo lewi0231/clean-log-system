@@ -58,7 +58,7 @@ async function globalSetup(config: FullConfig): Promise<void> {
     // Get baseURL from config - check multiple sources
     const baseURL = process.env.E2E_BASE_URL ||
       config.projects[0]?.use?.baseURL ||
-      "http://localhost:3001";
+      "http://localhost:3000";
 
     console.log(`  Using baseURL: ${baseURL}`);
 

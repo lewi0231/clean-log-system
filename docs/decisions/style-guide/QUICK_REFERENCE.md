@@ -493,13 +493,64 @@ supabase migration up
 
 ---
 
+## GitHub Workflow
+
+### Essential Commands
+
+```bash
+# List issues
+gh issue list                    # All open issues
+gh issue list --assignee @me     # Issues assigned to you
+gh issue list --label "bug"      # Issues with specific label
+
+# Create issues
+gh issue create                  # Interactive mode
+gh issue create --title "Title" --body "Description"
+
+# Create pull requests
+gh pr create                     # Interactive mode
+gh pr create --title "Title" --body "Closes #123"
+
+# View issues/PRs
+gh issue view 123               # View issue details
+gh pr view 456                  # View PR details
+```
+
+### Working Through Issues
+
+```bash
+# 1. List and review issues
+gh issue list
+
+# 2. View issue details
+gh issue view 123
+
+# 3. Create branch and make changes
+git checkout -b fix/issue-123
+# ... make changes ...
+git commit -m "Fix: Issue #123"
+git push origin fix/issue-123
+
+# 4. Create PR linked to issue
+gh pr create --title "Fix: Issue #123" --body "Closes #123"
+```
+
+### Best Practices
+
+- **One issue per PR**: Keep PRs focused on a single issue
+- **Link issues**: Use "Closes #123" or "Fixes #123" in PR descriptions
+- **Descriptive titles**: Clear titles that explain what the PR does
+- **Branch naming**: Use `fix/issue-123` or `feature/description` format
+
+**Full guide:** [GitHub Workflow](./universal/github-workflow.md)
+
 ---
 
 ## Detailed Documentation
 
 For comprehensive documentation, see the modular guides:
 
-- **[Universal](./universal/)** - Code-agnostic patterns (TypeScript, naming, imports, constants, errors, testing principles)
+- **[Universal](./universal/)** - Code-agnostic patterns (TypeScript, naming, imports, constants, errors, testing principles, GitHub workflow)
 - **[Dashboard](./dashboard/)** - Next.js 16 patterns (components, hooks, services, Tailwind v4, testing)
 - **[Mobile App](./mobile-app/)** - React Native patterns (components, hooks, NativeWind/Tailwind v3)
 - **[Edge Functions](./edge-functions/)** - Supabase/Deno patterns (structure, Zod validation, auth, testing)

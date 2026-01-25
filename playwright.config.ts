@@ -51,7 +51,7 @@ export default defineConfig({
 
   use: {
     // Base URL to use in actions like `await page.goto('/')`
-    baseURL: process.env.E2E_BASE_URL || "http://localhost:3001",
+    baseURL: process.env.E2E_BASE_URL || "http://localhost:3000",
 
     // Collect trace when retrying the failed test
     trace: "on-first-retry",
@@ -126,7 +126,7 @@ export default defineConfig({
   // Run your local dev server before starting the tests
   webServer: {
     command: "pnpm dev:dashboard",
-    url: "http://localhost:3001",
+    url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

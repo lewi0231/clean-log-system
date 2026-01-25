@@ -42,6 +42,7 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
 import {
   FieldConfig,
   FieldType,
@@ -50,6 +51,7 @@ import {
 import {
   AlignLeft,
   Calendar,
+  Check,
   CheckSquare,
   ChevronDown,
   ChevronRight,
@@ -909,21 +911,23 @@ export function SectionEditor({
                                         </Badge>
                                       )}
                                       {clusterId && (
-                                        <Tooltip>
-                                          <TooltipTrigger asChild>
-                                            <Badge
-                                              variant="outline"
-                                              className="text-[10px] px-1.5 border-dashed border-primary/40 text-primary"
-                                            >
-                                              Cluster: {clusterId}
-                                            </Badge>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            Fields sharing a cluster act as one
-                                            option inside their exclusive group
-                                            (e.g., wiped + soaped details).
-                                          </TooltipContent>
-                                        </Tooltip>
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Badge
+                                                variant="outline"
+                                                className="text-[10px] px-1.5 border-dashed border-primary/40 text-primary"
+                                              >
+                                                Cluster: {clusterId}
+                                              </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              Fields sharing a cluster act as one
+                                              option inside their exclusive group
+                                              (e.g., wiped + soaped details).
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
                                       )}
                                       {locationRestrictionsMap.get(field.id) &&
                                         locationRestrictionsMap.get(field.id)!
@@ -1267,92 +1271,115 @@ export function SectionEditor({
                                                   <div className="space-y-2 pl-6 border-l-2 border-muted">
                                                     {locations.length === 0 ? (
                                                       <p className="text-xs text-muted-foreground">
-                                                        No locations available
+                                                        No locations available. Create locations first.
                                                       </p>
                                                     ) : (
-                                                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                                                        {locations
-                                                          .filter(
-                                                            (loc) => loc.active
-                                                          )
-                                                          .map((location) => (
-                                                            <div
-                                                              key={location.id}
-                                                              className="flex items-center space-x-2"
-                                                            >
-                                                              <input
-                                                                type="checkbox"
-                                                                id={`section-location-${field.id}-${location.id}`}
-                                                                checked={(
-                                                                  locationRestrictionsMap.get(
-                                                                    field.id
-                                                                  ) || []
-                                                                ).includes(
-                                                                  location.id
-                                                                )}
-                                                                onChange={(
-                                                                  e
-                                                                ) => {
-                                                                  const currentIds =
-                                                                    locationRestrictionsMap.get(
-                                                                      field.id
-                                                                    ) || [];
-                                                                  if (
-                                                                    e.target
-                                                                      .checked
-                                                                  ) {
-                                                                    setLocationRestrictionsMap(
-                                                                      (
-                                                                        prev
-                                                                      ) => {
-                                                                        const next =
-                                                                          new Map(
-                                                                            prev
+                                                      <div className="rounded-md border border-input bg-transparent shadow-sm">
+                                                        <div className="max-h-48 overflow-y-auto p-2">
+                                                          {locations
+                                                            .filter(
+                                                              (loc) => loc.active
+                                                            )
+                                                            .map((location) => {
+                                                              const isSelected = (
+                                                                locationRestrictionsMap.get(
+                                                                  field.id
+                                                                ) || []
+                                                              ).includes(
+                                                                location.id
+                                                              );
+                                                              return (
+                                                                <div
+                                                                  key={location.id}
+                                                                  className={cn(
+                                                                    "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                                                    isSelected && "bg-accent/50"
+                                                                  )}
+                                                                  onClick={() => {
+                                                                    const currentIds =
+                                                                      locationRestrictionsMap.get(
+                                                                        field.id
+                                                                      ) || [];
+                                                                    if (isSelected) {
+                                                                      setLocationRestrictionsMap(
+                                                                        (prev) => {
+                                                                          const next = new Map(prev);
+                                                                          next.set(
+                                                                            field.id,
+                                                                            currentIds.filter(
+                                                                              (id) => id !== location.id
+                                                                            )
                                                                           );
-                                                                        next.set(
-                                                                          field.id,
-                                                                          [
-                                                                            ...currentIds,
-                                                                            location.id,
-                                                                          ]
-                                                                        );
-                                                                        return next;
-                                                                      }
-                                                                    );
-                                                                  } else {
-                                                                    setLocationRestrictionsMap(
-                                                                      (
-                                                                        prev
-                                                                      ) => {
-                                                                        const next =
-                                                                          new Map(
-                                                                            prev
+                                                                          return next;
+                                                                        }
+                                                                      );
+                                                                    } else {
+                                                                      setLocationRestrictionsMap(
+                                                                        (prev) => {
+                                                                          const next = new Map(prev);
+                                                                          next.set(
+                                                                            field.id,
+                                                                            [...currentIds, location.id]
                                                                           );
-                                                                        next.set(
-                                                                          field.id,
-                                                                          currentIds.filter(
-                                                                            (
-                                                                              id
-                                                                            ) =>
-                                                                              id !==
-                                                                              location.id
-                                                                          )
+                                                                          return next;
+                                                                        }
+                                                                      );
+                                                                    }
+                                                                  }}
+                                                                >
+                                                                  <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                                                                    {isSelected && (
+                                                                      <Check className="h-4 w-4 text-primary" />
+                                                                    )}
+                                                                  </span>
+                                                                  <Label
+                                                                    htmlFor={`section-location-${field.id}-${location.id}`}
+                                                                    className="text-xs font-normal cursor-pointer flex-1"
+                                                                  >
+                                                                    {location.name}
+                                                                  </Label>
+                                                                  <input
+                                                                    type="checkbox"
+                                                                    id={`section-location-${field.id}-${location.id}`}
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
+                                                                      const currentIds =
+                                                                        locationRestrictionsMap.get(
+                                                                          field.id
+                                                                        ) || [];
+                                                                      if (e.target.checked) {
+                                                                        setLocationRestrictionsMap(
+                                                                          (prev) => {
+                                                                            const next = new Map(prev);
+                                                                            next.set(
+                                                                              field.id,
+                                                                              [...currentIds, location.id]
+                                                                            );
+                                                                            return next;
+                                                                          }
                                                                         );
-                                                                        return next;
+                                                                      } else {
+                                                                        setLocationRestrictionsMap(
+                                                                          (prev) => {
+                                                                            const next = new Map(prev);
+                                                                            next.set(
+                                                                              field.id,
+                                                                              currentIds.filter(
+                                                                                (id) => id !== location.id
+                                                                              )
+                                                                            );
+                                                                            return next;
+                                                                          }
+                                                                        );
                                                                       }
-                                                                    );
-                                                                  }
-                                                                }}
-                                                                className="h-4 w-4 rounded border-gray-300"
-                                                              />
-                                                              <Label
-                                                                htmlFor={`section-location-${field.id}-${location.id}`}
-                                                                className="text-xs font-normal cursor-pointer"
-                                                              >
-                                                                {location.name}
-                                                              </Label>
-                                                            </div>
-                                                          ))}
+                                                                    }}
+                                                                    className="sr-only"
+                                                                    aria-hidden="true"
+                                                                  />
+                                                                </div>
+                                                              );
+                                                            })}
+                                                        </div>
                                                       </div>
                                                     )}
                                                   </div>
@@ -1398,16 +1425,27 @@ export function SectionEditor({
                                               <CollapsibleContent className="space-y-4 pt-2 pl-4 border-l-2 border-muted bg-muted/20 rounded-r-md">
                                                 {/* Mutually Exclusive Cluster */}
                                                 <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
-                                                  <Label className="text-xs">
-                                                    Mutually Exclusive Cluster
-                                                  </Label>
-                                                  <p className="text-[11px] text-muted-foreground">
-                                                    Assign this field to a
-                                                    cluster where only one
-                                                    option can be selected at a
-                                                    time. All clusters share a
-                                                    single implicit group behind
-                                                    the scenes.
+                                                  <div className="flex items-start justify-between gap-2">
+                                                    <div className="flex-1">
+                                                      <Label className="text-xs">
+                                                        Mutually Exclusive Cluster
+                                                      </Label>
+                                                      <p className="text-[11px] text-muted-foreground mt-1">
+                                                        Assign this field to a
+                                                        cluster where only one
+                                                        option can be selected at a
+                                                        time. All clusters share a
+                                                        single implicit group behind
+                                                        the scenes.
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                  <p className="text-[11px] text-muted-foreground italic">
+                                                    💡 Need to create a new cluster name? Click the{" "}
+                                                    <span className="font-medium text-primary">
+                                                      Selection Group Settings
+                                                    </span>{" "}
+                                                    button at the top of the page to create option names first.
                                                   </p>
                                                   {(() => {
                                                     // Get all clusters from all fields AND created clusters
