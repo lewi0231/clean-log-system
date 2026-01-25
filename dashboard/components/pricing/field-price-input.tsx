@@ -1,5 +1,6 @@
 "use client";
 
+import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FieldConfig } from "@clean-log/shared";
@@ -9,8 +10,6 @@ interface FieldPriceInputProps {
   fieldConfig: FieldConfig;
   currentCustomerPrice: string;
   currentWorkerPrice: string;
-  showBothContexts: boolean;
-  pricingContext: "customer" | "worker";
   isSaving: boolean;
   onPriceChange: (fieldId: string, value: string, context: "customer" | "worker") => void;
 }
@@ -30,11 +29,10 @@ export function FieldPriceInput({
   fieldConfig,
   currentCustomerPrice,
   currentWorkerPrice,
-  showBothContexts,
-  pricingContext,
   isSaving,
   onPriceChange,
 }: FieldPriceInputProps) {
+  const { pricingContext, showBothContexts } = usePricingScope();
   if (showBothContexts) {
     return (
       <div className="grid gap-4 md:grid-cols-2">

@@ -1,5 +1,6 @@
 "use client";
 
+import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
 import {
   LocationOverridesMatrix,
@@ -24,12 +25,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useFieldPricingCardState } from "@/hooks/use-field-pricing-card-state";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import type { ScopedPricingEntry } from "@/lib/pricing-scope";
 import type { FieldPricing, PricingCondition } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig } from "@clean-log/shared";
 import { ChevronDown, ChevronRight, Save, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { FieldPriceInput } from "./field-price-input";
 
 interface FieldPricingCardProps {
@@ -41,17 +44,11 @@ interface FieldPricingCardProps {
   currentCustomerPrice: string;
   currentWorkerPrice: string;
   hasChanges: boolean;
-  isSaving: boolean;
   overrides: LocationOverrideRow[];
   conditions: PricingCondition[];
-  isExpanded: boolean;
   hasScopedValue: boolean;
-  showBothContexts: boolean;
-  pricingContext: "customer" | "worker";
   locationId: string | null;
   locationHierarchyId: string | null;
-  fieldLabelLookup: Record<string, string>;
-  onExpandedChange: (expanded: boolean) => void;
   onPriceChange: (
     fieldId: string,
     value: string,
@@ -60,7 +57,6 @@ interface FieldPricingCardProps {
   onSave: (fieldConfig: FieldConfig) => Promise<void>;
   onDeleteOverride: (id: string) => Promise<void>;
   onOpenConditionalModal: (field: FieldConfig) => void;
-  deletingIds: Set<string>;
 }
 
 const getEquationPreview = (fieldType: string): string => {
@@ -82,27 +78,42 @@ export function FieldPricingCard({
   currentCustomerPrice,
   currentWorkerPrice,
   hasChanges,
-  isSaving,
   overrides,
   conditions,
-  isExpanded,
   hasScopedValue,
-  showBothContexts,
-  pricingContext,
   locationId,
   locationHierarchyId,
-  fieldLabelLookup,
-  onExpandedChange,
   onPriceChange,
   onSave,
   onDeleteOverride,
   onOpenConditionalModal,
-  deletingIds,
 }: FieldPricingCardProps) {
+  const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
+  const { isExpanded, setIsExpanded, isSaving, setIsSaving } = 
+    useFieldPricingCardState(fieldConfig.id);
+  const [deletingOverrideId, setDeletingOverrideId] = useState<string | null>(null);
   const { formatCurrency } = useOrganizationCurrency();
 
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(fieldConfig);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteOverride = async (id: string) => {
+    setDeletingOverrideId(id);
+    try {
+      await onDeleteOverride(id);
+    } finally {
+      setDeletingOverrideId(null);
+    }
+  };
+
   return (
-    <Collapsible open={isExpanded} onOpenChange={onExpandedChange}>
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
       <Card>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-muted/30 transition-colors py-3">
@@ -183,8 +194,6 @@ export function FieldPricingCard({
               fieldConfig={fieldConfig}
               currentCustomerPrice={currentCustomerPrice}
               currentWorkerPrice={currentWorkerPrice}
-              showBothContexts={showBothContexts}
-              pricingContext={pricingContext}
               isSaving={isSaving}
               onPriceChange={onPriceChange}
             />
@@ -192,7 +201,7 @@ export function FieldPricingCard({
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 size="sm"
-                onClick={() => onSave(fieldConfig)}
+                onClick={handleSave}
                 disabled={
                   isSaving ||
                   !hasChanges ||
@@ -268,8 +277,8 @@ export function FieldPricingCard({
               <LocationOverridesMatrix
                 rows={overrides}
                 emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
-                onDelete={onDeleteOverride}
-                deletingIds={deletingIds}
+                onDelete={handleDeleteOverride}
+                deletingIds={deletingOverrideId ? new Set([deletingOverrideId]) : new Set()}
               />
             )}
 

@@ -7,8 +7,6 @@ interface NumberPricingListProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   refreshToken?: number;
-  pricingContext?: "customer" | "worker";
-  showBothContexts?: boolean;
 }
 
 export default function NumberPricingList(props: NumberPricingListProps) {

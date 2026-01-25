@@ -52,7 +52,7 @@ import {
   TestTube,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function PricingPage() {
   const {
@@ -134,7 +134,13 @@ function PricingPageContent({
     setEffectiveDate,
     expirationDate,
     setExpirationDate,
+    setShowBothContexts,
   } = usePricingScope();
+
+  // Set showBothContexts to true for pricing page (all components show both customer and worker pricing)
+  useEffect(() => {
+    setShowBothContexts(true);
+  }, [setShowBothContexts]);
 
   const { isFixedPricing, location } = useLocationFixedPricingGuard(locationId);
   const { formatCurrency } = useOrganizationCurrency();
@@ -312,7 +318,6 @@ function PricingPageContent({
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
-                        showBothContexts={true}
                       />
                     </CardContent>
                   </CollapsibleContent>
@@ -509,7 +514,6 @@ function PricingPageContent({
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
-                        showBothContexts={true}
                       />
                     </CardContent>
                   </Card>
@@ -542,7 +546,6 @@ function PricingPageContent({
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
-                        showBothContexts={true}
                       />
                     </CardContent>
                   </Card>
@@ -589,7 +592,6 @@ function PricingPageContent({
                                 locationHierarchyId={locationNodeId}
                                 locationId={locationId}
                                 effectiveAt={effectiveDate}
-                                showBothContexts={true}
                               />
                             </div>
                           ))}
@@ -666,7 +668,6 @@ function PricingPageContent({
                                 locationHierarchyId={locationNodeId}
                                 locationId={locationId}
                                 effectiveAt={effectiveDate}
-                                showBothContexts={true}
                               />
                             </div>
                           ))}

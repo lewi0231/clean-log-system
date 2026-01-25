@@ -26,8 +26,6 @@ interface OptionPricingEditorProps {
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
-  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
-  showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
 }
 
 export default function OptionPricingEditor({
@@ -35,9 +33,8 @@ export default function OptionPricingEditor({
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
-  pricingContext = "customer",
-  showBothContexts = false,
 }: OptionPricingEditorProps) {
+  const { pricingContext, showBothContexts } = usePricingScope();
   const {
     optionPricing: customerPricing,
     loading: customerLoading,

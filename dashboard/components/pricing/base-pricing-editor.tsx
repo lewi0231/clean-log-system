@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
+import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
@@ -59,17 +60,14 @@ interface BasePricingEditorProps {
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
-  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
-  showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
 }
 
 export default function BasePricingEditor({
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
-  pricingContext = "customer",
-  showBothContexts = false,
 }: BasePricingEditorProps) {
+  const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
   const { fieldConfigs } = useFieldConfigs();
   const { workers } = useWorkers();
   const hasWorkers = workers && workers.length > 0;
@@ -156,14 +154,6 @@ export default function BasePricingEditor({
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
-
-  const fieldLabelLookup = useMemo(() => {
-    const lookup: Record<string, string> = {};
-    fieldConfigs.forEach((fc) => {
-      lookup[fc.id] = fc.label;
-    });
-    return lookup;
-  }, [fieldConfigs]);
 
   // Create maps for quick lookup
   const customerStandaloneEntry = useMemo(() => {

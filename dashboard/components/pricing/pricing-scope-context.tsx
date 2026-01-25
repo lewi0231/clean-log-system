@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useFieldConfigs } from "@/hooks/use-field-configs";
 
 interface PricingScopeValue {
   selectedFieldId: string | null;
@@ -22,6 +23,11 @@ interface PricingScopeValue {
   setExpirationDate: (date: string | null) => void;
   pricingHistoryRefreshToken: number;
   refreshPricingHistory: () => void;
+  pricingContext: "customer" | "worker";
+  setPricingContext: (context: "customer" | "worker") => void;
+  showBothContexts: boolean;
+  setShowBothContexts: (show: boolean) => void;
+  fieldLabelLookup: Record<string, string>;
 }
 
 const PricingScopeContext = createContext<PricingScopeValue | undefined>(
@@ -64,6 +70,18 @@ export function PricingScopeProvider({
   const [expirationDate, setExpirationDate] = useState<string | null>(null);
   const [pricingHistoryRefreshToken, setPricingHistoryRefreshToken] =
     useState(0);
+  const [pricingContext, setPricingContext] = useState<"customer" | "worker">("customer");
+  const [showBothContexts, setShowBothContexts] = useState(false);
+
+  const { fieldConfigs } = useFieldConfigs();
+
+  const fieldLabelLookup = useMemo(() => {
+    const lookup: Record<string, string> = {};
+    fieldConfigs.forEach((fc) => {
+      lookup[fc.id] = fc.label;
+    });
+    return lookup;
+  }, [fieldConfigs]);
 
   const refreshPricingHistory = useCallback(() => {
     setPricingHistoryRefreshToken((prev) => prev + 1);
@@ -83,6 +101,11 @@ export function PricingScopeProvider({
       setExpirationDate,
       pricingHistoryRefreshToken,
       refreshPricingHistory,
+      pricingContext,
+      setPricingContext,
+      showBothContexts,
+      setShowBothContexts,
+      fieldLabelLookup,
     }),
     [
       selectedFieldId,
@@ -92,6 +115,9 @@ export function PricingScopeProvider({
       expirationDate,
       pricingHistoryRefreshToken,
       refreshPricingHistory,
+      pricingContext,
+      showBothContexts,
+      fieldLabelLookup,
     ]
   );
 
