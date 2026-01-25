@@ -17,6 +17,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -25,9 +30,13 @@ import {
 } from "@/components/ui/select";
 import { FieldConfig } from "@clean-log/shared";
 import {
+  Check,
+  CheckCircleIcon,
   ChevronDown,
   ChevronRight,
+  Edit,
   HelpCircle,
+  Info,
   Plus,
   Smartphone,
   X,
@@ -38,12 +47,13 @@ interface MutuallyExclusiveGroupManagerProps {
   fields: FieldConfig[];
   onUpdateField: (
     fieldId: string,
-    updates: Partial<FieldConfig>
+    updates: Partial<FieldConfig>,
   ) => Promise<void>;
   createdClusters: string[];
   onCreatedClustersChange: (clusters: string[]) => void;
   defaultExclusiveGroupLabel?: string | null;
   onUpdateDefaultExclusiveGroupLabel?: (label: string) => Promise<void>;
+  isInModal?: boolean;
 }
 
 interface GroupInfo {
@@ -92,13 +102,18 @@ export function MutuallyExclusiveGroupManager({
   onCreatedClustersChange,
   defaultExclusiveGroupLabel,
   onUpdateDefaultExclusiveGroupLabel,
+  isInModal = false,
 }: MutuallyExclusiveGroupManagerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [newClusterName, setNewClusterName] = useState("");
   const [editingDefaultLabel, setEditingDefaultLabel] = useState(false);
   const [defaultLabelValue, setDefaultLabelValue] = useState(
-    defaultExclusiveGroupLabel || ""
+    defaultExclusiveGroupLabel || "",
+  );
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [fieldSelectionOpen, setFieldSelectionOpen] = useState<string | null>(
+    null,
   );
 
   // Build groups and clusters from existing fields
@@ -151,23 +166,55 @@ export function MutuallyExclusiveGroupManager({
       onCreatedClustersChange([...createdClusters, clusterId]);
     }
     setNewClusterName("");
+    setShowCreateForm(false);
   };
 
   const handleDeleteCluster = async (groupId: string, clusterId: string) => {
+    // Try to find the cluster in groups (it might not exist if it has no fields)
     const group = groups.find((g) => g.id === groupId);
-    if (!group) return;
+    const cluster = group?.clusters.get(clusterId);
 
-    const cluster = group.clusters.get(clusterId);
-    if (!cluster) return;
+    // If cluster exists and has fields, remove them first
+    if (cluster && cluster.fieldIds.length > 0) {
+      // Remove all fields from this cluster (optimistic updates handle UI immediately)
+      const updatePromises = cluster.fieldIds.map((fieldId) =>
+        onUpdateField(fieldId, {
+          mutually_exclusive_group: null,
+          group_cluster: null,
+        }),
+      );
+      await Promise.all(updatePromises);
+    }
 
-    // Remove all fields from this cluster
-    for (const fieldId of cluster.fieldIds) {
-      await onUpdateField(fieldId, {
-        mutually_exclusive_group: null,
-        group_cluster: null,
-      });
+    // Always remove cluster from createdClusters list (works for both empty and populated clusters)
+    // This is the key fix - we need to remove it even if it wasn't in groups
+    if (createdClusters.includes(clusterId)) {
+      onCreatedClustersChange(createdClusters.filter((id) => id !== clusterId));
     }
   };
+
+  const handleAddFieldToCluster = (clusterId: string, fieldId: string) => {
+    // Close popover first to prevent layout shift
+    setFieldSelectionOpen(null);
+    
+    // Use requestAnimationFrame to batch the update with the next paint
+    // This ensures the popover closes smoothly before the field update triggers re-render
+    requestAnimationFrame(() => {
+      // Optimistic update happens immediately in the hook
+      // Don't await to prevent UI jitter
+      onUpdateField(fieldId, {
+        mutually_exclusive_group: DEFAULT_EXCLUSIVE_GROUP,
+        group_cluster: clusterId,
+      }).catch((err) => {
+        console.error("Failed to add field to option:", err);
+      });
+    });
+  };
+
+  // Get fields not assigned to any cluster
+  const availableFields = useMemo(() => {
+    return fields.filter((field) => !field.mutually_exclusive_group);
+  }, [fields]);
 
   const handleSaveDefaultLabel = async () => {
     if (onUpdateDefaultExclusiveGroupLabel && defaultLabelValue.trim()) {
@@ -187,15 +234,452 @@ export function MutuallyExclusiveGroupManager({
   }, [defaultExclusiveGroupLabel]);
 
   const hasDefaultExclusiveGroup = groups.some(
-    (g) => g.id === DEFAULT_EXCLUSIVE_GROUP
+    (g) => g.id === DEFAULT_EXCLUSIVE_GROUP,
   );
 
-  // Find default exclusive group for preview
-  const defaultGroup = groups.find((g) => g.id === DEFAULT_EXCLUSIVE_GROUP);
-  const defaultGroupClusters = defaultGroup
-    ? Array.from(defaultGroup.clusters.values())
-    : [];
+  // Find default exclusive group clusters for preview
+  const defaultGroupClusters = useMemo(() => {
+    const defaultGroup = groups.find((g) => g.id === DEFAULT_EXCLUSIVE_GROUP);
+    return defaultGroup ? Array.from(defaultGroup.clusters.values()) : [];
+  }, [groups]);
 
+  // Combine clusters from fields with created clusters (so newly created options appear immediately)
+  // Use a more stable comparison to prevent unnecessary recalculations
+  const allClusters = useMemo(() => {
+    const clusterMap = new Map<string, ClusterInfo>();
+
+    // Add clusters from fields
+    defaultGroupClusters.forEach((cluster) => {
+      clusterMap.set(cluster.id, cluster);
+    });
+
+    // Add created clusters that don't have fields yet
+    createdClusters.forEach((clusterId) => {
+      if (!clusterMap.has(clusterId)) {
+        clusterMap.set(clusterId, {
+          id: clusterId,
+          displayName: getClusterDisplayName(clusterId),
+          fieldIds: [],
+        });
+      }
+    });
+
+    return Array.from(clusterMap.values());
+  }, [
+    // Use JSON.stringify for stable comparison of cluster arrays
+    // This prevents recalculation when array reference changes but content is the same
+    JSON.stringify(
+      defaultGroupClusters.map((c) => ({
+        id: c.id,
+        fieldCount: c.fieldIds.length,
+      })),
+    ),
+    // Use joined string for createdClusters to avoid array reference issues
+    createdClusters.join(","),
+  ]);
+
+  // Calculate total options count
+  const totalOptionsCount = allClusters.length;
+
+  // If in modal, render single column layout with mobile preview moved
+  if (isInModal) {
+    return (
+      <div className="space-y-6 py-4">
+        {/* Configuration Section */}
+        <div className="space-y-6">
+          {/* Dropdown Label Section */}
+          {hasDefaultExclusiveGroup && onUpdateDefaultExclusiveGroupLabel && (
+            <Card>
+              <CardContent className="py-2 px-4">
+                <Label className=" font-semibold mb-2 flex items-center gap-2">
+                  {/* <Info className="w-4 h-4 text-muted-foreground" /> */}
+                  Dropdown Label
+                </Label>
+                <p className="text-xs text-muted-foreground mb-4">
+                  This text appears as the prompt for the question in the mobile
+                  app.
+                </p>
+                <div className="relative">
+                  {editingDefaultLabel ? (
+                    <div className="flex gap-2">
+                      <Input
+                        value={defaultLabelValue}
+                        onChange={(e) => setDefaultLabelValue(e.target.value)}
+                        placeholder="e.g., Select tracking method, Choose an option"
+                        className="flex-1"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            handleSaveDefaultLabel();
+                          } else if (e.key === "Escape") {
+                            handleCancelDefaultLabel();
+                          }
+                        }}
+                      />
+                      <Button onClick={handleSaveDefaultLabel} size="sm">
+                        Save
+                      </Button>
+                      <Button
+                        onClick={handleCancelDefaultLabel}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        value={defaultExclusiveGroupLabel || "Select an option"}
+                        readOnly
+                        className="pr-16"
+                      />
+                      <Button
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-primary font-medium text-sm hover:underline cursor-pointer"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingDefaultLabel(true)}
+                      >
+                        <Edit /> Edit
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Available Options Section */}
+          <Card>
+            <CardHeader className="px-4 py-2 border-b bg-muted/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CheckCircleIcon className="bg-linear-to-brary" />
+
+                <CardTitle className="text-base">Available Options</CardTitle>
+              </div>
+              {totalOptionsCount > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="bg-muted text-muted-foreground px-2.5 py-0.5 text-xs font-semibold"
+                >
+                  {totalOptionsCount} Total
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="px-4 py-2 space-y-4">
+              {totalOptionsCount > 0 && (
+                <p className="text-sm text-muted-foreground mb-4 italic">
+                  Workers can only select one of these options at a time.
+                </p>
+              )}
+
+              {/* Empty State */}
+              {totalOptionsCount === 0 && createdClusters.length === 0 && (
+                <div className="flex flex-col items-center justify-center min-h-[500px] text-center">
+                  {/* Illustration */}
+                  <div className="w-64 h-48 bg-linear-to-br from-indigo-100 to-slate-100 dark:from-indigo-900/20 dark:to-slate-900 rounded-3xl mb-8 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-20 dark:opacity-10 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
+
+                    <div className="relative flex flex-col items-center">
+                      <div className="w-32 h-20 bg-white dark:bg-slate-700 rounded-lg shadow-lg flex flex-col p-3 space-y-2 transform -rotate-3 border border-slate-100 dark:border-slate-600">
+                        <div className="w-full h-2 bg-slate-100 dark:bg-slate-600 rounded"></div>
+                        <div className="w-2/3 h-2 bg-slate-100 dark:bg-slate-600 rounded"></div>
+                      </div>
+                      <div className="w-32 h-20 bg-white dark:bg-slate-700 rounded-lg shadow-xl flex flex-col p-3 space-y-2 transform rotate-6 -mt-10 border border-slate-100 dark:border-slate-600">
+                        <div className="w-full h-2 bg-primary/20 rounded"></div>
+                        <div className="w-2/3 h-2 bg-primary/20 rounded"></div>
+                        <div className="self-end mt-auto">
+                          <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2">
+                    No options created yet
+                  </h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-8">
+                    Define the choices workers can select from. Each option can
+                    be assigned specific fields to streamline their workflow.
+                  </p>
+                  {!showCreateForm ? (
+                    <Button
+                      onClick={() => setShowCreateForm(true)}
+                      className="bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-8 rounded-full flex items-center space-x-2 shadow-lg shadow-primary/20"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Create First Option</span>
+                    </Button>
+                  ) : (
+                    <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+                      <div className="bg-muted/50 p-4 rounded-xl border space-y-4">
+                        <div className="text-left">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+                            Option Name
+                          </Label>
+                          <Input
+                            value={newClusterName}
+                            onChange={(e) => setNewClusterName(e.target.value)}
+                            placeholder="e.g., Simple Toggle, Warehouse, Detailed..."
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                handleCreateCluster();
+                              } else if (e.key === "Escape") {
+                                setShowCreateForm(false);
+                                setNewClusterName("");
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => {
+                              setShowCreateForm(false);
+                              setNewClusterName("");
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            onClick={handleCreateCluster}
+                            disabled={!newClusterName.trim()}
+                          >
+                            Save Option
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Populated State - Options List */}
+              {totalOptionsCount > 0 && (
+                <div className="space-y-4">
+                  {allClusters.map((cluster) => {
+                    const clusterFields = cluster.fieldIds
+                      .map((fieldId) => fields.find((f) => f.id === fieldId))
+                      .filter((f): f is FieldConfig => f !== undefined);
+
+                    // Determine if this is the "selected" option (first one for now, or could be based on some state)
+                    const isSelected = false; // Could be based on some selection state
+
+                    return (
+                      <div
+                        key={cluster.id}
+                        className="group border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:border-primary/50 transition-all bg-white dark:bg-slate-900/50 flex items-start justify-between"
+                      >
+                        <div className="flex gap-4 flex-1">
+                          <div className="mt-1">
+                            <div
+                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? "border-primary"
+                                  : "border-slate-300 dark:border-slate-600 group-hover:border-primary"
+                              }`}
+                            >
+                              {/* Show dot if selected, or on hover if not selected */}
+                              {isSelected ? (
+                                <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
+                              ) : (
+                                <div className="w-2.5 h-2.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="font-bold">
+                                {cluster.displayName}
+                              </span>
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] uppercase tracking-wider font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded"
+                              >
+                                {cluster.fieldIds.length}{" "}
+                                {cluster.fieldIds.length === 1
+                                  ? "Field"
+                                  : "Fields Assigned"}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {clusterFields.map((field) => (
+                                <Badge
+                                  key={field.id}
+                                  variant="outline"
+                                  className="text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md flex items-center gap-1.5 group"
+                                >
+                                  <span>{field.label}</span>
+                                  <button
+                                    onClick={() => {
+                                      // Optimistic update happens immediately in the hook
+                                      // Don't await to prevent UI jitter
+                                      onUpdateField(field.id, {
+                                        mutually_exclusive_group: null,
+                                        group_cluster: null,
+                                      }).catch((err) => {
+                                        console.error(
+                                          "Failed to remove field from option:",
+                                          err,
+                                        );
+                                      });
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-0.5 -mr-1"
+                                    aria-label={`Remove ${field.label} from option`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Add Field Button */}
+                          {availableFields.length > 0 && (
+                            <Popover
+                              open={fieldSelectionOpen === cluster.id}
+                              onOpenChange={(open) =>
+                                setFieldSelectionOpen(open ? cluster.id : null)
+                              }
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-400 hover:text-primary transition-colors"
+                                  onClick={() =>
+                                    setFieldSelectionOpen(cluster.id)
+                                  }
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64" align="end">
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-semibold">
+                                    Add Field to Option
+                                  </Label>
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Select a field to add to this option
+                                  </p>
+                                  <div className="max-h-48 overflow-y-auto space-y-1">
+                                    {availableFields.map((field) => (
+                                      <Button
+                                        key={field.id}
+                                        variant="ghost"
+                                        className="w-full justify-start text-sm h-auto py-2"
+                                        onClick={() =>
+                                          handleAddFieldToCluster(
+                                            cluster.id,
+                                            field.id,
+                                          )
+                                        }
+                                      >
+                                        {field.label}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          )}
+                          {/* Delete Button */}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-red-500 transition-colors"
+                            onClick={() =>
+                              handleDeleteCluster(
+                                DEFAULT_EXCLUSIVE_GROUP,
+                                cluster.id,
+                              )
+                            }
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add New Option Button */}
+                  <Button
+                    variant="outline"
+                    className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all font-medium"
+                    onClick={() => setShowCreateForm(true)}
+                  >
+                    <Plus className="w-5 h-5" />
+                    Add New Option
+                  </Button>
+                </div>
+              )}
+
+              {/* Create Form (shown when Add New Option is clicked in populated state) */}
+              {showCreateForm && totalOptionsCount > 0 && (
+                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="text-left">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 block">
+                      Option Name
+                    </Label>
+                    <Input
+                      value={newClusterName}
+                      onChange={(e) => setNewClusterName(e.target.value)}
+                      placeholder="e.g., Simple Toggle, Warehouse, Detailed..."
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleCreateCluster();
+                        } else if (e.key === "Escape") {
+                          setShowCreateForm(false);
+                          setNewClusterName("");
+                        }
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setShowCreateForm(false);
+                        setNewClusterName("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleCreateCluster}
+                      disabled={!newClusterName.trim()}
+                    >
+                      Save Option
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Info Box */}
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-lg flex gap-3">
+            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-blue-800 dark:text-blue-300">
+              To add a new option, create it above, then assign fields to it in
+              their individual settings. The option will appear active once
+              fields are linked.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Original Card layout (backward compatibility)
   return (
     <Card>
       <CardHeader>
@@ -416,7 +900,7 @@ export function MutuallyExclusiveGroupManager({
                           {clusters.map((cluster) => {
                             const clusterFields = cluster.fieldIds
                               .map((fieldId) =>
-                                fields.find((f) => f.id === fieldId)
+                                fields.find((f) => f.id === fieldId),
                               )
                               .filter((f): f is FieldConfig => f !== undefined);
 
@@ -514,14 +998,14 @@ export function MutuallyExclusiveGroupManager({
                                       displayName: cluster.displayName,
                                       fieldLabels: cluster.fieldIds
                                         .map((fieldId) =>
-                                          fields.find((f) => f.id === fieldId)
+                                          fields.find((f) => f.id === fieldId),
                                         )
                                         .filter(
                                           (f): f is FieldConfig =>
-                                            f !== undefined
+                                            f !== undefined,
                                         )
                                         .map((f) => f.label),
-                                    })
+                                    }),
                                   )}
                                 />
                               </div>
