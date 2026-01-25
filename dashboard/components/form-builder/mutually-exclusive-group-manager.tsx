@@ -244,7 +244,6 @@ export function MutuallyExclusiveGroupManager({
   }, [groups]);
 
   // Combine clusters from fields with created clusters (so newly created options appear immediately)
-  // Use a more stable comparison to prevent unnecessary recalculations
   const allClusters = useMemo(() => {
     const clusterMap = new Map<string, ClusterInfo>();
 
@@ -265,18 +264,7 @@ export function MutuallyExclusiveGroupManager({
     });
 
     return Array.from(clusterMap.values());
-  }, [
-    // Use JSON.stringify for stable comparison of cluster arrays
-    // This prevents recalculation when array reference changes but content is the same
-    JSON.stringify(
-      defaultGroupClusters.map((c) => ({
-        id: c.id,
-        fieldCount: c.fieldIds.length,
-      })),
-    ),
-    // Use joined string for createdClusters to avoid array reference issues
-    createdClusters.join(","),
-  ]);
+  }, [defaultGroupClusters, createdClusters]);
 
   // Calculate total options count
   const totalOptionsCount = allClusters.length;
@@ -516,16 +504,20 @@ export function MutuallyExclusiveGroupManager({
                                   <span>{field.label}</span>
                                   <button
                                     onClick={() => {
-                                      // Optimistic update happens immediately in the hook
-                                      // Don't await to prevent UI jitter
-                                      onUpdateField(field.id, {
-                                        mutually_exclusive_group: null,
-                                        group_cluster: null,
-                                      }).catch((err) => {
-                                        console.error(
-                                          "Failed to remove field from option:",
-                                          err,
-                                        );
+                                      // Use requestAnimationFrame to batch the update with the next paint
+                                      // This reduces jitter by ensuring smooth state transitions
+                                      requestAnimationFrame(() => {
+                                        // Optimistic update happens immediately in the hook
+                                        // Don't await to prevent UI jitter
+                                        onUpdateField(field.id, {
+                                          mutually_exclusive_group: null,
+                                          group_cluster: null,
+                                        }).catch((err) => {
+                                          console.error(
+                                            "Failed to remove field from option:",
+                                            err,
+                                          );
+                                        });
                                       });
                                     }}
                                     className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-0.5 -mr-1"

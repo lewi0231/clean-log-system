@@ -953,21 +953,23 @@ export function VisualFormBuilder({
                                     </Badge>
                                   )}
                                   {clusterId && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[10px] px-1.5 border-dashed border-primary/40 text-primary"
-                                        >
-                                          Cluster: {clusterId}
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Fields sharing a cluster act as one
-                                        option inside their exclusive group
-                                        (e.g., wiped + soaped details).
-                                      </TooltipContent>
-                                    </Tooltip>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] px-1.5 border-dashed border-primary/40 text-primary"
+                                          >
+                                            Cluster: {clusterId}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          Fields sharing a cluster act as one
+                                          option inside their exclusive group
+                                          (e.g., wiped + soaped details).
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                   )}
                                   {locationRestrictionsMap.get(field.id) &&
                                     locationRestrictionsMap.get(field.id)!

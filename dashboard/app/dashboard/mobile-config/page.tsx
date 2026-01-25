@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 // 2. Third-party
-import { ChevronDown, ChevronRight, Package, Sparkles } from "lucide-react";
+import { HelpCircle, Package, Settings, Sparkles } from "lucide-react";
 
 // 3. Internal components
 import { VisualFormBuilder } from "@/components/form-builder";
@@ -22,12 +22,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { PageHeaderSkeleton } from "@/components/ui/skeleton-loaders";
 
 // 4. Hooks
@@ -42,7 +49,8 @@ import { supabase } from "@/lib/supabase";
 import { getTemplateDescription } from "@/lib/templates";
 
 export default function MobileConfigPage() {
-  const [advancedSectionOpen, setAdvancedSectionOpen] = useState(false);
+  const [advancedOptionsModalOpen, setAdvancedOptionsModalOpen] =
+    useState(false);
   const [createdClusters, setCreatedClusters] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
@@ -119,7 +127,17 @@ export default function MobileConfigPage() {
                   {labels.mobileConfigDescription}
                 </p>
               </div>
-              <TourTriggerButton />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setAdvancedOptionsModalOpen(true)}
+                  className="cursor-pointer"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Selection Group Settings
+                </Button>
+                <TourTriggerButton />
+              </div>
             </div>
           </div>
           {/* Reset to Template button disabled for now */}
@@ -168,60 +186,78 @@ export default function MobileConfigPage() {
             createdClusters={createdClusters}
           />
         )}
-
-        {/* Choose One Options Configuration */}
-        <Collapsible
-          open={advancedSectionOpen}
-          onOpenChange={setAdvancedSectionOpen}
-        >
-          <Card>
-            <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Advanced Options</CardTitle>
-                  </div>
-                  {advancedSectionOpen ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                </div>
-              </CardHeader>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent>
-                <MutuallyExclusiveGroupManager
-                  fields={optimisticFieldConfigs}
-                  onUpdateField={handleUpdateFieldConfig}
-                  createdClusters={createdClusters}
-                  onCreatedClustersChange={setCreatedClusters}
-                  defaultExclusiveGroupLabel={
-                    settings?.default_exclusive_group_label || null
-                  }
-                  onUpdateDefaultExclusiveGroupLabel={async (label) => {
-                    if (!organizationId) return;
-                    const { error } = await supabase.functions.invoke(
-                      "update-organization-settings",
-                      {
-                        body: {
-                          organization_id: organizationId,
-                          default_exclusive_group_label: label,
-                        },
-                      }
-                    );
-                    if (error) throw error;
-                    // Invalidate settings query to refetch updated data
-                    queryClient.invalidateQueries({
-                      queryKey: organizationSettingsKey(organizationId),
-                    });
-                  }}
-                />
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
       </div>
+
+      {/* Advanced Options Modal */}
+      <Dialog
+        open={advancedOptionsModalOpen}
+        onOpenChange={setAdvancedOptionsModalOpen}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <DialogTitle>Selection Group Settings</DialogTitle>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/20"
+                  >
+                    <HelpCircle className="w-4 h-4 text-indigo-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="start">
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-indigo-900 dark:text-indigo-200">
+                      How it works?
+                    </h4>
+                    <p className="text-sm text-indigo-700/80 dark:text-indigo-300/80 leading-relaxed">
+                      Workers will see these options in a single-select dropdown
+                      menu. When they select an option, only the fields assigned
+                      to that option will be visible to them.
+                    </p>
+                    <p className="text-sm text-indigo-700/80 dark:text-indigo-300/80 leading-relaxed">
+                      This helps reduce clutter and ensures workers only fill
+                      out relevant data for their specific task.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <DialogDescription>
+              Configure how workers select specific task options in the field
+            </DialogDescription>
+          </DialogHeader>
+          <MutuallyExclusiveGroupManager
+            fields={optimisticFieldConfigs}
+            onUpdateField={handleUpdateFieldConfig}
+            createdClusters={createdClusters}
+            onCreatedClustersChange={setCreatedClusters}
+            defaultExclusiveGroupLabel={
+              settings?.default_exclusive_group_label || null
+            }
+            onUpdateDefaultExclusiveGroupLabel={async (label) => {
+              if (!organizationId) return;
+              const { error } = await supabase.functions.invoke(
+                "update-organization-settings",
+                {
+                  body: {
+                    organization_id: organizationId,
+                    default_exclusive_group_label: label,
+                  },
+                },
+              );
+              if (error) throw error;
+              // Invalidate settings query to refetch updated data
+              queryClient.invalidateQueries({
+                queryKey: organizationSettingsKey(organizationId),
+              });
+            }}
+            isInModal={true}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Reset Template Dialog */}
       <AlertDialog
