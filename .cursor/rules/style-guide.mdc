@@ -1,8 +1,10 @@
 ---
+description: 
 alwaysApply: true
 ---
+
 # Overview
 
 Always adhere to the following guidelines and all references within:
 
-/Users/paullewis/Coding/portfolio-websites/clean-log-system/docs/decisions/style-guide/README.md
+/Users/paullewis/Coding/portfolio-websites/clean-log-system/docs/decisions/style-guide/README.md and the AI_INDEX.md guide which can be found here /Users/paullewis/Coding/portfolio-websites/clean-log-system/docs/decisions/style-guide/AI_INDEX.md

@@ -16,7 +16,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex min-h-screen relative">
           <DashboardSidebar />
           <main className="flex-1 ml-64 pt-20">
-            <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-[calc(100%-2rem)]">
+            <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8 max-w-[calc(100%-3rem)]">
               {children}
             </div>
           </main>

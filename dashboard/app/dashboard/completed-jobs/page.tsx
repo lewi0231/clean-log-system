@@ -130,7 +130,7 @@ export default function CompletedJobsPage() {
   }
 
   return (
-    <div className="min-w-[calc(100vw-320px)] pr-6 max-w-screen">
+    <div className="min-w-[calc(100vw-300px)] pr-6 max-w-[calc(100%-300px)]">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Completed Jobs</h1>
