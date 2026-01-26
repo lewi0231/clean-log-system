@@ -174,6 +174,7 @@ export interface ListFeedbackResponse {
 // Field Configs API
 export interface ListFieldConfigsRequest {
   organization_id: string;
+  location_id?: string | null;
 }
 
 export interface ListFieldConfigsResponse {

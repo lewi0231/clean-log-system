@@ -321,12 +321,15 @@ export default function CreateJobDialog({
 }: CreateJobDialogProps) {
   const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
-  const { fieldConfigs } = useFieldConfigs();
+  const [locationId, setLocationId] = useState<string>("");
+  // Normalize locationId: treat empty string as null
+  const normalizedLocationId = locationId && locationId.trim() !== "" ? locationId : null;
+  const { fieldConfigs } = useFieldConfigs({
+    locationId: normalizedLocationId,
+  });
   const { locations } = useLocations();
   const { workers } = useWorkers();
   const { createJob } = useJobs();
-
-  const [locationId, setLocationId] = useState<string>("");
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
   const [startDateTime, setStartDateTime] = useState<string>("");
   const [finishDateTime, setFinishDateTime] = useState<string>(
@@ -566,6 +569,9 @@ export default function CreateJobDialog({
           const minutes = now.getMinutes().toString().padStart(2, "0");
           submissionData[config.name] = `${hours}:${minutes}`;
         }
+      } else if (config.field_type === "boolean") {
+        // Boolean fields should always be true or false, never empty string
+        submissionData[config.name] = value === true ? true : false;
       } else {
         submissionData[config.name] = value ?? (config.required ? null : "");
       }
