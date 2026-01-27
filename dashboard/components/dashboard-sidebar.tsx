@@ -7,11 +7,12 @@ import {
   Clipboard,
   DollarSign,
   FileText,
+  HelpCircle,
   Settings,
   Smartphone,
   Star,
   Users,
-  Wallet
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -65,7 +66,11 @@ const navigation = [
   //   href: "/dashboard/visualizations",
   //   icon: ChartBar,
   // },
-  // System Settings
+  {
+    name: "Help",
+    href: "/dashboard/help",
+    icon: HelpCircle,
+  },
   {
     name: "Settings",
     href: "/dashboard/settings",

@@ -40,6 +40,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { organizationSettingsKey } from "@/app/query-provider";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -59,7 +60,9 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function SettingsPage() {
   const {
@@ -67,6 +70,8 @@ export default function SettingsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
   // Separate state for business address fields
   const [businessAddressFields, setBusinessAddressFields] = useState({
@@ -629,6 +634,51 @@ export default function SettingsPage() {
     log.info("Settings: Primary contact phone updated successfully");
   };
 
+  const handleTogglePredefinedLocations = async (checked: boolean) => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating predefined locations setting", { checked });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            use_predefined_locations: checked,
+          },
+        }
+      );
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          use_predefined_locations:
+            data.settings.use_predefined_locations ?? true,
+        }));
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+
+      log.info("Settings: Predefined locations setting updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update predefined locations setting", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
   // Helper function to capitalize first letter of each word (title case)
   const toTitleCase = (str: string): string => {
     return str
@@ -1038,7 +1088,16 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="organization" className="space-y-6">
+      <Tabs
+        defaultValue={
+          ["organization", "features", "payment"].includes(
+            searchParams.get("tab") || ""
+          )
+            ? searchParams.get("tab")!
+            : "organization"
+        }
+        className="space-y-6"
+      >
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
           <TabsTrigger value="features">Feature Specific</TabsTrigger>
@@ -1358,19 +1417,37 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Locations Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure mobile app location integration
-                  </p>
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="predefined-locations"
+                      className="text-base font-semibold"
+                    >
+                      Customer Locations
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When enabled, your Customer Locations will appear as
+                      selectable options in the mobile app. Workers can choose
+                      from your locations when completing jobs. You can still
+                      configure custom fields in Mobile Application regardless
+                      of this setting.
+                    </p>
+                  </div>
+                  <Switch
+                    id="predefined-locations"
+                    checked={settings.use_predefined_locations ?? true}
+                    onCheckedChange={handleTogglePredefinedLocations}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/locations">
-                    Go to Locations
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <Link
+                  href="/dashboard/locations"
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Manage locations
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
               </div>
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>

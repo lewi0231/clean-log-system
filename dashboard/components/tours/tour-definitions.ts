@@ -53,14 +53,7 @@ export const locationsTourSteps: TourStep[] = [
         target: "[data-tour='locations-tab']",
         title: "Customer Locations",
         content:
-            "Manage all your customer locations here. These are the sites where your workers complete jobs.",
-        position: "bottom",
-    },
-    {
-        target: "[data-tour='location-settings']",
-        title: "Location Settings",
-        content:
-            "Configure whether locations appear in the mobile app. When enabled, workers can select from your predefined locations when completing jobs.",
+            "Manage all your customer locations here. These are the sites where your workers complete jobs. Configure whether locations appear in the mobile app via the link in the page subtitle (Settings > Feature Specific).",
         position: "bottom",
     },
     {
