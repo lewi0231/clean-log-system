@@ -22,7 +22,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -52,6 +51,7 @@ interface FieldConfigDialogProps {
       | "updated_at"
     >
   ) => Promise<void>;
+  organizationId: string | null;
 }
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = {
@@ -76,6 +76,7 @@ export function FieldConfigDialog({
   sections,
   existingFieldNames,
   onSave,
+  organizationId,
 }: FieldConfigDialogProps) {
   const [label, setLabel] = useState("");
   const [name, setName] = useState("");
@@ -90,7 +91,6 @@ export function FieldConfigDialog({
   const nameManuallyEditedRef = useRef(false);
 
   const { locations } = useLocations();
-  const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
 
   // Update name when label changes (only if not manually edited)

@@ -117,7 +117,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
       });
 
       // Mock useFieldPricing to return different values based on pricingContext
-      vi.mocked(useFieldPricing).mockImplementation((options) => {
+      vi.mocked(useFieldPricing).mockImplementation((organizationId, options) => {
         if (options?.pricingContext === "customer") {
           return {
             fieldPricing: [
@@ -162,6 +162,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
         <FieldPricingList
           locationHierarchyId={null}
           locationId={null}
+          organizationId="org-1"
         />
       );
 
@@ -192,7 +193,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
       });
 
       // Mock useFieldPricing to return different values based on pricingContext
-      vi.mocked(useFieldPricing).mockImplementation((options) => {
+      vi.mocked(useFieldPricing).mockImplementation((organizationId, options) => {
         if (options?.pricingContext === "customer") {
           return {
             fieldPricing: [
@@ -237,6 +238,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
         <FieldPricingList
           locationHierarchyId={null}
           locationId={null}
+          organizationId="org-1"
         />
       );
 
@@ -266,7 +268,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
       });
 
       // Mock useFieldPricing to return different values based on pricingContext
-      vi.mocked(useFieldPricing).mockImplementation((options) => {
+      vi.mocked(useFieldPricing).mockImplementation((organizationId, options) => {
         if (options?.pricingContext === "customer") {
           return {
             fieldPricing: [
@@ -311,6 +313,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
         <FieldPricingList
           locationHierarchyId={null}
           locationId={null}
+          organizationId="org-1"
         />
       );
 

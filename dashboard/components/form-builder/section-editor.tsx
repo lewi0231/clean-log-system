@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
@@ -100,6 +99,7 @@ interface SectionEditorProps {
   onSectionFieldDragStart?: (fieldId: string) => void;
   onSectionFieldDragEnd?: () => void;
   createdClusters?: string[];
+  organizationId: string | null;
 }
 
 interface SectionFormData {
@@ -146,6 +146,7 @@ export function SectionEditor({
   onSectionFieldDragStart,
   onSectionFieldDragEnd,
   createdClusters = [],
+  organizationId,
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSection, setEditingSection] =
@@ -192,7 +193,6 @@ export function SectionEditor({
   const editingFieldsRef = useRef<Set<string>>(new Set());
 
   const { locations } = useLocations();
-  const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
   const fieldMap = useMemo(
     () => new Map(fields.map((field) => [field.id, field])),
