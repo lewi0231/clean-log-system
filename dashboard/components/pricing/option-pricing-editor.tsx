@@ -26,6 +26,7 @@ interface OptionPricingEditorProps {
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
+  organizationId: string | null;
 }
 
 export default function OptionPricingEditor({
@@ -33,6 +34,7 @@ export default function OptionPricingEditor({
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
+  organizationId,
 }: OptionPricingEditorProps) {
   const { pricingContext, showBothContexts } = usePricingScope();
   const {
@@ -41,7 +43,7 @@ export default function OptionPricingEditor({
     error: customerError,
     upsertPricing: upsertCustomerPricing,
     refetch: refetchCustomerPricing,
-  } = useOptionPricing(fieldConfig.id, {
+  } = useOptionPricing(organizationId, fieldConfig.id, {
     locationHierarchyId,
     locationId,
     effectiveAt,
@@ -53,7 +55,7 @@ export default function OptionPricingEditor({
     error: workerError,
     upsertPricing: upsertWorkerPricing,
     refetch: refetchWorkerPricing,
-  } = useOptionPricing(fieldConfig.id, {
+  } = useOptionPricing(organizationId, fieldConfig.id, {
     locationHierarchyId,
     locationId,
     effectiveAt,

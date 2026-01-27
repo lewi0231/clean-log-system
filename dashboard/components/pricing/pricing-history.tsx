@@ -25,7 +25,11 @@ import type { PricingHistoryEntry } from "@/lib/services/pricing.service";
 import { ArrowUpDown, Calendar, MapPin } from "lucide-react";
 import { useMemo, useState } from "react";
 
-export function PricingHistory() {
+interface PricingHistoryProps {
+  organizationId: string | null;
+}
+
+export function PricingHistory({ organizationId }: PricingHistoryProps) {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [pricingContext, setPricingContext] = useState<
@@ -36,7 +40,7 @@ export function PricingHistory() {
 
   const { pricingHistoryRefreshToken } = usePricingScope();
 
-  const { historyEntries, loading, error } = usePricingHistory({
+  const { historyEntries, loading, error } = usePricingHistory(organizationId, {
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
     pricingContext: pricingContext === "all" ? undefined : pricingContext,

@@ -28,7 +28,6 @@ import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { JobsService } from "@/lib/services/jobs.service";
@@ -277,13 +276,14 @@ function GroupedBreakdownField({
 interface TestInvoiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  organizationId: string | null;
 }
 
 export default function TestInvoiceModal({
   open,
   onOpenChange,
+  organizationId,
 }: TestInvoiceModalProps) {
-  const { organizationId } = useOrganization();
   const { fieldConfigs, loading: fieldsLoading } = useFieldConfigs();
   const { sections } = useMobileConfig(organizationId);
   const { locations, loading: locationsLoading } = useLocations();

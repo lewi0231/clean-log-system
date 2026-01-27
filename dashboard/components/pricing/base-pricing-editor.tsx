@@ -60,12 +60,14 @@ interface BasePricingEditorProps {
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
+  organizationId: string | null;
 }
 
 export default function BasePricingEditor({
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
+  organizationId,
 }: BasePricingEditorProps) {
   const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
   const { fieldConfigs } = useFieldConfigs();
@@ -77,7 +79,7 @@ export default function BasePricingEditor({
     error: customerError,
     upsertPricing: upsertCustomerPricing,
     deletePricing: deleteCustomerPricing,
-  } = useBasePricing({
+  } = useBasePricing(organizationId, {
     locationHierarchyId,
     locationId,
     effectiveAt,
@@ -89,7 +91,7 @@ export default function BasePricingEditor({
     error: workerError,
     upsertPricing: upsertWorkerPricing,
     deletePricing: deleteWorkerPricing,
-  } = useBasePricing({
+  } = useBasePricing(organizationId, {
     locationHierarchyId,
     locationId,
     effectiveAt,

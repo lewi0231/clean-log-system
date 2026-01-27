@@ -57,6 +57,7 @@ interface FieldPricingListProps {
   effectiveAt?: string | null;
   refreshToken?: number;
   fieldTypeFilter?: FieldType; // Filter to show only specific field type
+  organizationId: string | null;
 }
 
 export default function FieldPricingList({
@@ -65,6 +66,7 @@ export default function FieldPricingList({
   effectiveAt = null,
   refreshToken,
   fieldTypeFilter,
+  organizationId,
 }: FieldPricingListProps) {
   const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
   const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
@@ -75,7 +77,7 @@ export default function FieldPricingList({
     upsertPricing: upsertCustomerPricing,
     deletePricing: deleteCustomerPricing,
     refetch: refetchCustomerPricing,
-  } = useFieldPricing({
+  } = useFieldPricing(organizationId, {
     locationHierarchyId,
     locationId,
     effectiveAt,
@@ -89,7 +91,7 @@ export default function FieldPricingList({
     upsertPricing: upsertWorkerPricing,
     deletePricing: deleteWorkerPricing,
     refetch: refetchWorkerPricing,
-  } = useFieldPricing({
+  } = useFieldPricing(organizationId, {
     locationHierarchyId,
     locationId,
     effectiveAt,

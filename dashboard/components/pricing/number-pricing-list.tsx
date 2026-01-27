@@ -7,6 +7,7 @@ interface NumberPricingListProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   refreshToken?: number;
+  organizationId: string | null;
 }
 
 export default function NumberPricingList(props: NumberPricingListProps) {

@@ -107,6 +107,7 @@ export default function PricingPage() {
         booleanFields={booleanFields}
         selectFields={selectFields}
         groupedBreakdownFields={groupedBreakdownFields}
+        organizationId={organizationId}
       />
     </PricingScopeProvider>
   );
@@ -117,6 +118,7 @@ interface PricingPageContentProps {
   booleanFields: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
   selectFields: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
   groupedBreakdownFields: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
+  organizationId: string | null;
 }
 
 function PricingPageContent({
@@ -124,6 +126,7 @@ function PricingPageContent({
   booleanFields,
   selectFields,
   groupedBreakdownFields,
+  organizationId,
 }: PricingPageContentProps) {
   const {
     locationNodeId,
@@ -318,6 +321,7 @@ function PricingPageContent({
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
+                        organizationId={organizationId}
                       />
                     </CardContent>
                   </CollapsibleContent>
@@ -514,6 +518,7 @@ function PricingPageContent({
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
+                        organizationId={organizationId}
                       />
                     </CardContent>
                   </Card>
@@ -546,6 +551,7 @@ function PricingPageContent({
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
+                        organizationId={organizationId}
                       />
                     </CardContent>
                   </Card>
@@ -592,6 +598,7 @@ function PricingPageContent({
                                 locationHierarchyId={locationNodeId}
                                 locationId={locationId}
                                 effectiveAt={effectiveDate}
+                                organizationId={organizationId}
                               />
                             </div>
                           ))}
@@ -668,6 +675,7 @@ function PricingPageContent({
                                 locationHierarchyId={locationNodeId}
                                 locationId={locationId}
                                 effectiveAt={effectiveDate}
+                                organizationId={organizationId}
                               />
                             </div>
                           ))}
@@ -710,7 +718,7 @@ function PricingPageContent({
 
         <TabsContent value="pricing-history" className="space-y-6">
           <div data-tour="pricing-history-tab">
-            <PricingHistory />
+            <PricingHistory organizationId={organizationId} />
           </div>
         </TabsContent>
       </Tabs>
@@ -730,6 +738,7 @@ function PricingPageContent({
       <TestInvoiceModal
         open={testInvoiceOpen}
         onOpenChange={setTestInvoiceOpen}
+        organizationId={organizationId}
       />
     </PageTourWrapper>
   );
