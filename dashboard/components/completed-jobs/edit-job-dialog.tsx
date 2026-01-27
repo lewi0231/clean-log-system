@@ -21,11 +21,9 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
-import { useJobs } from "@/hooks/use-jobs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import type { Job } from "@/lib/types";
 import type { UpdateJobRequest } from "@/lib/types/api";
@@ -43,6 +41,8 @@ interface EditJobDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   job: Job | null;
+  updateJob: (request: UpdateJobRequest) => Promise<Job>;
+  organizationId: string | null;
 }
 
 // Helper to evaluate conditional logic
@@ -321,15 +321,18 @@ export default function EditJobDialog({
   onOpenChange,
   onSuccess,
   job,
+  updateJob,
+  organizationId,
 }: EditJobDialogProps) {
-  const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
-  const { fieldConfigs } = useFieldConfigs();
+  const [locationId, setLocationId] = useState<string>("");
+  // Normalize locationId: treat empty string as null
+  const normalizedLocationId = locationId && locationId.trim() !== "" ? locationId : null;
+  const { fieldConfigs } = useFieldConfigs({
+    locationId: normalizedLocationId,
+  });
   const { locations } = useLocations();
   const { workers } = useWorkers();
-  const { updateJob } = useJobs();
-
-  const [locationId, setLocationId] = useState<string>("");
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
   const [startDateTime, setStartDateTime] = useState<string>("");
   const [finishDateTime, setFinishDateTime] = useState<string>(
@@ -648,6 +651,9 @@ export default function EditJobDialog({
           const minutes = now.getMinutes().toString().padStart(2, "0");
           submissionData[config.name] = `${hours}:${minutes}`;
         }
+      } else if (config.field_type === "boolean") {
+        // Boolean fields should always be true or false, never empty string
+        submissionData[config.name] = value === true ? true : false;
       } else {
         submissionData[config.name] = value ?? (config.required ? null : "");
       }

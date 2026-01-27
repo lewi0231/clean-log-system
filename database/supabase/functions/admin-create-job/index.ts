@@ -271,6 +271,7 @@ serve(async (req) => {
       submission_data: submission_data,
       completed_at: normalizedCompletedAt,
       is_test: isTestJob,
+      submitted_by_email: userEmail, // Track who created the job
     };
     logger.debug("Inserting job for admin", {
       organizationId,

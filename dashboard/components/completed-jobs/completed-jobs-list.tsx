@@ -11,8 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
-import useOrganization from "@/hooks/useOrganization";
-import { InvoiceStatus, Job } from "@/lib/types";
+import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
+import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
+import { CheckCircle2 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import JobDetailDialog from "./job-detail-dialog";
 
@@ -22,6 +23,10 @@ interface CompletedJobsListProps {
   error: string | null;
   isAdmin?: boolean;
   onJobUpdated?: () => void;
+  updateJob: (request: UpdateJobRequest) => Promise<Job>;
+  getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
+  sendFeedbackEmail: (jobId: string) => Promise<void>;
+  organizationId: string | null;
 }
 
 // Standard fields that should be displayed in a specific order
@@ -33,9 +38,12 @@ export default function CompletedJobsList({
   error,
   isAdmin = false,
   onJobUpdated,
+  updateJob,
+  getJobEdits,
+  sendFeedbackEmail,
+  organizationId,
 }: CompletedJobsListProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const { organizationId } = useOrganization();
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
 
   // Extract all unique keys from submission_data across all jobs
@@ -56,6 +64,7 @@ export default function CompletedJobsList({
       {
         id: string;
         name: string;
+        field_type: string;
         order_position: number;
         section_id: string | null;
       }
@@ -64,6 +73,7 @@ export default function CompletedJobsList({
       map.set(fc.name, {
         id: fc.id,
         name: fc.name,
+        field_type: fc.field_type,
         order_position: fc.order_position,
         section_id: fc.section_id,
       });
@@ -89,7 +99,7 @@ export default function CompletedJobsList({
 
     // Sort sections by order_position
     const sortedSections = [...sections].sort(
-      (a, b) => a.order_position - b.order_position
+      (a, b) => a.order_position - b.order_position,
     );
 
     // Create a set of all field IDs that are in sections
@@ -110,7 +120,7 @@ export default function CompletedJobsList({
           fieldConfig &&
           submissionDataKeys.includes(fieldConfig.name) &&
           !STANDARD_FIELDS.includes(
-            fieldConfig.name as (typeof STANDARD_FIELDS)[number]
+            fieldConfig.name as (typeof STANDARD_FIELDS)[number],
           )
         ) {
           // Only add if not already in standard fields
@@ -148,15 +158,64 @@ export default function CompletedJobsList({
 
   const formatValue = (
     value: unknown,
-    fieldExists: boolean
+    fieldExists: boolean,
+    fieldName?: string,
   ): string | React.ReactNode => {
     // If field doesn't exist in this job's submission_data, show N/A indicator
     if (!fieldExists) {
-      return <span className="text-muted-foreground italic text-xs">N/A</span>;
+      return <span className="text-muted-foreground italic text-xs">-</span>;
     }
 
     if (value === null || value === undefined) {
       return "-";
+    }
+
+    // Handle boolean values (check before string to catch actual booleans)
+    // Also handle string "true"/"false" which can occur in JSON
+    if (typeof value === "boolean") {
+      return value ? (
+        <CheckCircle2
+          className="h-4 w-4 text-green-600 mx-auto"
+          aria-label="Yes"
+        />
+      ) : (
+        <span className="text-muted-foreground text-center">-</span>
+      );
+    }
+
+    // Handle string "true"/"false" values (can occur when JSON stores booleans as strings)
+    if (typeof value === "string" && (value === "true" || value === "false")) {
+      return value === "true" ? (
+        <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Yes" />
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      );
+    }
+
+    // Handle empty string for boolean fields (legacy data - should be treated as false)
+    if (typeof value === "string" && value === "" && fieldName) {
+      const fieldConfig = fieldConfigMap.get(fieldName);
+      if (fieldConfig?.field_type === "boolean") {
+        return <span className="text-muted-foreground">-</span>;
+      }
+    }
+
+    // Check for number 1/0 (legacy data format)
+    if (typeof value === "number" && (value === 1 || value === 0)) {
+      return value === 1 ? (
+        <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Yes" />
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      );
+    }
+
+    // Check for capitalized True/False (legacy data format)
+    if (typeof value === "string" && (value === "True" || value === "False")) {
+      return value === "True" ? (
+        <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Yes" />
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      );
     }
 
     // Handle date/time strings
@@ -171,10 +230,6 @@ export default function CompletedJobsList({
         }
       }
     }
-
-    if (typeof value === "boolean") {
-      return value ? "Yes" : "No";
-    }
     if (Array.isArray(value)) {
       // Handle arrays of objects (like grouped breakdown)
       if (value.length === 0) {
@@ -187,7 +242,7 @@ export default function CompletedJobsList({
             typeof item === "object" &&
             item !== null &&
             "brand" in item &&
-            "quantity" in item
+            "quantity" in item,
         )
       ) {
         // Format as "Option: Quantity, Option: Quantity"
@@ -225,7 +280,7 @@ export default function CompletedJobsList({
 
   // Calculate feedback status
   const getFeedbackStatus = (
-    job: Job
+    job: Job,
   ): {
     label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
@@ -255,7 +310,7 @@ export default function CompletedJobsList({
 
   // Calculate job status from invoice data
   const getJobStatus = (
-    job: Job
+    job: Job,
   ): {
     status: "not_invoiced" | InvoiceStatus;
     label: string;
@@ -332,13 +387,13 @@ export default function CompletedJobsList({
     );
   }
 
-  // Column order: Status, Location, Workers, Ordered Fields, Completed At
-  const totalColumns = 2 + orderedFields.length + 2; // Status, Location, Workers, ordered fields, Completed At
+  // Column order: Status, Location, Workers, Ordered Fields, Submitted By, Completed At
+  const totalColumns = 2 + orderedFields.length + 3; // Status, Location, Workers, ordered fields, Submitted By, Completed At
 
   return (
-    <div className=" overflow-x-auto">
-      <div className="rounded-md border w-full">
-        <Table className="w-full">
+    <div className="w-full overflow-x-auto">
+      <div className="rounded-md border min-w-full">
+        <Table className="min-w-full">
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[120px]">Status</TableHead>
@@ -348,12 +403,15 @@ export default function CompletedJobsList({
                 <TableHead
                   key={key}
                   className={
-                    key === "notes" ? "min-w-[200px]" : "min-w-[120px]"
+                    key === "notes"
+                      ? "min-w-[200px]"
+                      : "min-w-[120px] text-center"
                   }
                 >
                   {formatColumnHeader(key)}
                 </TableHead>
               ))}
+              <TableHead className="min-w-[150px]">Submitted By</TableHead>
               <TableHead className="min-w-[150px]">Completed At</TableHead>
             </TableRow>
           </TableHeader>
@@ -394,10 +452,10 @@ export default function CompletedJobsList({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="mx-auto">
                     {job.location ? job.location.name : "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     {job.workers.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {job.workers.map((worker) => (
@@ -417,13 +475,16 @@ export default function CompletedJobsList({
                         className={
                           key === "notes"
                             ? "max-w-[300px] whitespace-normal"
-                            : ""
+                            : "text-center"
                         }
                       >
-                        {formatValue(value, fieldExists)}
+                        {formatValue(value, fieldExists, key)}
                       </TableCell>
                     );
                   })}
+                  <TableCell className="text-sm text-muted-foreground">
+                    {job.submitted_by_email || "-"}
+                  </TableCell>
                   <TableCell className="font-medium">
                     {new Date(job.completed_at).toLocaleString()}
                   </TableCell>
@@ -446,6 +507,11 @@ export default function CompletedJobsList({
         onEditSuccess={() => {
           onJobUpdated?.();
         }}
+        updateJob={updateJob}
+        getJobEdits={getJobEdits}
+        sendFeedbackEmail={sendFeedbackEmail}
+        jobs={jobs}
+        organizationId={organizationId}
       />
     </div>
   );

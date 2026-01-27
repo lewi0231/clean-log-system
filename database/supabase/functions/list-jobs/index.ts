@@ -37,6 +37,7 @@ serve(async (req) => {
         feedback_token,
         feedback_email_sent,
         feedback_email_sent_at,
+        submitted_by_email,
         location:location_id (
           id,
           name,

@@ -3,7 +3,6 @@
 import { PricingService } from "@/lib/services";
 import type { PricingHistoryEntry } from "@/lib/services/pricing.service";
 import { useEffect, useState } from "react";
-import useOrganization from "./useOrganization";
 
 interface UsePricingHistoryOptions {
   dateFrom?: string;
@@ -20,9 +19,9 @@ interface UsePricingHistoryResult {
 }
 
 export function usePricingHistory(
+  organizationId: string | null,
   options?: UsePricingHistoryOptions,
 ): UsePricingHistoryResult {
-  const { organizationId } = useOrganization();
   const [historyEntries, setHistoryEntries] = useState<PricingHistoryEntry[]>(
     [],
   );

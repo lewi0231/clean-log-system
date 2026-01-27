@@ -7,16 +7,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
+import { Job } from "@/lib/types";
 import { Briefcase, DollarSign, Users } from "lucide-react";
 import { useMemo } from "react";
 
-export default function PaymentOverview() {
-  const { jobs } = useJobs();
+interface PaymentOverviewProps {
+  jobs: Job[];
+}
+
+export default function PaymentOverview({ jobs }: PaymentOverviewProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { paymentHistory } = useWorkerPaymentHistory();
+  const { paymentHistory } = useWorkerPaymentHistory(jobs);
 
   // Get unique workers from jobs
   const uniqueWorkers = useMemo(() => {

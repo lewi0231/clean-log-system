@@ -22,7 +22,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocations } from "@/hooks/use-locations";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { fieldConfigSchema } from "@/lib/validations";
@@ -110,6 +109,7 @@ interface FieldConfigFormProps {
     fieldConfigId?: string
   ) => void | Promise<void>;
   fieldConfig?: FieldConfig | null;
+  organizationId: string | null;
 }
 
 export default function FieldConfigForm({
@@ -117,6 +117,7 @@ export default function FieldConfigForm({
   onOpenChange,
   onSuccess,
   fieldConfig,
+  organizationId,
 }: FieldConfigFormProps) {
   const [name, setName] = useState("");
   const [label, setLabel] = useState("");
@@ -146,7 +147,6 @@ export default function FieldConfigForm({
   const [loadingLocations, setLoadingLocations] = useState(false);
 
   const { locations } = useLocations();
-  const { organizationId } = useOrganization();
 
   const isEditMode = !!fieldConfig;
   const isSelectField = fieldType === "select";

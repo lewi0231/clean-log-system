@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useInvoices } from "@/hooks/use-invoices";
 import { useJobs } from "@/hooks/use-jobs";
-import useOrganization from "@/hooks/useOrganization";
 import type { Job } from "@/lib/types";
 import { format } from "date-fns";
 import { AlertCircle, CheckCircle2, Circle, Loader2 } from "lucide-react";
@@ -32,14 +31,15 @@ interface CreateInvoiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  organizationId: string | null;
 }
 
 export default function CreateInvoiceDialog({
   open,
   onOpenChange,
   onSuccess,
+  organizationId,
 }: CreateInvoiceDialogProps) {
-  const { organizationId } = useOrganization();
   const { jobs, loading: jobsLoading } = useJobs();
   const { calculateInvoice, createInvoice } = useInvoices();
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());

@@ -4,7 +4,6 @@ import { PricingService } from "@/lib/services";
 import type { UpsertPricingRuleRequest } from "@/lib/services/pricing.service";
 import type { BasePricing, PricingRule } from "@/lib/types";
 import { useEffect, useState } from "react";
-import useOrganization from "./useOrganization";
 
 interface UseBasePricingOptions {
   locationId?: string | null;
@@ -35,9 +34,9 @@ interface UseBasePricingResult {
 }
 
 export function useBasePricing(
+  organizationId: string | null,
   filters?: UseBasePricingOptions,
 ): UseBasePricingResult {
-  const { organizationId } = useOrganization();
   const [basePricing, setBasePricing] = useState<BasePricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

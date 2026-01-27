@@ -16,25 +16,7 @@ vi.mock("@/hooks/useOrganization", () => ({
   default: vi.fn(() => ({ organizationId: "org-123" })),
 }));
 
-vi.mock("@/hooks/use-jobs", () => ({
-  useJobs: vi.fn(() => ({
-    jobs: [
-      {
-        id: "job-1",
-        completed_at: "2024-01-15T10:00:00Z",
-        workers: [
-          { id: "worker-1", name: "John" },
-          { id: "worker-2", name: "Jane" },
-        ],
-      },
-      {
-        id: "job-2",
-        completed_at: "2024-01-16T10:00:00Z",
-        workers: [{ id: "worker-1", name: "John" }],
-      },
-    ],
-  })),
-}));
+// Note: useJobs is no longer used in useWorkerPaymentHistory, so this mock is not needed
 
 vi.mock("@/lib/services/worker-payment.service", async () => {
   const actual = await vi.importActual("@/lib/services/worker-payment.service");
@@ -78,6 +60,22 @@ const createWrapper = () => {
 };
 
 describe("useWorkerPaymentHistory", () => {
+  const mockJobs = [
+    {
+      id: "job-1",
+      completed_at: "2024-01-15T10:00:00Z",
+      workers: [
+        { id: "worker-1", name: "John" },
+        { id: "worker-2", name: "Jane" },
+      ],
+    },
+    {
+      id: "job-2",
+      completed_at: "2024-01-16T10:00:00Z",
+      workers: [{ id: "worker-1", name: "John" }],
+    },
+  ];
+
   const mockPayments: PaymentRecord[] = [
     {
       id: "batch-1",
@@ -138,7 +136,7 @@ describe("useWorkerPaymentHistory", () => {
 
   describe("hook initialization", () => {
     it("should fetch payment history from database on mount", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -155,7 +153,7 @@ describe("useWorkerPaymentHistory", () => {
         () => new Promise(() => {}) // Never resolves
       );
 
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -167,7 +165,7 @@ describe("useWorkerPaymentHistory", () => {
         new Error("Network error")
       );
 
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -185,7 +183,7 @@ describe("useWorkerPaymentHistory", () => {
         hasMore: false,
       });
 
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -199,7 +197,7 @@ describe("useWorkerPaymentHistory", () => {
 
   describe("addPayment", () => {
     it("should add payment optimistically to history", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -240,7 +238,7 @@ describe("useWorkerPaymentHistory", () => {
     });
 
     it("should calculate correct date range from jobs", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -277,7 +275,7 @@ describe("useWorkerPaymentHistory", () => {
     });
 
     it("should calculate correct worker count from jobs", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -316,7 +314,7 @@ describe("useWorkerPaymentHistory", () => {
 
   describe("filterByDateRange", () => {
     it("should filter payments by date range", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -335,7 +333,7 @@ describe("useWorkerPaymentHistory", () => {
     });
 
     it("should return all payments when no date range specified", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -350,7 +348,7 @@ describe("useWorkerPaymentHistory", () => {
 
   describe("filterByWorker", () => {
     it("should filter payments by worker ID", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -364,7 +362,7 @@ describe("useWorkerPaymentHistory", () => {
     });
 
     it("should filter payments for worker in single job", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -379,7 +377,7 @@ describe("useWorkerPaymentHistory", () => {
     });
 
     it("should return empty array for worker with no payments", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -394,7 +392,7 @@ describe("useWorkerPaymentHistory", () => {
 
   describe("invalidate", () => {
     it("should trigger refetch when invalidate is called", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 
@@ -416,7 +414,7 @@ describe("useWorkerPaymentHistory", () => {
 
   describe("refetch", () => {
     it("should refetch data when refetch is called", async () => {
-      const { result } = renderHook(() => useWorkerPaymentHistory(), {
+      const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
       });
 

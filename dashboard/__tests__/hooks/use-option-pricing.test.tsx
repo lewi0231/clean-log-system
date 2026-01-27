@@ -6,9 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
-vi.mock("@/hooks/useOrganization", () => ({
-  default: () => ({ organizationId: "org-1" }),
-}));
 
 // Helper to get today's date at midnight UTC for consistent effective_at matching
 const getTodayMidnightUTC = () => {
@@ -66,7 +63,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -84,6 +81,7 @@ describe("useOptionPricing", () => {
         field_config_id: "field-1",
         location_hierarchy_id: null,
         location_id: null,
+        effective_at: undefined,
         pricing_context: "customer",
       });
     });
@@ -99,7 +97,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "worker",
         })
       );
@@ -119,7 +117,7 @@ describe("useOptionPricing", () => {
       );
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -144,7 +142,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -192,7 +190,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -225,7 +223,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -275,7 +273,7 @@ describe("useOptionPricing", () => {
       );
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -309,7 +307,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "worker",
         })
       );
@@ -345,7 +343,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "worker",
         })
       );
@@ -373,7 +371,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "worker",
         })
       );
@@ -408,7 +406,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -439,7 +437,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -473,7 +471,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
           locationId: "location-1",
         })
@@ -506,7 +504,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
           locationHierarchyId: "hierarchy-1",
         })
@@ -541,7 +539,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );
@@ -578,7 +576,7 @@ describe("useOptionPricing", () => {
       vi.mocked(PricingService.deleteRule).mockResolvedValue(undefined);
 
       const { result } = renderHook(() =>
-        useOptionPricing("field-1", {
+        useOptionPricing("org-1", "field-1", {
           pricingContext: "customer",
         })
       );

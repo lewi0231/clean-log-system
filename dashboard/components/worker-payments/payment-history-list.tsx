@@ -19,10 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
-import useOrganization from "@/hooks/useOrganization";
+import { Job } from "@/lib/types";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { cn } from "@/lib/utils";
@@ -99,12 +98,18 @@ const statusConfig: Record<
   },
 };
 
-export default function PaymentHistoryList() {
+interface PaymentHistoryListProps {
+  jobs: Job[];
+  organizationId: string | null;
+}
+
+export default function PaymentHistoryList({
+  jobs,
+  organizationId,
+}: PaymentHistoryListProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { organizationId } = useOrganization();
-  const { jobs } = useJobs();
   const { paymentHistory, filterByDateRange, invalidate } =
-    useWorkerPaymentHistory();
+    useWorkerPaymentHistory(jobs);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
@@ -322,6 +327,7 @@ export default function PaymentHistoryList() {
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           payment={selectedPayment}
+          jobs={jobs}
         />
       )}
 
@@ -339,6 +345,7 @@ export default function PaymentHistoryList() {
             // Invalidate cache to refresh payment history
             invalidate();
           }}
+          organizationId={organizationId}
         />
       )}
     </>

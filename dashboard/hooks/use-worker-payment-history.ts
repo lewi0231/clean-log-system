@@ -5,9 +5,9 @@ import type {
     PaymentRecord,
 } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+import { Job } from "@/lib/types";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo } from "react";
-import { useJobs } from "./use-jobs";
 import useOrganization from "./useOrganization";
 
 export function workerPaymentHistoryKey(organizationId: string | null) {
@@ -40,9 +40,8 @@ interface UseWorkerPaymentHistoryResult {
  * Data is fetched from the database via the list-worker-payments edge function.
  * The hook provides methods for filtering and accessing payment records.
  */
-export function useWorkerPaymentHistory(): UseWorkerPaymentHistoryResult {
+export function useWorkerPaymentHistory(jobs: Job[]): UseWorkerPaymentHistoryResult {
     const { organizationId } = useOrganization();
-    const { jobs } = useJobs();
     const queryClient = useQueryClient();
 
     // Fetch payment history from database

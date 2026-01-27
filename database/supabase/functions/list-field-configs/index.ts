@@ -20,49 +20,91 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    // Fetch field configs
     const { data: fieldConfigs, error: fieldConfigsError } = await supabase
       .from("organization_field_configs")
-      .select("*, location_field_config(location_id)")
+      .select("*")
       .eq("organization_id", organization_id)
       .eq("active", true)
       .order("order_position", { ascending: true });
 
     if (fieldConfigsError) throw fieldConfigsError;
 
-    const filtered = (fieldConfigs || []).filter((config) => {
-      const locLinks = (config as typeof config & {
-        location_field_config?: { location_id: string }[] | null;
-      }).location_field_config || [];
+    // Normalize location_id: treat empty string as null/undefined
+    const normalizedLocationId = location_id && location_id.trim() !== "" ? location_id : null;
 
-      // If no restrictions, it's available everywhere
-      if (!location_id || locLinks.length === 0) return true;
+    // If location_id is provided, fetch location restrictions and filter
+    let filtered = fieldConfigs || [];
+    if (normalizedLocationId) {
+      // Fetch all location restrictions for these field configs
+      const fieldConfigIds = (fieldConfigs || []).map((fc) => fc.id);
+      
+      if (fieldConfigIds.length > 0) {
+        const { data: locationRestrictions, error: restrictionsError } =
+          await supabase
+            .from("location_field_config")
+            .select("field_config_id, location_id")
+            .in("field_config_id", fieldConfigIds);
 
-      // Allow if explicitly linked to the requested location
-      return locLinks.some(
-        (link: { location_id: string }) => link.location_id === location_id,
-      );
-    });
+        if (restrictionsError) throw restrictionsError;
 
-    const sanitized = filtered.map((config) => {
-      const locLinks = (config as typeof config & {
-        location_field_config?: { location_id: string }[] | null;
-      }).location_field_config || [];
+        // Create a map: field_config_id -> array of location_ids
+        const restrictionsMap = new Map<string, string[]>();
+        (locationRestrictions || []).forEach((restriction) => {
+          const fieldId = restriction.field_config_id;
+          if (!restrictionsMap.has(fieldId)) {
+            restrictionsMap.set(fieldId, []);
+          }
+          restrictionsMap.get(fieldId)!.push(restriction.location_id);
+        });
 
-      const { location_field_config: _location_field_config, ...rest } =
-        config as Record<string, unknown>;
+        // Filter fields based on location restrictions
+        filtered = (fieldConfigs || []).filter((config) => {
+          const restrictedLocations = restrictionsMap.get(config.id) || [];
 
-      // Include location restrictions if requested (for admin UI)
-      if (include_location_restrictions) {
-        return {
-          ...rest,
-          location_restrictions: locLinks.map(
-            (link: { location_id: string }) => link.location_id,
-          ),
-        };
+          // If field has no restrictions, it's available everywhere
+          if (restrictedLocations.length === 0) return true;
+
+          // Field has restrictions - only show if location_id matches
+          return restrictedLocations.includes(normalizedLocationId);
+        });
       }
+    }
 
-      return rest;
-    });
+    // If include_location_restrictions is requested, fetch restrictions for filtered configs
+    let sanitized = filtered;
+    if (include_location_restrictions) {
+      const filteredConfigIds = filtered.map((fc) => fc.id);
+      
+      if (filteredConfigIds.length > 0) {
+        const { data: locationRestrictions, error: restrictionsError } =
+          await supabase
+            .from("location_field_config")
+            .select("field_config_id, location_id")
+            .in("field_config_id", filteredConfigIds);
+
+        if (restrictionsError) throw restrictionsError;
+
+        // Create a map: field_config_id -> array of location_ids
+        const restrictionsMap = new Map<string, string[]>();
+        (locationRestrictions || []).forEach((restriction) => {
+          const fieldId = restriction.field_config_id;
+          if (!restrictionsMap.has(fieldId)) {
+            restrictionsMap.set(fieldId, []);
+          }
+          restrictionsMap.get(fieldId)!.push(restriction.location_id);
+        });
+
+        // Add location_restrictions to each config
+        sanitized = filtered.map((config) => {
+          const restrictions = restrictionsMap.get(config.id) || [];
+          return {
+            ...config,
+            location_restrictions: restrictions,
+          };
+        });
+      }
+    }
 
     return jsonResponse({
       success: true,

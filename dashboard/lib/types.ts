@@ -122,6 +122,7 @@ export interface Job {
   feedback_token?: string | null;
   feedback_email_sent?: boolean | null;
   feedback_email_sent_at?: string | null;
+  submitted_by_email?: string | null;
   location: {
     id: string;
     name: string;

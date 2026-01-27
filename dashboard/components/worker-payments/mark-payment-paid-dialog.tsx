@@ -19,7 +19,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import useOrganization from "@/hooks/useOrganization";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +28,7 @@ interface MarkPaymentPaidDialogProps {
   onOpenChange: (open: boolean) => void;
   batchId: string;
   onSuccess?: () => void;
+  organizationId: string | null;
 }
 
 export default function MarkPaymentPaidDialog({
@@ -36,8 +36,8 @@ export default function MarkPaymentPaidDialog({
   onOpenChange,
   batchId,
   onSuccess,
+  organizationId,
 }: MarkPaymentPaidDialogProps) {
-  const { organizationId } = useOrganization();
   const [paymentMethod, setPaymentMethod] = useState<
     "bank_transfer" | "cash" | "check" | "payroll_system" | "other" | ""
   >("");

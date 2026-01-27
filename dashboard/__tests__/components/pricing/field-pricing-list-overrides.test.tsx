@@ -204,6 +204,7 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
           locationHierarchyId={null}
           pricingContext="customer"
           showBothContexts={false}
+          organizationId="org-1"
         />
       </Wrapper>
     );
@@ -212,6 +213,7 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
     // The getLocationOverrides function should filter out the worker rule
     // We can't easily test the UI here, but we can verify the logic
     expect(useFieldPricing).toHaveBeenCalledWith(
+      "org-1",
       expect.objectContaining({
         pricingContext: "customer",
       })
@@ -259,17 +261,20 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
           locationHierarchyId={null}
           pricingContext="customer"
           showBothContexts={true}
+          organizationId="org-1"
         />
       </Wrapper>
     );
 
     // Verify both hooks are called with correct contexts
     expect(useFieldPricing).toHaveBeenCalledWith(
+      "org-1",
       expect.objectContaining({
         pricingContext: "customer",
       })
     );
     expect(useFieldPricing).toHaveBeenCalledWith(
+      "org-1",
       expect.objectContaining({
         pricingContext: "worker",
       })

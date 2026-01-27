@@ -7,6 +7,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
+import useOrganization from "@/hooks/useOrganization";
 import { ArrowLeft, Printer } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
@@ -18,6 +19,7 @@ interface InvoicePageProps {
 export default function InvoicePage({ params }: InvoicePageProps) {
   const { id } = use(params);
   const { invoice, loading, error } = useInvoiceDetails(id);
+  const { organizationId } = useOrganization();
 
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
@@ -144,9 +146,9 @@ export default function InvoicePage({ params }: InvoicePageProps) {
         <div className="mb-6">
           <Alert className="border-amber-200 bg-amber-50 text-amber-900">
             <AlertTitle>Test invoice</AlertTitle>
-            <AlertDescription>
-              This invoice was generated for testing and <b>cannot</b> be sent
-              to customers.
+            <AlertDescription className="text-nowrap inline">
+              This invoice was generated for testing and{" "}
+              <b className="">cannot</b> be sent to customers.
             </AlertDescription>
           </Alert>
         </div>
@@ -156,7 +158,7 @@ export default function InvoicePage({ params }: InvoicePageProps) {
 
       {/* Invoice Preview */}
       <div className="bg-white dark:bg-card rounded-lg shadow-sm border p-6">
-        <InvoicePreview invoice={invoice} />
+        <InvoicePreview invoice={invoice} organizationId={organizationId} />
       </div>
     </div>
   );

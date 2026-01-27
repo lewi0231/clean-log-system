@@ -7,8 +7,7 @@ interface BooleanPricingListProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   refreshToken?: number;
-  pricingContext?: "customer" | "worker";
-  showBothContexts?: boolean;
+  organizationId: string | null;
 }
 
 export default function BooleanPricingList(props: BooleanPricingListProps) {

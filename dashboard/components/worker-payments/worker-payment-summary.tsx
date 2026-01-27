@@ -20,6 +20,7 @@ import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPaymentSummary } from "@/hooks/use-worker-payment-summary";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
+import { Job } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
   ArrowDown,
@@ -54,12 +55,18 @@ function SortIcon({
   );
 }
 
-export default function WorkerPaymentSummary() {
+interface WorkerPaymentSummaryProps {
+  jobs: Job[];
+}
+
+export default function WorkerPaymentSummary({
+  jobs,
+}: WorkerPaymentSummaryProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { paymentHistory } = useWorkerPaymentHistory();
-  const { workerSummary } = useWorkerPaymentSummary();
+  const { paymentHistory } = useWorkerPaymentHistory(jobs);
+  const { workerSummary } = useWorkerPaymentSummary(jobs);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
-    null
+    null,
   );
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>("total");
@@ -154,7 +161,9 @@ export default function WorkerPaymentSummary() {
                   <span className="text-green-500 font-bold">$</span>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Payments</p>
+                  <p className="text-sm text-muted-foreground">
+                    Total Payments
+                  </p>
                   <p className="text-2xl font-bold">
                     {formatCurrency(totals.totalPayment)}
                   </p>
@@ -189,7 +198,7 @@ export default function WorkerPaymentSummary() {
                       onClick={() => handleSort("name")}
                       className={cn(
                         "flex items-center hover:text-foreground transition-colors",
-                        sortField === "name" && "text-foreground"
+                        sortField === "name" && "text-foreground",
                       )}
                     >
                       Worker
@@ -206,7 +215,7 @@ export default function WorkerPaymentSummary() {
                       onClick={() => handleSort("jobs")}
                       className={cn(
                         "flex items-center justify-end w-full hover:text-foreground transition-colors",
-                        sortField === "jobs" && "text-foreground"
+                        sortField === "jobs" && "text-foreground",
                       )}
                     >
                       Jobs
@@ -223,7 +232,7 @@ export default function WorkerPaymentSummary() {
                       onClick={() => handleSort("total")}
                       className={cn(
                         "flex items-center justify-end w-full hover:text-foreground transition-colors",
-                        sortField === "total" && "text-foreground"
+                        sortField === "total" && "text-foreground",
                       )}
                     >
                       Total Payment
@@ -240,7 +249,7 @@ export default function WorkerPaymentSummary() {
                       onClick={() => handleSort("average")}
                       className={cn(
                         "flex items-center justify-end w-full hover:text-foreground transition-colors",
-                        sortField === "average" && "text-foreground"
+                        sortField === "average" && "text-foreground",
                       )}
                     >
                       Average per Job
@@ -258,7 +267,7 @@ export default function WorkerPaymentSummary() {
                 {sortedWorkerSummary.map((summary) => {
                   // Find the most recent payment record that includes this worker
                   const relatedPayment = paymentHistory.find((p) =>
-                    summary.jobs.some((jobId) => p.jobIds.includes(jobId))
+                    summary.jobs.some((jobId) => p.jobIds.includes(jobId)),
                   );
 
                   return (
@@ -301,6 +310,7 @@ export default function WorkerPaymentSummary() {
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           payment={selectedPayment}
+          jobs={jobs}
         />
       )}
     </>

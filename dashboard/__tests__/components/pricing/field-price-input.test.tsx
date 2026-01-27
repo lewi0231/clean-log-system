@@ -1,9 +1,11 @@
 import { FieldPriceInput } from "@/components/pricing/field-price-input";
+import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import type { FieldConfig } from "@clean-log/shared";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock useOrganizationCurrency
+// Mock dependencies
+vi.mock("@/components/pricing/pricing-scope-context");
 vi.mock("@/hooks/use-organization-currency", () => ({
   useOrganizationCurrency: () => ({
     formatCurrency: (amount: number) => `$${amount.toFixed(2)}`,
@@ -40,17 +42,59 @@ describe("FieldPriceInput", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Default mock for usePricingScope
+    vi.mocked(usePricingScope).mockReturnValue({
+      selectedFieldId: null,
+      setSelectedFieldId: vi.fn(),
+      locationNodeId: null,
+      setLocationNodeId: vi.fn(),
+      locationId: null,
+      setLocationId: vi.fn(),
+      effectiveDate: null,
+      setEffectiveDate: vi.fn(),
+      expirationDate: null,
+      setExpirationDate: vi.fn(),
+      pricingHistoryRefreshToken: 0,
+      refreshPricingHistory: vi.fn(),
+      pricingContext: "customer",
+      setPricingContext: vi.fn(),
+      showBothContexts: false,
+      setShowBothContexts: vi.fn(),
+      fieldLabelLookup: {},
+    });
   });
 
   describe("showBothContexts mode", () => {
+    beforeEach(() => {
+      // Mock for showBothContexts mode
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+    });
+
     it("should render both customer and worker price inputs", () => {
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="50"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -70,8 +114,6 @@ describe("FieldPriceInput", () => {
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="50"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -88,13 +130,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should call onPriceChange with worker context when worker input changes", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="50"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -107,13 +167,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should disable inputs when isSaving is true", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="50"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={true}
           onPriceChange={mockOnPriceChange}
         />
@@ -127,13 +205,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should display correct field type description for number field", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="50"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -145,6 +241,26 @@ describe("FieldPriceInput", () => {
     });
 
     it("should display correct field type description for boolean field", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       const booleanFieldConfig: FieldConfig = {
         ...mockFieldConfig,
         field_type: "boolean",
@@ -155,8 +271,6 @@ describe("FieldPriceInput", () => {
           fieldConfig={booleanFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="50"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -170,13 +284,31 @@ describe("FieldPriceInput", () => {
 
   describe("single context mode - customer", () => {
     it("should render single customer price input", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice=""
-          showBothContexts={false}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -189,13 +321,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should display 'Price per Unit' label for customer context", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice=""
-          showBothContexts={false}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -205,13 +355,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should use currentCustomerPrice value for customer context", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="150"
           currentWorkerPrice="50"
-          showBothContexts={false}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -224,13 +392,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should call onPriceChange with customer context", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice=""
-          showBothContexts={false}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -249,13 +435,31 @@ describe("FieldPriceInput", () => {
 
   describe("single context mode - worker", () => {
     it("should render single worker price input", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "worker",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice=""
           currentWorkerPrice="50"
-          showBothContexts={false}
-          pricingContext="worker"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -265,13 +469,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should display 'Payment per Unit' label for worker context", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "worker",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice=""
           currentWorkerPrice="50"
-          showBothContexts={false}
-          pricingContext="worker"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -281,13 +503,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should use currentWorkerPrice value for worker context", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "worker",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="100"
           currentWorkerPrice="75"
-          showBothContexts={false}
-          pricingContext="worker"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -300,13 +540,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should call onPriceChange with worker context", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "worker",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice=""
           currentWorkerPrice="50"
-          showBothContexts={false}
-          pricingContext="worker"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -321,13 +579,31 @@ describe("FieldPriceInput", () => {
 
   describe("zero price handling", () => {
     it("should allow zero as a valid price value", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="0"
           currentWorkerPrice=""
-          showBothContexts={false}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />
@@ -340,13 +616,31 @@ describe("FieldPriceInput", () => {
     });
 
     it("should handle zero in both contexts", () => {
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: {},
+      });
+
       render(
         <FieldPriceInput
           fieldConfig={mockFieldConfig}
           currentCustomerPrice="0"
           currentWorkerPrice="0"
-          showBothContexts={true}
-          pricingContext="customer"
           isSaving={false}
           onPriceChange={mockOnPriceChange}
         />

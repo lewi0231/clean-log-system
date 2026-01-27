@@ -2,8 +2,8 @@
 
 import type { WorkerSummary } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+import { Job } from "@/lib/types";
 import { useMemo } from "react";
-import { useJobs } from "./use-jobs";
 import { useWorkerPaymentHistory } from "./use-worker-payment-history";
 
 interface UseWorkerPaymentSummaryResult {
@@ -19,9 +19,8 @@ interface UseWorkerPaymentSummaryResult {
     ) => WorkerSummary[];
 }
 
-export function useWorkerPaymentSummary(): UseWorkerPaymentSummaryResult {
-    const { paymentHistory, loading } = useWorkerPaymentHistory();
-    const { jobs } = useJobs();
+export function useWorkerPaymentSummary(jobs: Job[]): UseWorkerPaymentSummaryResult {
+    const { paymentHistory, loading } = useWorkerPaymentHistory(jobs);
 
     const workerSummary = useMemo(() => {
         if (paymentHistory.length === 0) return [];

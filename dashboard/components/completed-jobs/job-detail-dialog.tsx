@@ -12,11 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
-import { useJobs } from "@/hooks/use-jobs";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
-import useOrganization from "@/hooks/useOrganization";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
+import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import {
   AlertTriangle,
   Calculator,
@@ -37,6 +36,11 @@ interface JobDetailDialogProps {
   job: Job | null;
   isAdmin?: boolean;
   onEditSuccess?: () => void;
+  updateJob: (request: UpdateJobRequest) => Promise<Job>;
+  getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
+  sendFeedbackEmail: (jobId: string) => Promise<void>;
+  jobs: Job[];
+  organizationId: string | null;
 }
 
 // Standard fields that should be displayed in a specific order
@@ -48,10 +52,13 @@ export default function JobDetailDialog({
   job,
   isAdmin = false,
   onEditSuccess,
+  updateJob,
+  getJobEdits,
+  sendFeedbackEmail,
+  jobs,
+  organizationId,
 }: JobDetailDialogProps) {
-  const { organizationId } = useOrganization();
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
-  const { getJobEdits, sendFeedbackEmail } = useJobs();
   const { calculatePayments } = useWorkerPayments();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCalculatePaymentDialogOpen, setIsCalculatePaymentDialogOpen] =
@@ -613,6 +620,8 @@ export default function JobDetailDialog({
               // onOpenChange(false);
             }}
             job={job}
+            updateJob={updateJob}
+            organizationId={organizationId}
           />
           {job && job.workers.length > 0 && (
             <CalculatePaymentDialog
@@ -622,6 +631,7 @@ export default function JobDetailDialog({
                 await calculatePayments(jobIds);
               }}
               preselectedJobIds={[job.id]}
+              jobs={jobs}
             />
           )}
         </>

@@ -16,8 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { Job } from "@/lib/types";
 import type { CalculateWorkerPaymentsResponse } from "@/lib/services/worker-payment.service";
 import { format } from "date-fns";
 
@@ -35,15 +35,16 @@ interface PaymentDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   payment: PaymentRecord;
+  jobs: Job[];
 }
 
 export default function PaymentDetailDialog({
   open,
   onOpenChange,
   payment,
+  jobs,
 }: PaymentDetailDialogProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { jobs } = useJobs();
 
   const jobCalculations = payment.calculation.calculation.job_calculations;
 

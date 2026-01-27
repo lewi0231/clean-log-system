@@ -184,6 +184,7 @@ export default function MobileConfigPage() {
             onDeleteSection={handleDeleteSection}
             onReorderSections={handleReorderSections}
             createdClusters={createdClusters}
+            organizationId={organizationId}
           />
         )}
       </div>

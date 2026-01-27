@@ -9,7 +9,6 @@ import type {
   WorkerPaymentType,
 } from "@/lib/types";
 import { useEffect, useState } from "react";
-import useOrganization from "./useOrganization";
 
 interface UseFieldPricingOptions {
   locationId?: string | null;
@@ -47,9 +46,9 @@ interface UseFieldPricingResult {
 }
 
 export function useFieldPricing(
+  organizationId: string | null,
   options?: UseFieldPricingOptions,
 ): UseFieldPricingResult {
-  const { organizationId } = useOrganization();
   const [fieldPricing, setFieldPricing] = useState<FieldPricing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

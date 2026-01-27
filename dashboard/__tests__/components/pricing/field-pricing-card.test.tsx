@@ -1,10 +1,13 @@
 import { FieldPricingCard } from "@/components/pricing/field-pricing-card";
+import { usePricingScope } from "@/components/pricing/pricing-scope-context";
+import { useFieldPricingCardState } from "@/hooks/use-field-pricing-card-state";
 import type { FieldPricing, PricingCondition, PricingRule } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
+vi.mock("@/components/pricing/pricing-scope-context");
 vi.mock("@/hooks/use-organization-currency", () => ({
   useOrganizationCurrency: () => ({
     formatCurrency: (amount: number) => `$${amount.toFixed(2)}`,
@@ -69,6 +72,14 @@ vi.mock("@/lib/utils", async () => {
     isPricingRulesEnabled: () => true,
   };
 });
+
+vi.mock("@/hooks/use-field-pricing-card-state", () => ({
+  useFieldPricingCardState: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-field-pricing-card-state", () => ({
+  useFieldPricingCardState: vi.fn(),
+}));
 
 describe("FieldPricingCard", () => {
   const mockFieldConfig: FieldConfig = {
@@ -155,26 +166,50 @@ describe("FieldPricingCard", () => {
     currentCustomerPrice: "",
     currentWorkerPrice: "",
     hasChanges: false,
-    isSaving: false,
     overrides: [],
     conditions: [],
-    isExpanded: true,
     hasScopedValue: false,
-    showBothContexts: false,
-    pricingContext: "customer" as const,
     locationId: null,
     locationHierarchyId: null,
-    fieldLabelLookup: {},
-    onExpandedChange: vi.fn(),
     onPriceChange: vi.fn(),
     onSave: vi.fn(),
     onDeleteOverride: vi.fn(),
     onOpenConditionalModal: vi.fn(),
-    deletingIds: new Set<string>(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock usePricingScope
+    vi.mocked(usePricingScope).mockReturnValue({
+      selectedFieldId: null,
+      setSelectedFieldId: vi.fn(),
+      locationNodeId: null,
+      setLocationNodeId: vi.fn(),
+      locationId: null,
+      setLocationId: vi.fn(),
+      effectiveDate: null,
+      setEffectiveDate: vi.fn(),
+      expirationDate: null,
+      setExpirationDate: vi.fn(),
+      pricingHistoryRefreshToken: 0,
+      refreshPricingHistory: vi.fn(),
+      pricingContext: "customer",
+      setPricingContext: vi.fn(),
+      showBothContexts: false,
+      setShowBothContexts: vi.fn(),
+      fieldLabelLookup: { "field-1": "Service Hours" },
+    });
+
+    // Mock useFieldPricingCardState - default to expanded, not saving
+    vi.mocked(useFieldPricingCardState).mockReturnValue({
+      isExpanded: true,
+      setIsExpanded: vi.fn(),
+      isSaving: false,
+      setIsSaving: vi.fn(),
+      isDeleting: false,
+      setIsDeleting: vi.fn(),
+    });
   });
 
   it("should render field label and type", () => {
@@ -214,6 +249,27 @@ describe("FieldPricingCard", () => {
 
   describe("showBothContexts mode", () => {
     it("should display both customer and worker prices when both are set", () => {
+      // Update mock for showBothContexts mode
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: { "field-1": "Service Hours" },
+      });
+
       const customerPricing = createMockPricing(100, 50);
       // Worker pricing record: for worker context, worker_payment_value = base_price (customer_price)
       const workerPricing = createMockPricing(50);
@@ -224,7 +280,6 @@ describe("FieldPricingCard", () => {
       render(
         <FieldPricingCard
           {...defaultProps}
-          showBothContexts={true}
           customerPricingRecord={customerPricing}
           workerPricingRecord={workerPricing}
           currentCustomerPrice="100"
@@ -239,10 +294,30 @@ describe("FieldPricingCard", () => {
     });
 
     it("should display 'No prices set' when neither price is set", () => {
+      // Update mock for showBothContexts mode
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: true,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: { "field-1": "Service Hours" },
+      });
+
       render(
         <FieldPricingCard
           {...defaultProps}
-          showBothContexts={true}
           customerPricingRecord={null}
           workerPricingRecord={null}
         />
@@ -254,12 +329,31 @@ describe("FieldPricingCard", () => {
 
   describe("single context mode", () => {
     it("should display customer price for customer context", () => {
+      // Mock for customer context
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: { "field-1": "Service Hours" },
+      });
+
       const pricing = createMockPricing(100);
       render(
         <FieldPricingCard
           {...defaultProps}
-          showBothContexts={false}
-          pricingContext="customer"
           scopedPricing={pricing}
           currentCustomerPrice="100"
         />
@@ -269,12 +363,31 @@ describe("FieldPricingCard", () => {
     });
 
     it("should display worker payment for worker context", () => {
+      // Mock for worker context
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "worker",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: { "field-1": "Service Hours" },
+      });
+
       const pricing = createMockPricing(100, 50);
       render(
         <FieldPricingCard
           {...defaultProps}
-          showBothContexts={false}
-          pricingContext="worker"
           scopedPricing={pricing}
           currentWorkerPrice="50"
         />
@@ -284,11 +397,30 @@ describe("FieldPricingCard", () => {
     });
 
     it("should display 'No price set' when no pricing is available", () => {
+      // Mock for customer context
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: { "field-1": "Service Hours" },
+      });
+
       render(
         <FieldPricingCard
           {...defaultProps}
-          showBothContexts={false}
-          pricingContext="customer"
           scopedPricing={null}
         />
       );
@@ -299,7 +431,7 @@ describe("FieldPricingCard", () => {
 
   describe("collapsible behavior", () => {
     it("should show chevron down when expanded", () => {
-      render(<FieldPricingCard {...defaultProps} isExpanded={true} />);
+      render(<FieldPricingCard {...defaultProps} />);
 
       // The collapsible trigger is a button
       const buttons = screen.getAllByRole("button");
@@ -307,12 +439,9 @@ describe("FieldPricingCard", () => {
     });
 
     it("should call onExpandedChange when toggled", async () => {
-      const onExpandedChange = vi.fn();
       render(
         <FieldPricingCard
           {...defaultProps}
-          isExpanded={true}
-          onExpandedChange={onExpandedChange}
         />
       );
 
@@ -358,8 +487,18 @@ describe("FieldPricingCard", () => {
     });
 
     it("should be disabled when saving", () => {
+      // Mock useFieldPricingCardState to return isSaving: true
+      vi.mocked(useFieldPricingCardState).mockReturnValue({
+        isExpanded: true,
+        setIsExpanded: vi.fn(),
+        isSaving: true,
+        setIsSaving: vi.fn(),
+        isDeleting: false,
+        setIsDeleting: vi.fn(),
+      });
+
       render(
-        <FieldPricingCard {...defaultProps} hasChanges={true} isSaving={true} />
+        <FieldPricingCard {...defaultProps} hasChanges={true} />
       );
 
       const saveButton = screen.getByRole("button", { name: /saving/i });

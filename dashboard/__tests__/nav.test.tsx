@@ -39,10 +39,10 @@ vi.mock("@/hooks/useIsScrollTop", () => ({
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
-  default: vi.fn(),
+  useAuth: vi.fn(),
 }));
 
-import useAuth from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useIsScrollTop } from "@/hooks/useIsScrollTop";
 
 const mockUseIsScrollTop = vi.mocked(useIsScrollTop);

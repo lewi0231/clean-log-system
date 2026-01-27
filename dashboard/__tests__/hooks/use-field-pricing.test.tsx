@@ -6,9 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
-vi.mock("@/hooks/useOrganization", () => ({
-  default: () => ({ organizationId: "org-1" }),
-}));
 
 const createMockPricingRule = (
   overrides?: Partial<PricingRule>
@@ -60,7 +57,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -91,7 +88,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "worker",
         })
       );
@@ -117,7 +114,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -157,7 +154,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -193,7 +190,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "worker",
         })
       );
@@ -221,7 +218,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "worker",
         })
       );
@@ -252,7 +249,7 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useFieldPricing({
+        useFieldPricing("org-1", {
           pricingContext: "customer",
         })
       );

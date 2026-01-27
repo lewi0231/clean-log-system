@@ -1,5 +1,6 @@
 "use client";
 
+import { log } from "@/lib/logger";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { jobsKey } from "@/app/query-provider";
@@ -36,16 +37,20 @@ async function fetchJobs(
 }
 
 export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
-  const { organizationId } = useOrganization();
+  const { organizationId, loading } = useOrganization();
   const queryClient = useQueryClient();
   const includeTests = options?.includeTests ?? false;
 
+  log.debug("Logging from use jobs:", organizationId);
+
   const query = useQuery({
     queryKey: jobsKey(organizationId, includeTests),
-    enabled: !!organizationId,
+    enabled: !!organizationId && !loading,
     queryFn: () => fetchJobs(organizationId as string, includeTests),
     select: (data) => data ?? [],
     placeholderData: (previous) => previous,
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
   });
 
   const createJob = useCallback(
@@ -112,7 +117,7 @@ export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
 
   return {
     jobs: query.data ?? [],
-    loading: query.isLoading,
+    loading: query.isLoading || loading,
     error: query.error ? (query.error as Error).message : null,
     refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
     createJob,

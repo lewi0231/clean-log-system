@@ -94,6 +94,11 @@ describe("FieldPricingList - Zero Price Handling", () => {
       setSelectedFieldId: vi.fn(),
       pricingHistoryRefreshToken: 0,
       refreshPricingHistory: vi.fn(),
+      pricingContext: "customer",
+      setPricingContext: vi.fn(),
+      showBothContexts: false,
+      setShowBothContexts: vi.fn(),
+      fieldLabelLookup: { "field-1": "Service Hours" },
     });
 
     vi.mocked(useOrganizationCurrency).mockReturnValue({
@@ -111,39 +116,53 @@ describe("FieldPricingList - Zero Price Handling", () => {
         base_price: 0,
       });
 
-      vi.mocked(useFieldPricing).mockReturnValue({
-        fieldPricing: [
-          {
-            id: "rule-1",
-            organization_id: "org-1",
-            field_config_id: "field-1",
-            location_id: null,
-            location_hierarchy_id: null,
-            pricing_type: "unit",
-            customer_price: 100,
-            currency: "USD",
-            applies_to_field_type: null,
-            worker_payment_type: null,
-            worker_payment_value: null,
-            source_rule: mockPricingRule,
-            field_config: null,
-            location: null,
-            location_node: null,
-          },
-        ],
-        loading: false,
-        error: null,
-        refetch: vi.fn(),
-        upsertPricing: mockUpsertPricing,
-        deletePricing: vi.fn(),
+      // Mock useFieldPricing to return different values based on pricingContext
+      vi.mocked(useFieldPricing).mockImplementation((organizationId, options) => {
+        if (options?.pricingContext === "customer") {
+          return {
+            fieldPricing: [
+              {
+                id: "rule-1",
+                organization_id: "org-1",
+                field_config_id: "field-1",
+                location_id: null,
+                location_hierarchy_id: null,
+                pricing_type: "unit",
+                customer_price: 100,
+                currency: "USD",
+                applies_to_field_type: null,
+                worker_payment_type: null,
+                worker_payment_value: null,
+                source_rule: mockPricingRule,
+                field_config: null,
+                location: null,
+                location_node: null,
+              },
+            ],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+            upsertPricing: mockUpsertPricing,
+            deletePricing: vi.fn(),
+          };
+        } else {
+          // worker context
+          return {
+            fieldPricing: [],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+            upsertPricing: vi.fn(),
+            deletePricing: vi.fn(),
+          };
+        }
       });
 
       render(
         <FieldPricingList
           locationHierarchyId={null}
           locationId={null}
-          pricingContext="customer"
-          showBothContexts={false}
+          organizationId="org-1"
         />
       );
 
@@ -173,39 +192,53 @@ describe("FieldPricingList - Zero Price Handling", () => {
         base_price: 0,
       });
 
-      vi.mocked(useFieldPricing).mockReturnValue({
-        fieldPricing: [
-          {
-            id: "rule-1",
-            organization_id: "org-1",
-            field_config_id: "field-1",
-            location_id: null,
-            location_hierarchy_id: null,
-            pricing_type: "unit",
-            customer_price: 100, // Existing price is 100
-            currency: "USD",
-            applies_to_field_type: null,
-            worker_payment_type: null,
-            worker_payment_value: null,
-            source_rule: mockPricingRule,
-            field_config: null,
-            location: null,
-            location_node: null,
-          },
-        ],
-        loading: false,
-        error: null,
-        refetch: vi.fn(),
-        upsertPricing: mockUpsertPricing,
-        deletePricing: vi.fn(),
+      // Mock useFieldPricing to return different values based on pricingContext
+      vi.mocked(useFieldPricing).mockImplementation((organizationId, options) => {
+        if (options?.pricingContext === "customer") {
+          return {
+            fieldPricing: [
+              {
+                id: "rule-1",
+                organization_id: "org-1",
+                field_config_id: "field-1",
+                location_id: null,
+                location_hierarchy_id: null,
+                pricing_type: "unit",
+                customer_price: 100, // Existing price is 100
+                currency: "USD",
+                applies_to_field_type: null,
+                worker_payment_type: null,
+                worker_payment_value: null,
+                source_rule: mockPricingRule,
+                field_config: null,
+                location: null,
+                location_node: null,
+              },
+            ],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+            upsertPricing: mockUpsertPricing,
+            deletePricing: vi.fn(),
+          };
+        } else {
+          // worker context
+          return {
+            fieldPricing: [],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+            upsertPricing: vi.fn(),
+            deletePricing: vi.fn(),
+          };
+        }
       });
 
       render(
         <FieldPricingList
           locationHierarchyId={null}
           locationId={null}
-          pricingContext="customer"
-          showBothContexts={false}
+          organizationId="org-1"
         />
       );
 
@@ -234,39 +267,53 @@ describe("FieldPricingList - Zero Price Handling", () => {
         base_price: 0,
       });
 
-      vi.mocked(useFieldPricing).mockReturnValue({
-        fieldPricing: [
-          {
-            id: "rule-1",
-            organization_id: "org-1",
-            field_config_id: "field-1",
-            location_id: null,
-            location_hierarchy_id: null,
-            pricing_type: "unit",
-            customer_price: 100,
-            currency: "USD",
-            applies_to_field_type: null,
-            worker_payment_type: null,
-            worker_payment_value: null,
-            source_rule: mockPricingRule,
-            field_config: null,
-            location: null,
-            location_node: null,
-          },
-        ],
-        loading: false,
-        error: null,
-        refetch: vi.fn(),
-        upsertPricing: mockUpsertPricing,
-        deletePricing: vi.fn(),
+      // Mock useFieldPricing to return different values based on pricingContext
+      vi.mocked(useFieldPricing).mockImplementation((organizationId, options) => {
+        if (options?.pricingContext === "customer") {
+          return {
+            fieldPricing: [
+              {
+                id: "rule-1",
+                organization_id: "org-1",
+                field_config_id: "field-1",
+                location_id: null,
+                location_hierarchy_id: null,
+                pricing_type: "unit",
+                customer_price: 100,
+                currency: "USD",
+                applies_to_field_type: null,
+                worker_payment_type: null,
+                worker_payment_value: null,
+                source_rule: mockPricingRule,
+                field_config: null,
+                location: null,
+                location_node: null,
+              },
+            ],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+            upsertPricing: mockUpsertPricing,
+            deletePricing: vi.fn(),
+          };
+        } else {
+          // worker context
+          return {
+            fieldPricing: [],
+            loading: false,
+            error: null,
+            refetch: vi.fn(),
+            upsertPricing: vi.fn(),
+            deletePricing: vi.fn(),
+          };
+        }
       });
 
       render(
         <FieldPricingList
           locationHierarchyId={null}
           locationId={null}
-          pricingContext="customer"
-          showBothContexts={false}
+          organizationId="org-1"
         />
       );
 

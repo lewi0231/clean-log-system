@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
@@ -126,6 +125,7 @@ interface VisualFormBuilderProps {
   onDeleteSection: (sectionId: string) => void | Promise<void>;
   onReorderSections: (sectionIds: string[]) => void | Promise<void>;
   createdClusters?: string[];
+  organizationId: string | null;
 }
 
 export function VisualFormBuilder({
@@ -140,6 +140,7 @@ export function VisualFormBuilder({
   onDeleteSection,
   onReorderSections,
   createdClusters = [],
+  organizationId,
 }: VisualFormBuilderProps) {
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [draggedSectionField, setDraggedSectionField] = useState<string | null>(
@@ -164,7 +165,6 @@ export function VisualFormBuilder({
   >(new Map());
 
   const { locations } = useLocations();
-  const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
 
   // Keep local order in sync when fields change externally
@@ -622,6 +622,7 @@ export function VisualFormBuilder({
                 }}
                 onUpdateField={onUpdateField}
                 onReorderFields={onReorderFields}
+                organizationId={organizationId}
                 createdClusters={createdClusters}
               />
             </CardContent>
@@ -1585,6 +1586,7 @@ export function VisualFormBuilder({
           sections={sections}
           existingFieldNames={fields.map((f) => f.name)}
           onSave={handleSaveFieldFromDialog}
+          organizationId={organizationId}
         />
       )}
     </div>

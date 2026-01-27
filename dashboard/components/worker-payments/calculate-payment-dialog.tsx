@@ -19,9 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
+import { Job } from "@/lib/types";
 import type { CalculateWorkerPaymentsResponse } from "@/lib/services/worker-payment.service";
 import { format } from "date-fns";
 import {
@@ -40,6 +40,7 @@ interface CalculatePaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   onCalculate: (jobIds: string[]) => Promise<void>;
   preselectedJobIds?: string[];
+  jobs: Job[];
 }
 
 export default function CalculatePaymentDialog({
@@ -47,8 +48,8 @@ export default function CalculatePaymentDialog({
   onOpenChange,
   onCalculate,
   preselectedJobIds = [],
+  jobs,
 }: CalculatePaymentDialogProps) {
-  const { jobs } = useJobs();
   const { calculatePayments, loading } = useWorkerPayments();
   const { formatCurrency } = useOrganizationCurrency();
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(

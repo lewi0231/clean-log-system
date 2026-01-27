@@ -6,9 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
-vi.mock("@/hooks/useOrganization", () => ({
-  default: () => ({ organizationId: "org-1" }),
-}));
 
 const createMockHistoryEntry = (
   overrides?: Partial<PricingHistoryEntry>
@@ -54,7 +51,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       expect(result.current.loading).toBe(true);
       expect(result.current.historyEntries).toEqual([]);
@@ -79,7 +76,7 @@ describe("usePricingHistory", () => {
     it("should handle empty history", async () => {
       vi.mocked(PricingService.listHistory).mockResolvedValue([]);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -95,7 +92,7 @@ describe("usePricingHistory", () => {
         new Error(errorMessage)
       );
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -125,7 +122,7 @@ describe("usePricingHistory", () => {
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
       const { result } = renderHook(() =>
-        usePricingHistory({
+        usePricingHistory("org-1", {
           dateFrom: "2024-12-01",
         })
       );
@@ -150,7 +147,7 @@ describe("usePricingHistory", () => {
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
       const { result } = renderHook(() =>
-        usePricingHistory({
+        usePricingHistory("org-1", {
           dateTo: "2024-12-31",
         })
       );
@@ -175,7 +172,7 @@ describe("usePricingHistory", () => {
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
       const { result } = renderHook(() =>
-        usePricingHistory({
+        usePricingHistory("org-1", {
           dateFrom: "2024-12-01",
           dateTo: "2024-12-31",
         })
@@ -205,7 +202,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -228,7 +225,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -251,7 +248,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -273,7 +270,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(initialHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -315,7 +312,7 @@ describe("usePricingHistory", () => {
         .mockResolvedValueOnce(initialHistory)
         .mockRejectedValueOnce(new Error("Refetch failed"));
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -346,7 +343,7 @@ describe("usePricingHistory", () => {
 
       type Props = { dateFrom?: string };
       const { result, rerender } = renderHook(
-        (props: Props) => usePricingHistory({ dateFrom: props.dateFrom }),
+        (props: Props) => usePricingHistory("org-1", { dateFrom: props.dateFrom }),
         {
           initialProps: { dateFrom: undefined } as Props,
         }
@@ -379,7 +376,7 @@ describe("usePricingHistory", () => {
 
       type Props = { dateTo?: string };
       const { result, rerender } = renderHook(
-        (props: Props) => usePricingHistory({ dateTo: props.dateTo }),
+        (props: Props) => usePricingHistory("org-1", { dateTo: props.dateTo }),
         {
           initialProps: { dateTo: undefined } as Props,
         }
@@ -416,7 +413,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -439,7 +436,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -459,7 +456,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -477,7 +474,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -506,7 +503,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -533,7 +530,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -559,7 +556,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -593,7 +590,7 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory());
+      const { result } = renderHook(() => usePricingHistory("org-1"));
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);

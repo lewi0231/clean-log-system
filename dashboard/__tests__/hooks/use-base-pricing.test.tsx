@@ -6,9 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
-vi.mock("@/hooks/useOrganization", () => ({
-  default: () => ({ organizationId: "org-1" }),
-}));
 
 // Helper to get today's date at midnight UTC for consistent effective_at matching
 const getTodayMidnightUTC = () => {
@@ -67,7 +64,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -100,7 +97,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "worker",
         })
       );
@@ -120,7 +117,7 @@ describe("useBasePricing", () => {
       );
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -146,7 +143,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -188,7 +185,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -225,7 +222,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -270,7 +267,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
           locationId: "location-1",
         })
@@ -308,7 +305,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "worker",
         })
       );
@@ -339,7 +336,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "worker",
         })
       );
@@ -374,7 +371,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -413,7 +410,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(existingRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -451,7 +448,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -488,7 +485,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );
@@ -527,7 +524,7 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.deleteRule).mockResolvedValue(undefined);
 
       const { result } = renderHook(() =>
-        useBasePricing({
+        useBasePricing("org-1", {
           pricingContext: "customer",
         })
       );

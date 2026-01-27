@@ -36,6 +36,7 @@ describe("MarkPaymentPaidDialog", () => {
     onOpenChange: vi.fn(),
     batchId: "batch-123",
     onSuccess: vi.fn(),
+    organizationId: "org-123",
   };
 
   beforeEach(() => {

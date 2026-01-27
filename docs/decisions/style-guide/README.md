@@ -197,6 +197,42 @@ Each README provides quick reference. Detailed docs are available when needed.
 - **Exception**: Create documentation when it's part of the actual deliverable (e.g., API docs, migration notes for team reference)
 - **If I want a summary, I'll ask for it** - Trust that I'm reviewing your changes directly
 
+### 8. Tree of Thought for Ambiguous Decisions
+When you cannot provide a single, clear recommendation (i.e., multiple valid approaches exist or the best path is uncertain):
+
+- **Use tree of thought reasoning** to systematically explore options
+- **Evaluate each branch** against the triple criteria (Technical, UX, Business)
+- **Present multiple options** with pros/cons for each approach
+- **Provide a recommendation** based on your analysis, explaining why
+- **Show your reasoning** so the decision can be made with full context
+
+**When to use tree of thought:**
+- Multiple valid approaches exist and trade-offs need evaluation
+- The style guide doesn't cover the specific scenario
+- Research reveals conflicting best practices
+- Technical constraints create competing priorities
+- UX considerations suggest different approaches
+
+**Example structure:**
+```
+## Approach Analysis
+
+### Option 1: [Name]
+- Pros: [benefits]
+- Cons: [drawbacks]
+- Best for: [when this makes sense]
+
+### Option 2: [Name]
+- Pros: [benefits]
+- Cons: [drawbacks]
+- Best for: [when this makes sense]
+
+### Recommendation
+Based on [criteria], I recommend Option X because [reasoning].
+```
+
+This ensures decisions are made with full context rather than guessing or asking for clarification prematurely.
+
 ---
 
 ## UX Evaluation Methods
@@ -268,10 +304,13 @@ When adding new patterns:
 If you encounter a scenario not covered by existing guides:
 
 1. **Research** industry best practices using research tools (include UX research)
-2. **Evaluate** options against all three criteria: technical, UX, and business impact
-3. **Propose** a pattern with examples (❌ vs ✅) showing UX implications
-4. **Document** your reasoning and sources, including user research insights
-5. **Suggest** this be added to the style guide for future consistency
+2. **Use tree of thought** (see Principle #8) if multiple valid approaches exist
+3. **Evaluate** options against all three criteria: technical, UX, and business impact
+4. **Propose** a pattern with examples (❌ vs ✅) showing UX implications
+5. **Document** your reasoning and sources, including user research insights
+6. **Suggest** this be added to the style guide for future consistency
+
+**Note:** When multiple approaches are valid, don't ask "which should I use?" - instead, use tree of thought to analyze options and provide a recommendation with reasoning.
 
 ---
 

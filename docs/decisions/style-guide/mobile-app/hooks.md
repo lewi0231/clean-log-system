@@ -4,6 +4,12 @@
 
 ---
 
+## Preferred Use of Hooks
+
+**Prefer props over context hooks in reusable components** (forms, modals, shared screens). Use `useOrganization`, `useAuth`, etc. at the screen or layout level; pass values like `organizationId` as props into child components. This keeps components testable and explicit about dependencies. See [Dashboard Hooks](../dashboard/hooks.md#preferred-use-of-hooks) for the full pattern and examples.
+
+---
+
 ## Mobile-Specific Hooks
 
 The mobile app has fewer hooks than the dashboard, focusing on:
@@ -353,6 +359,7 @@ describe("useEntryForm", () => {
 
 | Rule | Description |
 |------|-------------|
+| **Props over context in reusable** | Pass `organizationId` etc. as props in forms/modals; use org/auth hooks at screen/layout level |
 | Named exports | No default exports |
 | Return interface | Define explicit result interface |
 | Consistent shape | `{ data, loading, error, refetch }` |

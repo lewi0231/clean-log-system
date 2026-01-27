@@ -75,6 +75,8 @@ export function WorkerCard({ worker, onEdit }: WorkerCardProps) {
 
 ## Hooks
 
+**Preferred use:** Prefer **props over context hooks** in reusable components (dialogs, modals, forms). Use `useOrganization` / `useAuth` at page/layout level; pass `organizationId` etc. as props into dialogs and shared UI. Use data-fetching hooks when the component owns the fetch; pass as props when the parent already has the data. See [Dashboard Hooks](./dashboard/hooks.md#preferred-use-of-hooks).
+
 ```typescript
 // File naming: use-kebab-case.ts
 // hooks/use-workers.ts
@@ -268,6 +270,7 @@ await waitFor(() => expect(result.current.loading).toBe(false));
 | Server or Client Component? | Default to Server, add `"use client"` only when needed |
 | Service or Server Action? | Service for mobile+dashboard shared, Server Action for dashboard-only |
 | useState or useReducer? | useState for simple, useReducer for related state + multiple actions |
+| **Context hook or prop for org/auth?** | **Props in dialogs/modals/reusable forms; hooks at page/layout level** |
 | Zod or legacy validation? | Always Zod |
 | null or undefined? | null for database, undefined for JS optional |
 | Test colocated or centralized? | Colocated in `__tests__/` directories |

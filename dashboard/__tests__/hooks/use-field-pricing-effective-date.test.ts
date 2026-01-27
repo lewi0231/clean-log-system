@@ -1,12 +1,10 @@
 import { useFieldPricing } from "@/hooks/use-field-pricing";
-import useOrganization from "@/hooks/useOrganization";
 import { PricingService } from "@/lib/services/pricing.service";
 import type { PricingRule } from "@/lib/types";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
-vi.mock("@/hooks/useOrganization");
 vi.mock("@/lib/services/pricing.service", () => ({
     PricingService: {
         listRules: vi.fn(),
@@ -58,15 +56,8 @@ const createMockPricingRule = (
 });
 
 describe("useFieldPricing - Effective Date Updates", () => {
-    const mockOrganizationId = "org-1";
-
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.mocked(useOrganization).mockReturnValue({
-            organizationId: mockOrganizationId,
-            loading: false,
-            error: null,
-        });
     });
 
     it("should find existing rule and update when effective_at date matches", async () => {
@@ -83,7 +74,7 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-        const { result } = renderHook(() => useFieldPricing());
+        const { result } = renderHook(() => useFieldPricing("org-1"));
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);
@@ -124,7 +115,7 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(newRule);
 
-        const { result } = renderHook(() => useFieldPricing());
+        const { result } = renderHook(() => useFieldPricing("org-1"));
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);
@@ -162,7 +153,7 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-        const { result } = renderHook(() => useFieldPricing());
+        const { result } = renderHook(() => useFieldPricing("org-1"));
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);
@@ -196,7 +187,7 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(newRule);
 
-        const { result } = renderHook(() => useFieldPricing());
+        const { result } = renderHook(() => useFieldPricing("org-1"));
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(0);
@@ -244,7 +235,7 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-        const { result } = renderHook(() => useFieldPricing());
+        const { result } = renderHook(() => useFieldPricing("org-1"));
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);

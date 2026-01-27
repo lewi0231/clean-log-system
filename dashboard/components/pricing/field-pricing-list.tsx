@@ -56,9 +56,8 @@ interface FieldPricingListProps {
   locationId?: string | null;
   effectiveAt?: string | null;
   refreshToken?: number;
-  pricingContext?: "customer" | "worker"; // Defaults to 'customer'
-  showBothContexts?: boolean; // When true, shows both customer and worker pricing side-by-side
   fieldTypeFilter?: FieldType; // Filter to show only specific field type
+  organizationId: string | null;
 }
 
 export default function FieldPricingList({
@@ -66,10 +65,10 @@ export default function FieldPricingList({
   locationId = null,
   effectiveAt = null,
   refreshToken,
-  pricingContext = "customer",
-  showBothContexts = false,
   fieldTypeFilter,
+  organizationId,
 }: FieldPricingListProps) {
+  const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
   const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
   const {
     fieldPricing: customerPricing,
@@ -78,7 +77,7 @@ export default function FieldPricingList({
     upsertPricing: upsertCustomerPricing,
     deletePricing: deleteCustomerPricing,
     refetch: refetchCustomerPricing,
-  } = useFieldPricing({
+  } = useFieldPricing(organizationId, {
     locationHierarchyId,
     locationId,
     effectiveAt,
@@ -92,7 +91,7 @@ export default function FieldPricingList({
     upsertPricing: upsertWorkerPricing,
     deletePricing: deleteWorkerPricing,
     refetch: refetchWorkerPricing,
-  } = useFieldPricing({
+  } = useFieldPricing(organizationId, {
     locationHierarchyId,
     locationId,
     effectiveAt,
@@ -119,11 +118,6 @@ export default function FieldPricingList({
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer?: string; worker?: string }>
   >({});
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>(
-    {}
-  );
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [ruleModalField, setRuleModalField] = useState<FieldConfig | null>(
     null
   );
@@ -178,14 +172,6 @@ export default function FieldPricingList({
     ? customerPricingMap
     : workerPricingMap;
 
-  const fieldLabelLookup = useMemo(() => {
-    const lookup: Record<string, string> = {};
-    fieldConfigs.forEach((fc) => {
-      lookup[fc.id] = fc.label;
-    });
-    return lookup;
-  }, [fieldConfigs]);
-
   const handlePriceChange = (
     fieldConfigId: string,
     value: string,
@@ -224,7 +210,6 @@ export default function FieldPricingList({
         return;
       }
 
-      setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
       try {
         const customerEntry = customerPricingMap[fieldConfig.id];
         const workerEntry = workerPricingMap[fieldConfig.id];
@@ -316,12 +301,6 @@ export default function FieldPricingList({
           error: error instanceof Error ? error.message : "Unknown error",
           fieldConfigId: fieldConfig.id,
         });
-      } finally {
-        setSaving((prev) => {
-          const next = { ...prev };
-          delete next[fieldConfig.id];
-          return next;
-        });
       }
     } else {
       // Original single-context save logic
@@ -336,7 +315,6 @@ export default function FieldPricingList({
         return;
       }
 
-      setSaving((prev) => ({ ...prev, [fieldConfig.id]: true }));
       try {
         const pricingEntry = pricingMap[fieldConfig.id];
         const existingRule = pricingEntry?.record;
@@ -379,12 +357,6 @@ export default function FieldPricingList({
         log.error("Failed to save pricing", {
           error: error instanceof Error ? error.message : "Unknown error",
           fieldConfigId: fieldConfig.id,
-        });
-      } finally {
-        setSaving((prev) => {
-          const next = { ...prev };
-          delete next[fieldConfig.id];
-          return next;
         });
       }
     }
@@ -558,7 +530,6 @@ export default function FieldPricingList({
             ? hasCustomerChanges
             : hasWorkerChanges;
 
-          const isSaving = saving[fieldConfig.id] || false;
           // Get location overrides for both customer and worker contexts when showBothContexts is true
           // When showBothContexts, we show customer overrides with customer price and worker payment
           // We also show worker overrides separately with worker price
@@ -588,11 +559,9 @@ export default function FieldPricingList({
           const overrides = [...customerOverrides, ...workerOverrides];
           const conditions =
             customerPricingRecord?.source_rule?.conditions ?? [];
-          const isExpanded = expandedCards[fieldConfig.id] ?? true;
           const hasScopedValue = isEntryForScope(pricingEntry, scopeSource);
 
           const handleDeleteOverride = async (id: string) => {
-            setDeletingIds((prev) => new Set(prev).add(id));
             try {
               // Find which context this override belongs to
               const override = overrides.find((o) => o.id === id);
@@ -640,12 +609,6 @@ export default function FieldPricingList({
                 fieldConfigId: fieldConfig.id,
               });
               throw error;
-            } finally {
-              setDeletingIds((prev) => {
-                const next = new Set(prev);
-                next.delete(id);
-                return next;
-              });
             }
           };
 
@@ -660,27 +623,15 @@ export default function FieldPricingList({
               currentCustomerPrice={currentCustomerPrice}
               currentWorkerPrice={currentWorkerPrice}
               hasChanges={hasChanges}
-              isSaving={isSaving}
               overrides={overrides}
               conditions={conditions}
-              isExpanded={isExpanded}
               hasScopedValue={hasScopedValue}
-              showBothContexts={showBothContexts}
-              pricingContext={pricingContext}
               locationId={locationId}
               locationHierarchyId={locationHierarchyId}
-              fieldLabelLookup={fieldLabelLookup}
-              onExpandedChange={(expanded) =>
-                setExpandedCards((prev) => ({
-                  ...prev,
-                  [fieldConfig.id]: expanded,
-                }))
-              }
               onPriceChange={handlePriceChange}
               onSave={handleSave}
               onDeleteOverride={handleDeleteOverride}
               onOpenConditionalModal={openConditionalModal}
-              deletingIds={deletingIds}
             />
           );
         })}

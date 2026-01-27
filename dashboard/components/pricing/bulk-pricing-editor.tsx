@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { PricingService } from "@/lib/services";
 import type { FieldConfig } from "@clean-log/shared";
@@ -26,6 +25,7 @@ interface BulkPricingEditorProps {
   locationId: string | null;
   effectiveDate: string | null;
   onApplied?: () => void;
+  organizationId: string | null;
 }
 
 export function BulkPricingEditor({
@@ -36,8 +36,8 @@ export function BulkPricingEditor({
   locationId,
   effectiveDate,
   onApplied,
+  organizationId,
 }: BulkPricingEditorProps) {
-  const { organizationId } = useOrganization();
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [isSaving, setIsSaving] = useState(false);
