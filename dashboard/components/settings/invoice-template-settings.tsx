@@ -32,7 +32,6 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
-import useOrganization from "@/hooks/useOrganization";
 import {
   DEFAULT_BILLING_ADDRESS_CONFIG,
   DEFAULT_EMAIL_RECIPIENT_CONFIG,
@@ -61,7 +60,13 @@ import {
 import { useEffect, useState } from "react";
 import { InvoiceHeaderSettings } from "./invoice-template/InvoiceHeaderSettings";
 
-export default function InvoiceTemplateSettings() {
+interface InvoiceTemplateSettingsProps {
+  organizationId: string | null;
+}
+
+export default function InvoiceTemplateSettings({
+  organizationId,
+}: InvoiceTemplateSettingsProps) {
   const {
     config,
     loading: configLoading,
@@ -71,7 +76,6 @@ export default function InvoiceTemplateSettings() {
   const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
   const { locations, loading: locationsLoading } = useLocations();
   const { settings: orgSettings } = useOrganizationSettings();
-  const { organizationId } = useOrganization();
   const hasLocations = locations && locations.length > 0;
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);

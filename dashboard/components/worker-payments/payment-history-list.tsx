@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
-import useOrganization from "@/hooks/useOrganization";
 import { Job } from "@/lib/types";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
@@ -101,11 +100,14 @@ const statusConfig: Record<
 
 interface PaymentHistoryListProps {
   jobs: Job[];
+  organizationId: string | null;
 }
 
-export default function PaymentHistoryList({ jobs }: PaymentHistoryListProps) {
+export default function PaymentHistoryList({
+  jobs,
+  organizationId,
+}: PaymentHistoryListProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { organizationId } = useOrganization();
   const { paymentHistory, filterByDateRange, invalidate } =
     useWorkerPaymentHistory(jobs);
   const [startDate, setStartDate] = useState<string>("");
@@ -343,6 +345,7 @@ export default function PaymentHistoryList({ jobs }: PaymentHistoryListProps) {
             // Invalidate cache to refresh payment history
             invalidate();
           }}
+          organizationId={organizationId}
         />
       )}
     </>

@@ -18,7 +18,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import useOrganization from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
 import {
   FieldConfig,
@@ -66,6 +65,7 @@ interface FieldConfigListProps {
     }
   ) => Promise<void>;
   onReorderFieldConfigs: (fieldConfigIds: string[]) => Promise<void>;
+  organizationId: string | null;
 }
 
 interface SortableFieldConfigItemProps {
@@ -192,6 +192,7 @@ export default function FieldConfigList({
   onDeleteFieldConfig,
   onUpdateFieldConfig,
   onReorderFieldConfigs,
+  organizationId,
 }: FieldConfigListProps) {
   const [editingFieldConfig, setEditingFieldConfig] =
     useState<FieldConfig | null>(null);
@@ -201,7 +202,6 @@ export default function FieldConfigList({
   const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<
     Record<string, string[]>
   >({});
-  const { organizationId } = useOrganization();
 
   // Fetch location restrictions for all field configs
   useEffect(() => {
@@ -356,6 +356,7 @@ export default function FieldConfigList({
         }}
         onSuccess={handleFormSuccess}
         fieldConfig={editingFieldConfig}
+        organizationId={organizationId}
       />
 
       <AlertDialog

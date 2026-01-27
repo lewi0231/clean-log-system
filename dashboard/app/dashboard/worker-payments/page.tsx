@@ -51,14 +51,19 @@ export default function WorkerPaymentsPage() {
 
   return (
     <PricingScopeProvider>
-      <WorkerPaymentsPageContent />
+      <WorkerPaymentsPageContent organizationId={organizationId} />
     </PricingScopeProvider>
   );
 }
 
-function WorkerPaymentsPageContent() {
+interface WorkerPaymentsPageContentProps {
+  organizationId: string | null;
+}
+
+function WorkerPaymentsPageContent({
+  organizationId,
+}: WorkerPaymentsPageContentProps) {
   const { jobs } = useJobs();
-  const { organizationId } = useOrganization();
   const { calculatePayments } = useWorkerPayments();
   const { addPayment } = useWorkerPaymentHistory(jobs);
   const [isCalculateDialogOpen, setIsCalculateDialogOpen] = useState(false);
@@ -117,7 +122,7 @@ function WorkerPaymentsPageContent() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-6">
-          <PaymentHistoryList jobs={jobs} />
+          <PaymentHistoryList jobs={jobs} organizationId={organizationId} />
         </TabsContent>
 
         <TabsContent value="worker-summary" className="space-y-6">

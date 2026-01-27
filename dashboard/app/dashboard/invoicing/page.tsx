@@ -201,7 +201,7 @@ export default function InvoicingPage() {
 
               {/* Invoice Template Settings */}
               <div className="pt-4 border-t">
-                <InvoiceTemplateSettings />
+                <InvoiceTemplateSettings organizationId={organizationId} />
               </div>
             </CardContent>
           </CollapsibleContent>
