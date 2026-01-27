@@ -19,6 +19,7 @@ import {
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPaymentSummary } from "@/hooks/use-worker-payment-summary";
+import { Job } from "@/lib/types";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { cn } from "@/lib/utils";
 import {
@@ -54,10 +55,14 @@ function SortIcon({
   );
 }
 
-export default function WorkerPaymentSummary() {
+interface WorkerPaymentSummaryProps {
+  jobs: Job[];
+}
+
+export default function WorkerPaymentSummary({ jobs }: WorkerPaymentSummaryProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { paymentHistory } = useWorkerPaymentHistory();
-  const { workerSummary } = useWorkerPaymentSummary();
+  const { paymentHistory } = useWorkerPaymentHistory(jobs);
+  const { workerSummary } = useWorkerPaymentSummary(jobs);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
     null
   );
@@ -301,6 +306,7 @@ export default function WorkerPaymentSummary() {
           open={isDetailDialogOpen}
           onOpenChange={setIsDetailDialogOpen}
           payment={selectedPayment}
+          jobs={jobs}
         />
       )}
     </>

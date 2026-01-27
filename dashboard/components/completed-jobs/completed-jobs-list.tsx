@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/table";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import useOrganization from "@/hooks/useOrganization";
-import { InvoiceStatus, Job } from "@/lib/types";
+import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
+import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import { CheckCircle2 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import JobDetailDialog from "./job-detail-dialog";
@@ -23,6 +24,9 @@ interface CompletedJobsListProps {
   error: string | null;
   isAdmin?: boolean;
   onJobUpdated?: () => void;
+  updateJob: (request: UpdateJobRequest) => Promise<Job>;
+  getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
+  sendFeedbackEmail: (jobId: string) => Promise<void>;
 }
 
 // Standard fields that should be displayed in a specific order
@@ -34,6 +38,9 @@ export default function CompletedJobsList({
   error,
   isAdmin = false,
   onJobUpdated,
+  updateJob,
+  getJobEdits,
+  sendFeedbackEmail,
 }: CompletedJobsListProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const { organizationId } = useOrganization();
@@ -381,9 +388,9 @@ export default function CompletedJobsList({
   const totalColumns = 2 + orderedFields.length + 3; // Status, Location, Workers, ordered fields, Submitted By, Completed At
 
   return (
-    <div className=" overflow-x-auto">
-      <div className="rounded-md border w-full">
-        <Table className="w-full">
+    <div className="w-full overflow-x-auto">
+      <div className="rounded-md border min-w-full">
+        <Table className="min-w-full">
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[120px]">Status</TableHead>
@@ -495,6 +502,10 @@ export default function CompletedJobsList({
         onEditSuccess={() => {
           onJobUpdated?.();
         }}
+        updateJob={updateJob}
+        getJobEdits={getJobEdits}
+        sendFeedbackEmail={sendFeedbackEmail}
+        jobs={jobs}
       />
     </div>
   );

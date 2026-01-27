@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
-import useAuth from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
 import { Job } from "@/lib/types";
 import {
@@ -30,7 +30,16 @@ export default function CompletedJobsPage() {
     error: orgError,
   } = useOrganization();
   const [showTests, setShowTests] = useState(false);
-  const { jobs, loading, error, refetch } = useJobs({
+  const {
+    jobs,
+    loading,
+    error,
+    refetch,
+    createJob,
+    updateJob,
+    getJobEdits,
+    sendFeedbackEmail,
+  } = useJobs({
     includeTests: showTests,
   });
   const { user } = useAuth();
@@ -130,7 +139,7 @@ export default function CompletedJobsPage() {
   }
 
   return (
-    <div className="min-w-[calc(100vw-300px)] pr-6 max-w-[calc(100%-300px)]">
+    <div className="w-[calc(100vw-360px)]">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Completed Jobs</h1>
@@ -217,6 +226,9 @@ export default function CompletedJobsPage() {
           error={error}
           isAdmin={isAdmin}
           onJobUpdated={refetch}
+          updateJob={updateJob}
+          getJobEdits={getJobEdits}
+          sendFeedbackEmail={sendFeedbackEmail}
         />
       </div>
 
@@ -226,6 +238,7 @@ export default function CompletedJobsPage() {
         onSuccess={() => {
           refetch();
         }}
+        createJob={createJob}
       />
 
       <CalculatePaymentDialog
@@ -234,6 +247,7 @@ export default function CompletedJobsPage() {
         onCalculate={async () => {
           // Payment calculation completed
         }}
+        jobs={jobs}
       />
     </div>
   );

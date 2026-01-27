@@ -8,14 +8,18 @@ import {
   TableSkeleton,
 } from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import PaymentHistoryList from "@/components/worker-payments/payment-history-list";
 import PaymentOverview from "@/components/worker-payments/payment-overview";
 import RateCardManager from "@/components/worker-payments/rate-card-manager";
 import WorkerPaymentSummary from "@/components/worker-payments/worker-payment-summary";
 import { useJobs } from "@/hooks/use-jobs";
+import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
+import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import useOrganization from "@/hooks/useOrganization";
+import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { Calculator } from "lucide-react";
-import { useCalculatePayments } from "./layout";
+import { useState } from "react";
 
 export default function WorkerPaymentsPage() {
   const {
@@ -54,10 +58,30 @@ export default function WorkerPaymentsPage() {
 
 function WorkerPaymentsPageContent() {
   const { jobs } = useJobs();
-  const { openDialog } = useCalculatePayments();
-  
+  const { organizationId } = useOrganization();
+  const { calculatePayments } = useWorkerPayments();
+  const { addPayment } = useWorkerPaymentHistory(jobs);
+  const [isCalculateDialogOpen, setIsCalculateDialogOpen] = useState(false);
+
   // Get jobs with workers
   const jobsWithWorkers = jobs.filter((job) => job.workers.length > 0);
+
+  const handleCalculatePayments = async (jobIds: string[]) => {
+    if (!organizationId) return;
+
+    const result = await calculatePayments(jobIds);
+    if (result?.calculation) {
+      // Save to database via service
+      try {
+        await WorkerPaymentService.savePayment(organizationId, result, jobIds);
+        addPayment(result, jobIds);
+      } catch (error) {
+        console.error("Failed to save payment:", error);
+        // Still add to local state for now, but log error
+        addPayment(result, jobIds);
+      }
+    }
+  };
 
   return (
     <>
@@ -72,7 +96,7 @@ function WorkerPaymentsPageContent() {
 
       <div className="flex items-center justify-end mb-6">
         <Button
-          onClick={openDialog}
+          onClick={() => setIsCalculateDialogOpen(true)}
           disabled={jobsWithWorkers.length === 0}
         >
           <Calculator className="mr-2 h-4 w-4" />
@@ -89,21 +113,28 @@ function WorkerPaymentsPageContent() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <PaymentOverview />
+          <PaymentOverview jobs={jobs} />
         </TabsContent>
 
         <TabsContent value="history" className="space-y-6">
-          <PaymentHistoryList />
+          <PaymentHistoryList jobs={jobs} />
         </TabsContent>
 
         <TabsContent value="worker-summary" className="space-y-6">
-          <WorkerPaymentSummary />
+          <WorkerPaymentSummary jobs={jobs} />
         </TabsContent>
 
         <TabsContent value="rate-cards" className="space-y-6">
           <RateCardManager />
         </TabsContent>
       </Tabs>
+
+      <CalculatePaymentDialog
+        open={isCalculateDialogOpen}
+        onOpenChange={setIsCalculateDialogOpen}
+        onCalculate={handleCalculatePayments}
+        jobs={jobs}
+      />
     </>
   );
 }

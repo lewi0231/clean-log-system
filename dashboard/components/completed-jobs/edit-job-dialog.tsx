@@ -21,7 +21,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
-import { useJobs } from "@/hooks/use-jobs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
@@ -43,6 +42,7 @@ interface EditJobDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   job: Job | null;
+  updateJob: (request: UpdateJobRequest) => Promise<Job>;
 }
 
 // Helper to evaluate conditional logic
@@ -321,6 +321,7 @@ export default function EditJobDialog({
   onOpenChange,
   onSuccess,
   job,
+  updateJob,
 }: EditJobDialogProps) {
   const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
@@ -332,7 +333,6 @@ export default function EditJobDialog({
   });
   const { locations } = useLocations();
   const { workers } = useWorkers();
-  const { updateJob } = useJobs();
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
   const [startDateTime, setStartDateTime] = useState<string>("");
   const [finishDateTime, setFinishDateTime] = useState<string>(
