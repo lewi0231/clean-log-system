@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -91,7 +90,7 @@ const getDaysOverdue = (dueDate: string): number => {
  * Yellow (1-7 days), Orange (8-14 days), Red (15+ days)
  */
 const getOverdueSeverity = (
-  daysOverdue: number
+  daysOverdue: number,
 ): "warning" | "orange" | "destructive" => {
   if (daysOverdue <= 7) return "warning";
   if (daysOverdue <= 14) return "orange";
@@ -150,7 +149,7 @@ export default function InvoiceList({
   const [endDate, setEndDate] = useState<string>("");
   const [showTests, setShowTests] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>(
-    initialStatusFilter || "all"
+    initialStatusFilter || "all",
   );
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -171,7 +170,7 @@ export default function InvoiceList({
     debouncedSearch || undefined,
     statusFilter !== "all" ? statusFilter : undefined,
     currentPage,
-    pageSize
+    pageSize,
   );
 
   // Invoices are already filtered by the backend
@@ -181,16 +180,16 @@ export default function InvoiceList({
   const [invoiceToResend, setInvoiceToResend] =
     useState<InvoiceWithJobs | null>(null);
   const [approvingInvoiceId, setApprovingInvoiceId] = useState<string | null>(
-    null
+    null,
   );
   const [rejectingInvoiceId, setRejectingInvoiceId] = useState<string | null>(
-    null
+    null,
   );
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(
-    null
+    null,
   );
   const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [bulkProcessing, setBulkProcessing] = useState(false);
 
@@ -332,7 +331,7 @@ export default function InvoiceList({
 
   const handleSendReminder = async (
     e: React.MouseEvent,
-    invoice: InvoiceWithJobs
+    invoice: InvoiceWithJobs,
   ) => {
     e.stopPropagation();
 
@@ -363,7 +362,7 @@ export default function InvoiceList({
 
   const handleApproveInvoice = async (
     e: React.MouseEvent,
-    invoiceId: string
+    invoiceId: string,
   ) => {
     e.stopPropagation();
     try {
@@ -393,7 +392,7 @@ export default function InvoiceList({
 
   const handleRejectInvoice = async (
     e: React.MouseEvent,
-    invoiceId: string
+    invoiceId: string,
   ) => {
     e.stopPropagation();
     try {
@@ -423,10 +422,10 @@ export default function InvoiceList({
 
   // Bulk selection handlers
   const pendingReviewInvoices = filteredInvoices.filter(
-    (inv) => inv.status === "pending_review"
+    (inv) => inv.status === "pending_review",
   );
   const selectedPendingReview = Array.from(selectedInvoiceIds).filter((id) =>
-    pendingReviewInvoices.some((inv) => inv.id === id)
+    pendingReviewInvoices.some((inv) => inv.id === id),
   );
 
   const handleSelectAll = (checked: boolean) => {
@@ -454,7 +453,9 @@ export default function InvoiceList({
 
     try {
       setBulkProcessing(true);
-      log.info("Bulk approving invoices", { count: selectedPendingReview.length });
+      log.info("Bulk approving invoices", {
+        count: selectedPendingReview.length,
+      });
 
       let successCount = 0;
       let errorCount = 0;
@@ -494,7 +495,9 @@ export default function InvoiceList({
 
     try {
       setBulkProcessing(true);
-      log.info("Bulk rejecting invoices", { count: selectedPendingReview.length });
+      log.info("Bulk rejecting invoices", {
+        count: selectedPendingReview.length,
+      });
 
       let successCount = 0;
       let errorCount = 0;
@@ -528,25 +531,6 @@ export default function InvoiceList({
       setBulkProcessing(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {/* Date filter skeletons */}
-        <div className="flex flex-col sm:flex-row gap-4 items-end">
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-        </div>
-        <TableSkeleton rows={5} columns={8} />
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -678,7 +662,9 @@ export default function InvoiceList({
         )}
 
         {/* Invoice Table */}
-        {filteredInvoices.length === 0 ? (
+        {loading && filteredInvoices.length === 0 ? (
+          <TableSkeleton rows={5} columns={8} />
+        ) : filteredInvoices.length === 0 ? (
           <div className="text-center py-12 border rounded-lg">
             <FileText className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
             <p className="text-muted-foreground">No invoices found</p>
@@ -699,7 +685,7 @@ export default function InvoiceList({
                         checked={
                           pendingReviewInvoices.length > 0 &&
                           pendingReviewInvoices.every((inv) =>
-                            selectedInvoiceIds.has(inv.id)
+                            selectedInvoiceIds.has(inv.id),
                           )
                         }
                         onCheckedChange={handleSelectAll}

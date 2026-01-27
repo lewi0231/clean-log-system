@@ -27,7 +27,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
-import useAuth from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -73,7 +73,7 @@ export default function InvoicingPage() {
             organization_id: organizationId,
             invoice_send_immediately: checked,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -86,14 +86,14 @@ export default function InvoicingPage() {
       });
 
       log.info(
-        "Invoicing: Invoice send immediately setting updated successfully"
+        "Invoicing: Invoice send immediately setting updated successfully",
       );
     } catch (err) {
       log.error(
         "Invoicing: Failed to update invoice send immediately setting",
         {
           error: err instanceof Error ? err.message : "Unknown error",
-        }
+        },
       );
       alert("Failed to update setting. Please try again.");
     }

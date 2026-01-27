@@ -21,12 +21,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
-import { useJobs } from "@/hooks/use-jobs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
+import { Job } from "@/lib/types";
 import type { CreateJobRequest } from "@/lib/types/api";
 import type { ConditionalLogic, FieldConfig } from "@clean-log/shared/types";
 import { Plus, X } from "lucide-react";
@@ -41,13 +41,14 @@ interface CreateJobDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  createJob: (request: CreateJobRequest) => Promise<Job>;
 }
 
 // Helper to evaluate conditional logic
 function evaluateCondition(
   logic: ConditionalLogic | null,
   fieldValues: Record<string, unknown>,
-  fieldConfigs: FieldConfig[]
+  fieldConfigs: FieldConfig[],
 ): boolean {
   if (!logic || !logic.conditions || logic.conditions.length === 0) {
     return true; // No conditions = always visible
@@ -121,7 +122,7 @@ function GroupedBreakdownField({
 
   // Get available brands (not already selected)
   const availableBrands = options.filter(
-    (option) => !value.some((item) => item.brand === option)
+    (option) => !value.some((item) => item.brand === option),
   );
 
   const handleAddItem = () => {
@@ -158,8 +159,8 @@ function GroupedBreakdownField({
 
     onChange(
       value.map((item) =>
-        item.brand === brand ? { ...item, quantity: newQuantity } : item
-      )
+        item.brand === brand ? { ...item, quantity: newQuantity } : item,
+      ),
     );
   };
 
@@ -318,22 +319,23 @@ export default function CreateJobDialog({
   open,
   onOpenChange,
   onSuccess,
+  createJob,
 }: CreateJobDialogProps) {
   const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
   const [locationId, setLocationId] = useState<string>("");
   // Normalize locationId: treat empty string as null
-  const normalizedLocationId = locationId && locationId.trim() !== "" ? locationId : null;
+  const normalizedLocationId =
+    locationId && locationId.trim() !== "" ? locationId : null;
   const { fieldConfigs } = useFieldConfigs({
     locationId: normalizedLocationId,
   });
   const { locations } = useLocations();
   const { workers } = useWorkers();
-  const { createJob } = useJobs();
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
   const [startDateTime, setStartDateTime] = useState<string>("");
   const [finishDateTime, setFinishDateTime] = useState<string>(
-    new Date().toISOString().slice(0, 16) // YYYY-MM-DDTHH:mm format
+    new Date().toISOString().slice(0, 16), // YYYY-MM-DDTHH:mm format
   );
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -362,7 +364,7 @@ export default function CreateJobDialog({
   // Filter active field configs
   const activeFieldConfigs = useMemo(
     () => fieldConfigs.filter((fc) => fc.active && !fc.archived_at),
-    [fieldConfigs]
+    [fieldConfigs],
   );
 
   // Check if a field should be visible based on conditional logic
@@ -371,16 +373,16 @@ export default function CreateJobDialog({
       return evaluateCondition(
         field.conditional_logic,
         fieldValues,
-        activeFieldConfigs
+        activeFieldConfigs,
       );
     },
-    [fieldValues, activeFieldConfigs]
+    [fieldValues, activeFieldConfigs],
   );
 
   // Get visible fields
   const visibleFields = useMemo(
     () => activeFieldConfigs.filter(isFieldVisible),
-    [activeFieldConfigs, isFieldVisible]
+    [activeFieldConfigs, isFieldVisible],
   );
 
   // Helper: Get cluster identifier for a field
@@ -421,7 +423,7 @@ export default function CreateJobDialog({
       });
       return Array.from(clusters).sort();
     },
-    [groupedFields.groups, getFieldCluster]
+    [groupedFields.groups, getFieldCluster],
   );
 
   // Format cluster name from snake_case to Title Case
@@ -430,7 +432,7 @@ export default function CreateJobDialog({
       .split("_")
       .map(
         (word: string) =>
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
       )
       .join(" ");
   }, []);
@@ -448,7 +450,7 @@ export default function CreateJobDialog({
         });
       }
     },
-    [errors]
+    [errors],
   );
 
   // Handle cluster selection
@@ -477,7 +479,7 @@ export default function CreateJobDialog({
         }
       });
     },
-    [groupedFields.groups, getFieldCluster, updateFieldValue]
+    [groupedFields.groups, getFieldCluster, updateFieldValue],
   );
 
   // Get fields to render (only from selected clusters)
@@ -492,7 +494,7 @@ export default function CreateJobDialog({
       const selectedCluster = selectedClusters[groupId];
       if (selectedCluster) {
         const clusterFields = groupFields.filter(
-          (field) => getFieldCluster(field) === selectedCluster
+          (field) => getFieldCluster(field) === selectedCluster,
         );
         fields.push(...clusterFields);
       }
@@ -506,7 +508,7 @@ export default function CreateJobDialog({
     setSelectedWorkerIds((prev) =>
       prev.includes(workerId)
         ? prev.filter((id) => id !== workerId)
-        : [...prev, workerId]
+        : [...prev, workerId],
     );
   }, []);
 
@@ -706,7 +708,7 @@ export default function CreateJobDialog({
               onChange={(e) =>
                 updateFieldValue(
                   field.id,
-                  e.target.value === "" ? 0 : Number(e.target.value) || 0
+                  e.target.value === "" ? 0 : Number(e.target.value) || 0,
                 )
               }
               placeholder={field.description || field.label}
@@ -1024,7 +1026,7 @@ export default function CreateJobDialog({
                         .map(
                           (word: string) =>
                             word.charAt(0).toUpperCase() +
-                            word.slice(1).toLowerCase()
+                            word.slice(1).toLowerCase(),
                         )
                         .join(" ") || "Select Option";
 
@@ -1053,7 +1055,7 @@ export default function CreateJobDialog({
                     {selectedCluster &&
                       fields
                         .filter(
-                          (field) => getFieldCluster(field) === selectedCluster
+                          (field) => getFieldCluster(field) === selectedCluster,
                         )
                         .map((field) => renderField(field))}
                   </div>

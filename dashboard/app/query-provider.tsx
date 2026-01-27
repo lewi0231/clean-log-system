@@ -15,14 +15,21 @@ export function QueryProvider({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: {
             // Avoid aggressive refetching; callers can opt-in via refetch
-            staleTime: 30 * 1000,
+            staleTime: 2 * 60 * 1000,
             retry: 1,
+            // Don't refetch on mount if data exists in cache
+            // This prevents showing loading states when navigating back
+            refetchOnMount: false,
+            // Don't refetch when window regains focus
+            refetchOnWindowFocus: false,
+            // Don't refetch on reconnect
+            refetchOnReconnect: false,
           },
           mutations: {
             retry: 1,
           },
         },
-      })
+      }),
   );
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
@@ -40,7 +47,7 @@ export const organizationUsersKey = (orgId: string | null): QueryKey => [
 
 export const jobsKey = (
   orgId: string | null,
-  includeTests?: boolean
+  includeTests?: boolean,
 ): QueryKey => ["jobs", orgId, includeTests ?? false];
 
 export const locationHierarchyKey = (orgId: string | null): QueryKey => [
@@ -52,7 +59,7 @@ export const invoicesKey = (
   orgId: string | null,
   startDate?: string,
   endDate?: string,
-  includeTests?: boolean
+  includeTests?: boolean,
 ): QueryKey => ["invoices", orgId, startDate, endDate, includeTests ?? false];
 
 export const invoiceDetailsKey = (invoiceId: string | null): QueryKey => [

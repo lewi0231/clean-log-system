@@ -65,11 +65,18 @@ export function useInvoices(
   const queryClient = useQueryClient();
   const includeTestsSafe = includeTests ?? false;
 
+  // Normalize query parameters to ensure consistent cache keys
+  // Empty strings should be treated as undefined to avoid cache misses
+  const normalizedSearch = search && search.trim() ? search.trim() : undefined;
+  const normalizedStatus = status && status !== "all" ? status : undefined;
+  const normalizedStartDate = startDate && startDate.trim() ? startDate.trim() : undefined;
+  const normalizedEndDate = endDate && endDate.trim() ? endDate.trim() : undefined;
+
   const query = useQuery({
     queryKey: [
-      ...invoicesKey(organizationId, startDate, endDate, includeTestsSafe),
-      search,
-      status,
+      ...invoicesKey(organizationId, normalizedStartDate, normalizedEndDate, includeTestsSafe),
+      normalizedSearch,
+      normalizedStatus,
       page,
       pageSize,
     ],
@@ -77,16 +84,21 @@ export function useInvoices(
     queryFn: () =>
       fetchInvoices(
         organizationId as string,
-        startDate,
-        endDate,
+        normalizedStartDate,
+        normalizedEndDate,
         includeTestsSafe,
-        search,
-        status,
+        normalizedSearch,
+        normalizedStatus,
         page,
         pageSize
       ),
     select: (data) => data ?? { invoices: [], pagination: undefined },
     placeholderData: (previous) => previous,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache for 10 minutes (must be > staleTime)
+    // Explicitly disable refetch on mount to use cached data when navigating back
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({
@@ -128,7 +140,9 @@ export function useInvoices(
 
   return {
     invoices: query.data?.invoices ?? [],
-    loading: query.isLoading,
+    // isPending is true only when there's no data in cache yet (first load)
+    // This allows showing cached data immediately when navigating back
+    loading: query.isPending,
     error: query.error ? (query.error as Error).message : null,
     refetch: useCallback(() => query.refetch().then(() => undefined), [query]),
     pagination: query.data?.pagination,
