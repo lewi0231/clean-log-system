@@ -92,11 +92,8 @@ export const emailRecipientConfigSchema = z.object({
         EMAIL_RECIPIENT_SOURCE.LOCATION_CONTACT_EMAIL,
     ]),
     form_field_email: z.string().nullable(),
-    default_email: z
-        .string()
-        .email("Invalid email format")
-        .nullable()
-        .or(z.literal("")),
+    // default_email removed: fallback not used; always null when saving
+    default_email: z.string().email().nullable().optional(),
 });
 
 export type EmailRecipientConfigInput = z.infer<

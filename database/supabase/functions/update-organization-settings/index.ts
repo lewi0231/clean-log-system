@@ -48,6 +48,9 @@ serve(async (req) => {
       bank_transfer_account_name,
       show_bank_transfer_on_invoices,
       default_invoice_due_days,
+      gst_registered,
+      gst_inclusive,
+      gst_rate_percent,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -384,6 +387,70 @@ serve(async (req) => {
       }
     }
 
+    // Handle GST settings (stored in organization_settings table)
+    if (
+      gst_registered !== undefined ||
+      gst_inclusive !== undefined ||
+      gst_rate_percent !== undefined
+    ) {
+      if (gst_rate_percent !== undefined) {
+        const rate = Number(gst_rate_percent);
+        if (isNaN(rate) || rate < 0 || rate > 100) {
+          return errorResponse(
+            "gst_rate_percent must be a number between 0 and 100",
+            400,
+          );
+        }
+      }
+
+      const { data: existingGstSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      const gstUpdate: Record<string, unknown> = {};
+      if (gst_registered !== undefined) {
+        if (typeof gst_registered !== "boolean") {
+          return errorResponse("gst_registered must be a boolean", 400);
+        }
+        gstUpdate.gst_registered = gst_registered;
+      }
+      if (gst_inclusive !== undefined) {
+        if (typeof gst_inclusive !== "boolean") {
+          return errorResponse("gst_inclusive must be a boolean", 400);
+        }
+        gstUpdate.gst_inclusive = gst_inclusive;
+      }
+      if (gst_rate_percent !== undefined) {
+        gstUpdate.gst_rate_percent = Number(gst_rate_percent);
+      }
+
+      if (existingGstSettings) {
+        const { error: gstError } = await supabase
+          .from("organization_settings")
+          .update(gstUpdate)
+          .eq("id", existingGstSettings.id);
+
+        if (gstError) {
+          logger.error("Failed to update GST settings", { error: gstError });
+        }
+      } else {
+        const { error: gstError } = await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id,
+            ...gstUpdate,
+          });
+
+        if (gstError) {
+          logger.error("Failed to create organization_settings with GST", {
+            error: gstError,
+          });
+        }
+      }
+    }
+
     // Only update organization table if there are fields to update
     let organization = null;
     if (Object.keys(updateData).length > 0) {
@@ -416,7 +483,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent",
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -480,6 +547,9 @@ serve(async (req) => {
         show_bank_transfer_on_invoices:
           orgSettings?.show_bank_transfer_on_invoices ?? false,
         default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
+        gst_registered: orgSettings?.gst_registered ?? false,
+        gst_inclusive: orgSettings?.gst_inclusive ?? true,
+        gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
       },
     });
   } catch (error) {

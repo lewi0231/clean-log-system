@@ -123,7 +123,9 @@ serve(async (req) => {
     // Fetch organization info for display
     const { data: organization, error: orgError } = await supabase
       .from("organization")
-      .select("name, abn, logo_url, primary_contact_email")
+      .select(
+        "name, abn, logo_url, primary_contact_email, business_address, primary_contact_phone, stripe_account_id",
+      )
       .eq("id", invoice.organization_id)
       .single();
 
@@ -133,6 +135,31 @@ serve(async (req) => {
         error: orgError,
       });
     }
+
+    // Fetch organization_settings for payment and invoice display
+    const { data: orgSettings } = await supabase
+      .from("organization_settings")
+      .select(
+        "default_invoice_due_days, show_bank_transfer_on_invoices, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name",
+      )
+      .eq("organization_id", invoice.organization_id)
+      .maybeSingle();
+
+    // Flatten organization + org_settings for the response (orgInfo for InvoiceDocument)
+    const organizationForDisplay = organization
+      ? {
+          ...organization,
+          default_invoice_due_days: orgSettings?.default_invoice_due_days ??
+            30,
+          show_bank_transfer_on_invoices:
+            orgSettings?.show_bank_transfer_on_invoices ?? false,
+          bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
+          bank_transfer_account_number:
+            orgSettings?.bank_transfer_account_number ?? null,
+          bank_transfer_account_name:
+            orgSettings?.bank_transfer_account_name ?? null,
+        }
+      : null;
 
     // Fetch invoice template config
     let templateConfig = null;
@@ -268,7 +295,7 @@ serve(async (req) => {
       calculation: calculationData.calculation,
       template_config: templateConfig,
       hierarchy_metadata: hierarchyMetadata,
-      organization: organization || null,
+      organization: organizationForDisplay,
     });
   } catch (error) {
     logger.error("Get public invoice details error", error);

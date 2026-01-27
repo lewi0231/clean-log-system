@@ -178,7 +178,6 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     it("P2: should render all main sections", () => {
       render(<InvoiceTemplateSettings />);
 
-      expect(screen.getByText(/invoice header settings/i)).toBeInTheDocument();
       expect(
         screen.getByText(/service address configuration/i)
       ).toBeInTheDocument();
@@ -310,11 +309,11 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       email_recipient_config: {
         location_email_source: "location_email" as const,
         form_field_email: null,
-        default_email: "invalid-email", // Invalid email
+        default_email: null,
       },
       line_item_display: {
         include_option_value: true,
-        description_format: "Missing placeholders", // Missing required placeholders
+        description_format: "Missing placeholders", // Missing required placeholders – triggers validation
         show_base_price_separately: true,
       },
       created_at: "2024-01-01T00:00:00Z",
@@ -473,25 +472,15 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       });
     });
 
-    it("P2: should update invoice title when radio button is selected", async () => {
+    it("P2: should toggle include option value switch", async () => {
       render(<InvoiceTemplateSettings />);
-      const invoiceRadio = screen.getByLabelText(/^invoice$/i);
+      const includeOptionSwitch = screen.getByLabelText(/include option values/i);
 
-      fireEvent.click(invoiceRadio);
+      expect(includeOptionSwitch).toBeChecked();
 
-      // The value should be updated in state (we can't directly test state, but we can test the UI reflects it)
-      expect(invoiceRadio).toBeChecked();
-    });
+      fireEvent.click(includeOptionSwitch);
 
-    it("P2: should toggle show logo switch", async () => {
-      render(<InvoiceTemplateSettings />);
-      const showLogoSwitch = screen.getByLabelText(/show logo/i);
-
-      expect(showLogoSwitch).toBeChecked(); // Initially true
-
-      fireEvent.click(showLogoSwitch);
-
-      expect(showLogoSwitch).not.toBeChecked();
+      expect(includeOptionSwitch).not.toBeChecked();
     });
   });
 });

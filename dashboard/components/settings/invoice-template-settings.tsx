@@ -39,8 +39,6 @@ import {
   DEFAULT_LINE_ITEM_DISPLAY,
   DEFAULT_SERVICE_ADDRESS_CONFIG,
 } from "@/lib/constants/invoice-template-defaults";
-import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
 import type {
   BillingAddressConfig,
   InvoiceEmailRecipientConfig,
@@ -58,15 +56,15 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { InvoiceHeaderSettings } from "./invoice-template/InvoiceHeaderSettings";
 
 interface InvoiceTemplateSettingsProps {
-  organizationId: string | null;
+  /** Optional for backward compatibility; org is resolved via useOrganization in child hooks. */
+  organizationId?: string | null;
 }
 
-export default function InvoiceTemplateSettings({
-  organizationId,
-}: InvoiceTemplateSettingsProps) {
+export default function InvoiceTemplateSettings(
+  _props?: InvoiceTemplateSettingsProps,
+) {
   const {
     config,
     loading: configLoading,
@@ -79,7 +77,6 @@ export default function InvoiceTemplateSettings({
   const hasLocations = locations && locations.length > 0;
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(false);
 
   // Helper to normalize logo URL for display
   const normalizeLogoUrl = (url: string | null): string | null => {
@@ -96,12 +93,8 @@ export default function InvoiceTemplateSettings({
   >({});
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Local state for form
-  const [invoiceTitle, setInvoiceTitle] = useState<string>(
-    DEFAULT_INVOICE_TITLE
-  );
-  const [showLogo, setShowLogo] = useState(true);
-  const [showAbn, setShowAbn] = useState(true);
+  // Local state for form (invoice_title, show_logo, show_abn are no longer user-editable:
+  // title is derived from GST; logo/ABN always shown when present)
   const [serviceAddressConfig, setServiceAddressConfig] =
     useState<ServiceAddressConfig>(DEFAULT_SERVICE_ADDRESS_CONFIG);
   const [billingAddressConfig, setBillingAddressConfig] =
@@ -112,23 +105,9 @@ export default function InvoiceTemplateSettings({
   const [emailRecipientConfig, setEmailRecipientConfig] =
     useState<InvoiceEmailRecipientConfig>(DEFAULT_EMAIL_RECIPIENT_CONFIG);
 
-  // Initialize auto-generate invoices from organization settings
-  useEffect(() => {
-    if (orgSettings) {
-      setAutoGenerateInvoices(
-        orgSettings.auto_generate_invoices_immediately ?? false
-      );
-    }
-  }, [orgSettings]);
-
   // Initialize form with config data
   useEffect(() => {
     if (config) {
-      setInvoiceTitle(
-        (config.invoice_title || DEFAULT_INVOICE_TITLE) as string
-      );
-      setShowLogo(config.show_logo ?? true);
-      setShowAbn(config.show_abn ?? true);
       // Migrate legacy bill_to_fields to service_address_config.form_fields if needed
       const legacyBillToFields = config.bill_to_fields || [];
       const existingServiceConfig =
@@ -154,14 +133,15 @@ export default function InvoiceTemplateSettings({
     // Clear previous validation errors
     setValidationErrors({});
 
-    // Validate the config before saving
+    // Validate the config before saving (invoice_title, show_logo, show_abn use defaults:
+    // title from GST; logo/ABN always shown when org has them)
     const configToSave = {
-      invoice_title: invoiceTitle,
-      show_logo: showLogo,
-      show_abn: showAbn,
+      invoice_title: DEFAULT_INVOICE_TITLE,
+      show_logo: true,
+      show_abn: true,
       service_address_config: serviceAddressConfig,
       billing_address_config: billingAddressConfig,
-      email_recipient_config: emailRecipientConfig,
+      email_recipient_config: { ...emailRecipientConfig, default_email: null },
       line_item_display: lineItemDisplay,
     };
 
@@ -220,12 +200,12 @@ export default function InvoiceTemplateSettings({
     }));
   };
 
+  // Form fields for service address: text-like inputs only (exclude number)
   const getAvailableServiceAddressFields = () => {
     return fieldConfigs.filter(
       (field) =>
         !serviceAddressConfig.form_fields?.includes(field.name) &&
         (field.field_type === "text" ||
-          field.field_type === "number" ||
           field.field_type === "address" ||
           field.field_type === "email" ||
           field.field_type === "phone")
@@ -278,48 +258,6 @@ export default function InvoiceTemplateSettings({
     return field?.label || fieldName;
   };
 
-  const handleAutoGenerateInvoicesChange = async (enabled: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Invoice Settings: Updating auto-generate invoices", {
-        enabled,
-      });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            auto_generate_invoices_immediately: enabled,
-          },
-        }
-      );
-
-      if (updateError) {
-        log.error("Invoice Settings: Failed to update auto-generate invoices", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setAutoGenerateInvoices(
-          data.settings.auto_generate_invoices_immediately ?? false
-        );
-      }
-
-      log.info("Invoice Settings: Auto-generate invoices updated successfully");
-    } catch (err) {
-      log.error("Invoice Settings: Failed to update auto-generate invoices", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      alert(
-        `Failed to update auto-generate invoices setting. Please try again.`
-      );
-    }
-  };
-
   if (configLoading || fieldConfigsLoading || locationsLoading) {
     return (
       <div>
@@ -347,15 +285,6 @@ export default function InvoiceTemplateSettings({
 
   return (
     <div className="space-y-6">
-      <InvoiceHeaderSettings
-        invoiceTitle={invoiceTitle}
-        showLogo={showLogo}
-        showAbn={showAbn}
-        onInvoiceTitleChange={setInvoiceTitle}
-        onShowLogoChange={setShowLogo}
-        onShowAbnChange={setShowAbn}
-      />
-
       {/* Service Address Configuration */}
       <Card>
         <CardHeader>
@@ -811,62 +740,10 @@ export default function InvoiceTemplateSettings({
             </Select>
             <p className="text-xs text-muted-foreground">
               For jobs without a location, select which form field contains the
-              customer email address. Leave empty to use the default email
-              below.
+              customer email address. Leave empty when there is no form-field
+              email; those invoices will not be auto-sent and may require manual
+              review.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="default-email">Default Email (Fallback)</Label>
-            <Input
-              id="default-email"
-              type="email"
-              value={emailRecipientConfig.default_email || ""}
-              onChange={(e) => {
-                const value = e.target.value.trim() || null;
-                setEmailRecipientConfig((prev) => ({
-                  ...prev,
-                  default_email: value,
-                }));
-                // Clear validation error when user types
-                if (validationErrors["email_recipient_config.default_email"]) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors["email_recipient_config.default_email"];
-                    return newErrors;
-                  });
-                }
-              }}
-              placeholder="default@example.com"
-              pattern="[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
-            />
-            <p
-              id="default-email-help"
-              className="text-xs text-muted-foreground"
-            >
-              Fallback email address used when no other email source is
-              available. Leave empty if you want invoices without valid email
-              addresses to require manual review.
-            </p>
-            {validationErrors["email_recipient_config.default_email"] && (
-              <p
-                id="default-email-error"
-                className="text-xs text-destructive"
-                data-error-field="email_recipient_config.default_email"
-                role="alert"
-              >
-                {validationErrors["email_recipient_config.default_email"]}
-              </p>
-            )}
-            {emailRecipientConfig.default_email &&
-              !validationErrors["email_recipient_config.default_email"] &&
-              !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(
-                emailRecipientConfig.default_email
-              ) && (
-                <p className="text-xs text-destructive">
-                  Please enter a valid email address
-                </p>
-              )}
           </div>
         </CardContent>
       </Card>
@@ -974,35 +851,6 @@ export default function InvoiceTemplateSettings({
         </CardContent>
       </Card>
 
-      {/* Auto-Generate Invoices Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Auto-Generate Invoices</CardTitle>
-          <CardDescription>
-            Configure automatic invoice creation when jobs are completed
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base font-semibold">
-                Auto-Generate Invoices
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Automatically create invoices in pending review when jobs are
-                completed. Location-specific auto-generate takes precedence. All
-                invoices require review before sending.
-              </p>
-            </div>
-            <Switch
-              checked={autoGenerateInvoices}
-              onCheckedChange={handleAutoGenerateInvoicesChange}
-              className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Success Message */}
       {saveSuccess && (
         <Card className="border-success/20 bg-success/5">
@@ -1097,7 +945,7 @@ export default function InvoiceTemplateSettings({
             {/* Invoice Header */}
             <div className="flex items-start justify-between">
               <div className="space-y-2">
-                {showLogo && orgSettings?.logo_url && (
+                {orgSettings?.logo_url && (
                   <div className="h-16 w-16 rounded border bg-muted flex items-center justify-center overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1107,25 +955,13 @@ export default function InvoiceTemplateSettings({
                     />
                   </div>
                 )}
-                {showLogo && !orgSettings?.logo_url && (
-                  <div className="h-16 w-16 rounded border border-dashed bg-muted/50 flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">
-                      No logo
-                    </span>
-                  </div>
-                )}
                 <div>
                   <p className="font-bold text-lg">
                     {orgSettings?.name || "Your Business Name"}
                   </p>
-                  {showAbn && orgSettings?.abn && (
+                  {orgSettings?.abn && (
                     <p className="text-sm text-muted-foreground">
                       ABN: {orgSettings.abn}
-                    </p>
-                  )}
-                  {showAbn && !orgSettings?.abn && (
-                    <p className="text-sm text-muted-foreground italic">
-                      ABN: Not configured
                     </p>
                   )}
                   {orgSettings?.business_address && (
@@ -1147,7 +983,7 @@ export default function InvoiceTemplateSettings({
               </div>
               <div className="text-right">
                 <h1 className="text-2xl font-bold text-primary">
-                  {invoiceTitle}
+                  Tax Invoice
                 </h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Invoice #: INV-00001

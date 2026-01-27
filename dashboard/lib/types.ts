@@ -109,6 +109,9 @@ export interface OrganizationSettings {
   bank_transfer_account_name: string | null;
   show_bank_transfer_on_invoices: boolean;
   default_invoice_due_days: number;
+  gst_registered: boolean;
+  gst_inclusive: boolean;
+  gst_rate_percent: number;
 }
 
 export interface Job {
@@ -477,7 +480,8 @@ export interface InvoiceEmailRecipientConfig {
     | "hierarchy_billing_email"
     | "location_contact_email";
   form_field_email: string | null; // Field config ID that contains email for jobs without location
-  default_email: string | null; // Organization default email for invoices (fallback)
+  /** @deprecated No longer used; fallback removed. Kept for backward compatibility. */
+  default_email?: string | null;
 }
 
 export interface InvoiceTemplateConfig {

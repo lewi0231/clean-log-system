@@ -41,6 +41,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { organizationSettingsKey } from "@/app/query-provider";
+import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -98,6 +99,9 @@ export default function SettingsPage() {
     bank_transfer_account_name: null,
     show_bank_transfer_on_invoices: false,
     default_invoice_due_days: 30,
+    gst_registered: false,
+    gst_inclusive: true,
+    gst_rate_percent: 10,
     rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
@@ -171,6 +175,9 @@ export default function SettingsPage() {
             data.settings.show_bank_transfer_on_invoices ?? false,
           default_invoice_due_days:
             data.settings.default_invoice_due_days ?? 30,
+          gst_registered: data.settings.gst_registered ?? false,
+          gst_inclusive: data.settings.gst_inclusive ?? true,
+          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -210,6 +217,9 @@ export default function SettingsPage() {
             data.settings.show_bank_transfer_on_invoices ?? false,
           default_invoice_due_days:
             data.settings.default_invoice_due_days ?? 30,
+          gst_registered: data.settings.gst_registered ?? false,
+          gst_inclusive: data.settings.gst_inclusive ?? true,
+          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -679,6 +689,80 @@ export default function SettingsPage() {
     }
   };
 
+  const handleInvoiceSendImmediatelyChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating invoice send immediately", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            invoice_send_immediately: checked,
+          },
+        }
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          invoice_send_immediately:
+            data.settings.invoice_send_immediately ?? false,
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Invoice send immediately updated");
+    } catch (err) {
+      log.error("Settings: Failed to update invoice send immediately", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleAutoGenerateInvoicesChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating auto-generate invoices", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            auto_generate_invoices_immediately: checked,
+          },
+        }
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately ?? false,
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Auto-generate invoices updated");
+    } catch (err) {
+      log.error("Settings: Failed to update auto-generate invoices", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
   // Helper function to capitalize first letter of each word (title case)
   const toTitleCase = (str: string): string => {
     return str
@@ -1047,6 +1131,84 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSaveGstSettings = async () => {
+    if (!organizationId) return;
+
+    const rate = settings.gst_rate_percent;
+    if (typeof rate !== "number" || isNaN(rate) || rate < 0 || rate > 100) {
+      setErrorDialog({
+        open: true,
+        title: "Validation Error",
+        message: "GST rate must be between 0 and 100",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      log.info("Settings: Saving GST settings", {
+        gst_registered: settings.gst_registered,
+        gst_inclusive: settings.gst_inclusive,
+        gst_rate_percent: settings.gst_rate_percent,
+      });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_registered: settings.gst_registered,
+            gst_inclusive: settings.gst_inclusive,
+            gst_rate_percent: settings.gst_rate_percent,
+          },
+        }
+      );
+
+      if (updateError) throw updateError;
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_registered: data.settings.gst_registered,
+          gst_inclusive: data.settings.gst_inclusive,
+          gst_rate_percent: data.settings.gst_rate_percent,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_registered: data.settings.gst_registered,
+            gst_inclusive: data.settings.gst_inclusive,
+            gst_rate_percent: data.settings.gst_rate_percent,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST settings saved successfully");
+    } catch (err) {
+      log.error("Settings: Failed to save GST settings", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Save Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to save GST settings. Please try again.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const hasGstUnsaved =
+    initialSettings &&
+    (settings.gst_registered !== initialSettings.gst_registered ||
+      settings.gst_inclusive !== initialSettings.gst_inclusive ||
+      settings.gst_rate_percent !== initialSettings.gst_rate_percent);
+
   useEffect(() => {
     if (organizationId) {
       fetchSettings();
@@ -1090,7 +1252,7 @@ export default function SettingsPage() {
 
       <Tabs
         defaultValue={
-          ["organization", "features", "payment"].includes(
+          ["organization", "invoicing", "payment", "features"].includes(
             searchParams.get("tab") || ""
           )
             ? searchParams.get("tab")!
@@ -1100,9 +1262,9 @@ export default function SettingsPage() {
       >
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="features">Feature Specific</TabsTrigger>
-          {/* Business Mode tab hidden - feature not currently in use */}
-          <TabsTrigger value="payment">Payment Details</TabsTrigger>
+          <TabsTrigger value="invoicing">Invoicing</TabsTrigger>
+          <TabsTrigger value="payment">Payments</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organization" className="space-y-6">
@@ -1406,6 +1568,365 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="invoicing" className="space-y-6">
+          {/* Sending & behavior */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Sending &amp; behavior</CardTitle>
+              <CardDescription>
+                When to send invoices and when payment is due
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5 flex-1">
+                  <Label htmlFor="invoice-send-immediately">
+                    Send Invoices Immediately
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {settings.invoice_send_immediately
+                      ? "Invoices will be sent to customers immediately upon creation"
+                      : "Invoices will be created in draft status and require review before sending"}
+                  </p>
+                </div>
+                <Switch
+                  id="invoice-send-immediately"
+                  checked={settings.invoice_send_immediately}
+                  onCheckedChange={handleInvoiceSendImmediatelyChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5 flex-1">
+                  <Label htmlFor="auto-generate-invoices">
+                    Auto-Generate Invoices
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically create invoices in pending review when jobs are
+                    completed. Location-specific auto-generate takes precedence.
+                  </p>
+                </div>
+                <Switch
+                  id="auto-generate-invoices"
+                  checked={settings.auto_generate_invoices_immediately}
+                  onCheckedChange={handleAutoGenerateInvoicesChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="default-invoice-due-days">
+                  Default Invoice Due Days
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Number of days after invoice creation when payment is due
+                </p>
+                <div className="flex items-center gap-3">
+                  <Input
+                    id="default-invoice-due-days"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={settings.default_invoice_due_days}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (!isNaN(value) && value >= 1 && value <= 365) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          default_invoice_due_days: value,
+                        }));
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      const value = parseInt(e.target.value, 10);
+                      if (isNaN(value) || value < 1 || value > 365) return;
+                      try {
+                        const { error } = await supabase.functions.invoke(
+                          "update-organization-settings",
+                          {
+                            body: {
+                              organization_id: organizationId,
+                              default_invoice_due_days: value,
+                            },
+                          }
+                        );
+                        if (error) throw error;
+                        queryClient.invalidateQueries({
+                          queryKey: organizationSettingsKey(organizationId),
+                        });
+                      } catch (err) {
+                        log.error("Failed to update invoice due days", {
+                          error: err,
+                        });
+                        setErrorDialog({
+                          open: true,
+                          title: "Update Failed",
+                          message:
+                            "Failed to update invoice due days. Please try again.",
+                        });
+                      }
+                    }}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">days</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tax / GST */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax / GST</CardTitle>
+              <CardDescription>
+                Configure GST for Australian tax invoices. If you&apos;re not
+                GST-registered (e.g. under $75k), leave GST registered off.
+                Invoices will show &quot;Invoice&quot; and no GST. If
+                registered, we use &quot;Tax Invoice&quot; and show a GST
+                breakdown when the total is $82.50 or more (AUD).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">
+                    GST registered
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Your business is registered for GST (e.g. turnover $75k+)
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.gst_registered}
+                  onCheckedChange={(checked) =>
+                    setSettings((prev) => ({ ...prev, gst_registered: checked }))
+                  }
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+
+              {settings.gst_registered && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base font-semibold">
+                        Prices include GST
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Your prices in Pricing are GST-inclusive
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.gst_inclusive}
+                      onCheckedChange={(checked) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          gst_inclusive: checked,
+                        }))
+                      }
+                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gst-rate-percent-inv">GST rate (%)</Label>
+                    <Input
+                      id="gst-rate-percent-inv"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      value={settings.gst_rate_percent}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v) && v >= 0 && v <= 100) {
+                          setSettings((prev) => ({
+                            ...prev,
+                            gst_rate_percent: v,
+                          }));
+                        }
+                      }}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Default 10% for Australia
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {hasGstUnsaved && (
+                <div className="flex justify-end pt-4 border-t">
+                  <Button
+                    onClick={handleSaveGstSettings}
+                    disabled={saving}
+                    className="cursor-pointer"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save GST Settings
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Invoice template */}
+          <InvoiceTemplateSettings organizationId={organizationId} />
+
+          {/* Bank transfer on invoices */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank Transfer on Invoices</CardTitle>
+              <CardDescription>
+                Add your bank account details to display on invoices for manual
+                payment processing. Payments via bank transfer require manual
+                status updates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">
+                    Show Bank Transfer Details on Invoices
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Display bank transfer details on invoices. Payments via bank
+                    transfer will not be automatically tracked and require
+                    manual payment status updates.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.show_bank_transfer_on_invoices}
+                  onCheckedChange={handleShowBankTransferChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+
+              {settings.show_bank_transfer_on_invoices && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-bsb-inv">BSB</Label>
+                    <Input
+                      id="bank-transfer-bsb-inv"
+                      value={settings.bank_transfer_bsb || ""}
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        const digits = value.replace(/\D/g, "");
+                        if (digits.length <= 3) {
+                          value = digits;
+                        } else if (digits.length <= 6) {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+                        } else {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
+                        }
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_bsb: value,
+                        }));
+                      }}
+                      placeholder="123-456"
+                      maxLength={7}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: XXX-XXX (e.g., 123-456)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-number-inv">
+                      Account Number
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-number-inv"
+                      type="text"
+                      inputMode="numeric"
+                      value={settings.bank_transfer_account_number || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_number: e.target.value.replace(
+                            /\D/g,
+                            ""
+                          ),
+                        }))
+                      }
+                      placeholder="987654321"
+                      maxLength={10}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">6-10 digits</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-name-inv">
+                      Account Name (Optional)
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-name-inv"
+                      value={settings.bank_transfer_account_name || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_name: e.target.value,
+                        }))
+                      }
+                      placeholder="Account Holder Name"
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Name associated with the bank account
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/50 border border-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Note:</strong> Payments via bank transfer will not
+                      be automatically tracked. You will need to manually update
+                      the payment status when payments are received. Include the
+                      invoice number in your payment reference to help match
+                      payments.
+                    </p>
+                  </div>
+
+                  {hasUnsavedChanges && (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        You have unsaved changes
+                      </p>
+                      <Button
+                        onClick={handleSaveBankTransferSettings}
+                        disabled={saving}
+                        className="cursor-pointer"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Bank Transfer Settings
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="features" className="space-y-6">
           {/* Feature-Specific Settings */}
           <Card>
@@ -1448,75 +1969,6 @@ export default function SettingsPage() {
                   Manage locations
                   <ExternalLink className="h-3 w-3" />
                 </Link>
-              </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Invoice Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure invoice templates and sending behavior
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/invoicing">
-                    Go to Invoicing
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="p-4 border rounded-lg space-y-3">
-                <div>
-                  <p className="font-medium">Default Invoice Due Days</p>
-                  <p className="text-sm text-muted-foreground">
-                    Number of days after invoice creation when payment is due
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={settings.default_invoice_due_days}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value, 10);
-                      if (!isNaN(value) && value >= 1 && value <= 365) {
-                        setSettings((prev) => ({
-                          ...prev,
-                          default_invoice_due_days: value,
-                        }));
-                      }
-                    }}
-                    onBlur={async (e) => {
-                      const value = parseInt(e.target.value, 10);
-                      if (isNaN(value) || value < 1 || value > 365) {
-                        return;
-                      }
-                      try {
-                        const { error } = await supabase.functions.invoke(
-                          "update-organization-settings",
-                          {
-                            body: {
-                              organization_id: organizationId,
-                              default_invoice_due_days: value,
-                            },
-                          }
-                        );
-                        if (error) throw error;
-                      } catch (err) {
-                        log.error("Failed to update invoice due days", {
-                          error: err,
-                        });
-                        setErrorDialog({
-                          open: true,
-                          title: "Update Failed",
-                          message:
-                            "Failed to update invoice due days. Please try again.",
-                        });
-                      }
-                    }}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">days</span>
-                </div>
               </div>
               <div className="flex items-center justify-between p-4 border rounded-lg">
                 <div>
@@ -1610,155 +2062,6 @@ export default function SettingsPage() {
         </TabsContent> */}
 
         <TabsContent value="payment" className="space-y-6">
-          {/* Bank Transfer Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Bank Transfer Payment Details</CardTitle>
-              <CardDescription>
-                Add your bank account details to display on invoices for manual
-                payment processing. Payments via bank transfer require manual
-                status updates.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base font-semibold">
-                    Show Bank Transfer Details on Invoices
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Display bank transfer details on invoices. Payments via bank
-                    transfer will not be automatically tracked and require
-                    manual payment status updates.
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.show_bank_transfer_on_invoices}
-                  onCheckedChange={handleShowBankTransferChange}
-                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-                />
-              </div>
-
-              {settings.show_bank_transfer_on_invoices && (
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-bsb">BSB</Label>
-                    <Input
-                      id="bank-transfer-bsb"
-                      value={settings.bank_transfer_bsb || ""}
-                      onChange={(e) => {
-                        let value = e.target.value;
-                        // Auto-format BSB as user types: XXX-XXX
-                        // Remove non-digits
-                        const digits = value.replace(/\D/g, "");
-                        // Format as XXX-XXX
-                        if (digits.length <= 3) {
-                          value = digits;
-                        } else if (digits.length <= 6) {
-                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
-                        } else {
-                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
-                        }
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_bsb: value,
-                        }));
-                      }}
-                      placeholder="123-456"
-                      maxLength={7}
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Format: XXX-XXX (e.g., 123-456)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-number">
-                      Account Number
-                    </Label>
-                    <Input
-                      id="bank-transfer-account-number"
-                      type="text"
-                      inputMode="numeric"
-                      value={settings.bank_transfer_account_number || ""}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_account_number: e.target.value.replace(
-                            /\D/g,
-                            ""
-                          ),
-                        }))
-                      }
-                      placeholder="987654321"
-                      maxLength={10}
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">6-10 digits</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-name">
-                      Account Name (Optional)
-                    </Label>
-                    <Input
-                      id="bank-transfer-account-name"
-                      value={settings.bank_transfer_account_name || ""}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_account_name: e.target.value,
-                        }))
-                      }
-                      placeholder="Account Holder Name"
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Name associated with the bank account
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-muted/50 border border-muted p-3">
-                    <p className="text-sm text-muted-foreground">
-                      <strong>Note:</strong> Payments via bank transfer will not
-                      be automatically tracked. You will need to manually update
-                      the payment status when payments are received. Include the
-                      invoice number in your payment reference to help match
-                      payments.
-                    </p>
-                  </div>
-
-                  {/* Save Button */}
-                  {hasUnsavedChanges && (
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <p className="text-sm text-muted-foreground">
-                        You have unsaved changes
-                      </p>
-                      <Button
-                        onClick={handleSaveBankTransferSettings}
-                        disabled={saving}
-                        className="cursor-pointer"
-                      >
-                        {saving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Save Bank Transfer Settings
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader>
               <CardTitle>Payment Providers</CardTitle>
