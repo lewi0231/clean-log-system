@@ -174,9 +174,12 @@ export default function CompletedJobsList({
     // Also handle string "true"/"false" which can occur in JSON
     if (typeof value === "boolean") {
       return value ? (
-        <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Yes" />
+        <CheckCircle2
+          className="h-4 w-4 text-green-600 mx-auto"
+          aria-label="Yes"
+        />
       ) : (
-        <span className="text-muted-foreground">-</span>
+        <span className="text-muted-foreground text-center">-</span>
       );
     }
 
@@ -400,7 +403,9 @@ export default function CompletedJobsList({
                 <TableHead
                   key={key}
                   className={
-                    key === "notes" ? "min-w-[200px]" : "min-w-[120px]"
+                    key === "notes"
+                      ? "min-w-[200px]"
+                      : "min-w-[120px] text-center"
                   }
                 >
                   {formatColumnHeader(key)}
@@ -447,10 +452,10 @@ export default function CompletedJobsList({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="mx-auto">
                     {job.location ? job.location.name : "-"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-left">
                     {job.workers.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {job.workers.map((worker) => (
@@ -470,7 +475,7 @@ export default function CompletedJobsList({
                         className={
                           key === "notes"
                             ? "max-w-[300px] whitespace-normal"
-                            : ""
+                            : "text-center"
                         }
                       >
                         {formatValue(value, fieldExists, key)}

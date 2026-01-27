@@ -15,6 +15,85 @@
 
 ---
 
+## Preferred Use of Hooks
+
+### When to Use Hooks vs. Props
+
+**Prefer props over context hooks in reusable and leaf components** (dialogs, modals, forms, cards). This keeps components testable, flexible, and explicit about dependencies.
+
+| Situation | Use | Rationale |
+|-----------|-----|-----------|
+| Dialog, modal, or form used in multiple places | **Props** (e.g. `organizationId`, `onSuccess`) | No provider mocks in tests; can be used in any parent |
+| Page, layout, or top-level route component | **Context hooks** (`useOrganization`, `useAuth`) | Guaranteed to be inside providers |
+| Component that owns data-fetching for its subtree | **Data-fetching hooks** (`useWorkers`, `useInvoices`) | Encapsulates fetch + cache |
+| Child component when parent already has the data | **Props** | Avoid duplicate fetches and extra provider requirements |
+
+### Context hooks (useOrganization, useAuth)
+
+- **Use at:** Page/layout level or in components that are direct children of the provider.
+- **Avoid in:** Dialogs, modals, reusable forms, and shared UI that may be rendered outside the provider or need to be tested in isolation.
+
+```typescript
+// ❌ Avoid: context hook inside a reusable dialog
+function MarkPaymentPaidDialog({ open, onOpenChange, batchId }: Props) {
+  const { organizationId } = useOrganization();  // Tight coupling, harder to test
+  // ...
+}
+
+// ✅ Prefer: accept organizationId as a prop from the parent
+interface MarkPaymentPaidDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  batchId: string;
+  organizationId: string | null;  // Parent (page) provides this
+  onSuccess?: () => void;
+}
+function MarkPaymentPaidDialog({ organizationId, ... }: MarkPaymentPaidDialogProps) {
+  if (!organizationId) {
+    toast.error("Organization ID is required");
+    return;
+  }
+  // ...
+}
+```
+
+The **page** calls `useOrganization()` and passes `organizationId` into the dialog:
+
+```typescript
+// Page/layout: use the context hook here
+function WorkerPaymentsPage() {
+  const { organizationId } = useOrganization();
+  return (
+    <>
+      {/* ... */}
+      <MarkPaymentPaidDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        batchId={selectedBatchId}
+        organizationId={organizationId}
+        onSuccess={refetch}
+      />
+    </>
+  );
+}
+```
+
+### Data-fetching hooks
+
+- **Use when:** The component is responsible for fetching and owns the cache for that data.
+- **Prefer props when:** A parent already has the data (e.g. from `useWorkers()`) — pass it down instead of calling the hook again in the child.
+
+### Summary
+
+| Question | Answer |
+|----------|--------|
+| Dialog or reusable form needs `organizationId`? | Pass as prop from parent; parent uses `useOrganization()` |
+| Page or layout needs org/auth? | Use `useOrganization()` or `useAuth()` |
+| Component needs to fetch and cache list data? | Use a data-fetching hook |
+| Parent already has the data? | Pass as props, don’t call the hook in the child |
+
+---
+
 ## Standard Hook Structure
 
 ### Return Type Interface
@@ -413,6 +492,7 @@ describe("useWorkers", () => {
 
 | Rule | Description |
 |------|-------------|
+| **Props over context in reusable** | Pass `organizationId` etc. as props in dialogs/modals/forms; use `useOrganization` at page/layout level |
 | Return interface | All hooks define `Use[Name]Result` interface |
 | Named exports | No default exports |
 | kebab-case files | `use-workers.ts` |

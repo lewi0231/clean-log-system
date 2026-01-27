@@ -425,6 +425,16 @@
 - **Pattern:** Max 300 lines, then split into hooks/sub-components
 - **Applies to:** Components
 
+#### RULE: dashboard-hooks-prefer-props-for-context-in-reusable
+- **Scope:** dashboard
+- **File:** `dashboard/hooks.md#preferred-use-of-hooks`
+- **Tags:** hooks, components, props, context, testability
+- **Priority:** high
+- **Pattern:** Pass `organizationId`, auth, etc. as props in dialogs/modals/reusable forms; use `useOrganization`, `useAuth` at page/layout level
+- **Anti-pattern:** Calling `useOrganization()` or `useAuth()` inside reusable dialogs, modals, or shared forms
+- **Applies to:** Reusable components (dialogs, modals, forms)
+- **Rationale:** Easier testing (no provider mocks), explicit dependencies, flexibility to use in different parents
+
 #### RULE: dashboard-hook-return-interface
 - **Scope:** dashboard
 - **File:** `dashboard/hooks.md#return-type-interface`
@@ -810,6 +820,7 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 
 | Question | Answer | Rule ID | File |
 |----------|--------|---------|------|
+| **Context hook or prop for organizationId/auth?** | **Props in dialogs/modals/reusable forms; use `useOrganization`/`useAuth` at page/layout level** | `dashboard-hooks-prefer-props-for-context-in-reusable` | `dashboard/hooks.md` |
 | Should hooks define return interfaces? | Yes, all hooks define `Use[Name]Result` interface | `dashboard-hook-return-interface` | `dashboard/hooks.md` |
 | What should hooks return? | `{ data, loading, error, refetch }` for data-fetching hooks | `dashboard-hook-return-shape` | `dashboard/hooks.md` |
 | How should I structure TanStack Query keys? | Hierarchical keys with factory pattern | `dashboard-tanstack-query-keys` | `dashboard/hooks.md` |
@@ -919,6 +930,7 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 - `mobile-safe-area-view`
 
 #### Hooks
+- `dashboard-hooks-prefer-props-for-context-in-reusable`
 - `dashboard-hook-return-interface`
 - `dashboard-hook-return-shape`
 - `dashboard-tanstack-query-keys`
@@ -1016,6 +1028,7 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 - `dashboard-client-at-leaves`
 - `dashboard-component-structure`
 - `dashboard-state-components`
+- `dashboard-hooks-prefer-props-for-context-in-reusable`
 - `dashboard-hook-return-interface`
 - `dashboard-hook-return-shape`
 - `dashboard-tanstack-query-keys`
@@ -1065,12 +1078,13 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 2. Default to Server Component (Next.js), add `"use client"` only if needed
 3. Use PascalCase component name: `export function WorkerCard() { }`
 4. Define props interface: `interface WorkerCardProps { }`
-5. Structure: Imports → Props → Component → Hooks → Handlers → Effects → Early returns → Render
-6. Use state components for loading/error/empty: `LoadingState`, `ErrorState`, `EmptyState`
-7. Always accept and forward `className` prop
-8. Keep under 300 lines, split if larger
+5. For dialogs/modals/reusable forms: accept `organizationId` etc. as props; use `useOrganization`/`useAuth` only at page/layout level
+6. Structure: Imports → Props → Component → Hooks → Handlers → Effects → Early returns → Render
+7. Use state components for loading/error/empty: `LoadingState`, `ErrorState`, `EmptyState`
+8. Always accept and forward `className` prop
+9. Keep under 300 lines, split if larger
 
-**Rules:** `file-naming-kebab-case`, `component-naming-pascalCase`, `dashboard-server-by-default`, `dashboard-component-structure`, `dashboard-state-components`, `dashboard-props-forward-className`, `dashboard-component-max-size`
+**Rules:** `file-naming-kebab-case`, `component-naming-pascalCase`, `dashboard-server-by-default`, `dashboard-hooks-prefer-props-for-context-in-reusable`, `dashboard-component-structure`, `dashboard-state-components`, `dashboard-props-forward-className`, `dashboard-component-max-size`
 
 ### Creating a New Hook
 1. Use kebab-case file name: `use-workers.ts`
