@@ -229,6 +229,7 @@ export default function CompletedJobsPage() {
           updateJob={updateJob}
           getJobEdits={getJobEdits}
           sendFeedbackEmail={sendFeedbackEmail}
+          organizationId={organizationId}
         />
       </div>
 
@@ -239,6 +240,7 @@ export default function CompletedJobsPage() {
           refetch();
         }}
         createJob={createJob}
+        organizationId={organizationId}
       />
 
       <CalculatePaymentDialog

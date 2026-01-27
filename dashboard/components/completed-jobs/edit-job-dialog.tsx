@@ -24,7 +24,6 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import type { Job } from "@/lib/types";
 import type { UpdateJobRequest } from "@/lib/types/api";
@@ -43,6 +42,7 @@ interface EditJobDialogProps {
   onSuccess?: () => void;
   job: Job | null;
   updateJob: (request: UpdateJobRequest) => Promise<Job>;
+  organizationId: string | null;
 }
 
 // Helper to evaluate conditional logic
@@ -322,8 +322,8 @@ export default function EditJobDialog({
   onSuccess,
   job,
   updateJob,
+  organizationId,
 }: EditJobDialogProps) {
-  const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
   const [locationId, setLocationId] = useState<string>("");
   // Normalize locationId: treat empty string as null

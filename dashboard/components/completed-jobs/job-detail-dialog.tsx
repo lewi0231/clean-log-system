@@ -14,7 +14,6 @@ import { Separator } from "@/components/ui/separator";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
-import useOrganization from "@/hooks/useOrganization";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
 import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import {
@@ -41,6 +40,7 @@ interface JobDetailDialogProps {
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
   sendFeedbackEmail: (jobId: string) => Promise<void>;
   jobs: Job[];
+  organizationId: string | null;
 }
 
 // Standard fields that should be displayed in a specific order
@@ -56,8 +56,8 @@ export default function JobDetailDialog({
   getJobEdits,
   sendFeedbackEmail,
   jobs,
+  organizationId,
 }: JobDetailDialogProps) {
-  const { organizationId } = useOrganization();
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
   const { calculatePayments } = useWorkerPayments();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -621,6 +621,7 @@ export default function JobDetailDialog({
             }}
             job={job}
             updateJob={updateJob}
+            organizationId={organizationId}
           />
           {job && job.workers.length > 0 && (
             <CalculatePaymentDialog

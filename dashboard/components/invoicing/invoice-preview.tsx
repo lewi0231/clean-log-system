@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import useOrganization from "@/hooks/useOrganization";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { supabase } from "@/lib/supabase";
 import type {
@@ -65,6 +64,7 @@ interface InvoicePreviewProps {
       };
     }>;
   };
+  organizationId: string | null;
 }
 
 interface OrganizationInfo {
@@ -110,8 +110,7 @@ const formatCurrency = (amount: number, currency: string): string => {
   }).format(isNaN(amount) ? 0 : amount);
 };
 
-export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
-  const { organizationId } = useOrganization();
+export default function InvoicePreview({ invoice, organizationId }: InvoicePreviewProps) {
   const [orgInfo, setOrgInfo] = useState<OrganizationInfo | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);

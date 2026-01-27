@@ -14,7 +14,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { Download, Mail, Plus, Printer } from "lucide-react";
@@ -30,17 +29,18 @@ interface InvoicePreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   invoiceId: string | null;
+  organizationId: string | null;
 }
 
 export default function InvoicePreviewDialog({
   open,
   onOpenChange,
   invoiceId,
+  organizationId,
 }: InvoicePreviewDialogProps) {
   const { invoice, loading, error, refetch } = useInvoiceDetails(
     open ? invoiceId : null
   );
-  const { organizationId } = useOrganization();
   const [sending, setSending] = useState(false);
   const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -196,7 +196,7 @@ export default function InvoicePreviewDialog({
                   <TabsTrigger value="payments">Payments</TabsTrigger>
                 </TabsList>
                 <TabsContent value="preview" className="mt-4">
-                  <InvoicePreview invoice={invoice} />
+                  <InvoicePreview invoice={invoice} organizationId={organizationId} />
                 </TabsContent>
                 <TabsContent value="payments" className="mt-4 space-y-6">
                   {/* Payment Summary */}

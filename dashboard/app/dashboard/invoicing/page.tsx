@@ -220,12 +220,14 @@ export default function InvoicingPage() {
         onSuccess={() => {
           // Dialog will close automatically, list will refresh via hook
         }}
+        organizationId={organizationId}
       />
 
       <InvoicePreviewDialog
         open={previewDialogOpen}
         onOpenChange={handlePreviewDialogClose}
         invoiceId={previewInvoiceId}
+        organizationId={organizationId}
       />
     </>
   );

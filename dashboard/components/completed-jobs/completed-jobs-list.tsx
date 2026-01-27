@@ -11,7 +11,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
-import useOrganization from "@/hooks/useOrganization";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
 import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import { CheckCircle2 } from "lucide-react";
@@ -27,6 +26,7 @@ interface CompletedJobsListProps {
   updateJob: (request: UpdateJobRequest) => Promise<Job>;
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
   sendFeedbackEmail: (jobId: string) => Promise<void>;
+  organizationId: string | null;
 }
 
 // Standard fields that should be displayed in a specific order
@@ -41,9 +41,9 @@ export default function CompletedJobsList({
   updateJob,
   getJobEdits,
   sendFeedbackEmail,
+  organizationId,
 }: CompletedJobsListProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const { organizationId } = useOrganization();
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
 
   // Extract all unique keys from submission_data across all jobs
@@ -506,6 +506,7 @@ export default function CompletedJobsList({
         getJobEdits={getJobEdits}
         sendFeedbackEmail={sendFeedbackEmail}
         jobs={jobs}
+        organizationId={organizationId}
       />
     </div>
   );

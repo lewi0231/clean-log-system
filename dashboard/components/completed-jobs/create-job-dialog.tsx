@@ -24,7 +24,6 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
-import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { Job } from "@/lib/types";
 import type { CreateJobRequest } from "@/lib/types/api";
@@ -42,6 +41,7 @@ interface CreateJobDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   createJob: (request: CreateJobRequest) => Promise<Job>;
+  organizationId: string | null;
 }
 
 // Helper to evaluate conditional logic
@@ -320,8 +320,8 @@ export default function CreateJobDialog({
   onOpenChange,
   onSuccess,
   createJob,
+  organizationId,
 }: CreateJobDialogProps) {
-  const { organizationId } = useOrganization();
   const { settings } = useOrganizationSettings();
   const [locationId, setLocationId] = useState<string>("");
   // Normalize locationId: treat empty string as null
