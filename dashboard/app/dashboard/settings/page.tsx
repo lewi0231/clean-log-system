@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -40,11 +41,17 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { isSendInvoicesImmediatelyEnabled } from "@/lib/utils";
+import {
+  getRatingConfigPreset,
+  RATING_DIMENSION_LABELS,
+} from "@/lib/constants/rating-config";
 import {
   BusinessMode,
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
+import type { RatingConfigType } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   DollarSign,
@@ -756,6 +763,91 @@ export default function SettingsPage() {
       log.info("Settings: Auto-generate invoices updated");
     } catch (err) {
       log.error("Settings: Failed to update auto-generate invoices", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleFeedbackEmailSendImmediatelyChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating feedback email send immediately", {
+        checked,
+      });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            feedback_email_send_immediately: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          feedback_email_send_immediately:
+            data.settings.feedback_email_send_immediately ?? false,
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Feedback email send immediately updated");
+    } catch (err) {
+      log.error(
+        "Settings: Failed to update feedback email send immediately",
+        { error: err instanceof Error ? err.message : "Unknown error" },
+      );
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleRatingConfigChange = async (value: string) => {
+    const newType = value as RatingConfigType;
+    const newConfig = getRatingConfigPreset(newType);
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating rating configuration", {
+        type: newType,
+        dimensions: newConfig.dimensions,
+      });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            rating_config: newConfig,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          rating_config:
+            data.settings.rating_config ?? {
+              type: "single",
+              dimensions: ["overall"],
+            },
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Rating configuration updated");
+    } catch (err) {
+      log.error("Settings: Failed to update rating configuration", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       setErrorDialog({
@@ -1620,24 +1712,26 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5 flex-1">
-                  <Label htmlFor="invoice-send-immediately">
-                    Send Invoices Immediately
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {settings.invoice_send_immediately
-                      ? "Invoices will be sent to customers immediately upon creation"
-                      : "Invoices will be created in draft status and require review before sending"}
-                  </p>
+              {isSendInvoicesImmediatelyEnabled() && (
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1">
+                    <Label htmlFor="invoice-send-immediately">
+                      Send Invoices Immediately
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {settings.invoice_send_immediately
+                        ? "Invoices will be sent to customers immediately upon creation"
+                        : "Invoices will be created in draft status and require review before sending"}
+                    </p>
+                  </div>
+                  <Switch
+                    id="invoice-send-immediately"
+                    checked={settings.invoice_send_immediately}
+                    onCheckedChange={handleInvoiceSendImmediatelyChange}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
                 </div>
-                <Switch
-                  id="invoice-send-immediately"
-                  checked={settings.invoice_send_immediately}
-                  onCheckedChange={handleInvoiceSendImmediatelyChange}
-                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-                />
-              </div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5 flex-1">
                   <Label htmlFor="auto-generate-invoices">
@@ -1849,19 +1943,137 @@ export default function SettingsPage() {
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Feedback & Rating Settings</p>
+              <Separator />
+
+              {/* Feedback & Rating Settings */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="feedback-email-send-immediately"
+                      className="text-base font-semibold"
+                    >
+                      Send Feedback Requests Immediately
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {settings.feedback_email_send_immediately
+                        ? "Feedback request emails will be sent to customers immediately after a job is completed"
+                        : "Feedback request emails will require manual action to send"}
+                    </p>
+                  </div>
+                  <Switch
+                    id="feedback-email-send-immediately"
+                    checked={settings.feedback_email_send_immediately ?? false}
+                    onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
+                </div>
+                <Link
+                  href="/dashboard/ratings"
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  View customer ratings
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+
+              <Separator />
+
+              {/* Rating Configuration */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">
+                    Rating Configuration
+                  </Label>
                   <p className="text-sm text-muted-foreground">
-                    Configure feedback requests and rating system
+                    Choose how customers rate your service. Based on industry
+                    best practices.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/ratings">
-                    Go to Ratings
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <RadioGroup
+                  value={settings.rating_config?.type ?? "single"}
+                  onValueChange={(v) => handleRatingConfigChange(v)}
+                >
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="single"
+                      id="rating-single"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-single"
+                        className="font-normal cursor-pointer"
+                      >
+                        Single Overall Rating
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Customers provide one overall satisfaction rating (1-5
+                        stars). Simple and quick.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions: Overall Satisfaction
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="three_dimensions"
+                      id="rating-three"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-three"
+                        className="font-normal cursor-pointer"
+                      >
+                        Three Dimensions
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Customers rate Service Quality, Communication, and Value
+                        for Money. Recommended for most service businesses.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions:{" "}
+                        {["quality", "communication", "value"]
+                          .map((d) => RATING_DIMENSION_LABELS[d])
+                          .join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="rater"
+                      id="rating-rater"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-rater"
+                        className="font-normal cursor-pointer"
+                      >
+                        Full RATER Framework
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Comprehensive 5-dimension rating system: Reliability,
+                        Assurance, Tangibles, Empathy, and Responsiveness. Best
+                        for detailed feedback analysis.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions:{" "}
+                        {[
+                          "reliability",
+                          "assurance",
+                          "tangibles",
+                          "empathy",
+                          "responsiveness",
+                        ]
+                          .map((d) => RATING_DIMENSION_LABELS[d])
+                          .join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                </RadioGroup>
               </div>
             </CardContent>
           </Card>

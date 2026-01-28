@@ -27,3 +27,12 @@ export function isPricingRulesEnabled(): boolean {
     process.env.NEXT_PUBLIC_CONDITIONAL_PRICING_ENABLED === "true"
   );
 }
+
+/**
+ * Check if the "Send Invoices Immediately" setting is exposed in the UI.
+ * When false, the setting is hidden and effectively off. Enable via
+ * NEXT_PUBLIC_SEND_INVOICES_IMMEDIATELY_ENABLED=true in .env.
+ */
+export function isSendInvoicesImmediatelyEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_SEND_INVOICES_IMMEDIATELY_ENABLED === "true";
+}

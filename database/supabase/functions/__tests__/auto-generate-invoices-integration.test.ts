@@ -779,6 +779,125 @@ Deno.test("P1.6.1: should create single invoice for all jobs when grouping is 'a
 });
 
 // ============================================================================
+// P1.6.2: Location grouping – one invoice per location
+// ============================================================================
+
+Deno.test("P1.6.2: should create separate invoices per location when grouping is 'location'", async () => {
+  let testData: TestDataIds | null = null;
+  let location2Id: string | null = null;
+
+  try {
+    testData = await setupTestDatabase();
+    const available = await ensureFunctionAvailable();
+    if (!available) return;
+    const supabase = await getSupabaseClient();
+
+    // Job at first location (testData.locationId)
+    const job1 = await createTestJob(
+      testData.organizationId,
+      testData.locationId,
+      testData.fieldConfigIds.map((id) => ({ id, name: "service_type" })),
+      { service_type: "basic", quantity: 1 },
+      true,
+    );
+
+    // Second location under same hierarchy node
+    const { data: location2, error: loc2Error } = await supabase
+      .from("location")
+      .insert({
+        organization_id: testData.organizationId,
+        name: "Test Location 2",
+        email: "location2@test.com",
+        hierarchy_parent_id: testData.hierarchyNodeId,
+      })
+      .select()
+      .single();
+
+    if (loc2Error) throw loc2Error;
+    if (!location2) throw new Error("Failed to create second location");
+    location2Id = location2.id;
+
+    const job2 = await createTestJob(
+      testData.organizationId,
+      location2.id,
+      testData.fieldConfigIds.map((id) => ({ id, name: "service_type" })),
+      { service_type: "premium", quantity: 2 },
+      true,
+    );
+
+    testData.jobIds = [job1, job2];
+
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+
+    await supabase
+      .from("location_hierarchy")
+      .update({
+        metadata: {
+          auto_generate_invoices: {
+            enabled: true,
+            period: "daily",
+            time: timeString,
+            grouping: "location",
+            require_review: true,
+          },
+        },
+      })
+      .eq("id", testData.hierarchyNodeId);
+
+    const result = await invokeAutoGenerateInvoices();
+    assertEquals(result.success, true);
+    assertEquals(
+      result.generated,
+      2,
+      "Should create one invoice per location when grouping is 'location'",
+    );
+
+    await wait(1000);
+
+    const { data: invoices, error: invErr } = await supabase
+      .from("invoice")
+      .select("*, invoice_job(*)")
+      .eq("organization_id", testData.organizationId)
+      .eq("status", "pending_review");
+
+    if (invErr) throw invErr;
+    assertExists(invoices);
+    assertEquals(
+      invoices.length,
+      2,
+      "Should have exactly two invoices (one per location)",
+    );
+
+    const jobCounts = invoices.map(
+      (inv: { invoice_job: unknown[] }) => inv.invoice_job?.length ?? 0,
+    );
+    assertEquals(
+      jobCounts.every((n: number) => n === 1),
+      true,
+      "Each invoice should contain exactly one job",
+    );
+
+    const allJobIds = invoices.flatMap(
+      (inv: { invoice_job: Array<{ job_id: string }> }) =>
+        (inv.invoice_job ?? []).map((ij: { job_id: string }) => ij.job_id),
+    );
+    assertEquals(allJobIds.includes(job1), true);
+    assertEquals(allJobIds.includes(job2), true);
+
+    testData.invoiceIds = invoices.map((inv: { id: string }) => inv.id);
+  } finally {
+    if (testData) {
+      if (location2Id) {
+        const supabase = await getSupabaseClient();
+        await supabase.from("location").delete().eq("id", location2Id);
+      }
+      await cleanupTestDatabase(testData);
+    }
+  }
+});
+
+// ============================================================================
 // P1.7: Jobs with Null Location ID
 // ============================================================================
 // ============================================================================

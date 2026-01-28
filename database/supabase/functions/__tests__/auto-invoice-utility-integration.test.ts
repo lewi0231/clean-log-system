@@ -349,3 +349,105 @@ Deno.test({
     }
   },
 });
+
+// ============================================================================
+// AIG-3b: Hierarchy with enabled: false does not override org-level
+// ============================================================================
+
+Deno.test({
+  name:
+    "AIG-3b: should use org-level auto-generate when hierarchy has auto-generate disabled",
+  sanitizeResources: false,
+  sanitizeOps: false,
+  fn: async () => {
+    let testData: TestDataIds | null = null;
+
+    try {
+      testData = await setupTestDatabase();
+      const supabaseAdmin = createServiceRoleClient();
+      const supabase = supabaseAdmin;
+
+      // Enable org-level auto-generate
+      const { data: existingSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", testData.organizationId)
+        .maybeSingle();
+
+      if (existingSettings) {
+        await supabase
+          .from("organization_settings")
+          .update({
+            auto_generate_invoices_immediately: true,
+          })
+          .eq("id", existingSettings.id);
+      } else {
+        await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id: testData.organizationId,
+            auto_generate_invoices_immediately: true,
+          });
+      }
+
+      // Location stays under hierarchy, but hierarchy has auto_generate.enabled: false
+      await supabase
+        .from("location_hierarchy")
+        .update({
+          metadata: {
+            auto_generate_invoices: {
+              enabled: false,
+              period: "weekly",
+              day_of_week: 1,
+              time: "09:00",
+              grouping: "location",
+            },
+          },
+        })
+        .eq("id", testData.hierarchyNodeId);
+
+      const jobId = await createTestJob(
+        testData.organizationId,
+        testData.locationId,
+        testData.fieldConfigIds.map((id) => ({ id, name: "service_type" })),
+        { service_type: "basic", quantity: 1 },
+        true,
+      );
+
+      testData.jobIds = [jobId];
+      await wait(500);
+
+      const mockRequest = new Request("http://localhost/test", {
+        method: "POST",
+      });
+
+      const result = await autoGenerateInvoiceForJob({
+        jobId,
+        organizationId: testData.organizationId,
+        locationId: testData.locationId,
+        supabaseAdmin,
+        logger: createLogger(mockRequest, { functionName: "test" }),
+      });
+
+      // Should NOT skip: hierarchy override only applies when hierarchy has enabled: true
+      assertEquals(
+        result.skipped,
+        undefined,
+        "Should not skip when hierarchy has auto-generate disabled",
+      );
+      assertEquals(result.success, true, "Should succeed");
+      assertExists(
+        result.invoiceId,
+        "Invoice should be created via org-level setting",
+      );
+
+      if (testData.invoiceIds) {
+        testData.invoiceIds.push(result.invoiceId!);
+      } else {
+        testData.invoiceIds = [result.invoiceId!];
+      }
+    } finally {
+      if (testData) await cleanupTestDatabase(testData);
+    }
+  },
+});
