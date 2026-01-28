@@ -117,6 +117,14 @@ Deno.test({
         locationId: testData.locationId,
         supabaseAdmin,
         logger: createLogger(mockRequest, { functionName: "test" }),
+        // Mock calculation to bypass calculate-invoice edge function
+        // (edge function server may not be running during tests)
+        mockCalculation: {
+          total_subtotal: 100,
+          total: 100,
+          total_worker_payment: 80,
+          total_margin: 20,
+        },
       });
 
       // Verify it didn't skip due to setting being disabled
@@ -427,6 +435,14 @@ Deno.test({
         locationId: testData.locationId,
         supabaseAdmin,
         logger: createLogger(mockRequest, { functionName: "test" }),
+        // Mock calculation to bypass calculate-invoice edge function
+        // (edge function server may not be running during tests)
+        mockCalculation: {
+          total_subtotal: 100,
+          total: 100,
+          total_worker_payment: 80,
+          total_margin: 20,
+        },
       });
 
       // Should NOT skip: hierarchy override only applies when hierarchy has enabled: true

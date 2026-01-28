@@ -18,6 +18,13 @@ export interface AutoInvoiceResult {
   error?: string;
 }
 
+export interface InvoiceCalculation {
+  total_subtotal: number;
+  total: number;
+  total_worker_payment: number;
+  total_margin: number;
+}
+
 export interface AutoInvoiceOptions {
   jobId: string;
   organizationId: string;
@@ -33,6 +40,11 @@ export interface AutoInvoiceOptions {
       context?: Record<string, unknown>,
     ) => void;
   };
+  /**
+   * Optional: Provide a mock calculation for testing when calculate-invoice
+   * edge function is not available. When provided, bypasses the functions.invoke call.
+   */
+  mockCalculation?: InvoiceCalculation;
 }
 
 /**
@@ -273,24 +285,83 @@ export async function autoGenerateInvoiceForJob(
 
     logger.info("Auto-generating invoice for job", { jobId, organizationId });
 
-    // Calculate invoice totals
-    const { data: calculationData, error: calcError } = await supabaseAdmin
-      .functions.invoke("calculate-invoice", {
-        body: {
-          organization_id: organizationId,
-          job_ids: [jobId],
-        },
+    // Get calculation - either from mock (for testing) or from calculate-invoice function
+    let calculation: InvoiceCalculation;
+
+    if (options.mockCalculation) {
+      // Use mock calculation for testing when edge function server is not running
+      logger.debug("Using mock calculation for testing", {
+        jobId,
+        mockCalculation: options.mockCalculation,
       });
+      calculation = options.mockCalculation;
+    } else {
+      // Get an admin email for auth context when invoking calculate-invoice
+      // This is needed because calculate-invoice requires organization membership verification
+      const { data: adminUser } = await supabaseAdmin
+        .from("organization_user")
+        .select("email")
+        .eq("organization_id", organizationId)
+        .eq("role", "admin")
+        .limit(1)
+        .maybeSingle();
 
-    if (calcError) {
-      throw calcError;
+      // Calculate invoice totals via edge function
+      const { data: calculationData, error: calcError } = await supabaseAdmin
+        .functions.invoke("calculate-invoice", {
+          body: {
+            organization_id: organizationId,
+            job_ids: [jobId],
+            email: adminUser?.email, // Pass email for auth verification
+          },
+        });
+
+      if (calcError) {
+        // Log detailed error information for debugging
+        // For FunctionsHttpError, try to get the response body for more context
+        let responseBody: unknown = null;
+        if (
+          calcError.name === "FunctionsHttpError" &&
+          "context" in calcError &&
+          typeof (calcError as { context?: { json?: () => Promise<unknown> } })
+              .context?.json === "function"
+        ) {
+          try {
+            responseBody = await (
+              calcError as { context: { json: () => Promise<unknown> } }
+            ).context.json();
+          } catch {
+            // Could not parse response body
+          }
+        }
+        logger.error("calculate-invoice function error", calcError, {
+          jobId,
+          organizationId,
+          hasAdminEmail: !!adminUser?.email,
+          adminEmail: adminUser?.email,
+          errorName: calcError.name,
+          errorMessage: calcError.message,
+          responseBody,
+        });
+        throw calcError;
+      }
+
+      if (!calculationData?.calculation) {
+        logger.error("calculate-invoice returned invalid data", null, {
+          jobId,
+          organizationId,
+          calculationData,
+          hasSuccess: calculationData?.success,
+          errorMessage: calculationData?.error,
+        });
+        throw new Error(
+          calculationData?.error ||
+            "Failed to calculate invoice totals - no calculation data returned",
+        );
+      }
+
+      calculation = calculationData.calculation;
     }
-
-    if (!calculationData?.calculation) {
-      throw new Error("Failed to calculate invoice totals");
-    }
-
-    const calculation = calculationData.calculation;
 
     // Get currency, due days, and generate invoice number
     const currency = await getOrganizationCurrency(
