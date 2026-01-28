@@ -12,9 +12,31 @@ import {
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  uuidSchema,
+  validateRequest,
+} from "../_utils/zod-schemas.ts";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore - Inline dependency for cross-function compatibility
+import { z } from "https://esm.sh/zod@3.23.8";
 
-const VALID_CATEGORIES = ["bug", "idea", "general"] as const;
+/**
+ * Beta feedback category schema
+ */
+const betaFeedbackCategorySchema = z.enum(["bug", "idea", "general"]);
+
+/**
+ * Schema for submitting beta feedback
+ */
+const submitBetaFeedbackSchema = z.object({
+  organization_id: uuidSchema,
+  message: z
+    .string()
+    .min(1, "Message cannot be empty")
+    .max(5000, "Message must be 5000 characters or less"),
+  category: betaFeedbackCategorySchema.optional().default("general"),
+  page_path: z.string().max(500).optional(),
+});
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
@@ -24,45 +46,16 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const validation = validateRequiredFields(body, [
-      "organization_id",
-      "message",
-    ]);
+    const validation = validateRequest(submitBetaFeedbackSchema, body);
 
-    if (!validation.valid) {
-      logger.warn("Missing required fields", {
-        missingFields: validation.missingFields,
-      });
-      return errorResponse(
-        `Missing required fields: ${validation.missingFields?.join(", ") ?? "organization_id, message"}`,
-        400,
-      );
+    if (!validation.success) {
+      logger.warn("Validation failed", { error: validation.error });
+      return errorResponse(validation.error, 400);
     }
 
-    const {
-      organization_id,
-      message,
-      category: rawCategory,
-      page_path,
-    } = body;
+    const { organization_id, message, category, page_path } = validation.data;
 
-    const category =
-      typeof rawCategory === "string" && VALID_CATEGORIES.includes(rawCategory)
-        ? rawCategory
-        : "general";
-
-    if (typeof message !== "string" || message.trim().length === 0) {
-      return errorResponse("Message cannot be empty", 400);
-    }
-
-    if (message.length > 5000) {
-      return errorResponse("Message must be 5000 characters or less", 400);
-    }
-
-    const pagePath =
-      typeof page_path === "string" && page_path.length > 0
-        ? page_path.slice(0, 500)
-        : null;
+    const pagePath = page_path ?? null;
 
     const supabase = createServiceRoleClient();
 

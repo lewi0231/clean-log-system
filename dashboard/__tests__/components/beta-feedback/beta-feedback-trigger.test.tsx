@@ -1,5 +1,5 @@
 import { BetaFeedbackTrigger } from "@/components/beta-feedback/beta-feedback-trigger";
-import { submitBetaFeedback } from "@/lib/services/beta-feedback.service";
+import { BetaFeedbackService } from "@/lib/services/beta-feedback.service";
 import useOrganization from "@/hooks/useOrganization";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,7 +10,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/hooks/useOrganization", () => ({ default: vi.fn() }));
 vi.mock("@/lib/services/beta-feedback.service", () => ({
-  submitBetaFeedback: vi.fn(),
+  BetaFeedbackService: {
+    submit: vi.fn(),
+  },
 }));
 vi.mock("sonner", () => ({
   toast: {
@@ -20,7 +22,7 @@ vi.mock("sonner", () => ({
 }));
 
 const mockUseOrganization = vi.mocked(useOrganization);
-const mockSubmitBetaFeedback = vi.mocked(submitBetaFeedback);
+const mockSubmit = vi.mocked(BetaFeedbackService.submit);
 const mockToastSuccess = vi.mocked(toast.success);
 const mockToastError = vi.mocked(toast.error);
 
@@ -34,7 +36,7 @@ describe("BetaFeedbackTrigger", () => {
       loading: false,
       error: undefined,
     } as ReturnType<typeof useOrganization>);
-    mockSubmitBetaFeedback.mockResolvedValue({
+    mockSubmit.mockResolvedValue({
       success: true,
       id: "pf-1",
       created_at: "2026-01-28T12:00:00Z",
@@ -56,10 +58,8 @@ describe("BetaFeedbackTrigger", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("beta-feedback-message")).toBeInTheDocument();
     });
-    expect(
-      screen.getByPlaceholderText("What's on your mind?"),
-    ).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toHaveAttribute("aria-labelledby");
   });
 
@@ -74,14 +74,14 @@ describe("BetaFeedbackTrigger", () => {
     });
 
     const dialog = screen.getByRole("dialog");
-    const textarea = within(dialog).getByPlaceholderText("What's on your mind?");
+    const textarea = within(dialog).getByTestId("beta-feedback-message");
     fireEvent.change(textarea, { target: { value: "Add dark mode" } });
 
     const submitButton = within(dialog).getByTestId("beta-feedback-submit");
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(mockSubmitBetaFeedback).toHaveBeenCalledWith({
+      expect(mockSubmit).toHaveBeenCalledWith({
         organization_id: "org-1",
         message: "Add dark mode",
         category: "general",
@@ -105,7 +105,7 @@ describe("BetaFeedbackTrigger", () => {
 
     const dialog = screen.getByRole("dialog");
     // Use spaces so required attribute passes but our trim check fails
-    const textarea = within(dialog).getByPlaceholderText("What's on your mind?");
+    const textarea = within(dialog).getByTestId("beta-feedback-message");
     fireEvent.change(textarea, { target: { value: "   " } });
 
     const submitButton = within(dialog).getByTestId("beta-feedback-submit");
@@ -114,11 +114,11 @@ describe("BetaFeedbackTrigger", () => {
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith("Please enter your feedback.");
     });
-    expect(mockSubmitBetaFeedback).not.toHaveBeenCalled();
+    expect(mockSubmit).not.toHaveBeenCalled();
   });
 
-  it("shows toast.error when submitBetaFeedback throws", async () => {
-    mockSubmitBetaFeedback.mockRejectedValueOnce(
+  it("shows toast.error when BetaFeedbackService.submit throws", async () => {
+    mockSubmit.mockRejectedValueOnce(
       new Error("Network error"),
     );
 
@@ -132,7 +132,7 @@ describe("BetaFeedbackTrigger", () => {
     });
 
     const dialog = screen.getByRole("dialog");
-    const textarea = within(dialog).getByPlaceholderText("What's on your mind?");
+    const textarea = within(dialog).getByTestId("beta-feedback-message");
     fireEvent.change(textarea, { target: { value: "Feedback" } });
     fireEvent.click(within(dialog).getByTestId("beta-feedback-submit"));
 

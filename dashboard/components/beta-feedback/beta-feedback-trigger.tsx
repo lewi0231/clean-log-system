@@ -20,7 +20,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import useOrganization from "@/hooks/useOrganization";
 import {
-  submitBetaFeedback,
+  BetaFeedbackService,
   type BetaFeedbackCategory,
 } from "@/lib/services/beta-feedback.service";
 import { MessageSquarePlus } from "lucide-react";
@@ -28,11 +28,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-const CATEGORIES: { value: BetaFeedbackCategory; label: string }[] = [
+const CATEGORIES = [
   { value: "general", label: "General" },
   { value: "idea", label: "Idea" },
   { value: "bug", label: "Bug" },
-];
+] as const;
 
 export function BetaFeedbackTrigger(): React.ReactElement {
   const { organizationId } = useOrganization();
@@ -52,7 +52,7 @@ export function BetaFeedbackTrigger(): React.ReactElement {
     }
     setSubmitting(true);
     try {
-      await submitBetaFeedback({
+      await BetaFeedbackService.submit({
         organization_id: organizationId,
         message: message.trim(),
         category,
@@ -116,6 +116,7 @@ export function BetaFeedbackTrigger(): React.ReactElement {
             <Label htmlFor="beta-feedback-message">Your feedback *</Label>
             <Textarea
               id="beta-feedback-message"
+              data-testid="beta-feedback-message"
               placeholder="What’s on your mind?"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
