@@ -79,6 +79,156 @@ const faqEntries = [
       </>
     ),
   },
+  // Settings & Invoicing
+  {
+    id: "invoice-sending-and-auto-generate",
+    question:
+      "What's the difference between 'Send Invoices Immediately' and 'Auto-Generate Invoices'?",
+    answer: (
+      <>
+        <strong>Send Invoices Immediately</strong> (Settings → Invoicing) controls
+        whether, once an invoice exists, it is emailed to the customer
+        straight away or left in draft for you to review first. When on,
+        invoices are sent as soon as they’re created; when off, they stay in
+        &quot;pending review&quot; until you send them.
+        <br />
+        <br />
+        <strong>Auto-Generate Invoices</strong> (same tab) controls whether an
+        invoice is created at all when a job is completed. When on, completing
+        a job automatically creates an invoice (which may then be sent
+        immediately or not, depending on the setting above). When off, you
+        create invoices yourself from Completed Jobs. If a location has its own
+        auto-generate setting, that location’s setting overrides the
+        organization default for jobs at that location. Configure both in{" "}
+        <Link
+          href="/dashboard/settings?tab=invoicing"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Invoicing
+        </Link>
+        .
+      </>
+    ),
+  },
+  {
+    id: "gst-on-invoices",
+    question: "How does GST work on my invoices?",
+    answer: (
+      <>
+        In{" "}
+        <Link
+          href="/dashboard/settings?tab=invoicing"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Invoicing → Tax / GST
+        </Link>
+        you can turn <strong>GST registered</strong> on or off. If you’re not
+        registered (e.g. under the $75k turnover threshold), leave it off:
+        invoices will show as &quot;Invoice&quot; and no GST is calculated or
+        shown. If you are registered, we use &quot;Tax Invoice&quot; and show a
+        GST breakdown when the total is $82.50 or more (AUD).
+        <br />
+        <br />
+        <strong>Prices include GST</strong> tells the system whether the
+        amounts you enter on the Pricing page already include GST. When on,
+        we treat those as GST-inclusive and derive the GST component for the
+        invoice. <strong>GST rate (%)</strong> is the rate we use (default 10%
+        for Australia).
+      </>
+    ),
+  },
+  {
+    id: "customer-locations-setting",
+    question: "What does the 'Customer Locations' setting do?",
+    answer: (
+      <>
+        The <strong>Customer Locations</strong> toggle is in{" "}
+        <Link
+          href="/dashboard/settings?tab=features"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Features
+        </Link>
+        . When it’s <strong>on</strong>, the locations you add under{" "}
+        <Link
+          href="/dashboard/locations"
+          className="font-medium text-primary hover:underline"
+        >
+          Locations
+        </Link>{" "}
+        appear in the mobile app: workers choose a location when completing a
+        job, and that can drive regional pricing and invoicing. When it’s{" "}
+        <strong>off</strong>, workers don’t pick from a list of locations;
+        you can still use the app and custom fields, but location-based
+        features (e.g. location-specific pricing or auto-generate) don’t
+        apply. Use &quot;Manage locations&quot; in that same card to add or
+        edit locations.
+      </>
+    ),
+  },
+  {
+    id: "invoice-due-days",
+    question: "What does 'Default Invoice Due Days' mean?",
+    answer: (
+      <>
+        <strong>Default Invoice Due Days</strong> is set in{" "}
+        <Link
+          href="/dashboard/settings?tab=invoicing"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Invoicing
+        </Link>
+        . It’s the number of days from the day the invoice is created until
+        the payment due date shown on the invoice. For example, if you set it
+        to 14, a new invoice will show &quot;Due in 14 days&quot; (or an
+        equivalent due date). You can change it between 1 and 365. This is the
+        default for all new invoices unless a location or other rule overrides
+        it.
+      </>
+    ),
+  },
+  {
+    id: "bank-transfer-payments",
+    question: "How do bank transfer payments work?",
+    answer: (
+      <>
+        In{" "}
+        <Link
+          href="/dashboard/settings?tab=payment"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Payments
+        </Link>
+        you can add your <strong>BSB and account number</strong> and choose to
+        <strong> show bank transfer details on invoices</strong>. When that’s
+        on, customers see your bank details on the invoice so they can pay you
+        by transfer. The app does not track whether they’ve paid; you update
+        payment status yourself when the money arrives (e.g. from Completed
+        Jobs or Invoicing). Including the invoice number in the payment
+        reference helps you match payments to invoices.
+      </>
+    ),
+  },
+  {
+    id: "primary-contact-details",
+    question: "What are Primary Contact Email and Phone used for?",
+    answer: (
+      <>
+        <strong>Primary Contact Email</strong> and{" "}
+        <strong>Primary Contact Phone</strong> are set in{" "}
+        <Link
+          href="/dashboard/settings?tab=organization"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Organization
+        </Link>
+        . They are your business contact details, not your sign-in details.
+        The email is used for account-related notifications and communications;
+        the phone is shown on invoices so customers can contact you. Changing
+        these does not change the email or password you use to log in.
+      </>
+    ),
+  },
 ];
 
 export default function HelpPage() {
@@ -112,8 +262,8 @@ export default function HelpPage() {
           Help & FAQ
         </h1>
         <p className="text-muted-foreground mt-2">
-          Answers to common questions about locations, pricing, and how things
-          work.
+          Answers to common questions about locations, pricing, Settings
+          (invoicing, payments, features), and how things work.
         </p>
       </div>
 

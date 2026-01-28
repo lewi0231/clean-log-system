@@ -90,7 +90,7 @@ export default function SettingsPage() {
     bank_transfer_bsb: null,
     bank_transfer_account_number: null,
     bank_transfer_account_name: null,
-    show_bank_transfer_on_invoices: false,
+    show_bank_transfer_on_invoices: true,
     default_invoice_due_days: 30,
     gst_registered: false,
     gst_inclusive: true,
@@ -165,7 +165,7 @@ export default function SettingsPage() {
           bank_transfer_account_name:
             data.settings.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
-            data.settings.show_bank_transfer_on_invoices ?? false,
+            data.settings.show_bank_transfer_on_invoices ?? true,
           default_invoice_due_days:
             data.settings.default_invoice_due_days ?? 30,
           gst_registered: data.settings.gst_registered ?? false,
@@ -207,7 +207,7 @@ export default function SettingsPage() {
           bank_transfer_account_name:
             data.settings.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
-            data.settings.show_bank_transfer_on_invoices ?? false,
+            data.settings.show_bank_transfer_on_invoices ?? true,
           default_invoice_due_days:
             data.settings.default_invoice_due_days ?? 30,
           gst_registered: data.settings.gst_registered ?? false,
@@ -600,6 +600,10 @@ export default function SettingsPage() {
       }));
     }
 
+    queryClient.invalidateQueries({
+      queryKey: organizationSettingsKey(organizationId),
+    });
+
     log.info("Settings: Primary contact email updated successfully");
   };
 
@@ -633,6 +637,10 @@ export default function SettingsPage() {
         primary_contact_phone: data.settings.primary_contact_phone,
       }));
     }
+
+    queryClient.invalidateQueries({
+      queryKey: organizationSettingsKey(organizationId),
+    });
 
     log.info("Settings: Primary contact phone updated successfully");
   };
@@ -1025,6 +1033,10 @@ export default function SettingsPage() {
       }));
     }
 
+    queryClient.invalidateQueries({
+      queryKey: organizationSettingsKey(organizationId),
+    });
+
     log.info("Settings: Business address updated successfully");
   };
 
@@ -1296,7 +1308,15 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-2">
-          Configure global organization settings.
+          Configure global organization settings. For more on what each setting
+          does, see{" "}
+          <Link
+            href="/dashboard/help"
+            className="font-medium text-primary hover:underline"
+          >
+            Help & FAQ
+          </Link>
+          .
         </p>
       </div>
 
@@ -1778,151 +1798,6 @@ export default function SettingsPage() {
 
           {/* Invoice template */}
           <InvoiceTemplateSettings organizationId={organizationId} />
-
-          {/* Bank transfer on invoices */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Bank Transfer on Invoices</CardTitle>
-              <CardDescription>
-                Add your bank account details to display on invoices for manual
-                payment processing. Payments via bank transfer require manual
-                status updates.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base font-semibold">
-                    Show Bank Transfer Details on Invoices
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Display bank transfer details on invoices. Payments via bank
-                    transfer will not be automatically tracked and require
-                    manual payment status updates.
-                  </p>
-                </div>
-                <Switch
-                  checked={settings.show_bank_transfer_on_invoices}
-                  onCheckedChange={handleShowBankTransferChange}
-                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-                />
-              </div>
-
-              {settings.show_bank_transfer_on_invoices && (
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-bsb-inv">BSB</Label>
-                    <Input
-                      id="bank-transfer-bsb-inv"
-                      value={settings.bank_transfer_bsb || ""}
-                      onChange={(e) => {
-                        let value = e.target.value;
-                        const digits = value.replace(/\D/g, "");
-                        if (digits.length <= 3) {
-                          value = digits;
-                        } else if (digits.length <= 6) {
-                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
-                        } else {
-                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
-                        }
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_bsb: value,
-                        }));
-                      }}
-                      placeholder="123-456"
-                      maxLength={7}
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Format: XXX-XXX (e.g., 123-456)
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-number-inv">
-                      Account Number
-                    </Label>
-                    <Input
-                      id="bank-transfer-account-number-inv"
-                      type="text"
-                      inputMode="numeric"
-                      value={settings.bank_transfer_account_number || ""}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_account_number: e.target.value.replace(
-                            /\D/g,
-                            "",
-                          ),
-                        }))
-                      }
-                      placeholder="987654321"
-                      maxLength={10}
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">6-10 digits</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-name-inv">
-                      Account Name (Optional)
-                    </Label>
-                    <Input
-                      id="bank-transfer-account-name-inv"
-                      value={settings.bank_transfer_account_name || ""}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_account_name: e.target.value,
-                        }))
-                      }
-                      placeholder="Account Holder Name"
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Name associated with the bank account
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-muted/50 border border-muted p-3">
-                    <p className="text-sm text-muted-foreground">
-                      <strong>Note:</strong> Payments via bank transfer will not
-                      be automatically tracked. You will need to manually update
-                      the payment status when payments are received. Include the
-                      invoice number in your payment reference to help match
-                      payments.
-                    </p>
-                  </div>
-
-                  {hasUnsavedChanges && (
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <p className="text-sm text-muted-foreground">
-                        You have unsaved changes
-                      </p>
-                      <Button
-                        onClick={handleSaveBankTransferSettings}
-                        disabled={saving}
-                        className="cursor-pointer"
-                      >
-                        {saving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Save Bank Transfer Settings
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="features" className="space-y-6">
@@ -2060,6 +1935,151 @@ export default function SettingsPage() {
         </TabsContent> */}
 
         <TabsContent value="payment" className="space-y-6">
+          {/* Bank transfer – primary payment method until Stripe is enabled */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank Transfer</CardTitle>
+              <CardDescription>
+                Add your bank account details to display on invoices for manual
+                payment processing. Payments via bank transfer require manual
+                status updates.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">
+                    Show Bank Transfer Details on Invoices
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Display bank transfer details on invoices. Payments via bank
+                    transfer will not be automatically tracked and require
+                    manual payment status updates.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.show_bank_transfer_on_invoices}
+                  onCheckedChange={handleShowBankTransferChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+
+              {settings.show_bank_transfer_on_invoices && (
+                <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-bsb-pay">BSB</Label>
+                    <Input
+                      id="bank-transfer-bsb-pay"
+                      value={settings.bank_transfer_bsb || ""}
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        const digits = value.replace(/\D/g, "");
+                        if (digits.length <= 3) {
+                          value = digits;
+                        } else if (digits.length <= 6) {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
+                        } else {
+                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
+                        }
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_bsb: value,
+                        }));
+                      }}
+                      placeholder="123-456"
+                      maxLength={7}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: XXX-XXX (e.g., 123-456)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-number-pay">
+                      Account Number
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-number-pay"
+                      type="text"
+                      inputMode="numeric"
+                      value={settings.bank_transfer_account_number || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_number: e.target.value.replace(
+                            /\D/g,
+                            "",
+                          ),
+                        }))
+                      }
+                      placeholder="987654321"
+                      maxLength={10}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">6-10 digits</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bank-transfer-account-name-pay">
+                      Account Name (Optional)
+                    </Label>
+                    <Input
+                      id="bank-transfer-account-name-pay"
+                      value={settings.bank_transfer_account_name || ""}
+                      onChange={(e) =>
+                        setSettings((prev) => ({
+                          ...prev,
+                          bank_transfer_account_name: e.target.value,
+                        }))
+                      }
+                      placeholder="Account Holder Name"
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Name associated with the bank account
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/50 border border-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      <strong>Note:</strong> Payments via bank transfer will not
+                      be automatically tracked. You will need to manually update
+                      the payment status when payments are received. Include the
+                      invoice number in your payment reference to help match
+                      payments.
+                    </p>
+                  </div>
+
+                  {hasUnsavedChanges && (
+                    <div className="flex items-center justify-between pt-4 border-t">
+                      <p className="text-sm text-muted-foreground">
+                        You have unsaved changes
+                      </p>
+                      <Button
+                        onClick={handleSaveBankTransferSettings}
+                        disabled={saving}
+                        className="cursor-pointer"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Bank Transfer Settings
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Payment Providers</CardTitle>
