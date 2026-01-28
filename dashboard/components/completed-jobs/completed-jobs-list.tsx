@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
-import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
+import { Job, JobEdit } from "@/lib/types";
 import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import { CheckCircle2 } from "lucide-react";
 import React, { useMemo, useState } from "react";
@@ -312,73 +312,15 @@ export default function CompletedJobsList({
     return null;
   };
 
-  // Calculate job status from invoice data
-  const getJobStatus = (
+  // Job-level invoice status: only whether an invoice exists for this job
+  const getJobInvoiceStatus = (
     job: Job,
-  ): {
-    status: "not_invoiced" | InvoiceStatus;
-    label: string;
-    variant: "default" | "secondary" | "destructive" | "outline";
-  } => {
+  ): { status: "not_invoiced" | "invoice_created"; label: string } => {
     const invoices = job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
-
     if (invoices.length === 0) {
-      return {
-        status: "not_invoiced",
-        label: "Not Invoiced",
-        variant: "outline",
-      };
+      return { status: "not_invoiced", label: "Not Invoiced" };
     }
-
-    // Get the most recent invoice (if multiple, use the first one)
-    const invoice = invoices[0]?.invoice;
-    if (!invoice) {
-      return {
-        status: "not_invoiced",
-        label: "Not Invoiced",
-        variant: "outline",
-      };
-    }
-
-    // Check if paid
-    if (invoice.paid_at) {
-      return {
-        status: "paid",
-        label: "Paid",
-        variant: "secondary",
-      };
-    }
-
-    // Map invoice status to badge variant
-    const statusVariants: Record<
-      InvoiceStatus,
-      "default" | "secondary" | "destructive" | "outline"
-    > = {
-      draft: "outline",
-      pending_review: "outline",
-      sent: "default",
-      paid: "secondary",
-      overdue: "destructive",
-      cancelled: "outline",
-    };
-
-    // Map status to user-friendly label
-    const statusLabels: Record<InvoiceStatus, string> = {
-      draft: "Draft",
-      pending_review: "Pending Review",
-      sent: "Invoice Sent",
-      paid: "Paid",
-      overdue: "Overdue",
-      cancelled: "Cancelled",
-    };
-
-    return {
-      status: invoice.status,
-      label:
-        statusLabels[invoice.status] ||
-        invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1),
-      variant: statusVariants[invoice.status] || "default",
-    };
+    return { status: "invoice_created", label: "Invoice Created" };
   };
 
   if (loading) {
@@ -391,8 +333,8 @@ export default function CompletedJobsList({
     );
   }
 
-  // Column order: Status, Location, Workers, Ordered Fields, Submitted By, Completed At
-  const totalColumns = 2 + orderedFields.length + 3; // Status, Location, Workers, ordered fields, Submitted By, Completed At
+  // Column order: Status, Location, Workers, Ordered Fields, Submitted By, Completed At, Last Updated, Last Updated By
+  const totalColumns = 2 + orderedFields.length + 5; // Status, Location, Workers, ordered fields, Submitted By, Completed At, Last Updated, Last Updated By
 
   return (
     <div className="w-full overflow-x-auto">
@@ -417,6 +359,8 @@ export default function CompletedJobsList({
               ))}
               <TableHead className="min-w-[150px]">Submitted By</TableHead>
               <TableHead className="min-w-[150px]">Completed At</TableHead>
+              <TableHead className="min-w-[150px]">Last Updated</TableHead>
+              <TableHead className="min-w-[150px]">Last Updated By</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -434,30 +378,40 @@ export default function CompletedJobsList({
                   onClick={() => setSelectedJob(job)}
                 >
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      {job.is_test && (
-                        <Badge
-                          variant="destructive"
-                          className="w-fit text-[10px] tracking-wide"
-                        >
-                          TEST
-                        </Badge>
-                      )}
-                      <Badge variant={getJobStatus(job).variant}>
-                        {getJobStatus(job).label}
-                      </Badge>
-                      {getFeedbackStatus(job) && (
-                        <Badge
-                          variant={getFeedbackStatus(job)!.variant}
-                          className="text-xs"
-                        >
-                          {getFeedbackStatus(job)!.label}
-                        </Badge>
-                      )}
-                    </div>
+                    <Badge
+                      variant={
+                        getJobInvoiceStatus(job).status === "invoice_created"
+                          ? "secondary"
+                          : "outline"
+                      }
+                    >
+                      {getJobInvoiceStatus(job).label}
+                    </Badge>
                   </TableCell>
                   <TableCell className="mx-auto">
-                    {job.location ? job.location.name : "-"}
+                    <div className="flex flex-col gap-1">
+                      {(job.is_test || getFeedbackStatus(job)) && (
+                        <div className="flex flex-wrap gap-1">
+                          {job.is_test && (
+                            <Badge
+                              variant="destructive"
+                              className="w-fit text-[10px] tracking-wide"
+                            >
+                              TEST
+                            </Badge>
+                          )}
+                          {getFeedbackStatus(job) && (
+                            <Badge
+                              variant={getFeedbackStatus(job)!.variant}
+                              className="text-xs"
+                            >
+                              {getFeedbackStatus(job)!.label}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      {job.location ? job.location.name : "-"}
+                    </div>
                   </TableCell>
                   <TableCell className="text-left">
                     {job.workers.length > 0 ? (
@@ -491,6 +445,14 @@ export default function CompletedJobsList({
                   </TableCell>
                   <TableCell className="font-medium">
                     {new Date(job.completed_at).toLocaleString()}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {job.last_updated_at
+                      ? new Date(job.last_updated_at).toLocaleString()
+                      : "-"}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {job.last_updated_by || "-"}
                   </TableCell>
                 </TableRow>
               ))

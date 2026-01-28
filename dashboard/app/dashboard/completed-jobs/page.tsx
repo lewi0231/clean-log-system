@@ -13,7 +13,6 @@ import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
 import { useAuth } from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
-import { Job } from "@/lib/types";
 import {
   ArrowUpDown,
   Calculator,
@@ -61,17 +60,10 @@ export default function CompletedJobsPage() {
     return currentUser?.role === "admin";
   }, [user, organizationUsers]);
 
-  // Calculate job status for sorting
-  const getJobStatus = (job: Job): string => {
-    const invoices = job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
-    if (invoices.length === 0) return "not_invoiced";
-
-    // Get the most recent invoice (if multiple, use the first one)
-    const invoice = invoices[0]?.invoice;
-    if (!invoice) return "not_invoiced";
-
-    if (invoice.paid_at) return "paid";
-    return invoice.status;
+  // Job-level invoice status for sorting: not_invoiced | invoice_created
+  const getJobInvoiceStatus = (job: { invoice_job?: Array<{ invoice: unknown } | null> | null }): "not_invoiced" | "invoice_created" => {
+    const invoices = job.invoice_job?.filter((ij) => ij?.invoice !== null) ?? [];
+    return invoices.length === 0 ? "not_invoiced" : "invoice_created";
   };
 
   // Sort jobs based on selected criteria
@@ -98,19 +90,10 @@ export default function CompletedJobsPage() {
           comparison = workerA.localeCompare(workerB);
           break;
         case "status":
-          const statusA = getJobStatus(a);
-          const statusB = getJobStatus(b);
-          // Status priority: paid > sent > draft > overdue > cancelled > not_invoiced
-          const statusPriority: Record<string, number> = {
-            paid: 1,
-            sent: 2,
-            draft: 3,
-            overdue: 4,
-            cancelled: 5,
-            not_invoiced: 6,
-          };
+          // not_invoiced = 0, invoice_created = 1; desc = invoice_created first
+          const statusOrder = { not_invoiced: 0, invoice_created: 1 };
           comparison =
-            (statusPriority[statusA] || 99) - (statusPriority[statusB] || 99);
+            statusOrder[getJobInvoiceStatus(a)] - statusOrder[getJobInvoiceStatus(b)];
           break;
       }
 

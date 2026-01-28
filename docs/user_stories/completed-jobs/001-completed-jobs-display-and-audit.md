@@ -23,16 +23,21 @@ Admins need to view completed jobs with proper field display, audit trail inform
 
 5. Each completed job displays who submitted it (submitted_by_email) in a "Submitted By" column
 6. Jobs created via the dashboard show the admin user's email who created it
-7. Jobs created via the mobile app show "-" (no submitted_by_email)
+7. Jobs created via the mobile app show the worker's email who submitted the job (create-job sets submitted_by_email)
 8. The "Submitted By" column appears between the dynamic fields and "Completed At" column
+9. "Last Updated" and "Last Updated By" columns show when a job was last edited and which admin edited it (null if never updated after creation)
 
 ### Location Restrictions
 
-9. When creating a new job, fields are filtered based on the selected location
-10. When editing an existing job, fields are filtered based on the selected location
-11. Fields with location restrictions only appear when the selected location matches the restriction
-12. Fields without location restrictions appear for all locations
-13. When location is changed in create/edit dialogs, the field list updates to reflect the new location's restrictions
+10. When creating a new job, fields are filtered based on the selected location
+11. When editing an existing job, fields are filtered based on the selected location
+12. Fields with location restrictions only appear when the selected location matches the restriction
+13. Fields without location restrictions appear for all locations
+14. When location is changed in create/edit dialogs, the field list updates to reflect the new location's restrictions
+
+### Completed Jobs List (job-level status)
+
+15. The completed jobs table shows a Status column with job-level values only: **Not Invoiced** (job has no invoice) and **Invoice Created** (job has been added to an invoice). Invoice lifecycle (draft, sent, paid, etc.) is tracked on invoices, not duplicated on the job list.
 
 ## Technical Details
 
@@ -43,11 +48,14 @@ Admins need to view completed jobs with proper field display, audit trail inform
   - `dashboard/components/completed-jobs/create-job-dialog.tsx` - Create job dialog
   - `dashboard/components/completed-jobs/edit-job-dialog.tsx` - Edit job dialog
 - Database:
-  - `job.submitted_by_email` - Tracks who created the job (TEXT, nullable)
+  - `job.submitted_by_email` - Email of who created/submitted the job (dashboard admin or mobile worker) (TEXT, nullable)
+  - `job.last_updated_at` / `job.last_updated_by` - When and which admin last edited the job (nullable)
   - `location_field_config` - Junction table for field location restrictions
 - Edge Functions:
-  - `list-jobs` - Returns jobs with submitted_by_email
+  - `list-jobs` - Returns jobs with submitted_by_email, last_updated_at, last_updated_by
   - `admin-create-job` - Stores submitted_by_email when creating jobs
+  - `create-job` - Stores submitted_by_email (worker email) when workers submit via mobile
+  - `update-job` - Sets last_updated_at and last_updated_by when admins edit jobs
   - `list-field-configs` - Filters fields based on location_id parameter
 
 ### Field Display Logic
