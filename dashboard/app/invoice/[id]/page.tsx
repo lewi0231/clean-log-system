@@ -141,7 +141,7 @@ function InvoicePageContent() {
           primary_contact_phone: org?.primary_contact_phone ?? null,
           default_invoice_due_days: org?.default_invoice_due_days ?? 30,
           show_bank_transfer_on_invoices:
-            org?.show_bank_transfer_on_invoices ?? false,
+            org?.show_bank_transfer_on_invoices ?? true,
           bank_transfer_bsb: org?.bank_transfer_bsb ?? null,
           bank_transfer_account_number:
             org?.bank_transfer_account_number ?? null,

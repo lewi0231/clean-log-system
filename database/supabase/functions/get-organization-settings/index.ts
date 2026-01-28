@@ -96,7 +96,7 @@ serve(async (req) => {
         bank_transfer_account_name: orgSettings?.bank_transfer_account_name ??
           null,
         show_bank_transfer_on_invoices:
-          orgSettings?.show_bank_transfer_on_invoices ?? false,
+          orgSettings?.show_bank_transfer_on_invoices ?? true,
         default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
         gst_registered: orgSettings?.gst_registered ?? false,
         gst_inclusive: orgSettings?.gst_inclusive ?? true,

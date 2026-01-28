@@ -99,7 +99,7 @@ export default function InvoicePreview({
             primary_contact_phone: data.settings.primary_contact_phone ?? null,
             default_invoice_due_days: data.settings.default_invoice_due_days ?? 30,
             show_bank_transfer_on_invoices:
-              data.settings.show_bank_transfer_on_invoices ?? false,
+              data.settings.show_bank_transfer_on_invoices ?? true,
             bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
             bank_transfer_account_number:
               data.settings.bank_transfer_account_number ?? null,

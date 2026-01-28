@@ -152,7 +152,7 @@ serve(async (req) => {
           default_invoice_due_days: orgSettings?.default_invoice_due_days ??
             30,
           show_bank_transfer_on_invoices:
-            orgSettings?.show_bank_transfer_on_invoices ?? false,
+            orgSettings?.show_bank_transfer_on_invoices ?? true,
           bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
           bank_transfer_account_number:
             orgSettings?.bank_transfer_account_number ?? null,

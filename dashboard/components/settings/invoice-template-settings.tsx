@@ -899,8 +899,18 @@ export default function InvoiceTemplateSettings(
                     </p>
                   )}
                   {orgSettings?.business_address && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
                       {orgSettings.business_address}
+                    </p>
+                  )}
+                  {orgSettings?.primary_contact_email && (
+                    <p className="text-sm text-muted-foreground">
+                      {orgSettings.primary_contact_email}
+                    </p>
+                  )}
+                  {orgSettings?.primary_contact_phone && (
+                    <p className="text-sm text-muted-foreground">
+                      {orgSettings.primary_contact_phone}
                     </p>
                   )}
                 </div>
