@@ -63,9 +63,7 @@ describe("LocationForm", () => {
       render(<LocationForm {...defaultProps} />, { wrapper: createWrapper() });
 
       expect(screen.getByText("Add Location")).toBeInTheDocument();
-      expect(
-        screen.getByText("Add a new location to your organization.")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Add a new location.")).toBeInTheDocument();
       expect(screen.getByLabelText("Name")).toBeInTheDocument();
       expect(screen.getByLabelText("Contact Email")).toBeInTheDocument();
       expect(screen.getByLabelText("Address")).toBeInTheDocument();
