@@ -80,6 +80,56 @@ describe("Invoice Template Config Validation - P1 Tests", () => {
             const result = serviceAddressConfigSchema.safeParse(invalidConfig);
             expect(result.success).toBe(false);
         });
+
+        it("P1: should validate auto source with only location_fields", () => {
+            const validConfig = {
+                source: SERVICE_ADDRESS_SOURCE.AUTO,
+                location_fields: ["name", "address"],
+                // No form_fields - should be valid for auto
+            };
+
+            const result = serviceAddressConfigSchema.safeParse(validConfig);
+            expect(result.success).toBe(true);
+        });
+
+        it("P1: should validate auto source with only form_fields", () => {
+            const validConfig = {
+                source: SERVICE_ADDRESS_SOURCE.AUTO,
+                form_fields: ["customer_address"],
+                // No location_fields - should be valid for auto
+            };
+
+            const result = serviceAddressConfigSchema.safeParse(validConfig);
+            expect(result.success).toBe(true);
+        });
+
+        it("P1: should validate auto source with both location_fields and form_fields", () => {
+            const validConfig = {
+                source: SERVICE_ADDRESS_SOURCE.AUTO,
+                location_fields: ["name", "address"],
+                form_fields: ["customer_address"],
+            };
+
+            const result = serviceAddressConfigSchema.safeParse(validConfig);
+            expect(result.success).toBe(true);
+        });
+
+        it("P1: should reject auto source with neither location_fields nor form_fields", () => {
+            const invalidConfig = {
+                source: SERVICE_ADDRESS_SOURCE.AUTO,
+                // Neither location_fields nor form_fields
+            };
+
+            const result = serviceAddressConfigSchema.safeParse(invalidConfig);
+            expect(result.success).toBe(false);
+            if (!result.success) {
+                expect(
+                    result.error.issues.some((issue) =>
+                        issue.message.includes("At least location fields or form fields"),
+                    ),
+                ).toBe(true);
+            }
+        });
     });
 
     describe("Billing Address Config Schema", () => {

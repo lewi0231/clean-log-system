@@ -756,6 +756,141 @@ export default function SettingsPage() {
     }
   };
 
+  // GST auto-save handlers
+  const handleGstRegisteredChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating GST registered", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_registered: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_registered: data.settings.gst_registered ?? false,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_registered: data.settings.gst_registered ?? false,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST registered updated");
+    } catch (err) {
+      log.error("Settings: Failed to update GST registered", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleGstInclusiveChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating GST inclusive", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_inclusive: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_inclusive: data.settings.gst_inclusive ?? true,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_inclusive: data.settings.gst_inclusive ?? true,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST inclusive updated");
+    } catch (err) {
+      log.error("Settings: Failed to update GST inclusive", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleGstRateChange = async (rate: number) => {
+    if (!organizationId) return;
+    if (typeof rate !== "number" || isNaN(rate) || rate < 0 || rate > 100) {
+      setErrorDialog({
+        open: true,
+        title: "Validation Error",
+        message: "GST rate must be between 0 and 100",
+      });
+      return;
+    }
+    try {
+      log.info("Settings: Updating GST rate", { rate });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_rate_percent: rate,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST rate updated");
+    } catch (err) {
+      log.error("Settings: Failed to update GST rate", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
   // Helper function to capitalize first letter of each word (title case)
   const toTitleCase = (str: string): string => {
     return str
@@ -1124,83 +1259,6 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSaveGstSettings = async () => {
-    if (!organizationId) return;
-
-    const rate = settings.gst_rate_percent;
-    if (typeof rate !== "number" || isNaN(rate) || rate < 0 || rate > 100) {
-      setErrorDialog({
-        open: true,
-        title: "Validation Error",
-        message: "GST rate must be between 0 and 100",
-      });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      log.info("Settings: Saving GST settings", {
-        gst_registered: settings.gst_registered,
-        gst_inclusive: settings.gst_inclusive,
-        gst_rate_percent: settings.gst_rate_percent,
-      });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            gst_registered: settings.gst_registered,
-            gst_inclusive: settings.gst_inclusive,
-            gst_rate_percent: settings.gst_rate_percent,
-          },
-        },
-      );
-
-      if (updateError) throw updateError;
-
-      if (data?.settings) {
-        setSettings((prev) => ({
-          ...prev,
-          gst_registered: data.settings.gst_registered,
-          gst_inclusive: data.settings.gst_inclusive,
-          gst_rate_percent: data.settings.gst_rate_percent,
-        }));
-        if (initialSettings) {
-          setInitialSettings({
-            ...initialSettings,
-            gst_registered: data.settings.gst_registered,
-            gst_inclusive: data.settings.gst_inclusive,
-            gst_rate_percent: data.settings.gst_rate_percent,
-          });
-        }
-      }
-      queryClient.invalidateQueries({
-        queryKey: organizationSettingsKey(organizationId),
-      });
-      log.info("Settings: GST settings saved successfully");
-    } catch (err) {
-      log.error("Settings: Failed to save GST settings", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Save Failed",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to save GST settings. Please try again.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const hasGstUnsaved =
-    initialSettings &&
-    (settings.gst_registered !== initialSettings.gst_registered ||
-      settings.gst_inclusive !== initialSettings.gst_inclusive ||
-      settings.gst_rate_percent !== initialSettings.gst_rate_percent);
 
   useEffect(() => {
     if (organizationId) {
@@ -1660,12 +1718,7 @@ export default function SettingsPage() {
                 </div>
                 <Switch
                   checked={settings.gst_registered}
-                  onCheckedChange={(checked) =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      gst_registered: checked,
-                    }))
-                  }
+                  onCheckedChange={handleGstRegisteredChange}
                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                 />
               </div>
@@ -1683,12 +1736,7 @@ export default function SettingsPage() {
                     </div>
                     <Switch
                       checked={settings.gst_inclusive}
-                      onCheckedChange={(checked) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          gst_inclusive: checked,
-                        }))
-                      }
+                      onCheckedChange={handleGstInclusiveChange}
                       className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                     />
                   </div>
@@ -1711,6 +1759,12 @@ export default function SettingsPage() {
                           }));
                         }
                       }}
+                      onBlur={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v) && v >= 0 && v <= 100) {
+                          handleGstRateChange(v);
+                        }
+                      }}
                       className="max-w-xs"
                     />
                     <p className="text-xs text-muted-foreground">
@@ -1718,28 +1772,6 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </>
-              )}
-
-              {hasGstUnsaved && (
-                <div className="flex justify-end pt-4 border-t">
-                  <Button
-                    onClick={handleSaveGstSettings}
-                    disabled={saving}
-                    className="cursor-pointer"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save GST Settings
-                      </>
-                    )}
-                  </Button>
-                </div>
               )}
             </CardContent>
           </Card>

@@ -487,10 +487,14 @@ export interface InvoiceEmailRecipientConfig {
 export interface InvoiceTemplateConfig {
   id: string;
   organization_id: string;
+  /** @deprecated Title is now derived from GST registration status. Always sends "Tax Invoice" as default; InvoiceDocument determines actual title. */
   invoice_title: string;
+  /** @deprecated Logo is always shown when org has one. Kept for backward compatibility. */
   show_logo: boolean;
+  /** @deprecated ABN is always shown when org has one. Kept for backward compatibility. */
   show_abn: boolean;
-  bill_to_fields: string[]; // Array of field_config names to display in Bill To section (legacy/fallback)
+  /** @deprecated Use service_address_config.form_fields instead. Kept for backward compatibility/migration. */
+  bill_to_fields: string[];
   service_address_config?: ServiceAddressConfig;
   billing_address_config?: BillingAddressConfig;
   email_recipient_config?: InvoiceEmailRecipientConfig;
