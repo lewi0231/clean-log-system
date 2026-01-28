@@ -531,9 +531,14 @@ export default function EditJobDialog({
     fieldValues,
   ]);
 
-  // Build submission data
+  // Build submission data: retain existing job submission_data and overlay form values
+  // so we never drop keys from the initial submission (e.g. fields not in current form or hidden by conditional logic)
   const buildSubmissionData = useCallback((): Record<string, unknown> => {
-    const submissionData: Record<string, unknown> = {};
+    const submissionData: Record<string, unknown> = {
+      ...(job?.submission_data && typeof job.submission_data === "object"
+        ? (job.submission_data as Record<string, unknown>)
+        : {}),
+    };
 
     fieldsToRender.forEach((config) => {
       const value = fieldValues[config.id];
@@ -578,7 +583,13 @@ export default function EditJobDialog({
     }
 
     return submissionData;
-  }, [fieldsToRender, fieldValues, startDateTime, finishDateTime]);
+  }, [
+    job?.submission_data,
+    fieldsToRender,
+    fieldValues,
+    startDateTime,
+    finishDateTime,
+  ]);
 
   // Handle submit
   const handleSubmit = useCallback(async () => {

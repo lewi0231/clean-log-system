@@ -51,6 +51,15 @@ export function useNotifications(): UseNotificationsResult {
     fetchNotifications();
   }, [fetchNotifications]);
 
+  // Refetch when user returns to the tab (covers Realtime gaps and ensures fresh data)
+  useEffect(() => {
+    const handleFocus = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [fetchNotifications]);
+
   // Realtime: refetch when a new notification is inserted for this user
   useEffect(() => {
     if (!organizationUserId) return;

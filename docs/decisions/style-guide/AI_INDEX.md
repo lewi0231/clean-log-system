@@ -668,6 +668,18 @@
 - **Pattern:** `create-worker/`, `list-workers/`
 - **Applies to:** Function directory names
 
+### Database / Migrations Rules
+
+#### RULE: migrations-never-edit-applied
+- **Scope:** database, migrations
+- **File:** `README.md#database-migrations-do-not-edit-existing-files`, `QUICK_REFERENCE.md#database-migrations`
+- **Tags:** database, migrations, schema
+- **Priority:** high
+- **Pattern:** Add a new migration file for any schema or behaviour change
+- **Anti-pattern:** Modifying a migration file that has already been applied (locally or in any environment)
+- **Applies to:** All work in `/database/supabase/migrations/`
+- **Rationale:** Applied migrations are immutable; editing them breaks reproducibility and can cause apply failures or schema drift
+
 ---
 
 ## Decision-Making Approaches
@@ -839,6 +851,12 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 | What format should responses be? | `{ success: true, data }` or `{ success: false, error }` | `edge-function-response-format` | `edge-functions/structure.md` |
 | How should I name functions? | kebab-case: `create-worker/`, `list-workers/` | `edge-function-naming-kebab-case` | `edge-functions/structure.md` |
 
+### Database / Migrations Decisions
+
+| Question | Answer | Rule ID | File |
+|----------|--------|---------|------|
+| Should I edit an existing migration file? | No. Never modify a migration that has already been applied; add a new migration instead | `migrations-never-edit-applied` | `README.md`, `QUICK_REFERENCE.md` |
+
 ### Testing Decisions
 
 | Question | Answer | Rule ID | File |
@@ -964,6 +982,9 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 - `edge-function-response-format`
 - `edge-function-naming-kebab-case`
 
+#### Database / Migrations
+- `migrations-never-edit-applied`
+
 ### By Scope
 
 #### Universal (Applies to All)
@@ -991,6 +1012,9 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 - All edge function validation rules
 - All edge function auth rules
 - All edge function testing rules
+
+#### Database / Migrations Only
+- `migrations-never-edit-applied`
 
 ### By Priority
 
@@ -1052,6 +1076,7 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 - `edge-function-auth-org-membership`
 - `edge-function-response-format`
 - `edge-function-naming-kebab-case`
+- `migrations-never-edit-applied`
 
 #### Medium Priority (Important)
 - `typescript-infer-local-variables`
@@ -1117,6 +1142,14 @@ Based on [criteria], I recommend **Option X** because [reasoning].
 8. Return format: `{ success: true, data }` or `{ success: false, error }`
 
 **Rules:** `edge-function-naming-kebab-case`, `edge-function-structure-order`, `edge-function-cors-first`, `edge-function-per-function-deno-json`, `edge-function-service-role-client`, `edge-function-zod-validation`, `edge-function-validate-early`, `edge-function-auth-org-membership`, `edge-function-response-format`
+
+### Creating a New Migration
+1. **Never edit an existing migration** that has already been applied
+2. Add a new file: `database/supabase/migrations/YYYYMMDDHHMMSS_descriptive_name.sql`
+3. Use sequential timestamps so order is preserved
+4. Test locally (e.g. `supabase db reset`) before committing
+
+**Rules:** `migrations-never-edit-applied` — see QUICK_REFERENCE.md#database-migrations for structure and patterns
 
 ### Styling a Component
 1. Use semantic tokens in dashboard: `bg-primary`, `text-primary-foreground`

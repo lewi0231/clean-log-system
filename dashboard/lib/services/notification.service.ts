@@ -3,6 +3,7 @@
  * Handles fetching and managing in-app notifications
  */
 
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 
 export interface Notification {
@@ -38,6 +39,12 @@ export class NotificationService {
     receiverId: string,
     limit: number = 20
   ): Promise<NotificationListResponse> {
+    log.debug("NotificationService: Fetching notifications", {
+      organizationId,
+      receiverId,
+      limit,
+    });
+
     const { data, error } = await supabase
       .from("notification")
       .select("*")
@@ -47,11 +54,23 @@ export class NotificationService {
       .limit(limit);
 
     if (error) {
+      log.error("NotificationService: Fetch failed", {
+        organizationId,
+        receiverId,
+        error: error.message,
+      });
       throw new Error(error.message);
     }
 
     const notifications = (data || []) as Notification[];
     const unreadCount = notifications.filter((n) => !n.read).length;
+
+    log.debug("NotificationService: Fetch result", {
+      organizationId,
+      receiverId,
+      count: notifications.length,
+      unreadCount,
+    });
 
     return {
       notifications,

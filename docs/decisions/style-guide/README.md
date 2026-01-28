@@ -41,6 +41,9 @@ This is a monorepo containing:
 - **Migrations**: `/database/supabase/migrations/` - Database migration files
 - **Edge Functions**: `/database/supabase/functions/` - Supabase edge functions
 
+### Database migrations: do not edit existing files
+**Never modify a migration file that has already been applied** (locally or in any environment). Applied migrations are immutable; changing them breaks reproducibility and can cause apply failures or schema drift. Always add a **new** migration for any schema or behaviour change. See [Quick Reference — Database Migrations](./QUICK_REFERENCE.md#database-migrations) for naming, structure, and patterns.
+
 ---
 
 ## Structure
