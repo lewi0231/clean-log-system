@@ -189,8 +189,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       ).toBeInTheDocument();
     });
 
-    it("P2: should render save button", () => {
+    it("P2: should show save button when form has unsaved changes", () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/include option values/i));
       expect(
         screen.getByRole("button", { name: /save invoice template settings/i })
       ).toBeInTheDocument();
@@ -200,6 +201,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       mockUpdateConfig.mockImplementation(() => new Promise(() => {})); // Never resolves
 
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/include option values/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });
@@ -258,6 +260,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should call updateConfig when save button is clicked", async () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/include option values/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });
@@ -271,6 +274,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should pass correct config data to updateConfig", async () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/include option values/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });
@@ -332,6 +336,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should display validation errors when save is clicked with invalid data", async () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/show base price separately/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });
@@ -347,6 +352,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should disable save button when validation errors exist", async () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/show base price separately/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });
@@ -358,8 +364,9 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
       });
     });
 
-    it("P2: should show error count in save button area", async () => {
+    it("P2: should show error count in save button area when dirty and invalid", async () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/show base price separately/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });
@@ -416,6 +423,7 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
     it("P2: should show success message after successful save", async () => {
       render(<InvoiceTemplateSettings />);
+      fireEvent.click(screen.getByLabelText(/include option values/i));
       const saveButton = screen.getByRole("button", {
         name: /save invoice template settings/i,
       });

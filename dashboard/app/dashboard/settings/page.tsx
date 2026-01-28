@@ -1,5 +1,7 @@
 "use client";
 
+import { organizationSettingsKey } from "@/app/query-provider";
+import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,14 +36,6 @@ import {
 } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { organizationSettingsKey } from "@/app/query-provider";
-import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -50,10 +44,10 @@ import {
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DollarSign,
   ExternalLink,
-  Info,
   Loader2,
   Save,
   Upload,
@@ -63,7 +57,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 
 export default function SettingsPage() {
   const {
@@ -135,7 +128,7 @@ export default function SettingsPage() {
         "get-organization-settings",
         {
           body: { organization_id: organizationId },
-        }
+        },
       );
 
       if (fetchError) {
@@ -301,7 +294,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             business_mode: mode,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -337,7 +330,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           name,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -371,7 +364,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           abn: abn || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -392,7 +385,7 @@ export default function SettingsPage() {
   };
 
   const handleLogoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file || !organizationId) {
@@ -416,7 +409,7 @@ export default function SettingsPage() {
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
     const isValidExtension =
       ["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(
-        fileExtension || ""
+        fileExtension || "",
       ) || validTypes.includes(file.type);
 
     if (!isValidExtension) {
@@ -547,7 +540,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             logo_url: null,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -590,7 +583,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           primary_contact_email: email || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -624,7 +617,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           primary_contact_phone: phone || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -657,7 +650,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             use_predefined_locations: checked,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -700,7 +693,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             invoice_send_immediately: checked,
           },
-        }
+        },
       );
       if (error) throw error;
       if (data?.settings) {
@@ -737,7 +730,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             auto_generate_invoices_immediately: checked,
           },
-        }
+        },
       );
       if (error) throw error;
       if (data?.settings) {
@@ -778,7 +771,7 @@ export default function SettingsPage() {
   };
 
   const parseBusinessAddress = (
-    address: string
+    address: string,
   ): {
     street: string;
     city: string;
@@ -880,7 +873,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           business_address: formattedAddress || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -927,7 +920,7 @@ export default function SettingsPage() {
             stripe_account_id: null,
             payment_provider: null,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -981,7 +974,7 @@ export default function SettingsPage() {
             currency,
             locale,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -1076,7 +1069,7 @@ export default function SettingsPage() {
             show_bank_transfer_on_invoices:
               settings.show_bank_transfer_on_invoices,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -1161,7 +1154,7 @@ export default function SettingsPage() {
             gst_inclusive: settings.gst_inclusive,
             gst_rate_percent: settings.gst_rate_percent,
           },
-        }
+        },
       );
 
       if (updateError) throw updateError;
@@ -1245,15 +1238,14 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-2">
-          Configure global organization settings. Feature-specific settings are
-          available on their respective pages.
+          Configure global organization settings.
         </p>
       </div>
 
       <Tabs
         defaultValue={
           ["organization", "invoicing", "payment", "features"].includes(
-            searchParams.get("tab") || ""
+            searchParams.get("tab") || "",
           )
             ? searchParams.get("tab")!
             : "organization"
@@ -1275,7 +1267,7 @@ export default function SettingsPage() {
                 Manage your organization&apos;s basic information and details
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
               <AutoSaveInput
                 label="Organization Name"
                 value={settings.name}
@@ -1283,14 +1275,6 @@ export default function SettingsPage() {
                 placeholder="Enter organization name"
                 required
                 description="The name of your business as it appears throughout the application"
-              />
-
-              <AutoSaveInput
-                label="ABN (Australian Business Number)"
-                value={settings.abn}
-                onSave={handleABNChange}
-                placeholder="Enter ABN (optional)"
-                description="Your Australian Business Number for invoicing and business records (optional)"
               />
 
               <div className="space-y-2">
@@ -1341,65 +1325,100 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <AutoSaveInput
+                label="ABN (Australian Business Number)"
+                value={settings.abn}
+                onSave={handleABNChange}
+                placeholder="Enter ABN (optional)"
+                description="Your Australian Business Number for invoicing and business records (optional)"
+              />
 
-              <TooltipProvider>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="primary-contact-email">
-                      Primary Contact Email
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          This email is used for business communications and
-                          notifications. It does not change your sign-in email
-                          address.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <AutoSaveInput
-                    id="primary-contact-email"
-                    type="email"
-                    value={settings.primary_contact_email}
-                    onSave={handlePrimaryContactEmailChange}
-                    placeholder="Enter primary contact email"
-                    description="The primary business contact email for account communications and notifications."
-                  />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="primary-contact-phone">
+                    Primary Contact Phone
+                  </Label>
                 </div>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="primary-contact-phone">
-                      Primary Contact Phone
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          This phone number is displayed on invoices for
-                          customer contact purposes.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <AutoSaveInput
-                    id="primary-contact-phone"
-                    type="tel"
-                    value={settings.primary_contact_phone}
-                    onSave={handlePrimaryContactPhoneChange}
-                    placeholder="Enter primary contact phone (e.g., 0412 345 678)"
-                    description="The primary business contact phone number displayed on invoices."
-                  />
+                <AutoSaveInput
+                  id="primary-contact-phone"
+                  type="tel"
+                  value={settings.primary_contact_phone}
+                  onSave={handlePrimaryContactPhoneChange}
+                  placeholder="Enter primary contact phone (e.g., 0412 345 678)"
+                  description="The primary business contact phone number displayed on invoices."
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="primary-contact-email">
+                    Primary Contact Email
+                  </Label>
                 </div>
-              </TooltipProvider>
+                <AutoSaveInput
+                  id="primary-contact-email"
+                  type="email"
+                  value={settings.primary_contact_email}
+                  onSave={handlePrimaryContactEmailChange}
+                  placeholder="Enter primary contact email"
+                  description="The primary business contact email for account communications and notifications."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currency">Currency</Label>
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) =>
+                    handleCurrencyChange(value as SupportedCurrency)
+                  }
+                >
+                  <SelectTrigger id="currency" className="w-full max-w-xs">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select currency" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUD">
+                      <span className="font-medium">AUD</span>
+                      <span className="text-muted-foreground ml-2">
+                        Australian Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="USD">
+                      <span className="font-medium">USD</span>
+                      <span className="text-muted-foreground ml-2">
+                        US Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="GBP">
+                      <span className="font-medium">GBP</span>
+                      <span className="text-muted-foreground ml-2">
+                        British Pound
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="EUR">
+                      <span className="font-medium">EUR</span>
+                      <span className="text-muted-foreground ml-2">Euro</span>
+                    </SelectItem>
+                    <SelectItem value="CAD">
+                      <span className="font-medium">CAD</span>
+                      <span className="text-muted-foreground ml-2">
+                        Canadian Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="NZD">
+                      <span className="font-medium">NZD</span>
+                      <span className="text-muted-foreground ml-2">
+                        New Zealand Dollar
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Default currency for pricing and invoicing. This affects how
+                  prices are displayed throughout the application.
+                </p>
+              </div>
 
               <div className="space-y-4">
                 <div>
@@ -1507,63 +1526,6 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
-                <Select
-                  value={settings.currency}
-                  onValueChange={(value) =>
-                    handleCurrencyChange(value as SupportedCurrency)
-                  }
-                >
-                  <SelectTrigger id="currency" className="w-full max-w-xs">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <SelectValue placeholder="Select currency" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUD">
-                      <span className="font-medium">AUD</span>
-                      <span className="text-muted-foreground ml-2">
-                        Australian Dollar
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="USD">
-                      <span className="font-medium">USD</span>
-                      <span className="text-muted-foreground ml-2">
-                        US Dollar
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="GBP">
-                      <span className="font-medium">GBP</span>
-                      <span className="text-muted-foreground ml-2">
-                        British Pound
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="EUR">
-                      <span className="font-medium">EUR</span>
-                      <span className="text-muted-foreground ml-2">Euro</span>
-                    </SelectItem>
-                    <SelectItem value="CAD">
-                      <span className="font-medium">CAD</span>
-                      <span className="text-muted-foreground ml-2">
-                        Canadian Dollar
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="NZD">
-                      <span className="font-medium">NZD</span>
-                      <span className="text-muted-foreground ml-2">
-                        New Zealand Dollar
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Default currency for pricing and invoicing. This affects how
-                  prices are displayed throughout the application.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1602,8 +1564,9 @@ export default function SettingsPage() {
                     Auto-Generate Invoices
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically create invoices in pending review when jobs are
-                    completed. Location-specific auto-generate takes precedence.
+                    Automatically create invoices in pending review when jobs
+                    are completed. Location-specific auto-generate takes
+                    precedence.
                   </p>
                 </div>
                 <Switch
@@ -1647,7 +1610,7 @@ export default function SettingsPage() {
                               organization_id: organizationId,
                               default_invoice_due_days: value,
                             },
-                          }
+                          },
                         );
                         if (error) throw error;
                         queryClient.invalidateQueries({
@@ -1698,7 +1661,10 @@ export default function SettingsPage() {
                 <Switch
                   checked={settings.gst_registered}
                   onCheckedChange={(checked) =>
-                    setSettings((prev) => ({ ...prev, gst_registered: checked }))
+                    setSettings((prev) => ({
+                      ...prev,
+                      gst_registered: checked,
+                    }))
                   }
                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                 />
@@ -1855,7 +1821,7 @@ export default function SettingsPage() {
                           ...prev,
                           bank_transfer_account_number: e.target.value.replace(
                             /\D/g,
-                            ""
+                            "",
                           ),
                         }))
                       }

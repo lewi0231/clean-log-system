@@ -55,7 +55,7 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface InvoiceTemplateSettingsProps {
   /** Optional for backward compatibility; org is resolved via useOrganization in child hooks. */
@@ -105,27 +105,64 @@ export default function InvoiceTemplateSettings(
   const [emailRecipientConfig, setEmailRecipientConfig] =
     useState<InvoiceEmailRecipientConfig>(DEFAULT_EMAIL_RECIPIENT_CONFIG);
 
-  // Initialize form with config data
+  // Snapshot of last loaded/saved template form state (used for "save when dirty")
+  type TemplateFormSnapshot = {
+    serviceAddressConfig: ServiceAddressConfig;
+    billingAddressConfig: BillingAddressConfig;
+    lineItemDisplay: LineItemDisplayConfig;
+    emailRecipientConfig: InvoiceEmailRecipientConfig;
+  };
+  const [initialTemplateSnapshot, setInitialTemplateSnapshot] =
+    useState<TemplateFormSnapshot | null>(null);
+
+  // Initialize form and "initial" snapshot from config
   useEffect(() => {
     if (config) {
-      // Migrate legacy bill_to_fields to service_address_config.form_fields if needed
       const legacyBillToFields = config.bill_to_fields || [];
       const existingServiceConfig =
         config.service_address_config || DEFAULT_SERVICE_ADDRESS_CONFIG;
-
-      setServiceAddressConfig({
+      const service = {
         ...existingServiceConfig,
         form_fields: existingServiceConfig.form_fields || legacyBillToFields,
+      };
+      const billing =
+        config.billing_address_config || DEFAULT_BILLING_ADDRESS_CONFIG;
+      const lineItem = config.line_item_display || DEFAULT_LINE_ITEM_DISPLAY;
+      const email =
+        config.email_recipient_config || DEFAULT_EMAIL_RECIPIENT_CONFIG;
+
+      setServiceAddressConfig(service);
+      setBillingAddressConfig(billing);
+      setLineItemDisplay(lineItem);
+      setEmailRecipientConfig(email);
+      setInitialTemplateSnapshot({
+        serviceAddressConfig: service,
+        billingAddressConfig: billing,
+        lineItemDisplay: lineItem,
+        emailRecipientConfig: { ...email, default_email: null },
       });
-      setBillingAddressConfig(
-        config.billing_address_config || DEFAULT_BILLING_ADDRESS_CONFIG
-      );
-      setLineItemDisplay(config.line_item_display || DEFAULT_LINE_ITEM_DISPLAY);
-      setEmailRecipientConfig(
-        config.email_recipient_config || DEFAULT_EMAIL_RECIPIENT_CONFIG
-      );
     }
   }, [config]);
+
+  // Normalized current form state for dirty check (email uses default_email: null like save payload)
+  const currentFormSnapshot = useMemo(
+    (): TemplateFormSnapshot => ({
+      serviceAddressConfig,
+      billingAddressConfig,
+      lineItemDisplay,
+      emailRecipientConfig: { ...emailRecipientConfig, default_email: null },
+    }),
+    [
+      serviceAddressConfig,
+      billingAddressConfig,
+      lineItemDisplay,
+      emailRecipientConfig,
+    ],
+  );
+  const hasTemplateUnsaved =
+    initialTemplateSnapshot !== null &&
+    JSON.stringify(currentFormSnapshot) !==
+      JSON.stringify(initialTemplateSnapshot);
 
   const handleSave = async () => {
     if (!config) return;
@@ -155,7 +192,12 @@ export default function InvoiceTemplateSettings(
         const errorElement = document.querySelector(
           `[data-error-field="${firstErrorKey}"]`
         );
-        errorElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (
+          errorElement &&
+          typeof errorElement.scrollIntoView === "function"
+        ) {
+          errorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
       }
       return;
     }
@@ -166,6 +208,13 @@ export default function InvoiceTemplateSettings(
       await updateConfig(configToSave);
       // Clear errors on successful save
       setValidationErrors({});
+      // Align "initial" with saved state so form is no longer dirty
+      setInitialTemplateSnapshot({
+        serviceAddressConfig: configToSave.service_address_config,
+        billingAddressConfig: configToSave.billing_address_config,
+        lineItemDisplay: configToSave.line_item_display,
+        emailRecipientConfig: configToSave.email_recipient_config,
+      });
       // Show success message
       setSaveSuccess(true);
       // Hide success message after 3 seconds
@@ -885,37 +934,44 @@ export default function InvoiceTemplateSettings(
         </Card>
       )}
 
-      {/* Save Button */}
-      <div className="flex justify-end gap-2">
-        {Object.keys(validationErrors).length > 0 && (
-          <p className="text-sm text-muted-foreground self-center">
-            {Object.keys(validationErrors).length} error
-            {Object.keys(validationErrors).length !== 1 ? "s" : ""} to fix
-          </p>
-        )}
-        <Button
-          onClick={handleSave}
-          disabled={
-            saving || !config || Object.keys(validationErrors).length > 0
-          }
-          aria-label="Save invoice template settings"
-        >
-          {saving ? (
-            <>
-              <Loader2
-                className="mr-2 h-4 w-4 animate-spin"
-                aria-hidden="true"
-              />
-              Saving...
-            </>
+      {/* Save row: only when dirty, matching GST/Bank layout */}
+      {hasTemplateUnsaved && (
+        <div className="flex items-center justify-between pt-4 border-t">
+          {Object.keys(validationErrors).length > 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {Object.keys(validationErrors).length} error
+              {Object.keys(validationErrors).length !== 1 ? "s" : ""} to fix
+            </p>
           ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" aria-hidden="true" />
-              Save Changes
-            </>
+            <p className="text-sm text-muted-foreground">
+              You have unsaved changes
+            </p>
           )}
-        </Button>
-      </div>
+          <Button
+            onClick={handleSave}
+            disabled={
+              saving || !config || Object.keys(validationErrors).length > 0
+            }
+            aria-label="Save invoice template settings"
+            className="cursor-pointer"
+          >
+            {saving ? (
+              <>
+                <Loader2
+                  className="mr-2 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" aria-hidden="true" />
+                Save Invoice Template Settings
+              </>
+            )}
+          </Button>
+        </div>
+      )}
 
       {/* Fixed Preview Invoice Header Button */}
       <div className="fixed bottom-6 right-6 z-50">
