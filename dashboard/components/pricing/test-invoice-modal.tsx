@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocations } from "@/hooks/use-locations";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
+import { useMutuallyExclusiveFields } from "@/hooks/use-mutually-exclusive-fields";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
@@ -370,6 +371,32 @@ export default function TestInvoiceModal({
     return sectionedFields;
   }, [fieldConfigs, sections]);
 
+  const updateFieldValue = useCallback(
+    (fieldId: string, value: unknown) => {
+      setFieldValues((prev) => ({
+        ...prev,
+        [fieldId]: value as
+          | string
+          | number
+          | boolean
+          | string[]
+          | GroupedBreakdownItem[],
+      }));
+    },
+    []
+  );
+
+  const {
+    groupedFields,
+    selectedClusters,
+    setSelectedClusters,
+    handleClusterSelect,
+    fieldsToRender,
+    getClustersForGroup,
+    getFieldCluster,
+    formatClusterName,
+  } = useMutuallyExclusiveFields(formFields, updateFieldValue);
+
   // Reset when modal opens/closes, and cleanup test data
   useEffect(() => {
     if (!open) {
@@ -409,6 +436,7 @@ export default function TestInvoiceModal({
       setStartDateTime("");
       setFinishDateTime(getLocalDateTimeString());
       setFieldValues({});
+      setSelectedClusters({});
       setCalculation(null);
       setCreatedJobId(null);
       setCreatedInvoiceId(null);
@@ -486,8 +514,8 @@ export default function TestInvoiceModal({
         _test_created_at: new Date().toISOString(),
       };
 
-      // Validate required fields using shared utility
-      const validationErrors = validateFields(formFields, fieldValues);
+      // Validate required fields using shared utility (only fields to render, honouring mutual exclusion)
+      const validationErrors = validateFields(fieldsToRender, fieldValues);
       if (Object.keys(validationErrors).length > 0) {
         const missingFields = Object.values(validationErrors);
         toast.error(
@@ -496,8 +524,8 @@ export default function TestInvoiceModal({
         return;
       }
 
-      // Build submission data using shared utility
-      const builtSubmissionData = buildSubmissionData(formFields, fieldValues);
+      // Build submission data using shared utility (only fields to render)
+      const builtSubmissionData = buildSubmissionData(fieldsToRender, fieldValues);
       Object.assign(submissionData, builtSubmissionData);
 
       // Add start_time if provided (store as ISO datetime string)
@@ -565,7 +593,7 @@ export default function TestInvoiceModal({
     fieldValues,
     workers,
     calculateInvoice,
-    formFields,
+    fieldsToRender,
     isLocationRequired,
     startDateTime,
     finishDateTime,
@@ -742,18 +770,128 @@ export default function TestInvoiceModal({
                   </div>
                 </div>
 
-                {formFields.length > 0 ? (
+                {groupedFields.groups.size > 0 ||
+                groupedFields.regularFields.length > 0 ? (
                   <div className="space-y-6">
                     <div className="space-y-1">
                       <Label className="text-base font-semibold">
                         Field Values
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        Enter sample values to test your pricing configuration
+                        Enter sample values to test your pricing configuration.
+                        For mutually exclusive groups, select one option first.
                       </p>
                     </div>
                     <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                      {formFields.map((field) => (
+                      {/* Mutual exclusion groups: cluster dropdown then fields for selected cluster */}
+                      {Array.from(groupedFields.groups.keys()).map((groupId) => {
+                        const fields = groupedFields.groups.get(groupId) || [];
+                        const clusters = getClustersForGroup(groupId);
+                        const selectedCluster = selectedClusters[groupId] ?? null;
+                        const firstField = fields[0];
+                        const isDefaultGroup =
+                          groupId === "default_exclusive_group";
+                        const groupLabel =
+                          isDefaultGroup &&
+                          settings?.default_exclusive_group_label
+                            ? settings.default_exclusive_group_label
+                            : firstField.mutually_exclusive_group
+                                ?.split("_")
+                                .map(
+                                  (word: string) =>
+                                    word.charAt(0).toUpperCase() +
+                                    word.slice(1).toLowerCase()
+                                )
+                                .join(" ") || "Select Option";
+
+                        return (
+                          <div key={groupId} className="space-y-3">
+                            <div className="space-y-2">
+                              <Label htmlFor={`group-${groupId}`}>
+                                {groupLabel}
+                              </Label>
+                              <Select
+                                value={selectedCluster || ""}
+                                onValueChange={(value) =>
+                                  handleClusterSelect(groupId, value || null)
+                                }
+                              >
+                                <SelectTrigger id={`group-${groupId}`}>
+                                  <SelectValue
+                                    placeholder={`Select ${groupLabel}`}
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {clusters.map((clusterId) => (
+                                    <SelectItem
+                                      key={clusterId}
+                                      value={clusterId}
+                                    >
+                                      {formatClusterName(clusterId)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {selectedCluster &&
+                              fields
+                                .filter(
+                                  (field) =>
+                                    getFieldCluster(field) === selectedCluster
+                                )
+                                .map((field) => (
+                                  <div
+                                    key={field.id}
+                                    className="space-y-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
+                                  >
+                                    {field.field_type ===
+                                    "grouped_breakdown" ? (
+                                      <GroupedBreakdownField
+                                        field={field}
+                                        value={
+                                          (fieldValues[
+                                            field.id
+                                          ] as GroupedBreakdownItem[]) || []
+                                        }
+                                        onChange={(items) =>
+                                          setFieldValues((prev) => ({
+                                            ...prev,
+                                            [field.id]: items,
+                                          }))
+                                        }
+                                      />
+                                    ) : (
+                                      <FieldRenderer
+                                        field={field}
+                                        value={(() => {
+                                          const val = fieldValues[field.id];
+                                          return Array.isArray(val) &&
+                                            val.length > 0 &&
+                                            typeof val[0] === "object" &&
+                                            "brand" in (val[0] as object)
+                                            ? undefined
+                                            : (val as
+                                                | string
+                                                | number
+                                                | boolean
+                                                | string[]
+                                                | undefined);
+                                        })()}
+                                        onChange={(val) =>
+                                          setFieldValues((prev) => ({
+                                            ...prev,
+                                            [field.id]: val,
+                                          }))
+                                        }
+                                      />
+                                    )}
+                                  </div>
+                                ))}
+                          </div>
+                        );
+                      })}
+                      {/* Regular fields (not in mutually exclusive groups) */}
+                      {groupedFields.regularFields.map((field) => (
                         <div
                           key={field.id}
                           className="space-y-2 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
@@ -778,11 +916,10 @@ export default function TestInvoiceModal({
                               field={field}
                               value={(() => {
                                 const val = fieldValues[field.id];
-                                // Exclude GroupedBreakdownItem[] for non-grouped_breakdown fields
                                 return Array.isArray(val) &&
                                   val.length > 0 &&
                                   typeof val[0] === "object" &&
-                                  "brand" in val[0]
+                                  "brand" in (val[0] as object)
                                   ? undefined
                                   : (val as
                                       | string

@@ -21,6 +21,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocations } from "@/hooks/use-locations";
+import { useMutuallyExclusiveFields } from "@/hooks/use-mutually-exclusive-fields";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
@@ -338,10 +339,57 @@ export default function EditJobDialog({
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Track selected clusters for mutual exclusion groups
-  const [selectedClusters, setSelectedClusters] = useState<
-    Record<string, string | null>
-  >({});
+
+  // Check if location is required
+  const locationRequired = settings?.use_predefined_locations ?? true;
+
+  // Filter active field configs
+  const activeFieldConfigs = useMemo(
+    () => fieldConfigs.filter((fc) => fc.active && !fc.archived_at),
+    [fieldConfigs]
+  );
+
+  // Check if a field should be visible based on conditional logic
+  const isFieldVisible = useCallback(
+    (field: FieldConfig): boolean => {
+      return evaluateCondition(
+        field.conditional_logic,
+        fieldValues,
+        activeFieldConfigs
+      );
+    },
+    [fieldValues, activeFieldConfigs]
+  );
+
+  // Get visible fields
+  const visibleFields = useMemo(
+    () => activeFieldConfigs.filter(isFieldVisible),
+    [activeFieldConfigs, isFieldVisible]
+  );
+
+  const updateFieldValue = useCallback(
+    (fieldId: string, value: unknown) => {
+      setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
+      setErrors((prev) => {
+        if (!prev[fieldId]) return prev;
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+    },
+    []
+  );
+
+  const {
+    groupedFields,
+    selectedClusters,
+    setSelectedClusters,
+    handleClusterSelect,
+    fieldsToRender,
+    getClustersForGroup,
+    getFieldCluster,
+    formatClusterName,
+  } = useMutuallyExclusiveFields(visibleFields, updateFieldValue);
 
   // Initialize form when dialog opens with job data
   useEffect(() => {
@@ -433,152 +481,7 @@ export default function EditJobDialog({
       setErrors({});
       setSelectedClusters({});
     }
-  }, [open, job, fieldConfigs]);
-
-  // Check if location is required
-  const locationRequired = settings?.use_predefined_locations ?? true;
-
-  // Filter active field configs
-  const activeFieldConfigs = useMemo(
-    () => fieldConfigs.filter((fc) => fc.active && !fc.archived_at),
-    [fieldConfigs]
-  );
-
-  // Check if a field should be visible based on conditional logic
-  const isFieldVisible = useCallback(
-    (field: FieldConfig): boolean => {
-      return evaluateCondition(
-        field.conditional_logic,
-        fieldValues,
-        activeFieldConfigs
-      );
-    },
-    [fieldValues, activeFieldConfigs]
-  );
-
-  // Get visible fields
-  const visibleFields = useMemo(
-    () => activeFieldConfigs.filter(isFieldVisible),
-    [activeFieldConfigs, isFieldVisible]
-  );
-
-  // Helper: Get cluster identifier for a field
-  const getFieldCluster = useCallback((field: FieldConfig): string | null => {
-    return field.group_cluster || null;
-  }, []);
-
-  // Group fields by mutually exclusive groups
-  const groupedFields = useMemo(() => {
-    const groups = new Map<string, FieldConfig[]>();
-    const regularFields: FieldConfig[] = [];
-
-    visibleFields.forEach((field) => {
-      if (field.mutually_exclusive_group) {
-        const groupId = field.mutually_exclusive_group;
-        if (!groups.has(groupId)) {
-          groups.set(groupId, []);
-        }
-        groups.get(groupId)!.push(field);
-      } else {
-        regularFields.push(field);
-      }
-    });
-
-    return { groups, regularFields };
-  }, [visibleFields]);
-
-  // Get unique clusters for each mutual exclusion group
-  const getClustersForGroup = useCallback(
-    (groupId: string): string[] => {
-      const fields = groupedFields.groups.get(groupId) || [];
-      const clusters = new Set<string>();
-      fields.forEach((field) => {
-        const cluster = getFieldCluster(field);
-        if (cluster) {
-          clusters.add(cluster);
-        }
-      });
-      return Array.from(clusters).sort();
-    },
-    [groupedFields.groups, getFieldCluster]
-  );
-
-  // Format cluster name from snake_case to Title Case
-  const formatClusterName = useCallback((clusterId: string): string => {
-    return clusterId
-      .split("_")
-      .map(
-        (word: string) =>
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      )
-      .join(" ");
-  }, []);
-
-  // Update field value
-  const updateFieldValue = useCallback(
-    (fieldId: string, value: unknown) => {
-      setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
-      // Clear error for this field
-      if (errors[fieldId]) {
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next[fieldId];
-          return next;
-        });
-      }
-    },
-    [errors]
-  );
-
-  // Handle cluster selection
-  const handleClusterSelect = useCallback(
-    (groupId: string, clusterId: string | null) => {
-      setSelectedClusters((prev) => ({
-        ...prev,
-        [groupId]: clusterId,
-      }));
-
-      // Clear values from other clusters in the same group
-      const fields = groupedFields.groups.get(groupId) || [];
-      fields.forEach((field) => {
-        const fieldCluster = getFieldCluster(field);
-        if (fieldCluster !== clusterId) {
-          // Clear the field value based on its type
-          if (field.field_type === "boolean") {
-            updateFieldValue(field.id, false);
-          } else if (field.field_type === "number") {
-            updateFieldValue(field.id, 0);
-          } else if (field.field_type === "grouped_breakdown") {
-            updateFieldValue(field.id, []);
-          } else {
-            updateFieldValue(field.id, "");
-          }
-        }
-      });
-    },
-    [groupedFields.groups, getFieldCluster, updateFieldValue]
-  );
-
-  // Get fields to render (only from selected clusters)
-  const fieldsToRender = useMemo(() => {
-    const fields: FieldConfig[] = [];
-
-    // Add regular fields (not in mutually exclusive groups)
-    fields.push(...groupedFields.regularFields);
-
-    // Add fields from selected clusters
-    groupedFields.groups.forEach((groupFields, groupId) => {
-      const selectedCluster = selectedClusters[groupId];
-      if (selectedCluster) {
-        const clusterFields = groupFields.filter(
-          (field) => getFieldCluster(field) === selectedCluster
-        );
-        fields.push(...clusterFields);
-      }
-    });
-
-    return fields;
-  }, [groupedFields, selectedClusters, getFieldCluster]);
+  }, [open, job, fieldConfigs, setSelectedClusters]);
 
   // Toggle worker selection
   const toggleWorker = useCallback((workerId: string) => {

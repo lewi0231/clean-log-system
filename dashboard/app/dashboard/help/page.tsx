@@ -167,6 +167,46 @@ const faqEntries = [
     ),
   },
   {
+    id: "field-group-settings-mutual-exclusion",
+    question: "How do field group settings and mutual exclusion work?",
+    answer: (
+      <>
+        <strong>Field group settings</strong> on the{" "}
+        <Link
+          href="/dashboard/mobile-config"
+          className="font-medium text-primary hover:underline"
+        >
+          Mobile Config
+        </Link>{" "}
+        page let you define options that workers can choose from in the job
+        form. Only one option can be selected at a time—that’s the{" "}
+        <strong>mutual exclusion</strong> logic.
+        <br />
+        <br />
+        <strong>Our approach:</strong> We use a single mutually exclusive
+        group. Within it, each selectable &quot;option&quot; is a{" "}
+        <strong>cluster</strong>. Fields that share the same cluster are
+        shown together when that option is chosen—for example, &quot;Wiped&quot;
+        and &quot;Soaped&quot; might be two fields in the cluster &quot;wiped
+        + soaped details&quot;, so the worker picks one option and sees both
+        fields as one choice. All clusters together form one set: the worker
+        selects exactly one option from that set.
+        <br />
+        <br />
+        <strong>How to use it:</strong> (1) Open Mobile Config and click{" "}
+        <strong>Field Group Settings</strong> at the top to create option
+        names (clusters) if you need new ones. (2) In the form builder, open
+        a field’s settings (gear icon), expand &quot;Mutually Exclusive
+        Cluster&quot;, and assign the field to an existing cluster or type a
+        new cluster name. Fields in the same cluster act as one option;
+        different clusters are the different choices the worker can pick.
+        Clusters you create in Field Group Settings appear in the dropdown
+        when assigning fields. You can also type a new cluster name directly
+        in a field’s settings and it will be created.
+      </>
+    ),
+  },
+  {
     id: "invoice-due-days",
     question: "What does 'Default Invoice Due Days' mean?",
     answer: (
