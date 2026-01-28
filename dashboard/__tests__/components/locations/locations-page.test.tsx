@@ -1,6 +1,5 @@
 import LocationsPage from "@/app/dashboard/locations/page";
 import { useLocations } from "@/hooks/use-locations";
-import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import useOrganization from "@/hooks/useOrganization";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -53,10 +52,6 @@ vi.mock("@/hooks/use-locations", () => ({
   useLocations: vi.fn(),
 }));
 
-vi.mock("@/hooks/use-organization-settings", () => ({
-  useOrganizationSettings: vi.fn(),
-}));
-
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     functions: {
@@ -71,16 +66,6 @@ vi.mock("@/lib/logger", () => ({
     error: vi.fn(),
   },
 }));
-
-vi.mock("@tanstack/react-query", async () => {
-  const actual = await vi.importActual("@tanstack/react-query");
-  return {
-    ...actual,
-    useQueryClient: () => ({
-      invalidateQueries: vi.fn(),
-    }),
-  };
-});
 
 describe("LocationsPage", () => {
   const mockCreateLocation = vi.fn();
@@ -102,18 +87,10 @@ describe("LocationsPage", () => {
     deleteLocation: mockDeleteLocation,
   };
 
-  const defaultUseOrganizationSettings = {
-    settings: { use_predefined_locations: true },
-    loading: false,
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useOrganization).mockReturnValue(defaultUseOrganization);
     vi.mocked(useLocations).mockReturnValue(defaultUseLocations);
-    vi.mocked(useOrganizationSettings).mockReturnValue(
-      defaultUseOrganizationSettings
-    );
   });
 
   describe("Rendering", () => {
@@ -199,83 +176,6 @@ describe("LocationsPage", () => {
       expect(
         screen.getByRole("tab", { name: /customer locations/i })
       ).toBeInTheDocument();
-    });
-  });
-
-  describe("Location Settings", () => {
-    it("should display location settings card", () => {
-      render(<LocationsPage />, { wrapper: createWrapper() });
-
-      expect(
-        screen.getByText("Location Settings")
-      ).toBeInTheDocument();
-    });
-
-    it("should toggle predefined locations setting", async () => {
-      const { supabase } = await import("@/lib/supabase");
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: {},
-        error: null,
-      });
-
-      render(<LocationsPage />, { wrapper: createWrapper() });
-
-      // Expand settings if collapsed - find by the card title
-      const settingsTrigger = screen.getByText("Location Settings");
-      fireEvent.click(settingsTrigger);
-
-      await waitFor(() => {
-        // Use the switch id to find it specifically
-        const switchElement = screen.getByRole("switch", { name: /customer locations/i });
-        expect(switchElement).toBeInTheDocument();
-      });
-
-      const switchElement = screen.getByRole("switch", { name: /customer locations/i });
-      fireEvent.click(switchElement);
-
-      await waitFor(() => {
-        expect(supabase.functions.invoke).toHaveBeenCalledWith(
-          "update-organization-settings",
-          expect.objectContaining({
-            body: expect.objectContaining({
-              use_predefined_locations: false,
-            }),
-          })
-        );
-      });
-    });
-
-    it("should handle settings API error", async () => {
-      const { supabase } = await import("@/lib/supabase");
-      vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: null,
-        error: { message: "Update failed", status: 500 },
-      });
-
-      // Mock alert
-      const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-
-      render(<LocationsPage />, { wrapper: createWrapper() });
-
-      const settingsTrigger = screen.getByText("Location Settings");
-      fireEvent.click(settingsTrigger);
-
-      await waitFor(() => {
-        // Use the switch role to find it specifically
-        const switchElement = screen.getByRole("switch", { name: /customer locations/i });
-        expect(switchElement).toBeInTheDocument();
-      });
-
-      const switchElement = screen.getByRole("switch", { name: /customer locations/i });
-      fireEvent.click(switchElement);
-
-      await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(
-          "Failed to update setting. Please try again."
-        );
-      });
-
-      alertSpy.mockRestore();
     });
   });
 

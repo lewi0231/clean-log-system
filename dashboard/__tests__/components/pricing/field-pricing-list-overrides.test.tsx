@@ -34,6 +34,31 @@ function createWrapper() {
   return Wrapper;
 }
 
+function createPricingScopeMock(overrides: {
+  showBothContexts?: boolean;
+  pricingContext?: "customer" | "worker";
+} = {}) {
+  return {
+    locationNodeId: null,
+    setLocationNodeId: vi.fn(),
+    locationId: null,
+    setLocationId: vi.fn(),
+    effectiveDate: null,
+    setEffectiveDate: vi.fn(),
+    expirationDate: null,
+    setExpirationDate: vi.fn(),
+    selectedFieldId: null,
+    setSelectedFieldId: vi.fn(),
+    pricingHistoryRefreshToken: 0,
+    refreshPricingHistory: vi.fn(),
+    pricingContext: (overrides.pricingContext ?? "customer") as "customer" | "worker",
+    setPricingContext: vi.fn(),
+    showBothContexts: overrides.showBothContexts ?? false,
+    setShowBothContexts: vi.fn(),
+    fieldLabelLookup: {} as Record<string, string>,
+  };
+}
+
 describe("FieldPricingList - Location Overrides Context Separation", () => {
   const mockFieldConfig: FieldConfig = {
     id: "field-1",
@@ -133,20 +158,7 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
       refetch: vi.fn(),
     });
 
-    vi.mocked(usePricingScope).mockReturnValue({
-      locationNodeId: null,
-      setLocationNodeId: vi.fn(),
-      locationId: null,
-      setLocationId: vi.fn(),
-      effectiveDate: null,
-      setEffectiveDate: vi.fn(),
-      expirationDate: null,
-      setExpirationDate: vi.fn(),
-      selectedFieldId: null,
-      setSelectedFieldId: vi.fn(),
-      pricingHistoryRefreshToken: 0,
-      refreshPricingHistory: vi.fn(),
-    });
+    vi.mocked(usePricingScope).mockReturnValue(createPricingScopeMock());
 
     vi.mocked(useOrganizationCurrency).mockReturnValue({
       formatCurrency: (amount: number) => `$${amount.toFixed(2)}`,
@@ -200,10 +212,10 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
     render(
       <Wrapper>
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationId={null}
           locationHierarchyId={null}
-          pricingContext="customer"
-          showBothContexts={false}
           organizationId="org-1"
         />
       </Wrapper>
@@ -221,6 +233,10 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
   });
 
   it("should correctly separate customer and worker overrides when showBothContexts is true", () => {
+    vi.mocked(usePricingScope).mockReturnValue(
+      createPricingScopeMock({ showBothContexts: true }),
+    );
+
     const customerPricing1 = createMockFieldPricing(
       "customer-1",
       "loc-1",
@@ -257,10 +273,10 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
     render(
       <Wrapper>
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationId={null}
           locationHierarchyId={null}
-          pricingContext="customer"
-          showBothContexts={true}
           organizationId="org-1"
         />
       </Wrapper>

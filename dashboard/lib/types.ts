@@ -109,6 +109,9 @@ export interface OrganizationSettings {
   bank_transfer_account_name: string | null;
   show_bank_transfer_on_invoices: boolean;
   default_invoice_due_days: number;
+  gst_registered: boolean;
+  gst_inclusive: boolean;
+  gst_rate_percent: number;
 }
 
 export interface Job {
@@ -477,16 +480,21 @@ export interface InvoiceEmailRecipientConfig {
     | "hierarchy_billing_email"
     | "location_contact_email";
   form_field_email: string | null; // Field config ID that contains email for jobs without location
-  default_email: string | null; // Organization default email for invoices (fallback)
+  /** @deprecated No longer used; fallback removed. Kept for backward compatibility. */
+  default_email?: string | null;
 }
 
 export interface InvoiceTemplateConfig {
   id: string;
   organization_id: string;
+  /** @deprecated Title is now derived from GST registration status. Always sends "Tax Invoice" as default; InvoiceDocument determines actual title. */
   invoice_title: string;
+  /** @deprecated Logo is always shown when org has one. Kept for backward compatibility. */
   show_logo: boolean;
+  /** @deprecated ABN is always shown when org has one. Kept for backward compatibility. */
   show_abn: boolean;
-  bill_to_fields: string[]; // Array of field_config names to display in Bill To section (legacy/fallback)
+  /** @deprecated Use service_address_config.form_fields instead. Kept for backward compatibility/migration. */
+  bill_to_fields: string[];
   service_address_config?: ServiceAddressConfig;
   billing_address_config?: BillingAddressConfig;
   email_recipient_config?: InvoiceEmailRecipientConfig;

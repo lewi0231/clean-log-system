@@ -29,10 +29,9 @@ export const serviceAddressConfigSchema = z
     })
     .refine(
         (data) => {
-            // If source is "location" or "auto", location_fields should be provided
+            // If source is "location", location_fields must be provided
             if (
-                (data.source === SERVICE_ADDRESS_SOURCE.LOCATION ||
-                    data.source === SERVICE_ADDRESS_SOURCE.AUTO) &&
+                data.source === SERVICE_ADDRESS_SOURCE.LOCATION &&
                 (!data.location_fields || data.location_fields.length === 0)
             ) {
                 return false;
@@ -41,16 +40,15 @@ export const serviceAddressConfigSchema = z
         },
         {
             message:
-                "Location fields are required when source is 'location' or 'auto'",
+                "Location fields are required when source is 'location'",
             path: ["location_fields"],
         },
     )
     .refine(
         (data) => {
-            // If source is "form_fields" or "auto", form_fields should be provided
+            // If source is "form_fields", form_fields must be provided
             if (
-                (data.source === SERVICE_ADDRESS_SOURCE.FORM_FIELDS ||
-                    data.source === SERVICE_ADDRESS_SOURCE.AUTO) &&
+                data.source === SERVICE_ADDRESS_SOURCE.FORM_FIELDS &&
                 (!data.form_fields || data.form_fields.length === 0)
             ) {
                 return false;
@@ -59,8 +57,24 @@ export const serviceAddressConfigSchema = z
         },
         {
             message:
-                "Form fields are required when source is 'form_fields' or 'auto'",
+                "Form fields are required when source is 'form_fields'",
             path: ["form_fields"],
+        },
+    )
+    .refine(
+        (data) => {
+            // If source is "auto", at least one of location_fields or form_fields should be provided
+            if (data.source === SERVICE_ADDRESS_SOURCE.AUTO) {
+                const hasLocationFields = data.location_fields && data.location_fields.length > 0;
+                const hasFormFields = data.form_fields && data.form_fields.length > 0;
+                return hasLocationFields || hasFormFields;
+            }
+            return true;
+        },
+        {
+            message:
+                "At least location fields or form fields must be configured when source is 'auto'",
+            path: ["source"],
         },
     );
 
@@ -92,11 +106,8 @@ export const emailRecipientConfigSchema = z.object({
         EMAIL_RECIPIENT_SOURCE.LOCATION_CONTACT_EMAIL,
     ]),
     form_field_email: z.string().nullable(),
-    default_email: z
-        .string()
-        .email("Invalid email format")
-        .nullable()
-        .or(z.literal("")),
+    // default_email removed: fallback not used; always null when saving
+    default_email: z.string().email().nullable().optional(),
 });
 
 export type EmailRecipientConfigInput = z.infer<

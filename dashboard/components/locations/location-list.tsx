@@ -44,7 +44,7 @@ interface LocationListProps {
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
       fixed_price_currency?: string | null;
-    }
+    },
   ) => Promise<void>;
 }
 
@@ -58,7 +58,7 @@ export default function LocationList({
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(
-    null
+    null,
   );
 
   const handleEdit = (location: Location) => {
@@ -86,7 +86,7 @@ export default function LocationList({
       fixed_worker_payment?: number | null;
       fixed_price_currency?: string | null;
     },
-    locationId?: string
+    locationId?: string,
   ) => {
     setIsFormOpen(false);
     if (locationId && editingLocation) {
@@ -112,12 +112,12 @@ export default function LocationList({
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Region / Company</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Address</TableHead>
               <TableHead>Contact Person</TableHead>
               <TableHead>Phone</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -130,28 +130,11 @@ export default function LocationList({
               </TableRow>
             ) : (
               locations.map((location) => (
-                <TableRow key={location.id}>
+                <TableRow
+                  key={location.id}
+                  className="group hover:bg-muted/50 transition-colors"
+                >
                   <TableCell className="font-medium">{location.name}</TableCell>
-                  <TableCell>
-                    {location.hierarchy_parent ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
-                          {location.hierarchy_parent.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {location.hierarchy_parent.type}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-xs">
-                        Org default
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{location.email}</TableCell>
-                  <TableCell>{location.address || "-"}</TableCell>
-                  <TableCell>{location.contact_person || "-"}</TableCell>
-                  <TableCell>{location.phone || "-"}</TableCell>
                   <TableCell>
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
@@ -163,13 +146,34 @@ export default function LocationList({
                       {location.active ? "Active" : "Inactive"}
                     </span>
                   </TableCell>
+                  <TableCell>
+                    {location.hierarchy_parent ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
+                          {location.hierarchy_parent.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {location.hierarchy_parent.type}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-center">-</div>
+                    )}
+                  </TableCell>
+                  <TableCell>{location.email}</TableCell>
+                  <TableCell>{location.address || "-"}</TableCell>
+                  <TableCell>{location.contact_person || "-"}</TableCell>
+                  <TableCell className="text-center">
+                    {location.phone || "-"}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(location)}
                         className="cursor-pointer"
+                        aria-label={`Edit ${location.name}`}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -178,6 +182,7 @@ export default function LocationList({
                         size="icon"
                         onClick={() => setDeletingLocation(location)}
                         className="cursor-pointer"
+                        aria-label={`Delete ${location.name}`}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

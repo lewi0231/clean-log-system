@@ -137,7 +137,7 @@ describe("LocationList", () => {
       expect(screen.getByText("region")).toBeInTheDocument();
     });
 
-    it("should display 'Org default' when no hierarchy parent", () => {
+    it("should display hyphen when no hierarchy parent", () => {
       const location = createMockLocation({
         hierarchy_parent: null,
         hierarchy_parent_id: null,
@@ -147,7 +147,7 @@ describe("LocationList", () => {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getByText("Org default")).toBeInTheDocument();
+      expect(screen.getByText("-")).toBeInTheDocument();
     });
 
     it("should display active status badge", () => {
@@ -172,6 +172,7 @@ describe("LocationList", () => {
 
     it("should handle missing optional fields", () => {
       const location = createMockLocation({
+        hierarchy_parent: undefined,
         address: null,
         contact_person: null,
         phone: null,
@@ -181,7 +182,8 @@ describe("LocationList", () => {
         wrapper: createWrapper(),
       });
 
-      expect(screen.getAllByText("-")).toHaveLength(3);
+      // Region/Company, Address, Contact Person, Phone all show "-" when empty
+      expect(screen.getAllByText("-")).toHaveLength(4);
     });
   });
 

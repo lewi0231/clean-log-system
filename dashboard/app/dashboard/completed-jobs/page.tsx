@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { CompletedJobsSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
+import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,6 +30,7 @@ export default function CompletedJobsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const { fieldConfigs } = useFieldConfigs();
   const [showTests, setShowTests] = useState(false);
   const {
     jobs,
@@ -230,6 +232,7 @@ export default function CompletedJobsPage() {
           getJobEdits={getJobEdits}
           sendFeedbackEmail={sendFeedbackEmail}
           organizationId={organizationId}
+          fieldConfigs={fieldConfigs}
         />
       </div>
 
@@ -241,6 +244,7 @@ export default function CompletedJobsPage() {
         }}
         createJob={createJob}
         organizationId={organizationId}
+        fieldConfigs={fieldConfigs}
       />
 
       <CalculatePaymentDialog

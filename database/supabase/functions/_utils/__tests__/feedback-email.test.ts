@@ -189,7 +189,7 @@ Deno.test("P0: should handle form field email source", async () => {
   assertEquals(email, "form@example.com");
 });
 
-Deno.test("P0: should fallback to default email", async () => {
+Deno.test("P0: should return null when no email source (default_email deprecated)", async () => {
   const mockSupabase = createMockSupabase();
   const jobContext: JobContext = {
     location_id: null,
@@ -209,7 +209,8 @@ Deno.test("P0: should fallback to default email", async () => {
     config,
   );
 
-  assertEquals(email, "default@example.com");
+  // default_email is deprecated and fallback was removed; no source => null
+  assertEquals(email, null);
 });
 
 // Test Mode Tests

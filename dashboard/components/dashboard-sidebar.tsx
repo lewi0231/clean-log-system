@@ -1,5 +1,6 @@
 "use client";
 
+import { BetaFeedbackTrigger } from "@/components/beta-feedback/beta-feedback-trigger";
 import { OnboardingChecklistButton } from "@/components/onboarding/onboarding-checklist-button";
 import { cn } from "@/lib/utils";
 import {
@@ -7,11 +8,12 @@ import {
   Clipboard,
   DollarSign,
   FileText,
+  HelpCircle,
   Settings,
   Smartphone,
   Star,
   Users,
-  Wallet
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -65,7 +67,11 @@ const navigation = [
   //   href: "/dashboard/visualizations",
   //   icon: ChartBar,
   // },
-  // System Settings
+  {
+    name: "Help",
+    href: "/dashboard/help",
+    icon: HelpCircle,
+  },
   {
     name: "Settings",
     href: "/dashboard/settings",
@@ -99,7 +105,7 @@ export default function DashboardSidebar() {
                 "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300",
                 isActive
                   ? "bg-sidebar-primary/20 text-sidebar-primary border border-sidebar-primary/50"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/10 hover:text-sidebar-foreground",
               )}
             >
               <item.icon className="w-5 h-5" />
@@ -111,6 +117,11 @@ export default function DashboardSidebar() {
           );
         })}
       </nav>
+
+      {/* Beta feedback - always available for in-context feedback */}
+      <div className="pt-4 border-t border-sidebar-border">
+        <BetaFeedbackTrigger />
+      </div>
     </aside>
   );
 }

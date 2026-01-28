@@ -32,11 +32,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { useBasePricing } from "@/hooks/use-base-pricing";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
@@ -57,6 +57,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 interface BasePricingEditorProps {
+  fieldConfigs: FieldConfig[];
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
@@ -64,13 +65,13 @@ interface BasePricingEditorProps {
 }
 
 export default function BasePricingEditor({
+  fieldConfigs,
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
   organizationId,
 }: BasePricingEditorProps) {
   const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
-  const { fieldConfigs } = useFieldConfigs();
   const { workers } = useWorkers();
   const hasWorkers = workers && workers.length > 0;
   const {

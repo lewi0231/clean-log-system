@@ -29,7 +29,8 @@ export interface InvoiceEmailRecipientConfig {
     | "hierarchy_billing_email"
     | "location_contact_email";
   form_field_email: string | null;
-  default_email: string | null;
+  /** @deprecated No longer used; fallback removed. Kept for backward compatibility. */
+  default_email?: string | null;
 }
 
 export interface JobContext {
@@ -143,14 +144,6 @@ export async function getInvoiceEmailRecipient(
           return email;
         }
       }
-    }
-  }
-
-  // Fallback to default email
-  if (config.default_email) {
-    const defaultEmail = config.default_email.trim();
-    if (isValidEmail(defaultEmail)) {
-      return defaultEmail;
     }
   }
 

@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
+import { useMutuallyExclusiveFields } from "@/hooks/use-mutually-exclusive-fields";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
@@ -42,6 +42,8 @@ interface CreateJobDialogProps {
   onSuccess?: () => void;
   createJob: (request: CreateJobRequest) => Promise<Job>;
   organizationId: string | null;
+  /** Field configs from the page (avoids useFieldConfigs in nested components). */
+  fieldConfigs: FieldConfig[];
 }
 
 // Helper to evaluate conditional logic
@@ -321,15 +323,10 @@ export default function CreateJobDialog({
   onSuccess,
   createJob,
   organizationId,
+  fieldConfigs,
 }: CreateJobDialogProps) {
   const { settings } = useOrganizationSettings();
   const [locationId, setLocationId] = useState<string>("");
-  // Normalize locationId: treat empty string as null
-  const normalizedLocationId =
-    locationId && locationId.trim() !== "" ? locationId : null;
-  const { fieldConfigs } = useFieldConfigs({
-    locationId: normalizedLocationId,
-  });
   const { locations } = useLocations();
   const { workers } = useWorkers();
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
@@ -340,23 +337,6 @@ export default function CreateJobDialog({
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Track selected clusters for mutual exclusion groups
-  const [selectedClusters, setSelectedClusters] = useState<
-    Record<string, string | null>
-  >({});
-
-  // Reset form when dialog opens/closes
-  useEffect(() => {
-    if (open) {
-      setLocationId("");
-      setSelectedWorkerIds([]);
-      setStartDateTime("");
-      setFinishDateTime(new Date().toISOString().slice(0, 16));
-      setFieldValues({});
-      setErrors({});
-      setSelectedClusters({});
-    }
-  }, [open]);
 
   // Check if location is required
   const locationRequired = settings?.use_predefined_locations ?? true;
@@ -385,123 +365,43 @@ export default function CreateJobDialog({
     [activeFieldConfigs, isFieldVisible],
   );
 
-  // Helper: Get cluster identifier for a field
-  const getFieldCluster = useCallback((field: FieldConfig): string | null => {
-    return field.group_cluster || null;
-  }, []);
-
-  // Group fields by mutually exclusive groups
-  const groupedFields = useMemo(() => {
-    const groups = new Map<string, FieldConfig[]>();
-    const regularFields: FieldConfig[] = [];
-
-    visibleFields.forEach((field) => {
-      if (field.mutually_exclusive_group) {
-        const groupId = field.mutually_exclusive_group;
-        if (!groups.has(groupId)) {
-          groups.set(groupId, []);
-        }
-        groups.get(groupId)!.push(field);
-      } else {
-        regularFields.push(field);
-      }
-    });
-
-    return { groups, regularFields };
-  }, [visibleFields]);
-
-  // Get unique clusters for each mutual exclusion group
-  const getClustersForGroup = useCallback(
-    (groupId: string): string[] => {
-      const fields = groupedFields.groups.get(groupId) || [];
-      const clusters = new Set<string>();
-      fields.forEach((field) => {
-        const cluster = getFieldCluster(field);
-        if (cluster) {
-          clusters.add(cluster);
-        }
-      });
-      return Array.from(clusters).sort();
-    },
-    [groupedFields.groups, getFieldCluster],
-  );
-
-  // Format cluster name from snake_case to Title Case
-  const formatClusterName = useCallback((clusterId: string): string => {
-    return clusterId
-      .split("_")
-      .map(
-        (word: string) =>
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
-      )
-      .join(" ");
-  }, []);
-
-  // Update field value
+  // Update field value (clears error for this field)
   const updateFieldValue = useCallback(
     (fieldId: string, value: unknown) => {
       setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
-      // Clear error for this field
-      if (errors[fieldId]) {
-        setErrors((prev) => {
-          const next = { ...prev };
-          delete next[fieldId];
-          return next;
-        });
-      }
-    },
-    [errors],
-  );
-
-  // Handle cluster selection
-  const handleClusterSelect = useCallback(
-    (groupId: string, clusterId: string | null) => {
-      setSelectedClusters((prev) => ({
-        ...prev,
-        [groupId]: clusterId,
-      }));
-
-      // Clear values from other clusters in the same group
-      const fields = groupedFields.groups.get(groupId) || [];
-      fields.forEach((field) => {
-        const fieldCluster = getFieldCluster(field);
-        if (fieldCluster !== clusterId) {
-          // Clear the field value based on its type
-          if (field.field_type === "boolean") {
-            updateFieldValue(field.id, false);
-          } else if (field.field_type === "number") {
-            updateFieldValue(field.id, 0);
-          } else if (field.field_type === "grouped_breakdown") {
-            updateFieldValue(field.id, []);
-          } else {
-            updateFieldValue(field.id, "");
-          }
-        }
+      setErrors((prev) => {
+        if (!prev[fieldId]) return prev;
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
       });
     },
-    [groupedFields.groups, getFieldCluster, updateFieldValue],
+    [],
   );
 
-  // Get fields to render (only from selected clusters)
-  const fieldsToRender = useMemo(() => {
-    const fields: FieldConfig[] = [];
+  const {
+    groupedFields,
+    selectedClusters,
+    setSelectedClusters,
+    handleClusterSelect,
+    fieldsToRender,
+    getClustersForGroup,
+    getFieldCluster,
+    formatClusterName,
+  } = useMutuallyExclusiveFields(visibleFields, updateFieldValue);
 
-    // Add regular fields (not in mutually exclusive groups)
-    fields.push(...groupedFields.regularFields);
-
-    // Add fields from selected clusters
-    groupedFields.groups.forEach((groupFields, groupId) => {
-      const selectedCluster = selectedClusters[groupId];
-      if (selectedCluster) {
-        const clusterFields = groupFields.filter(
-          (field) => getFieldCluster(field) === selectedCluster,
-        );
-        fields.push(...clusterFields);
-      }
-    });
-
-    return fields;
-  }, [groupedFields, selectedClusters, getFieldCluster]);
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setLocationId("");
+      setSelectedWorkerIds([]);
+      setStartDateTime("");
+      setFinishDateTime(new Date().toISOString().slice(0, 16));
+      setFieldValues({});
+      setErrors({});
+      setSelectedClusters({});
+    }
+  }, [open, setSelectedClusters]);
 
   // Toggle worker selection
   const toggleWorker = useCallback((workerId: string) => {

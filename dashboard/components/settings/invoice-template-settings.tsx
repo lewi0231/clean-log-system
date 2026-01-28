@@ -28,7 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
@@ -39,8 +39,6 @@ import {
   DEFAULT_LINE_ITEM_DISPLAY,
   DEFAULT_SERVICE_ADDRESS_CONFIG,
 } from "@/lib/constants/invoice-template-defaults";
-import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
 import type {
   BillingAddressConfig,
   InvoiceEmailRecipientConfig,
@@ -48,38 +46,35 @@ import type {
   ServiceAddressConfig,
 } from "@/lib/types";
 import { validateInvoiceTemplateConfig } from "@/lib/validations/invoice-template";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Eye,
-  Loader2,
-  Plus,
-  Save,
-  Trash2,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { InvoiceHeaderSettings } from "./invoice-template/InvoiceHeaderSettings";
+import { AlertCircle, Eye, Loader2, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface InvoiceTemplateSettingsProps {
-  organizationId: string | null;
+  /** Optional for backward compatibility; org is resolved via useOrganization in child hooks. */
+  organizationId?: string | null;
+  /** Field configs from the page (avoids useFieldConfigs in nested components). */
+  fieldConfigs: FieldConfig[];
+  fieldConfigsLoading: boolean;
 }
 
-export default function InvoiceTemplateSettings({
-  organizationId,
-}: InvoiceTemplateSettingsProps) {
+export default function InvoiceTemplateSettings(
+  props?: InvoiceTemplateSettingsProps,
+): React.ReactElement {
   const {
     config,
     loading: configLoading,
     updateConfig,
     error: configError,
   } = useInvoiceTemplateConfig();
-  const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
+  const fieldConfigs = props?.fieldConfigs ?? [];
+  const fieldConfigsLoading = props?.fieldConfigsLoading ?? false;
   const { locations, loading: locationsLoading } = useLocations();
   const { settings: orgSettings } = useOrganizationSettings();
   const hasLocations = locations && locations.length > 0;
-  const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [autoGenerateInvoices, setAutoGenerateInvoices] = useState(false);
+
+  // Track saving state per-section for visual feedback
+  const [savingSection, setSavingSection] = useState<string | null>(null);
 
   // Helper to normalize logo URL for display
   const normalizeLogoUrl = (url: string | null): string | null => {
@@ -94,147 +89,245 @@ export default function InvoiceTemplateSettings({
   const [validationErrors, setValidationErrors] = useState<
     Partial<Record<string, string>>
   >({});
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Local state for form
-  const [invoiceTitle, setInvoiceTitle] = useState<string>(
-    DEFAULT_INVOICE_TITLE
-  );
-  const [showLogo, setShowLogo] = useState(true);
-  const [showAbn, setShowAbn] = useState(true);
+  // Local state for form (invoice_title, show_logo, show_abn are no longer user-editable:
+  // title is derived from GST; logo/ABN always shown when present)
   const [serviceAddressConfig, setServiceAddressConfig] =
     useState<ServiceAddressConfig>(DEFAULT_SERVICE_ADDRESS_CONFIG);
   const [billingAddressConfig, setBillingAddressConfig] =
     useState<BillingAddressConfig>(DEFAULT_BILLING_ADDRESS_CONFIG);
   const [lineItemDisplay, setLineItemDisplay] = useState<LineItemDisplayConfig>(
-    DEFAULT_LINE_ITEM_DISPLAY
+    DEFAULT_LINE_ITEM_DISPLAY,
   );
   const [emailRecipientConfig, setEmailRecipientConfig] =
     useState<InvoiceEmailRecipientConfig>(DEFAULT_EMAIL_RECIPIENT_CONFIG);
 
-  // Initialize auto-generate invoices from organization settings
-  useEffect(() => {
-    if (orgSettings) {
-      setAutoGenerateInvoices(
-        orgSettings.auto_generate_invoices_immediately ?? false
-      );
-    }
-  }, [orgSettings]);
+  // Debounce ref for text inputs (description_format)
+  const descriptionFormatTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize form with config data
+  // Initialize form from config
   useEffect(() => {
     if (config) {
-      setInvoiceTitle(
-        (config.invoice_title || DEFAULT_INVOICE_TITLE) as string
-      );
-      setShowLogo(config.show_logo ?? true);
-      setShowAbn(config.show_abn ?? true);
-      // Migrate legacy bill_to_fields to service_address_config.form_fields if needed
       const legacyBillToFields = config.bill_to_fields || [];
       const existingServiceConfig =
         config.service_address_config || DEFAULT_SERVICE_ADDRESS_CONFIG;
-
-      setServiceAddressConfig({
+      const service = {
         ...existingServiceConfig,
         form_fields: existingServiceConfig.form_fields || legacyBillToFields,
-      });
-      setBillingAddressConfig(
-        config.billing_address_config || DEFAULT_BILLING_ADDRESS_CONFIG
-      );
-      setLineItemDisplay(config.line_item_display || DEFAULT_LINE_ITEM_DISPLAY);
-      setEmailRecipientConfig(
-        config.email_recipient_config || DEFAULT_EMAIL_RECIPIENT_CONFIG
-      );
+      };
+      const billing =
+        config.billing_address_config || DEFAULT_BILLING_ADDRESS_CONFIG;
+      const lineItem = config.line_item_display || DEFAULT_LINE_ITEM_DISPLAY;
+      const email =
+        config.email_recipient_config || DEFAULT_EMAIL_RECIPIENT_CONFIG;
+
+      setServiceAddressConfig(service);
+      setBillingAddressConfig(billing);
+      setLineItemDisplay(lineItem);
+      setEmailRecipientConfig(email);
     }
   }, [config]);
 
-  const handleSave = async () => {
-    if (!config) return;
-
-    // Clear previous validation errors
-    setValidationErrors({});
-
-    // Validate the config before saving
-    const configToSave = {
-      invoice_title: invoiceTitle,
-      show_logo: showLogo,
-      show_abn: showAbn,
-      service_address_config: serviceAddressConfig,
-      billing_address_config: billingAddressConfig,
-      email_recipient_config: emailRecipientConfig,
-      line_item_display: lineItemDisplay,
-    };
-
-    const validation = validateInvoiceTemplateConfig(configToSave);
-
-    if (!validation.success) {
-      setValidationErrors(validation.errors || {});
-      // Scroll to first error
-      const firstErrorKey = Object.keys(validation.errors || {})[0];
-      if (firstErrorKey) {
-        const errorElement = document.querySelector(
-          `[data-error-field="${firstErrorKey}"]`
-        );
-        errorElement?.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (descriptionFormatTimeoutRef.current) {
+        clearTimeout(descriptionFormatTimeoutRef.current);
       }
-      return;
-    }
+    };
+  }, []);
 
-    try {
-      setSaving(true);
-      setSaveSuccess(false);
-      await updateConfig(configToSave);
-      // Clear errors on successful save
+  /**
+   * Auto-save: validates and saves the current config immediately.
+   * Each control change calls this with the updated state.
+   */
+  const saveConfig = useCallback(
+    async (
+      updates: {
+        serviceAddressConfig?: ServiceAddressConfig;
+        billingAddressConfig?: BillingAddressConfig;
+        lineItemDisplay?: LineItemDisplayConfig;
+        emailRecipientConfig?: InvoiceEmailRecipientConfig;
+      },
+      section: string,
+    ) => {
+      if (!config) return;
+
+      const configToSave = {
+        invoice_title: DEFAULT_INVOICE_TITLE,
+        show_logo: true,
+        show_abn: true,
+        service_address_config:
+          updates.serviceAddressConfig ?? serviceAddressConfig,
+        billing_address_config:
+          updates.billingAddressConfig ?? billingAddressConfig,
+        email_recipient_config: {
+          ...(updates.emailRecipientConfig ?? emailRecipientConfig),
+          default_email: null,
+        },
+        line_item_display: updates.lineItemDisplay ?? lineItemDisplay,
+      };
+
+      const validation = validateInvoiceTemplateConfig(configToSave);
+
+      if (!validation.success) {
+        setValidationErrors(validation.errors || {});
+        return;
+      }
+
+      // Clear validation errors on valid config
       setValidationErrors({});
-      // Show success message
-      setSaveSuccess(true);
-      // Hide success message after 3 seconds
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Failed to save invoice template configuration";
-      console.error("Failed to save invoice template config:", err);
-      alert(
-        `Failed to save settings: ${errorMessage}. Please try again or contact support if the problem persists.`
-      );
-    } finally {
-      setSaving(false);
-    }
+
+      try {
+        setSavingSection(section);
+        await updateConfig(configToSave);
+      } catch (err) {
+        console.error("Failed to save invoice template config:", err);
+        // Could show a toast here, but for now just log
+      } finally {
+        setSavingSection(null);
+      }
+    },
+    [
+      config,
+      serviceAddressConfig,
+      billingAddressConfig,
+      lineItemDisplay,
+      emailRecipientConfig,
+      updateConfig,
+    ],
+  );
+
+  // Auto-save handlers for each control type
+  const handleServiceAddressSourceChange = (
+    value: "auto" | "location" | "form_fields",
+  ) => {
+    const updated = { ...serviceAddressConfig, source: value };
+    setServiceAddressConfig(updated);
+    saveConfig({ serviceAddressConfig: updated }, "service-source");
   };
 
-  const addServiceAddressField = (fieldName: string) => {
+  const handleLocationFieldToggle = (
+    field: "name" | "email" | "address" | "contact_person" | "phone",
+    checked: boolean,
+  ) => {
+    const currentFields = serviceAddressConfig.location_fields || [];
+    const updated = {
+      ...serviceAddressConfig,
+      location_fields: checked
+        ? [...currentFields, field]
+        : currentFields.filter((f) => f !== field),
+    };
+    setServiceAddressConfig(updated);
+    saveConfig({ serviceAddressConfig: updated }, "location-fields");
+  };
+
+  const handleAddServiceAddressField = (fieldName: string) => {
     if (fieldName && !serviceAddressConfig.form_fields?.includes(fieldName)) {
-      setServiceAddressConfig((prev) => ({
-        ...prev,
-        form_fields: [...(prev.form_fields || []), fieldName],
-      }));
+      const updated = {
+        ...serviceAddressConfig,
+        form_fields: [...(serviceAddressConfig.form_fields || []), fieldName],
+      };
+      setServiceAddressConfig(updated);
+      saveConfig({ serviceAddressConfig: updated }, "form-fields");
     }
   };
 
-  const removeServiceAddressField = (fieldName: string) => {
-    setServiceAddressConfig((prev) => ({
-      ...prev,
-      form_fields: (prev.form_fields || []).filter((f) => f !== fieldName),
-    }));
+  const handleRemoveServiceAddressField = (fieldName: string) => {
+    const updated = {
+      ...serviceAddressConfig,
+      form_fields: (serviceAddressConfig.form_fields || []).filter(
+        (f) => f !== fieldName,
+      ),
+    };
+    setServiceAddressConfig(updated);
+    saveConfig({ serviceAddressConfig: updated }, "form-fields");
   };
 
+  const handleBillingAddressEnabledChange = (checked: boolean) => {
+    const updated = { ...billingAddressConfig, enabled: checked };
+    setBillingAddressConfig(updated);
+    saveConfig({ billingAddressConfig: updated }, "billing-enabled");
+  };
+
+  const handleEmailRecipientSourceChange = (
+    value:
+      | "location_email"
+      | "hierarchy_billing_email"
+      | "location_contact_email",
+  ) => {
+    const updated = { ...emailRecipientConfig, location_email_source: value };
+    setEmailRecipientConfig(updated);
+    saveConfig({ emailRecipientConfig: updated }, "email-source");
+  };
+
+  const handleFormFieldEmailChange = (value: string) => {
+    const updated = {
+      ...emailRecipientConfig,
+      form_field_email: value === "__none__" ? null : value,
+    };
+    setEmailRecipientConfig(updated);
+    saveConfig({ emailRecipientConfig: updated }, "email-form-field");
+  };
+
+  const handleIncludeOptionValueChange = (checked: boolean) => {
+    const updated = { ...lineItemDisplay, include_option_value: checked };
+    setLineItemDisplay(updated);
+    saveConfig({ lineItemDisplay: updated }, "include-option-value");
+  };
+
+  const handleDescriptionFormatChange = (value: string) => {
+    const updated = { ...lineItemDisplay, description_format: value };
+    setLineItemDisplay(updated);
+
+    // Clear error when user types
+    if (validationErrors["line_item_display.description_format"]) {
+      setValidationErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors["line_item_display.description_format"];
+        return newErrors;
+      });
+    }
+
+    // Debounce save for text input
+    if (descriptionFormatTimeoutRef.current) {
+      clearTimeout(descriptionFormatTimeoutRef.current);
+    }
+    descriptionFormatTimeoutRef.current = setTimeout(() => {
+      saveConfig({ lineItemDisplay: updated }, "description-format");
+    }, 1000);
+  };
+
+  const handleDescriptionFormatBlur = () => {
+    // Save immediately on blur
+    if (descriptionFormatTimeoutRef.current) {
+      clearTimeout(descriptionFormatTimeoutRef.current);
+      descriptionFormatTimeoutRef.current = null;
+    }
+    saveConfig({ lineItemDisplay }, "description-format");
+  };
+
+  const handleShowBasePriceSeparatelyChange = (checked: boolean) => {
+    const updated = { ...lineItemDisplay, show_base_price_separately: checked };
+    setLineItemDisplay(updated);
+    saveConfig({ lineItemDisplay: updated }, "show-base-price");
+  };
+
+  // Form fields for service address: text-like inputs only (exclude number)
   const getAvailableServiceAddressFields = () => {
     return fieldConfigs.filter(
       (field) =>
         !serviceAddressConfig.form_fields?.includes(field.name) &&
         (field.field_type === "text" ||
-          field.field_type === "number" ||
           field.field_type === "address" ||
           field.field_type === "email" ||
-          field.field_type === "phone")
+          field.field_type === "phone"),
     );
   };
 
   // Check if address field exists in field configs
   const addressField = fieldConfigs.find(
-    (field) => field.field_type === "address"
+    (field) => field.field_type === "address",
   );
 
   // Check if email field exists in field configs
@@ -278,48 +371,6 @@ export default function InvoiceTemplateSettings({
     return field?.label || fieldName;
   };
 
-  const handleAutoGenerateInvoicesChange = async (enabled: boolean) => {
-    if (!organizationId) return;
-
-    try {
-      log.info("Invoice Settings: Updating auto-generate invoices", {
-        enabled,
-      });
-
-      const { data, error: updateError } = await supabase.functions.invoke(
-        "update-organization-settings",
-        {
-          body: {
-            organization_id: organizationId,
-            auto_generate_invoices_immediately: enabled,
-          },
-        }
-      );
-
-      if (updateError) {
-        log.error("Invoice Settings: Failed to update auto-generate invoices", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
-        setAutoGenerateInvoices(
-          data.settings.auto_generate_invoices_immediately ?? false
-        );
-      }
-
-      log.info("Invoice Settings: Auto-generate invoices updated successfully");
-    } catch (err) {
-      log.error("Invoice Settings: Failed to update auto-generate invoices", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      alert(
-        `Failed to update auto-generate invoices setting. Please try again.`
-      );
-    }
-  };
-
   if (configLoading || fieldConfigsLoading || locationsLoading) {
     return (
       <div>
@@ -345,21 +396,23 @@ export default function InvoiceTemplateSettings({
 
   const availableServiceAddressFields = getAvailableServiceAddressFields();
 
+  // Helper to show saving indicator for a section
+  const SavingIndicator = ({ section }: { section: string }) =>
+    savingSection === section ? (
+      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-2 inline" />
+    ) : null;
+
   return (
     <div className="space-y-6">
-      <InvoiceHeaderSettings
-        invoiceTitle={invoiceTitle}
-        showLogo={showLogo}
-        showAbn={showAbn}
-        onInvoiceTitleChange={setInvoiceTitle}
-        onShowLogoChange={setShowLogo}
-        onShowAbnChange={setShowAbn}
-      />
-
       {/* Service Address Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Service Address Configuration</CardTitle>
+          <CardTitle>
+            Service Address Configuration
+            <SavingIndicator section="service-source" />
+            <SavingIndicator section="location-fields" />
+            <SavingIndicator section="form-fields" />
+          </CardTitle>
           <CardDescription>
             Configure how the service address (where work was performed) is
             displayed in the Service Address section on invoices
@@ -371,10 +424,9 @@ export default function InvoiceTemplateSettings({
             <RadioGroup
               value={serviceAddressConfig.source}
               onValueChange={(value) =>
-                setServiceAddressConfig((prev) => ({
-                  ...prev,
-                  source: value as "auto" | "location" | "form_fields",
-                }))
+                handleServiceAddressSourceChange(
+                  value as "auto" | "location" | "form_fields",
+                )
               }
             >
               <div className="flex items-center space-x-2">
@@ -434,58 +486,40 @@ export default function InvoiceTemplateSettings({
                           id={`location-field-${field}`}
                           checked={
                             serviceAddressConfig.location_fields?.includes(
-                              field
+                              field,
                             ) ?? false
                           }
-                          onChange={(e) => {
-                            const currentFields =
-                              serviceAddressConfig.location_fields || [];
-                            if (e.target.checked) {
-                              setServiceAddressConfig((prev) => ({
-                                ...prev,
-                                location_fields: [...currentFields, field],
-                              }));
-                            } else {
-                              setServiceAddressConfig((prev) => ({
-                                ...prev,
-                                location_fields: currentFields.filter(
-                                  (f) => f !== field
-                                ),
-                              }));
-                            }
-                          }}
+                          onChange={(e) =>
+                            handleLocationFieldToggle(field, e.target.checked)
+                          }
                           className="h-4 w-4 rounded border-gray-300"
                         />
                         <Label
                           htmlFor={`location-field-${field}`}
                           className="font-normal cursor-pointer capitalize"
                         >
-                          {field === "contact_person"
-                            ? "Contact Person"
-                            : field}
+                          {field === "contact_person" ? "Contact Person" : field}
                         </Label>
                       </div>
                     ))}
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-3 p-4 rounded-lg border border-amber-200 bg-amber-50">
-                  <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-amber-800">
-                      No locations configured
-                    </p>
-                    <p className="text-sm text-amber-700">
-                      Service address will use form fields since no locations
-                      have been set up. Configure locations in the{" "}
-                      <a
-                        href="/dashboard/locations"
-                        className="underline hover:no-underline font-medium"
-                      >
-                        Locations settings
-                      </a>{" "}
-                      to enable location-based addressing.
-                    </p>
+                <div className="rounded-lg bg-muted/50 border border-muted p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">No Locations Found</p>
+                      <p className="text-sm text-muted-foreground">
+                        You haven&apos;t set up any locations yet. Location
+                        fields will only appear on invoices for jobs associated
+                        with a location.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        For jobs without locations, form field data will be used
+                        instead.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}
@@ -496,114 +530,72 @@ export default function InvoiceTemplateSettings({
             serviceAddressConfig.source === "form_fields") && (
             <>
               <Separator />
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Form Fields for Service Address</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Select which fields from your field configurations should
-                    appear in the Service Address section. Fields will be
-                    displayed in the order they are added.
-                  </p>
-                </div>
+              <div className="space-y-3">
+                <Label>Form Fields for Service Address</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select which form fields should appear in the Service Address
+                  section when location data is not available
+                </p>
 
-                {/* Current Form Fields */}
+                {/* Selected fields */}
                 {serviceAddressConfig.form_fields &&
                   serviceAddressConfig.form_fields.length > 0 && (
                     <div className="space-y-2">
-                      <Label>Current Form Fields</Label>
-                      <div className="space-y-2">
-                        {serviceAddressConfig.form_fields.map((fieldName) => (
-                          <div
-                            key={fieldName}
-                            className="flex items-center justify-between p-3 border rounded-md bg-muted/50"
+                      {serviceAddressConfig.form_fields.map((fieldName) => (
+                        <div
+                          key={fieldName}
+                          className="flex items-center justify-between p-2 bg-muted/50 rounded-md"
+                        >
+                          <span className="text-sm">
+                            {getFieldLabel(fieldName)}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleRemoveServiceAddressField(fieldName)
+                            }
+                            className="h-6 w-6 p-0"
                           >
-                            <span className="text-sm font-medium">
-                              {getFieldLabel(fieldName)}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() =>
-                                removeServiceAddressField(fieldName)
-                              }
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
+                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                {/* Add Field */}
+                {/* Add field dropdown */}
                 {availableServiceAddressFields.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="add-service-address-field">
-                      {serviceAddressConfig.form_fields &&
-                      serviceAddressConfig.form_fields.length > 0
-                        ? "Add Another Field"
-                        : "Add Field"}
-                    </Label>
-                    <div className="flex gap-2">
-                      <Select
-                        value=""
-                        onValueChange={(value) => {
-                          if (value) {
-                            addServiceAddressField(value);
-                          }
-                        }}
-                      >
-                        <SelectTrigger
-                          id="add-service-address-field"
-                          className="flex-1"
-                        >
-                          <SelectValue placeholder="Select a field to add" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableServiceAddressFields.map((field) => (
-                            <SelectItem key={field.id} value={field.name}>
-                              {field.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => {
-                          const select = document.getElementById(
-                            "add-service-address-field"
-                          ) as HTMLSelectElement;
-                          if (select?.value) {
-                            addServiceAddressField(select.value);
-                          }
-                        }}
-                        className="shrink-0"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex gap-2">
+                    <Select onValueChange={handleAddServiceAddressField}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Add a field..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableServiceAddressFields.map((field) => (
+                          <SelectItem key={field.name} value={field.name}>
+                            {field.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      disabled={availableServiceAddressFields.length === 0}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
 
                 {availableServiceAddressFields.length === 0 &&
                   (!serviceAddressConfig.form_fields ||
                     serviceAddressConfig.form_fields.length === 0) && (
-                    <p className="text-sm text-muted-foreground">
-                      No field configurations available. Create fields in the
-                      Field Configuration settings first.
-                    </p>
-                  )}
-
-                {availableServiceAddressFields.length === 0 &&
-                  serviceAddressConfig.form_fields &&
-                  serviceAddressConfig.form_fields.length > 0 && (
-                    <p className="text-sm text-muted-foreground">
-                      All available fields have been added to Service Address
-                      section.
+                    <p className="text-sm text-muted-foreground italic">
+                      No text-based form fields available. Create text, address,
+                      email, or phone fields in your form configuration to use
+                      here.
                     </p>
                   )}
               </div>
@@ -612,96 +604,43 @@ export default function InvoiceTemplateSettings({
         </CardContent>
       </Card>
 
-      {/* Bill To Configuration */}
+      {/* Billing Address Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Bill To Configuration</CardTitle>
+          <CardTitle>
+            Billing Address Configuration
+            <SavingIndicator section="billing-enabled" />
+          </CardTitle>
           <CardDescription>
-            Configure a separate billing address when it differs from the
-            service address (e.g., for corporate accounts). By default, Bill To
-            uses the same address as Service Address.
+            Configure the billing address display for invoices sent to companies
+            with hierarchy billing information
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="show-billing-address">Show Billing Address</Label>
+              <Label htmlFor="billing-address-enabled">
+                Show Billing Address
+              </Label>
               <p className="text-sm text-muted-foreground">
-                Enable separate billing address section. The system will
-                auto-detect company billing addresses from location hierarchy.
+                Display company billing address from hierarchy when available
               </p>
             </div>
             <Switch
-              id="show-billing-address"
+              id="billing-address-enabled"
               checked={billingAddressConfig.enabled}
-              onCheckedChange={(checked) =>
-                setBillingAddressConfig((prev) => ({
-                  ...prev,
-                  enabled: checked,
-                }))
-              }
+              onCheckedChange={handleBillingAddressEnabledChange}
             />
           </div>
 
           {billingAddressConfig.enabled && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <Label>Billing Address Source</Label>
-                <RadioGroup
-                  value={billingAddressConfig.source}
-                  onValueChange={(value) =>
-                    setBillingAddressConfig((prev) => ({
-                      ...prev,
-                      source: value as
-                        | "auto"
-                        | "organization"
-                        | "hierarchy"
-                        | "form_fields",
-                    }))
-                  }
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="auto" id="billing-source-auto" />
-                    <Label
-                      htmlFor="billing-source-auto"
-                      className="font-normal cursor-pointer"
-                    >
-                      Auto-detect from company hierarchy
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="hierarchy"
-                      id="billing-source-hierarchy"
-                    />
-                    <Label
-                      htmlFor="billing-source-hierarchy"
-                      className="font-normal cursor-pointer"
-                    >
-                      Use hierarchy metadata
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem
-                      value="organization"
-                      id="billing-source-org"
-                    />
-                    <Label
-                      htmlFor="billing-source-org"
-                      className="font-normal cursor-pointer"
-                    >
-                      Use organization settings (coming soon)
-                    </Label>
-                  </div>
-                </RadioGroup>
-                <p className="text-xs text-muted-foreground">
-                  Auto-detect will check if a location belongs to a company in
-                  the hierarchy and use billing information from the company
-                  metadata if available.
-                </p>
-              </div>
-            </>
+            <div className="rounded-lg bg-muted/50 border border-muted p-3">
+              <p className="text-sm text-muted-foreground">
+                When enabled, the billing address from the parent company in the
+                location hierarchy will be shown separately from the service
+                address.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -709,66 +648,68 @@ export default function InvoiceTemplateSettings({
       {/* Email Recipient Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>Email Recipient Configuration</CardTitle>
+          <CardTitle>
+            Email Recipient Configuration
+            <SavingIndicator section="email-source" />
+            <SavingIndicator section="email-form-field" />
+          </CardTitle>
           <CardDescription>
-            Configure where invoice emails should be sent. This determines the
-            recipient email address when invoices are automatically sent.
+            Configure how invoice email recipients are determined
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-3">
             <Label>Location Email Source</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              When a job has a location, which field should be used for the
+              invoice email?
+            </p>
             <RadioGroup
               value={emailRecipientConfig.location_email_source}
               onValueChange={(value) =>
-                setEmailRecipientConfig((prev) => ({
-                  ...prev,
-                  location_email_source: value as
+                handleEmailRecipientSourceChange(
+                  value as
                     | "location_email"
                     | "hierarchy_billing_email"
                     | "location_contact_email",
-                }))
+                )
               }
             >
               <div className="flex items-center space-x-2">
-                <RadioGroupItem
-                  value="location_email"
-                  id="email-source-location"
-                />
+                <RadioGroupItem value="location_email" id="email-location" />
                 <Label
-                  htmlFor="email-source-location"
+                  htmlFor="email-location"
                   className="font-normal cursor-pointer"
                 >
-                  Use location email address (default)
+                  Location email (primary location email field)
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem
                   value="hierarchy_billing_email"
-                  id="email-source-hierarchy"
+                  id="email-hierarchy"
                 />
                 <Label
-                  htmlFor="email-source-hierarchy"
+                  htmlFor="email-hierarchy"
                   className="font-normal cursor-pointer"
                 >
-                  Use company billing email from hierarchy
+                  Hierarchy billing email (from parent company)
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem
                   value="location_contact_email"
-                  id="email-source-contact"
+                  id="email-contact"
                 />
                 <Label
-                  htmlFor="email-source-contact"
+                  htmlFor="email-contact"
                   className="font-normal cursor-pointer"
                 >
-                  Use location contact email (coming soon)
+                  Location contact email (from contact person field)
                 </Label>
               </div>
             </RadioGroup>
-            <p className="text-xs text-muted-foreground">
-              For jobs with locations, determines which email address to use.
+            <p className="text-xs text-muted-foreground pt-2">
               Hierarchy billing email takes precedence if the location belongs
               to a company with billing information.
             </p>
@@ -782,12 +723,7 @@ export default function InvoiceTemplateSettings({
             </Label>
             <Select
               value={emailRecipientConfig.form_field_email || "__none__"}
-              onValueChange={(value) =>
-                setEmailRecipientConfig((prev) => ({
-                  ...prev,
-                  form_field_email: value === "__none__" ? null : value,
-                }))
-              }
+              onValueChange={handleFormFieldEmailChange}
             >
               <SelectTrigger id="form-field-email">
                 <SelectValue placeholder="Select a field that contains email" />
@@ -800,7 +736,7 @@ export default function InvoiceTemplateSettings({
                   .filter(
                     (field) =>
                       field.field_type === "text" ||
-                      field.field_type === "email"
+                      field.field_type === "email",
                   )
                   .map((field) => (
                     <SelectItem key={field.id} value={field.id}>
@@ -811,62 +747,10 @@ export default function InvoiceTemplateSettings({
             </Select>
             <p className="text-xs text-muted-foreground">
               For jobs without a location, select which form field contains the
-              customer email address. Leave empty to use the default email
-              below.
+              customer email address. Leave empty when there is no form-field
+              email; those invoices will not be auto-sent and may require manual
+              review.
             </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="default-email">Default Email (Fallback)</Label>
-            <Input
-              id="default-email"
-              type="email"
-              value={emailRecipientConfig.default_email || ""}
-              onChange={(e) => {
-                const value = e.target.value.trim() || null;
-                setEmailRecipientConfig((prev) => ({
-                  ...prev,
-                  default_email: value,
-                }));
-                // Clear validation error when user types
-                if (validationErrors["email_recipient_config.default_email"]) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors["email_recipient_config.default_email"];
-                    return newErrors;
-                  });
-                }
-              }}
-              placeholder="default@example.com"
-              pattern="[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*"
-            />
-            <p
-              id="default-email-help"
-              className="text-xs text-muted-foreground"
-            >
-              Fallback email address used when no other email source is
-              available. Leave empty if you want invoices without valid email
-              addresses to require manual review.
-            </p>
-            {validationErrors["email_recipient_config.default_email"] && (
-              <p
-                id="default-email-error"
-                className="text-xs text-destructive"
-                data-error-field="email_recipient_config.default_email"
-                role="alert"
-              >
-                {validationErrors["email_recipient_config.default_email"]}
-              </p>
-            )}
-            {emailRecipientConfig.default_email &&
-              !validationErrors["email_recipient_config.default_email"] &&
-              !/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(
-                emailRecipientConfig.default_email
-              ) && (
-                <p className="text-xs text-destructive">
-                  Please enter a valid email address
-                </p>
-              )}
           </div>
         </CardContent>
       </Card>
@@ -874,7 +758,12 @@ export default function InvoiceTemplateSettings({
       {/* Line Item Display Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Line Item Display Settings</CardTitle>
+          <CardTitle>
+            Line Item Display Settings
+            <SavingIndicator section="include-option-value" />
+            <SavingIndicator section="description-format" />
+            <SavingIndicator section="show-base-price" />
+          </CardTitle>
           <CardDescription>
             Configure how line items are displayed on invoices
           </CardDescription>
@@ -882,9 +771,7 @@ export default function InvoiceTemplateSettings({
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="include-option-value">
-                Include Option Values
-              </Label>
+              <Label htmlFor="include-option-value">Include Option Values</Label>
               <p className="text-sm text-muted-foreground">
                 Show selected option values (e.g., &quot;Full Detail&quot;) in
                 line item descriptions
@@ -893,12 +780,7 @@ export default function InvoiceTemplateSettings({
             <Switch
               id="include-option-value"
               checked={lineItemDisplay.include_option_value}
-              onCheckedChange={(checked) =>
-                setLineItemDisplay((prev) => ({
-                  ...prev,
-                  include_option_value: checked,
-                }))
-              }
+              onCheckedChange={handleIncludeOptionValueChange}
             />
           </div>
 
@@ -908,22 +790,8 @@ export default function InvoiceTemplateSettings({
               <Input
                 id="description-format"
                 value={lineItemDisplay.description_format}
-                onChange={(e) => {
-                  setLineItemDisplay((prev) => ({
-                    ...prev,
-                    description_format: e.target.value,
-                  }));
-                  // Clear error when user types
-                  if (
-                    validationErrors["line_item_display.description_format"]
-                  ) {
-                    setValidationErrors((prev) => {
-                      const newErrors = { ...prev };
-                      delete newErrors["line_item_display.description_format"];
-                      return newErrors;
-                    });
-                  }
-                }}
+                onChange={(e) => handleDescriptionFormatChange(e.target.value)}
+                onBlur={handleDescriptionFormatBlur}
                 placeholder="{field_label}: {option_value}"
                 data-error-field="line_item_display.description_format"
                 className={
@@ -953,9 +821,7 @@ export default function InvoiceTemplateSettings({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label htmlFor="show-base-price">
-                Show Base Price Separately
-              </Label>
+              <Label htmlFor="show-base-price">Show Base Price Separately</Label>
               <p className="text-sm text-muted-foreground">
                 Display base price as a separate line item
               </p>
@@ -963,59 +829,11 @@ export default function InvoiceTemplateSettings({
             <Switch
               id="show-base-price"
               checked={lineItemDisplay.show_base_price_separately}
-              onCheckedChange={(checked) =>
-                setLineItemDisplay((prev) => ({
-                  ...prev,
-                  show_base_price_separately: checked,
-                }))
-              }
+              onCheckedChange={handleShowBasePriceSeparatelyChange}
             />
           </div>
         </CardContent>
       </Card>
-
-      {/* Auto-Generate Invoices Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Auto-Generate Invoices</CardTitle>
-          <CardDescription>
-            Configure automatic invoice creation when jobs are completed
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label className="text-base font-semibold">
-                Auto-Generate Invoices
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Automatically create invoices in pending review when jobs are
-                completed. Location-specific auto-generate takes precedence. All
-                invoices require review before sending.
-              </p>
-            </div>
-            <Switch
-              checked={autoGenerateInvoices}
-              onCheckedChange={handleAutoGenerateInvoicesChange}
-              className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Success Message */}
-      {saveSuccess && (
-        <Card className="border-success/20 bg-success/5">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              <p className="text-sm font-semibold text-success">
-                Invoice template settings saved successfully!
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Validation Errors Summary */}
       {Object.keys(validationErrors).length > 0 && (
@@ -1023,7 +841,7 @@ export default function InvoiceTemplateSettings({
           <CardContent className="pt-6">
             <div className="space-y-2">
               <p className="text-sm font-semibold text-destructive">
-                Please fix the following errors before saving:
+                Please fix the following errors:
               </p>
               <ul className="list-disc list-inside space-y-1 text-sm text-destructive">
                 {Object.entries(validationErrors).map(([field, error]) => (
@@ -1036,38 +854,6 @@ export default function InvoiceTemplateSettings({
           </CardContent>
         </Card>
       )}
-
-      {/* Save Button */}
-      <div className="flex justify-end gap-2">
-        {Object.keys(validationErrors).length > 0 && (
-          <p className="text-sm text-muted-foreground self-center">
-            {Object.keys(validationErrors).length} error
-            {Object.keys(validationErrors).length !== 1 ? "s" : ""} to fix
-          </p>
-        )}
-        <Button
-          onClick={handleSave}
-          disabled={
-            saving || !config || Object.keys(validationErrors).length > 0
-          }
-          aria-label="Save invoice template settings"
-        >
-          {saving ? (
-            <>
-              <Loader2
-                className="mr-2 h-4 w-4 animate-spin"
-                aria-hidden="true"
-              />
-              Saving...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" aria-hidden="true" />
-              Save Changes
-            </>
-          )}
-        </Button>
-      </div>
 
       {/* Fixed Preview Invoice Header Button */}
       <div className="fixed bottom-6 right-6 z-50">
@@ -1097,7 +883,7 @@ export default function InvoiceTemplateSettings({
             {/* Invoice Header */}
             <div className="flex items-start justify-between">
               <div className="space-y-2">
-                {showLogo && orgSettings?.logo_url && (
+                {orgSettings?.logo_url && (
                   <div className="h-16 w-16 rounded border bg-muted flex items-center justify-center overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1107,29 +893,17 @@ export default function InvoiceTemplateSettings({
                     />
                   </div>
                 )}
-                {showLogo && !orgSettings?.logo_url && (
-                  <div className="h-16 w-16 rounded border border-dashed bg-muted/50 flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">
-                      No logo
-                    </span>
-                  </div>
-                )}
                 <div>
                   <p className="font-bold text-lg">
                     {orgSettings?.name || "Your Business Name"}
                   </p>
-                  {showAbn && orgSettings?.abn && (
+                  {orgSettings?.abn && (
                     <p className="text-sm text-muted-foreground">
                       ABN: {orgSettings.abn}
                     </p>
                   )}
-                  {showAbn && !orgSettings?.abn && (
-                    <p className="text-sm text-muted-foreground italic">
-                      ABN: Not configured
-                    </p>
-                  )}
                   {orgSettings?.business_address && (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
                       {orgSettings.business_address}
                     </p>
                   )}
@@ -1146,20 +920,14 @@ export default function InvoiceTemplateSettings({
                 </div>
               </div>
               <div className="text-right">
-                <h1 className="text-2xl font-bold text-primary">
-                  {invoiceTitle}
-                </h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Invoice #: INV-00001
+                <p className="text-2xl font-bold">
+                  {orgSettings?.gst_registered ? "TAX INVOICE" : "INVOICE"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Date: {new Date().toLocaleDateString("en-AU")}
+                  Invoice #INV-00001
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Due:{" "}
-                  {new Date(
-                    Date.now() + 30 * 24 * 60 * 60 * 1000
-                  ).toLocaleDateString("en-AU")}
+                  Date: {new Date().toLocaleDateString()}
                 </p>
               </div>
             </div>
@@ -1168,144 +936,49 @@ export default function InvoiceTemplateSettings({
 
             {/* Service Address Preview */}
             <div className="grid grid-cols-2 gap-6">
-              <div className="p-3 rounded-lg bg-muted/30">
-                <h3 className="font-semibold text-sm mb-2 text-foreground">
-                  Service Address
-                </h3>
-                <div className="text-sm space-y-0.5">
-                  {serviceAddressConfig.source === "form_fields" ||
-                  (serviceAddressConfig.source === "auto" && !hasLocations) ? (
+              <div>
+                <p className="font-semibold text-sm mb-2">Service Address</p>
+                <div className="text-sm text-muted-foreground space-y-0.5">
+                  {serviceAddressConfig.source === "location" ||
+                  serviceAddressConfig.source === "auto" ? (
                     <>
-                      {serviceAddressConfig.form_fields &&
-                      serviceAddressConfig.form_fields.length > 0 ? (
-                        <div className="space-y-1">
-                          {serviceAddressConfig.form_fields.map((fieldName) => {
-                            const field = fieldConfigs.find(
-                              (f) => f.name === fieldName
-                            );
-                            // Show example data based on field type
-                            const exampleData: Record<string, string> = {
-                              address: "42 Smith Street, Sydney NSW 2000",
-                              email: "customer@example.com",
-                              phone: "0412 345 678",
-                              name: "John Smith",
-                            };
-                            const example =
-                              field?.field_type && exampleData[field.field_type]
-                                ? exampleData[field.field_type]
-                                : `Example ${getFieldLabel(fieldName)}`;
-                            return (
-                              <p key={fieldName} className="text-foreground">
-                                {example}
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  ({getFieldLabel(fieldName)})
-                                </span>
-                              </p>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <p className="italic text-muted-foreground">
-                          No fields configured
-                        </p>
-                      )}
+                      {serviceAddressConfig.location_fields?.includes(
+                        "name",
+                      ) && <p>Example Location Name</p>}
+                      {serviceAddressConfig.location_fields?.includes(
+                        "address",
+                      ) && <p>123 Main Street, City 12345</p>}
+                      {serviceAddressConfig.location_fields?.includes(
+                        "contact_person",
+                      ) && <p>John Smith</p>}
+                      {serviceAddressConfig.location_fields?.includes(
+                        "email",
+                      ) && <p>contact@example.com</p>}
+                      {serviceAddressConfig.location_fields?.includes(
+                        "phone",
+                      ) && <p>0412 345 678</p>}
                     </>
                   ) : (
-                    <div className="space-y-0.5 text-foreground">
-                      {serviceAddressConfig.location_fields?.includes(
-                        "name"
-                      ) && <p className="font-medium">ABC Company</p>}
-                      {serviceAddressConfig.location_fields?.includes(
-                        "address"
-                      ) && <p>123 Business Street, Melbourne VIC 3000</p>}
-                      {serviceAddressConfig.location_fields?.includes(
-                        "contact_person"
-                      ) && <p>Contact: Jane Doe</p>}
-                      {serviceAddressConfig.location_fields?.includes(
-                        "email"
-                      ) && <p>contact@abccompany.com.au</p>}
-                      {serviceAddressConfig.location_fields?.includes(
-                        "phone"
-                      ) && <p>03 9000 0000</p>}
-                    </div>
+                    <>
+                      {serviceAddressConfig.form_fields?.map((field) => (
+                        <p key={field}>[{getFieldLabel(field)}]</p>
+                      ))}
+                    </>
                   )}
                 </div>
               </div>
 
               {billingAddressConfig.enabled && (
-                <div className="p-3 rounded-lg bg-muted/30">
-                  <h3 className="font-semibold text-sm mb-2 text-foreground">
-                    Bill To
-                  </h3>
-                  <div className="text-sm space-y-0.5 text-foreground">
-                    <p className="font-medium">XYZ Corporation Pty Ltd</p>
-                    <p>Level 10, 100 Collins Street</p>
-                    <p>Melbourne VIC 3000</p>
-                    <p>accounts@xyzcorp.com.au</p>
+                <div>
+                  <p className="font-semibold text-sm mb-2">Billing Address</p>
+                  <div className="text-sm text-muted-foreground space-y-0.5">
+                    <p>Parent Company Name</p>
+                    <p>456 Business Ave, Suite 100</p>
+                    <p>City, State 54321</p>
+                    <p>billing@parentcompany.com</p>
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Sample Line Items Preview */}
-            <div className="mt-4">
-              <h3 className="font-semibold text-sm mb-2">Line Items</h3>
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-2 font-medium">Description</th>
-                      <th className="text-right p-2 font-medium">Qty</th>
-                      <th className="text-right p-2 font-medium">Price</th>
-                      <th className="text-right p-2 font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-t">
-                      <td className="p-2">Service - Full Detail</td>
-                      <td className="text-right p-2">1</td>
-                      <td className="text-right p-2">$150.00</td>
-                      <td className="text-right p-2">$150.00</td>
-                    </tr>
-                    <tr className="border-t">
-                      <td className="p-2">Windows (exterior)</td>
-                      <td className="text-right p-2">10</td>
-                      <td className="text-right p-2">$5.00</td>
-                      <td className="text-right p-2">$50.00</td>
-                    </tr>
-                    <tr className="border-t bg-muted/30">
-                      <td colSpan={3} className="p-2 text-right font-medium">
-                        Subtotal
-                      </td>
-                      <td className="text-right p-2">$200.00</td>
-                    </tr>
-                    <tr className="border-t bg-muted/30">
-                      <td colSpan={3} className="p-2 text-right font-medium">
-                        GST (10%)
-                      </td>
-                      <td className="text-right p-2">$20.00</td>
-                    </tr>
-                    <tr className="border-t bg-primary/10">
-                      <td colSpan={3} className="p-2 text-right font-bold">
-                        Total (inc. GST)
-                      </td>
-                      <td className="text-right p-2 font-bold">$220.00</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* ATO Requirements Notice */}
-            <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Australian Tax Invoice Requirements (ATO):</strong> For
-                sales under $1,000, invoices must show: (1) &quot;Tax
-                Invoice&quot; heading, (2) Seller&apos;s identity, (3) ABN, (4)
-                Date issued, (5) Description of items with quantity and price,
-                (6) GST amount, (7) Which items are taxable. For sales $1,000+,
-                buyer&apos;s identity or ABN is also required.
-              </p>
             </div>
           </div>
         </DialogContent>

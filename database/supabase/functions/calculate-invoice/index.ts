@@ -171,6 +171,25 @@ serve(async (req) => {
       );
     }
 
+    // Fetch organization (currency) and organization_settings (GST) for calculation
+    const [{ data: organization }, { data: orgSettings }] = await Promise.all([
+      supabase
+        .from("organization")
+        .select("currency")
+        .eq("id", organization_id)
+        .single(),
+      supabase
+        .from("organization_settings")
+        .select("gst_registered, gst_inclusive, gst_rate_percent")
+        .eq("organization_id", organization_id)
+        .maybeSingle(),
+    ]);
+
+    const currency = (organization?.currency as string) || "AUD";
+    const gstRegistered = orgSettings?.gst_registered ?? false;
+    const gstInclusive = orgSettings?.gst_inclusive ?? true;
+    const gstRatePercent = Number(orgSettings?.gst_rate_percent) || 10;
+
     // Query jobs first without location join to avoid PostgREST reverse relationship issues
     const { data: jobsRaw, error: jobsError } = await supabase
       .from("job")
@@ -347,22 +366,49 @@ serve(async (req) => {
       calculations.push(calculation);
     }
 
+    const totalSubtotal = calculations.reduce(
+      (sum, calc) => sum + calc.subtotal,
+      0,
+    );
+    const totalAdjustments = calculations.reduce(
+      (sum, calc) => sum + calc.total_adjustments,
+      0,
+    );
+    let total = calculations.reduce((sum, calc) => sum + calc.total, 0);
+
+    let gstAmount = 0;
+    let subtotalExGst = total;
+
+    if (gstRegistered) {
+      if (gstInclusive) {
+        // Prices include GST: back-calculate subtotal ex-GST and GST amount
+        const divisor = 1 + gstRatePercent / 100;
+        subtotalExGst = Math.round((total / divisor) * 100) / 100;
+        gstAmount = Math.round((total - subtotalExGst) * 100) / 100;
+      } else {
+        // Prices ex-GST: add GST on top
+        subtotalExGst = totalSubtotal + totalAdjustments;
+        gstAmount = Math.round(subtotalExGst * (gstRatePercent / 100) * 100) /
+          100;
+        total = Math.round((subtotalExGst + gstAmount) * 100) / 100;
+      }
+    }
+
     const aggregated = {
-      total_subtotal: calculations.reduce(
-        (sum, calc) => sum + calc.subtotal,
-        0,
-      ),
-      total_adjustments: calculations.reduce(
-        (sum, calc) => sum + calc.total_adjustments,
-        0,
-      ),
-      total: calculations.reduce((sum, calc) => sum + calc.total, 0),
+      total_subtotal: totalSubtotal,
+      total_adjustments: totalAdjustments,
+      total,
       total_worker_payment: calculations.reduce(
         (sum, calc) => sum + calc.worker_payment_total,
         0,
       ),
       total_margin: calculations.reduce((sum, calc) => sum + calc.margin, 0),
       job_calculations: calculations,
+      gst_registered: gstRegistered,
+      gst_inclusive: gstInclusive,
+      gst_amount: gstAmount,
+      subtotal_ex_gst: subtotalExGst,
+      currency,
     };
 
     return jsonResponse({

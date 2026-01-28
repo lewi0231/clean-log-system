@@ -52,7 +52,7 @@ interface LocationFormProps {
       fixed_worker_payment?: number | null;
       fixed_price_currency?: string | null;
     },
-    locationId?: string
+    locationId?: string,
   ) => void | Promise<void>;
   location?: {
     id: string;
@@ -106,7 +106,7 @@ export default function LocationForm({
       fixed_worker_payment: undefined,
       fixed_price_currency: undefined,
     }),
-    [location]
+    [location],
   );
 
   const form = useForm<LocationFormValues>({
@@ -178,7 +178,7 @@ export default function LocationForm({
         fixed_worker_payment: null,
         fixed_price_currency: null,
       },
-      location?.id
+      location?.id,
     );
 
     reset(defaultValues);
@@ -202,7 +202,7 @@ export default function LocationForm({
           <DialogDescription>
             {isEditMode
               ? "Update location information."
-              : "Add a new location to your organization."}
+              : "Add a new location."}
           </DialogDescription>
         </DialogHeader>
         <form
@@ -295,7 +295,7 @@ export default function LocationForm({
                   onValueChange={(value) =>
                     setValue(
                       "hierarchy_parent_id",
-                      value === "none" ? null : value
+                      value === "none" ? null : value,
                     )
                   }
                 >
@@ -393,7 +393,15 @@ export default function LocationForm({
                       this location in the Pricing page&apos;s scope selector.
                     </p>
                     <p className="text-xs text-popover-foreground/80 pt-2 border-t border-border">
-                      Fixed pricing per location may be available in a future
+                      For a full explanation of field-based pricing, see{" "}
+                      <Link
+                        href="/dashboard/help#field-based-pricing"
+                        className="text-primary hover:underline font-medium"
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                      >
+                        Help & FAQ
+                      </Link>
+                      . Fixed pricing per location may be available in a future
                       update.
                     </p>
                   </div>
@@ -403,13 +411,13 @@ export default function LocationForm({
             <div className="flex-1 space-y-1">
               <p className="text-sm font-medium">Pricing</p>
               <p className="text-xs text-muted-foreground">
-                This location uses field-based pricing. Configure pricing rules
-                in the{" "}
+                This location uses field-based pricing. Find out more about what
+                field-based pricing is and how to configure it{" "}
                 <Link
-                  href="/dashboard/pricing"
+                  href="/dashboard/help#field-based-pricing"
                   className="font-medium text-primary hover:underline"
                 >
-                  Pricing page
+                  here
                 </Link>
                 .
               </p>

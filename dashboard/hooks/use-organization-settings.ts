@@ -57,8 +57,11 @@ async function fetchOrganizationSettings(
     bank_transfer_account_name: data.settings.bank_transfer_account_name ??
       null,
     show_bank_transfer_on_invoices:
-      data.settings.show_bank_transfer_on_invoices ?? false,
+      data.settings.show_bank_transfer_on_invoices ?? true,
     default_invoice_due_days: data.settings.default_invoice_due_days ?? 30,
+    gst_registered: data.settings.gst_registered ?? false,
+    gst_inclusive: data.settings.gst_inclusive ?? true,
+    gst_rate_percent: data.settings.gst_rate_percent ?? 10,
   };
 }
 

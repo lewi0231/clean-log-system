@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
 import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
@@ -27,6 +28,8 @@ interface CompletedJobsListProps {
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
   sendFeedbackEmail: (jobId: string) => Promise<void>;
   organizationId: string | null;
+  /** Field configs from the page (avoids useFieldConfigs in nested components). */
+  fieldConfigs: FieldConfig[];
 }
 
 // Standard fields that should be displayed in a specific order
@@ -42,6 +45,7 @@ export default function CompletedJobsList({
   getJobEdits,
   sendFeedbackEmail,
   organizationId,
+  fieldConfigs: editDialogFieldConfigs,
 }: CompletedJobsListProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
@@ -512,6 +516,7 @@ export default function CompletedJobsList({
         sendFeedbackEmail={sendFeedbackEmail}
         jobs={jobs}
         organizationId={organizationId}
+        fieldConfigsForEdit={editDialogFieldConfigs}
       />
     </div>
   );

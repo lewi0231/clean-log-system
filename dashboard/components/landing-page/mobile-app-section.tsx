@@ -50,11 +50,15 @@ export function MobileAppSection() {
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Your Workers Complete Jobs on Their Phones
+              Easy to Use—On Phones, Tablets, and PCs
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              The RivetUp mobile app puts the power of your business in your workers' hands.
-              Complete jobs, track time, add photos, and sync everything automatically.
+              Whether you're a lone operator or manage staff and sub-contractors, entering hours is easy
+              on a data-connected phone or tablet before leaving the job. Your clients get invoiced correctly,
+              your sub-contractors get paid accordingly—and you keep control from one simple admin panel.
+            </p>
+            <p className="mt-3 text-base text-muted-foreground">
+              Works on phones, tablets, and PCs. No install required for the web—just sign in and go.
             </p>
           </div>
 

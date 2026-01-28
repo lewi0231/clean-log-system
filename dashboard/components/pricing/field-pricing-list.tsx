@@ -33,7 +33,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { log } from "@/lib/logger";
 import {
@@ -52,6 +51,8 @@ import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 const PRICING_SUPPORTED_TYPES: FieldType[] = ["number", "boolean"];
 
 interface FieldPricingListProps {
+  fieldConfigs: FieldConfig[];
+  configsLoading: boolean;
   locationHierarchyId?: string | null;
   locationId?: string | null;
   effectiveAt?: string | null;
@@ -61,6 +62,8 @@ interface FieldPricingListProps {
 }
 
 export default function FieldPricingList({
+  fieldConfigs,
+  configsLoading,
   locationHierarchyId = null,
   locationId = null,
   effectiveAt = null,
@@ -68,8 +71,7 @@ export default function FieldPricingList({
   fieldTypeFilter,
   organizationId,
 }: FieldPricingListProps) {
-  const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
-  const { fieldConfigs, loading: configsLoading } = useFieldConfigs();
+  const { pricingContext, showBothContexts } = usePricingScope();
   const {
     fieldPricing: customerPricing,
     loading: customerLoading,

@@ -24,8 +24,8 @@ export function FinalCTASection() {
             Ready to Transform Your Service Business?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Start your 14-day free trial today. No credit card required.
-            Set up in 15 minutes. Cancel anytime.
+            Stop losing revenue to missing or incorrect timesheets. Configure it yourself—no custom builds.
+            Start your 14-day free trial today. No credit card required. Set up in 15 minutes. Cancel anytime.
           </p>
 
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">

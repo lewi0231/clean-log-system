@@ -1,5 +1,7 @@
 "use client";
 
+import { organizationSettingsKey } from "@/app/query-provider";
+import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,6 +22,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -34,24 +37,25 @@ import {
 } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { useFieldConfigs } from "@/hooks/use-field-configs";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { isSendInvoicesImmediatelyEnabled } from "@/lib/utils";
+import {
+  getRatingConfigPreset,
+  RATING_DIMENSION_LABELS,
+} from "@/lib/constants/rating-config";
 import {
   BusinessMode,
   OrganizationSettings,
   SupportedCurrency,
 } from "@/lib/types";
+import type { RatingConfigType } from "@/lib/types";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   DollarSign,
   ExternalLink,
-  Info,
   Loader2,
   Save,
   Upload,
@@ -59,6 +63,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export default function SettingsPage() {
@@ -67,6 +72,9 @@ export default function SettingsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
   // Separate state for business address fields
   const [businessAddressFields, setBusinessAddressFields] = useState({
@@ -91,8 +99,11 @@ export default function SettingsPage() {
     bank_transfer_bsb: null,
     bank_transfer_account_number: null,
     bank_transfer_account_name: null,
-    show_bank_transfer_on_invoices: false,
+    show_bank_transfer_on_invoices: true,
     default_invoice_due_days: 30,
+    gst_registered: false,
+    gst_inclusive: true,
+    gst_rate_percent: 10,
     rating_config: { type: "single", dimensions: ["overall"] },
     stripe_account_id: null,
     payment_provider: null,
@@ -126,7 +137,7 @@ export default function SettingsPage() {
         "get-organization-settings",
         {
           body: { organization_id: organizationId },
-        }
+        },
       );
 
       if (fetchError) {
@@ -163,9 +174,12 @@ export default function SettingsPage() {
           bank_transfer_account_name:
             data.settings.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
-            data.settings.show_bank_transfer_on_invoices ?? false,
+            data.settings.show_bank_transfer_on_invoices ?? true,
           default_invoice_due_days:
             data.settings.default_invoice_due_days ?? 30,
+          gst_registered: data.settings.gst_registered ?? false,
+          gst_inclusive: data.settings.gst_inclusive ?? true,
+          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -202,9 +216,12 @@ export default function SettingsPage() {
           bank_transfer_account_name:
             data.settings.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
-            data.settings.show_bank_transfer_on_invoices ?? false,
+            data.settings.show_bank_transfer_on_invoices ?? true,
           default_invoice_due_days:
             data.settings.default_invoice_due_days ?? 30,
+          gst_registered: data.settings.gst_registered ?? false,
+          gst_inclusive: data.settings.gst_inclusive ?? true,
+          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
           rating_config: data.settings.rating_config ?? {
             type: "single",
             dimensions: ["overall"],
@@ -286,7 +303,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             business_mode: mode,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -322,7 +339,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           name,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -356,7 +373,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           abn: abn || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -377,7 +394,7 @@ export default function SettingsPage() {
   };
 
   const handleLogoUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file || !organizationId) {
@@ -401,7 +418,7 @@ export default function SettingsPage() {
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
     const isValidExtension =
       ["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(
-        fileExtension || ""
+        fileExtension || "",
       ) || validTypes.includes(file.type);
 
     if (!isValidExtension) {
@@ -532,7 +549,7 @@ export default function SettingsPage() {
             organization_id: organizationId,
             logo_url: null,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -575,7 +592,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           primary_contact_email: email || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -591,6 +608,10 @@ export default function SettingsPage() {
         primary_contact_email: data.settings.primary_contact_email,
       }));
     }
+
+    queryClient.invalidateQueries({
+      queryKey: organizationSettingsKey(organizationId),
+    });
 
     log.info("Settings: Primary contact email updated successfully");
   };
@@ -609,7 +630,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           primary_contact_phone: phone || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -626,7 +647,350 @@ export default function SettingsPage() {
       }));
     }
 
+    queryClient.invalidateQueries({
+      queryKey: organizationSettingsKey(organizationId),
+    });
+
     log.info("Settings: Primary contact phone updated successfully");
+  };
+
+  const handleTogglePredefinedLocations = async (checked: boolean) => {
+    if (!organizationId) return;
+
+    try {
+      log.info("Settings: Updating predefined locations setting", { checked });
+
+      const { data, error: updateError } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            use_predefined_locations: checked,
+          },
+        },
+      );
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          use_predefined_locations:
+            data.settings.use_predefined_locations ?? true,
+        }));
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+
+      log.info("Settings: Predefined locations setting updated successfully");
+    } catch (err) {
+      log.error("Settings: Failed to update predefined locations setting", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleInvoiceSendImmediatelyChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating invoice send immediately", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            invoice_send_immediately: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          invoice_send_immediately:
+            data.settings.invoice_send_immediately ?? false,
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Invoice send immediately updated");
+    } catch (err) {
+      log.error("Settings: Failed to update invoice send immediately", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleAutoGenerateInvoicesChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating auto-generate invoices", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            auto_generate_invoices_immediately: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          auto_generate_invoices_immediately:
+            data.settings.auto_generate_invoices_immediately ?? false,
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Auto-generate invoices updated");
+    } catch (err) {
+      log.error("Settings: Failed to update auto-generate invoices", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleFeedbackEmailSendImmediatelyChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating feedback email send immediately", {
+        checked,
+      });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            feedback_email_send_immediately: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          feedback_email_send_immediately:
+            data.settings.feedback_email_send_immediately ?? false,
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Feedback email send immediately updated");
+    } catch (err) {
+      log.error(
+        "Settings: Failed to update feedback email send immediately",
+        { error: err instanceof Error ? err.message : "Unknown error" },
+      );
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleRatingConfigChange = async (value: string) => {
+    const newType = value as RatingConfigType;
+    const newConfig = getRatingConfigPreset(newType);
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating rating configuration", {
+        type: newType,
+        dimensions: newConfig.dimensions,
+      });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            rating_config: newConfig,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          rating_config:
+            data.settings.rating_config ?? {
+              type: "single",
+              dimensions: ["overall"],
+            },
+        }));
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: Rating configuration updated");
+    } catch (err) {
+      log.error("Settings: Failed to update rating configuration", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  // GST auto-save handlers
+  const handleGstRegisteredChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating GST registered", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_registered: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_registered: data.settings.gst_registered ?? false,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_registered: data.settings.gst_registered ?? false,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST registered updated");
+    } catch (err) {
+      log.error("Settings: Failed to update GST registered", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleGstInclusiveChange = async (checked: boolean) => {
+    if (!organizationId) return;
+    try {
+      log.info("Settings: Updating GST inclusive", { checked });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_inclusive: checked,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_inclusive: data.settings.gst_inclusive ?? true,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_inclusive: data.settings.gst_inclusive ?? true,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST inclusive updated");
+    } catch (err) {
+      log.error("Settings: Failed to update GST inclusive", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
+  };
+
+  const handleGstRateChange = async (rate: number) => {
+    if (!organizationId) return;
+    if (typeof rate !== "number" || isNaN(rate) || rate < 0 || rate > 100) {
+      setErrorDialog({
+        open: true,
+        title: "Validation Error",
+        message: "GST rate must be between 0 and 100",
+      });
+      return;
+    }
+    try {
+      log.info("Settings: Updating GST rate", { rate });
+      const { data, error } = await supabase.functions.invoke(
+        "update-organization-settings",
+        {
+          body: {
+            organization_id: organizationId,
+            gst_rate_percent: rate,
+          },
+        },
+      );
+      if (error) throw error;
+      if (data?.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+        }));
+        if (initialSettings) {
+          setInitialSettings({
+            ...initialSettings,
+            gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+          });
+        }
+      }
+      queryClient.invalidateQueries({
+        queryKey: organizationSettingsKey(organizationId),
+      });
+      log.info("Settings: GST rate updated");
+    } catch (err) {
+      log.error("Settings: Failed to update GST rate", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: "Failed to update setting. Please try again.",
+      });
+    }
   };
 
   // Helper function to capitalize first letter of each word (title case)
@@ -644,7 +1008,7 @@ export default function SettingsPage() {
   };
 
   const parseBusinessAddress = (
-    address: string
+    address: string,
   ): {
     street: string;
     city: string;
@@ -746,7 +1110,7 @@ export default function SettingsPage() {
           organization_id: organizationId,
           business_address: formattedAddress || null,
         },
-      }
+      },
     );
 
     if (updateError) {
@@ -762,6 +1126,10 @@ export default function SettingsPage() {
         business_address: data.settings.business_address,
       }));
     }
+
+    queryClient.invalidateQueries({
+      queryKey: organizationSettingsKey(organizationId),
+    });
 
     log.info("Settings: Business address updated successfully");
   };
@@ -793,7 +1161,7 @@ export default function SettingsPage() {
             stripe_account_id: null,
             payment_provider: null,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -847,7 +1215,7 @@ export default function SettingsPage() {
             currency,
             locale,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -942,7 +1310,7 @@ export default function SettingsPage() {
             show_bank_transfer_on_invoices:
               settings.show_bank_transfer_on_invoices,
           },
-        }
+        },
       );
 
       if (updateError) {
@@ -997,6 +1365,7 @@ export default function SettingsPage() {
     }
   };
 
+
   useEffect(() => {
     if (organizationId) {
       fetchSettings();
@@ -1033,17 +1402,33 @@ export default function SettingsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-2">
-          Configure global organization settings. Feature-specific settings are
-          available on their respective pages.
+          Configure global organization settings. For more on what each setting
+          does, see{" "}
+          <Link
+            href="/dashboard/help"
+            className="font-medium text-primary hover:underline"
+          >
+            Help & FAQ
+          </Link>
+          .
         </p>
       </div>
 
-      <Tabs defaultValue="organization" className="space-y-6">
+      <Tabs
+        defaultValue={
+          ["organization", "invoicing", "payment", "features"].includes(
+            searchParams.get("tab") || "",
+          )
+            ? searchParams.get("tab")!
+            : "organization"
+        }
+        className="space-y-6"
+      >
         <TabsList>
           <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="features">Feature Specific</TabsTrigger>
-          {/* Business Mode tab hidden - feature not currently in use */}
-          <TabsTrigger value="payment">Payment Details</TabsTrigger>
+          <TabsTrigger value="invoicing">Invoicing</TabsTrigger>
+          <TabsTrigger value="payment">Payments</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
         </TabsList>
 
         <TabsContent value="organization" className="space-y-6">
@@ -1054,7 +1439,7 @@ export default function SettingsPage() {
                 Manage your organization&apos;s basic information and details
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
               <AutoSaveInput
                 label="Organization Name"
                 value={settings.name}
@@ -1062,14 +1447,6 @@ export default function SettingsPage() {
                 placeholder="Enter organization name"
                 required
                 description="The name of your business as it appears throughout the application"
-              />
-
-              <AutoSaveInput
-                label="ABN (Australian Business Number)"
-                value={settings.abn}
-                onSave={handleABNChange}
-                placeholder="Enter ABN (optional)"
-                description="Your Australian Business Number for invoicing and business records (optional)"
               />
 
               <div className="space-y-2">
@@ -1120,65 +1497,100 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <AutoSaveInput
+                label="ABN (Australian Business Number)"
+                value={settings.abn}
+                onSave={handleABNChange}
+                placeholder="Enter ABN (optional)"
+                description="Your Australian Business Number for invoicing and business records (optional)"
+              />
 
-              <TooltipProvider>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="primary-contact-email">
-                      Primary Contact Email
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          This email is used for business communications and
-                          notifications. It does not change your sign-in email
-                          address.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <AutoSaveInput
-                    id="primary-contact-email"
-                    type="email"
-                    value={settings.primary_contact_email}
-                    onSave={handlePrimaryContactEmailChange}
-                    placeholder="Enter primary contact email"
-                    description="The primary business contact email for account communications and notifications."
-                  />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="primary-contact-phone">
+                    Primary Contact Phone
+                  </Label>
                 </div>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="primary-contact-phone">
-                      Primary Contact Phone
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          This phone number is displayed on invoices for
-                          customer contact purposes.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <AutoSaveInput
-                    id="primary-contact-phone"
-                    type="tel"
-                    value={settings.primary_contact_phone}
-                    onSave={handlePrimaryContactPhoneChange}
-                    placeholder="Enter primary contact phone (e.g., 0412 345 678)"
-                    description="The primary business contact phone number displayed on invoices."
-                  />
+                <AutoSaveInput
+                  id="primary-contact-phone"
+                  type="tel"
+                  value={settings.primary_contact_phone}
+                  onSave={handlePrimaryContactPhoneChange}
+                  placeholder="Enter primary contact phone (e.g., 0412 345 678)"
+                  description="The primary business contact phone number displayed on invoices."
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="primary-contact-email">
+                    Primary Contact Email
+                  </Label>
                 </div>
-              </TooltipProvider>
+                <AutoSaveInput
+                  id="primary-contact-email"
+                  type="email"
+                  value={settings.primary_contact_email}
+                  onSave={handlePrimaryContactEmailChange}
+                  placeholder="Enter primary contact email"
+                  description="The primary business contact email for account communications and notifications."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="currency">Currency</Label>
+                <Select
+                  value={settings.currency}
+                  onValueChange={(value) =>
+                    handleCurrencyChange(value as SupportedCurrency)
+                  }
+                >
+                  <SelectTrigger id="currency" className="w-full max-w-xs">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select currency" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUD">
+                      <span className="font-medium">AUD</span>
+                      <span className="text-muted-foreground ml-2">
+                        Australian Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="USD">
+                      <span className="font-medium">USD</span>
+                      <span className="text-muted-foreground ml-2">
+                        US Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="GBP">
+                      <span className="font-medium">GBP</span>
+                      <span className="text-muted-foreground ml-2">
+                        British Pound
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="EUR">
+                      <span className="font-medium">EUR</span>
+                      <span className="text-muted-foreground ml-2">Euro</span>
+                    </SelectItem>
+                    <SelectItem value="CAD">
+                      <span className="font-medium">CAD</span>
+                      <span className="text-muted-foreground ml-2">
+                        Canadian Dollar
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="NZD">
+                      <span className="font-medium">NZD</span>
+                      <span className="text-muted-foreground ml-2">
+                        New Zealand Dollar
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Default currency for pricing and invoicing. This affects how
+                  prices are displayed throughout the application.
+                </p>
+              </div>
 
               <div className="space-y-4">
                 <div>
@@ -1286,115 +1698,68 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="currency">Currency</Label>
-                <Select
-                  value={settings.currency}
-                  onValueChange={(value) =>
-                    handleCurrencyChange(value as SupportedCurrency)
-                  }
-                >
-                  <SelectTrigger id="currency" className="w-full max-w-xs">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <SelectValue placeholder="Select currency" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUD">
-                      <span className="font-medium">AUD</span>
-                      <span className="text-muted-foreground ml-2">
-                        Australian Dollar
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="USD">
-                      <span className="font-medium">USD</span>
-                      <span className="text-muted-foreground ml-2">
-                        US Dollar
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="GBP">
-                      <span className="font-medium">GBP</span>
-                      <span className="text-muted-foreground ml-2">
-                        British Pound
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="EUR">
-                      <span className="font-medium">EUR</span>
-                      <span className="text-muted-foreground ml-2">Euro</span>
-                    </SelectItem>
-                    <SelectItem value="CAD">
-                      <span className="font-medium">CAD</span>
-                      <span className="text-muted-foreground ml-2">
-                        Canadian Dollar
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="NZD">
-                      <span className="font-medium">NZD</span>
-                      <span className="text-muted-foreground ml-2">
-                        New Zealand Dollar
-                      </span>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Default currency for pricing and invoicing. This affects how
-                  prices are displayed throughout the application.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="features" className="space-y-6">
-          {/* Feature-Specific Settings */}
+        <TabsContent value="invoicing" className="space-y-6">
+          {/* Sending & behavior */}
           <Card>
             <CardHeader>
-              <CardTitle>Feature-Specific Settings</CardTitle>
+              <CardTitle>Sending &amp; behavior</CardTitle>
               <CardDescription>
-                Configure settings for specific features on their respective
-                pages
+                When to send invoices and when payment is due
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Locations Settings</p>
+            <CardContent className="space-y-6">
+              {isSendInvoicesImmediatelyEnabled() && (
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 flex-1">
+                    <Label htmlFor="invoice-send-immediately">
+                      Send Invoices Immediately
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {settings.invoice_send_immediately
+                        ? "Invoices will be sent to customers immediately upon creation"
+                        : "Invoices will be created in draft status and require review before sending"}
+                    </p>
+                  </div>
+                  <Switch
+                    id="invoice-send-immediately"
+                    checked={settings.invoice_send_immediately}
+                    onCheckedChange={handleInvoiceSendImmediatelyChange}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5 flex-1">
+                  <Label htmlFor="auto-generate-invoices">
+                    Auto-Generate Invoices
+                  </Label>
                   <p className="text-sm text-muted-foreground">
-                    Configure mobile app location integration
+                    Automatically create invoices in pending review when jobs
+                    are completed. Location-specific auto-generate takes
+                    precedence.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/locations">
-                    Go to Locations
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <Switch
+                  id="auto-generate-invoices"
+                  checked={settings.auto_generate_invoices_immediately}
+                  onCheckedChange={handleAutoGenerateInvoicesChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Invoice Settings</p>
-                  <p className="text-sm text-muted-foreground">
-                    Configure invoice templates and sending behavior
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/invoicing">
-                    Go to Invoicing
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="p-4 border rounded-lg space-y-3">
-                <div>
-                  <p className="font-medium">Default Invoice Due Days</p>
-                  <p className="text-sm text-muted-foreground">
-                    Number of days after invoice creation when payment is due
-                  </p>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="default-invoice-due-days">
+                  Default Invoice Due Days
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Number of days after invoice creation when payment is due
+                </p>
                 <div className="flex items-center gap-3">
                   <Input
+                    id="default-invoice-due-days"
                     type="number"
                     min={1}
                     max={365}
@@ -1410,9 +1775,7 @@ export default function SettingsPage() {
                     }}
                     onBlur={async (e) => {
                       const value = parseInt(e.target.value, 10);
-                      if (isNaN(value) || value < 1 || value > 365) {
-                        return;
-                      }
+                      if (isNaN(value) || value < 1 || value > 365) return;
                       try {
                         const { error } = await supabase.functions.invoke(
                           "update-organization-settings",
@@ -1421,9 +1784,12 @@ export default function SettingsPage() {
                               organization_id: organizationId,
                               default_invoice_due_days: value,
                             },
-                          }
+                          },
                         );
                         if (error) throw error;
+                        queryClient.invalidateQueries({
+                          queryKey: organizationSettingsKey(organizationId),
+                        });
                       } catch (err) {
                         log.error("Failed to update invoice due days", {
                           error: err,
@@ -1441,19 +1807,273 @@ export default function SettingsPage() {
                   <span className="text-sm text-muted-foreground">days</span>
                 </div>
               </div>
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">Feedback & Rating Settings</p>
+            </CardContent>
+          </Card>
+
+          {/* Tax / GST */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax / GST</CardTitle>
+              <CardDescription>
+                Configure GST for Australian tax invoices. If you&apos;re not
+                GST-registered (e.g. under $75k), leave GST registered off.
+                Invoices will show &quot;Invoice&quot; and no GST. If
+                registered, we use &quot;Tax Invoice&quot; and show a GST
+                breakdown when the total is $82.50 or more (AUD).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">
+                    GST registered
+                  </Label>
                   <p className="text-sm text-muted-foreground">
-                    Configure feedback requests and rating system
+                    Your business is registered for GST (e.g. turnover $75k+)
                   </p>
                 </div>
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/dashboard/ratings">
-                    Go to Ratings
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                <Switch
+                  checked={settings.gst_registered}
+                  onCheckedChange={handleGstRegisteredChange}
+                  className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                />
+              </div>
+
+              {settings.gst_registered && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-base font-semibold">
+                        Prices include GST
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Your prices in Pricing are GST-inclusive
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.gst_inclusive}
+                      onCheckedChange={handleGstInclusiveChange}
+                      className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="gst-rate-percent-inv">GST rate (%)</Label>
+                    <Input
+                      id="gst-rate-percent-inv"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      value={settings.gst_rate_percent}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v) && v >= 0 && v <= 100) {
+                          setSettings((prev) => ({
+                            ...prev,
+                            gst_rate_percent: v,
+                          }));
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v) && v >= 0 && v <= 100) {
+                          handleGstRateChange(v);
+                        }
+                      }}
+                      className="max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Default 10% for Australia
+                    </p>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Invoice template */}
+          <InvoiceTemplateSettings
+            organizationId={organizationId}
+            fieldConfigs={fieldConfigs}
+            fieldConfigsLoading={fieldConfigsLoading}
+          />
+        </TabsContent>
+
+        <TabsContent value="features" className="space-y-6">
+          {/* Feature-Specific Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Feature-Specific Settings</CardTitle>
+              <CardDescription>
+                Configure settings for specific features on their respective
+                pages
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="predefined-locations"
+                      className="text-base font-semibold"
+                    >
+                      Customer Locations
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      When enabled, your Customer Locations will appear as
+                      selectable options in the mobile app. Workers can choose
+                      from your locations when completing jobs. You can still
+                      configure custom fields in Mobile Application regardless
+                      of this setting.
+                    </p>
+                  </div>
+                  <Switch
+                    id="predefined-locations"
+                    checked={settings.use_predefined_locations ?? true}
+                    onCheckedChange={handleTogglePredefinedLocations}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
+                </div>
+                <Link
+                  href="/dashboard/locations"
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Manage locations
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+              <Separator />
+
+              {/* Feedback & Rating Settings */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="feedback-email-send-immediately"
+                      className="text-base font-semibold"
+                    >
+                      Send Feedback Requests Immediately
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      {settings.feedback_email_send_immediately
+                        ? "Feedback request emails will be sent to customers immediately after a job is completed"
+                        : "Feedback request emails will require manual action to send"}
+                    </p>
+                  </div>
+                  <Switch
+                    id="feedback-email-send-immediately"
+                    checked={settings.feedback_email_send_immediately ?? false}
+                    onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
+                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+                  />
+                </div>
+                <Link
+                  href="/dashboard/ratings"
+                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  View customer ratings
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+
+              <Separator />
+
+              {/* Rating Configuration */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label className="text-base font-semibold">
+                    Rating Configuration
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose how customers rate your service. Based on industry
+                    best practices.
+                  </p>
+                </div>
+                <RadioGroup
+                  value={settings.rating_config?.type ?? "single"}
+                  onValueChange={(v) => handleRatingConfigChange(v)}
+                >
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="single"
+                      id="rating-single"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-single"
+                        className="font-normal cursor-pointer"
+                      >
+                        Single Overall Rating
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Customers provide one overall satisfaction rating (1-5
+                        stars). Simple and quick.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions: Overall Satisfaction
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="three_dimensions"
+                      id="rating-three"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-three"
+                        className="font-normal cursor-pointer"
+                      >
+                        Three Dimensions
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Customers rate Service Quality, Communication, and Value
+                        for Money. Recommended for most service businesses.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions:{" "}
+                        {["quality", "communication", "value"]
+                          .map((d) => RATING_DIMENSION_LABELS[d])
+                          .join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
+                    <RadioGroupItem
+                      value="rater"
+                      id="rating-rater"
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label
+                        htmlFor="rating-rater"
+                        className="font-normal cursor-pointer"
+                      >
+                        Full RATER Framework
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Comprehensive 5-dimension rating system: Reliability,
+                        Assurance, Tangibles, Empathy, and Responsiveness. Best
+                        for detailed feedback analysis.
+                      </p>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Dimensions:{" "}
+                        {[
+                          "reliability",
+                          "assurance",
+                          "tangibles",
+                          "empathy",
+                          "responsiveness",
+                        ]
+                          .map((d) => RATING_DIMENSION_LABELS[d])
+                          .join(", ")}
+                      </div>
+                    </div>
+                  </div>
+                </RadioGroup>
               </div>
             </CardContent>
           </Card>
@@ -1533,10 +2153,10 @@ export default function SettingsPage() {
         </TabsContent> */}
 
         <TabsContent value="payment" className="space-y-6">
-          {/* Bank Transfer Settings */}
+          {/* Bank transfer – primary payment method until Stripe is enabled */}
           <Card>
             <CardHeader>
-              <CardTitle>Bank Transfer Payment Details</CardTitle>
+              <CardTitle>Bank Transfer</CardTitle>
               <CardDescription>
                 Add your bank account details to display on invoices for manual
                 payment processing. Payments via bank transfer require manual
@@ -1565,16 +2185,13 @@ export default function SettingsPage() {
               {settings.show_bank_transfer_on_invoices && (
                 <div className="space-y-4 pt-4 border-t">
                   <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-bsb">BSB</Label>
+                    <Label htmlFor="bank-transfer-bsb-pay">BSB</Label>
                     <Input
-                      id="bank-transfer-bsb"
+                      id="bank-transfer-bsb-pay"
                       value={settings.bank_transfer_bsb || ""}
                       onChange={(e) => {
                         let value = e.target.value;
-                        // Auto-format BSB as user types: XXX-XXX
-                        // Remove non-digits
                         const digits = value.replace(/\D/g, "");
-                        // Format as XXX-XXX
                         if (digits.length <= 3) {
                           value = digits;
                         } else if (digits.length <= 6) {
@@ -1597,11 +2214,11 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-number">
+                    <Label htmlFor="bank-transfer-account-number-pay">
                       Account Number
                     </Label>
                     <Input
-                      id="bank-transfer-account-number"
+                      id="bank-transfer-account-number-pay"
                       type="text"
                       inputMode="numeric"
                       value={settings.bank_transfer_account_number || ""}
@@ -1610,7 +2227,7 @@ export default function SettingsPage() {
                           ...prev,
                           bank_transfer_account_number: e.target.value.replace(
                             /\D/g,
-                            ""
+                            "",
                           ),
                         }))
                       }
@@ -1622,11 +2239,11 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-name">
+                    <Label htmlFor="bank-transfer-account-name-pay">
                       Account Name (Optional)
                     </Label>
                     <Input
-                      id="bank-transfer-account-name"
+                      id="bank-transfer-account-name-pay"
                       value={settings.bank_transfer_account_name || ""}
                       onChange={(e) =>
                         setSettings((prev) => ({
@@ -1652,7 +2269,6 @@ export default function SettingsPage() {
                     </p>
                   </div>
 
-                  {/* Save Button */}
                   {hasUnsavedChanges && (
                     <div className="flex items-center justify-between pt-4 border-t">
                       <p className="text-sm text-muted-foreground">

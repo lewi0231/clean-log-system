@@ -20,6 +20,12 @@ export interface CalculateInvoiceResponse {
     total: number;
     total_worker_payment: number;
     total_margin: number;
+    /** GST fields from calculate-invoice (Australian tax). */
+    gst_registered?: boolean;
+    gst_inclusive?: boolean;
+    gst_amount?: number;
+    subtotal_ex_gst?: number;
+    currency?: string;
     job_calculations: Array<{
       job_id: string;
       base_price: number;
