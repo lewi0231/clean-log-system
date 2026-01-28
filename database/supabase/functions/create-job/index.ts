@@ -24,6 +24,7 @@ import type {
   JobContext,
 } from "../_utils/invoice-email.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
@@ -314,6 +315,22 @@ serve(async (req) => {
       jobId: job.id,
       organizationId: job.organization_id,
     });
+
+    // Notify admins that a worker submitted a job (non-blocking)
+    const notificationResult = await createNotification(supabaseAdmin, {
+      organization_id: job.organization_id,
+      type: "job_completed",
+      title: "Job submitted",
+      message: "A worker has submitted a new job.",
+      related_entity_type: "job",
+      related_entity_id: job.id,
+    });
+    if (!notificationResult.success) {
+      logger.warn("Failed to create job submission notification", {
+        error: notificationResult.error,
+        jobId: job.id,
+      });
+    }
 
     // Create job_worker entries if colleague_ids provided
     if (

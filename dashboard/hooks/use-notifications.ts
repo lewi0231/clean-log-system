@@ -4,6 +4,7 @@ import {
   NotificationService,
   type Notification,
 } from "@/lib/services/notification.service";
+import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
 
@@ -50,7 +51,32 @@ export function useNotifications(): UseNotificationsResult {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Poll for new notifications every 30 seconds
+  // Realtime: refetch when a new notification is inserted for this user
+  useEffect(() => {
+    if (!organizationUserId) return;
+
+    const channel = supabase
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notification",
+          filter: `receiver_id=eq.${organizationUserId}`,
+        },
+        () => {
+          void fetchNotifications();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [organizationUserId, fetchNotifications]);
+
+  // Fallback poll every 30 seconds (e.g. if Realtime is not enabled for table)
   useEffect(() => {
     if (!organizationId || !organizationUserId) return;
 

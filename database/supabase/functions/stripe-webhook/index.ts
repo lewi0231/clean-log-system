@@ -11,6 +11,7 @@ import {
   type JobContext,
 } from "../_utils/invoice-email.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import type { Stripe } from "../_utils/stripe.ts";
 import {
   createStripeClient,
@@ -259,6 +260,27 @@ serve(async (req) => {
                 invoice_id: invoiceId,
                 amount,
               });
+
+              // Notify admins when invoice is fully paid (non-blocking)
+              if (newTotalPaid >= invoice.total) {
+                const notificationResult = await createNotification(
+                  supabase,
+                  {
+                    organization_id: invoice.organization_id,
+                    type: "payment_received",
+                    title: "Invoice paid",
+                    message: "An invoice has been paid.",
+                    related_entity_type: "invoice",
+                    related_entity_id: invoiceId,
+                  },
+                );
+                if (!notificationResult.success) {
+                  console.warn(
+                    "Failed to create payment notification:",
+                    notificationResult.error,
+                  );
+                }
+              }
 
               // Send payment confirmation email
               try {

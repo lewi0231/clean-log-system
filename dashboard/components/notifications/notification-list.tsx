@@ -3,7 +3,14 @@
 import type { Notification } from "@/lib/services/notification.service";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
-import { Bell, CheckCircle2, FileText, User, Wallet } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  FileText,
+  MessageSquare,
+  User,
+  Wallet,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface NotificationListProps {
@@ -18,6 +25,7 @@ const notificationIcons: Record<Notification["type"], React.ReactNode> = {
   job_completed: <CheckCircle2 className="h-4 w-4 text-blue-500" />,
   invoice_generated: <FileText className="h-4 w-4 text-purple-500" />,
   payment_received: <Wallet className="h-4 w-4 text-emerald-500" />,
+  review_submitted: <MessageSquare className="h-4 w-4 text-amber-500" />,
 };
 
 export default function NotificationList({

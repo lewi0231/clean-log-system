@@ -965,7 +965,7 @@ CREATE TABLE IF NOT EXISTS "public"."notification" (
     "read" boolean DEFAULT false,
     "read_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "notification_type_check" CHECK (("type" = ANY (ARRAY['worker_active'::"text", 'job_completed'::"text", 'invoice_generated'::"text", 'payment_received'::"text"])))
+    CONSTRAINT "notification_type_check" CHECK (("type" = ANY (ARRAY['worker_active'::"text", 'job_completed'::"text", 'invoice_generated'::"text", 'payment_received'::"text", 'review_submitted'::"text"])))
 );
 
 
@@ -3024,6 +3024,10 @@ CREATE POLICY "Service role can manage location_hierarchy" ON "public"."location
 
 
 CREATE POLICY "Service role can manage notification" ON "public"."notification" USING ((( SELECT ("auth"."jwt"() ->> 'role'::"text")) = 'service_role'::"text"));
+
+CREATE POLICY "Authenticated users can read own notifications" ON "public"."notification" FOR SELECT TO authenticated USING ((receiver_id IN ( SELECT organization_user.id FROM organization_user WHERE (organization_user.auth_user_id = auth.uid()))));
+
+CREATE POLICY "Authenticated users can update own notifications" ON "public"."notification" FOR UPDATE TO authenticated USING ((receiver_id IN ( SELECT organization_user.id FROM organization_user WHERE (organization_user.auth_user_id = auth.uid())))) WITH CHECK ((receiver_id IN ( SELECT organization_user.id FROM organization_user WHERE (organization_user.auth_user_id = auth.uid()))));
 
 
 

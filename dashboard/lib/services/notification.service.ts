@@ -9,7 +9,12 @@ export interface Notification {
   id: string;
   organization_id: string;
   receiver_id: string;
-  type: "worker_active" | "job_completed" | "invoice_generated" | "payment_received";
+  type:
+    | "worker_active"
+    | "job_completed"
+    | "invoice_generated"
+    | "payment_received"
+    | "review_submitted";
   title: string;
   message: string;
   related_entity_type?: string;
