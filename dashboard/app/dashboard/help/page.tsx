@@ -167,6 +167,37 @@ const faqEntries = [
     ),
   },
   {
+    id: "send-feedback-requests-immediately",
+    question: "What does 'Send Feedback Requests Immediately' do?",
+    answer: (
+      <>
+        The <strong>Send Feedback Requests Immediately</strong> toggle is in{" "}
+        <Link
+          href="/dashboard/settings?tab=features"
+          className="font-medium text-primary hover:underline"
+        >
+          Settings → Features
+        </Link>
+        . It controls when we email customers to ask for a rating or feedback
+        after a job is completed.
+        <br />
+        <br />
+        When it’s <strong>on</strong>, we send the feedback request email
+        automatically as soon as the job is marked complete. When it’s{" "}
+        <strong>off</strong>, we don’t send it automatically; you can still
+        send feedback requests manually from the{" "}
+        <Link
+          href="/dashboard/ratings"
+          className="font-medium text-primary hover:underline"
+        >
+          Customer Ratings
+        </Link>{" "}
+        page or via the relevant job actions. Turning it off is useful if you
+        prefer to review jobs first or send feedback requests in batches.
+      </>
+    ),
+  },
+  {
     id: "field-group-settings-mutual-exclusion",
     question: "How do field group settings and mutual exclusion work?",
     answer: (
