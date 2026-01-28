@@ -13,6 +13,7 @@ import PaymentHistoryList from "@/components/worker-payments/payment-history-lis
 import PaymentOverview from "@/components/worker-payments/payment-overview";
 import RateCardManager from "@/components/worker-payments/rate-card-manager";
 import WorkerPaymentSummary from "@/components/worker-payments/worker-payment-summary";
+import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useJobs } from "@/hooks/use-jobs";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
@@ -27,6 +28,7 @@ export default function WorkerPaymentsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const { fieldConfigs } = useFieldConfigs();
 
   if (orgLoading) {
     return (
@@ -50,18 +52,23 @@ export default function WorkerPaymentsPage() {
   }
 
   return (
-    <PricingScopeProvider>
-      <WorkerPaymentsPageContent organizationId={organizationId} />
+    <PricingScopeProvider fieldConfigs={fieldConfigs}>
+      <WorkerPaymentsPageContent
+        organizationId={organizationId}
+        fieldConfigs={fieldConfigs}
+      />
     </PricingScopeProvider>
   );
 }
 
 interface WorkerPaymentsPageContentProps {
   organizationId: string | null;
+  fieldConfigs: import("@clean-log/shared/types").FieldConfig[];
 }
 
 function WorkerPaymentsPageContent({
   organizationId,
+  fieldConfigs,
 }: WorkerPaymentsPageContentProps) {
   const { jobs } = useJobs();
   const { calculatePayments } = useWorkerPayments();
@@ -130,7 +137,7 @@ function WorkerPaymentsPageContent({
         </TabsContent>
 
         <TabsContent value="rate-cards" className="space-y-6">
-          <RateCardManager />
+          <RateCardManager fieldConfigs={fieldConfigs} />
         </TabsContent>
       </Tabs>
 

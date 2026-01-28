@@ -160,6 +160,8 @@ describe("FieldPricingList - Zero Price Handling", () => {
 
       render(
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationHierarchyId={null}
           locationId={null}
           organizationId="org-1"
@@ -236,6 +238,8 @@ describe("FieldPricingList - Zero Price Handling", () => {
 
       render(
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationHierarchyId={null}
           locationId={null}
           organizationId="org-1"
@@ -311,6 +315,8 @@ describe("FieldPricingList - Zero Price Handling", () => {
 
       render(
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationHierarchyId={null}
           locationId={null}
           organizationId="org-1"

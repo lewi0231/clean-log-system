@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
+import type { FieldConfig } from "@clean-log/shared/types";
 
 interface PricingScopeValue {
   selectedFieldId: string | null;
@@ -36,6 +36,8 @@ const PricingScopeContext = createContext<PricingScopeValue | undefined>(
 
 interface PricingScopeProviderProps {
   children: ReactNode;
+  /** Field configs from the page (avoids useFieldConfigs in nested components). */
+  fieldConfigs: FieldConfig[];
   initialLocationNodeId?: string | null;
   initialLocationId?: string | null;
   initialEffectiveDate?: string | null;
@@ -43,6 +45,7 @@ interface PricingScopeProviderProps {
 
 export function PricingScopeProvider({
   children,
+  fieldConfigs,
   initialLocationNodeId = null,
   initialLocationId = null,
   initialEffectiveDate,
@@ -72,8 +75,6 @@ export function PricingScopeProvider({
     useState(0);
   const [pricingContext, setPricingContext] = useState<"customer" | "worker">("customer");
   const [showBothContexts, setShowBothContexts] = useState(false);
-
-  const { fieldConfigs } = useFieldConfigs();
 
   const fieldLabelLookup = useMemo(() => {
     const lookup: Record<string, string> = {};

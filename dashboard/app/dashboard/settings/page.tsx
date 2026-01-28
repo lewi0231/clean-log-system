@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useFieldConfigs } from "@/hooks/use-field-configs";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
@@ -64,6 +65,7 @@ export default function SettingsPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
@@ -1797,7 +1799,11 @@ export default function SettingsPage() {
           </Card>
 
           {/* Invoice template */}
-          <InvoiceTemplateSettings organizationId={organizationId} />
+          <InvoiceTemplateSettings
+            organizationId={organizationId}
+            fieldConfigs={fieldConfigs}
+            fieldConfigsLoading={fieldConfigsLoading}
+          />
         </TabsContent>
 
         <TabsContent value="features" className="space-y-6">

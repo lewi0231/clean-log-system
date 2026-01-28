@@ -41,7 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import {
   useWorkerRateCards,
@@ -93,10 +93,15 @@ const modifierTypeDescriptions: Record<ModifierType, string> = {
     "Percentage of other team members' earnings (e.g., 10% of team wages). Great for supervisors/team leads.",
 };
 
-export default function RateCardManager() {
+interface RateCardManagerProps {
+  fieldConfigs: FieldConfig[];
+}
+
+export default function RateCardManager({
+  fieldConfigs,
+}: RateCardManagerProps) {
   const { formatCurrency } = useOrganizationCurrency();
   const { workers } = useWorkers();
-  const { fieldConfigs } = useFieldConfigs();
   const {
     rateCards,
     loading,

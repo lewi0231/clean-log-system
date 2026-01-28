@@ -200,10 +200,10 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
     render(
       <Wrapper>
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationId={null}
           locationHierarchyId={null}
-          pricingContext="customer"
-          showBothContexts={false}
           organizationId="org-1"
         />
       </Wrapper>
@@ -257,10 +257,10 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
     render(
       <Wrapper>
         <FieldPricingList
+          fieldConfigs={[mockFieldConfig]}
+          configsLoading={false}
           locationId={null}
           locationHierarchyId={null}
-          pricingContext="customer"
-          showBothContexts={true}
           organizationId="org-1"
         />
       </Wrapper>

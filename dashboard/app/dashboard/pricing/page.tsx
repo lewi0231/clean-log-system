@@ -60,7 +60,7 @@ export default function PricingPage() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
-  const { fieldConfigs } = useFieldConfigs();
+  const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
 
   // Filter fields by type for each pricing tab
   const numberFields = useMemo(() => {
@@ -101,12 +101,14 @@ export default function PricingPage() {
   }
 
   return (
-    <PricingScopeProvider>
+    <PricingScopeProvider fieldConfigs={fieldConfigs}>
       <PricingPageContent
         numberFields={numberFields}
         booleanFields={booleanFields}
         selectFields={selectFields}
         groupedBreakdownFields={groupedBreakdownFields}
+        fieldConfigs={fieldConfigs}
+        fieldConfigsLoading={fieldConfigsLoading}
         organizationId={organizationId}
       />
     </PricingScopeProvider>
@@ -118,6 +120,8 @@ interface PricingPageContentProps {
   booleanFields: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
   selectFields: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
   groupedBreakdownFields: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
+  fieldConfigs: ReturnType<typeof useFieldConfigs>["fieldConfigs"];
+  fieldConfigsLoading: boolean;
   organizationId: string | null;
 }
 
@@ -126,6 +130,8 @@ function PricingPageContent({
   booleanFields,
   selectFields,
   groupedBreakdownFields,
+  fieldConfigs,
+  fieldConfigsLoading,
   organizationId,
 }: PricingPageContentProps) {
   const {
@@ -318,6 +324,7 @@ function PricingPageContent({
                         </p>
                       </div>
                       <BasePricingEditor
+                        fieldConfigs={fieldConfigs}
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
@@ -515,6 +522,8 @@ function PricingPageContent({
                     </CardHeader>
                     <CardContent>
                       <NumberPricingList
+                        fieldConfigs={fieldConfigs}
+                        configsLoading={fieldConfigsLoading}
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
@@ -548,6 +557,8 @@ function PricingPageContent({
                     </CardHeader>
                     <CardContent>
                       <BooleanPricingList
+                        fieldConfigs={fieldConfigs}
+                        configsLoading={fieldConfigsLoading}
                         locationHierarchyId={locationNodeId}
                         locationId={locationId}
                         effectiveAt={effectiveDate}
@@ -739,6 +750,8 @@ function PricingPageContent({
         open={testInvoiceOpen}
         onOpenChange={setTestInvoiceOpen}
         organizationId={organizationId}
+        fieldConfigs={fieldConfigs}
+        fieldsLoading={fieldConfigsLoading}
       />
     </PageTourWrapper>
   );

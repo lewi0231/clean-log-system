@@ -28,7 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
+import type { FieldConfig } from "@clean-log/shared/types";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
@@ -52,10 +52,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 interface InvoiceTemplateSettingsProps {
   /** Optional for backward compatibility; org is resolved via useOrganization in child hooks. */
   organizationId?: string | null;
+  /** Field configs from the page (avoids useFieldConfigs in nested components). */
+  fieldConfigs: FieldConfig[];
+  fieldConfigsLoading: boolean;
 }
 
 export default function InvoiceTemplateSettings(
-  _props?: InvoiceTemplateSettingsProps,
+  props?: InvoiceTemplateSettingsProps,
 ): React.ReactElement {
   const {
     config,
@@ -63,7 +66,8 @@ export default function InvoiceTemplateSettings(
     updateConfig,
     error: configError,
   } = useInvoiceTemplateConfig();
-  const { fieldConfigs, loading: fieldConfigsLoading } = useFieldConfigs();
+  const fieldConfigs = props?.fieldConfigs ?? [];
+  const fieldConfigsLoading = props?.fieldConfigsLoading ?? false;
   const { locations, loading: locationsLoading } = useLocations();
   const { settings: orgSettings } = useOrganizationSettings();
   const hasLocations = locations && locations.length > 0;

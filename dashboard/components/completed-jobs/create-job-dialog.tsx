@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
@@ -42,6 +41,8 @@ interface CreateJobDialogProps {
   onSuccess?: () => void;
   createJob: (request: CreateJobRequest) => Promise<Job>;
   organizationId: string | null;
+  /** Field configs from the page (avoids useFieldConfigs in nested components). */
+  fieldConfigs: FieldConfig[];
 }
 
 // Helper to evaluate conditional logic
@@ -321,15 +322,10 @@ export default function CreateJobDialog({
   onSuccess,
   createJob,
   organizationId,
+  fieldConfigs,
 }: CreateJobDialogProps) {
   const { settings } = useOrganizationSettings();
   const [locationId, setLocationId] = useState<string>("");
-  // Normalize locationId: treat empty string as null
-  const normalizedLocationId =
-    locationId && locationId.trim() !== "" ? locationId : null;
-  const { fieldConfigs } = useFieldConfigs({
-    locationId: normalizedLocationId,
-  });
   const { locations } = useLocations();
   const { workers } = useWorkers();
   const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);

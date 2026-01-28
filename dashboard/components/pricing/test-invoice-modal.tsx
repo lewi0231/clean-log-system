@@ -22,7 +22,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useLocations } from "@/hooks/use-locations";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
@@ -277,14 +276,17 @@ interface TestInvoiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId: string | null;
+  fieldConfigs: FieldConfig[];
+  fieldsLoading: boolean;
 }
 
 export default function TestInvoiceModal({
   open,
   onOpenChange,
   organizationId,
+  fieldConfigs,
+  fieldsLoading,
 }: TestInvoiceModalProps) {
-  const { fieldConfigs, loading: fieldsLoading } = useFieldConfigs();
   const { sections } = useMobileConfig(organizationId);
   const { locations, loading: locationsLoading } = useLocations();
   const { settings, loading: settingsLoading } = useOrganizationSettings();

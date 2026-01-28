@@ -6,7 +6,6 @@
  */
 
 import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
-import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
@@ -15,15 +14,13 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockFieldConfig } from "../../lib/fixtures";
 
-// Mock the hooks
+// Mock the hooks (field configs are passed from page; hook not used in component)
 vi.mock("@/hooks/use-invoice-template-config");
-vi.mock("@/hooks/use-field-configs");
 vi.mock("@/hooks/use-locations");
 vi.mock("@/hooks/use-organization-settings");
 vi.mock("@/hooks/useOrganization");
 
 const mockUseInvoiceTemplateConfig = vi.mocked(useInvoiceTemplateConfig);
-const mockUseFieldConfigs = vi.mocked(useFieldConfigs);
 const mockUseLocations = vi.mocked(useLocations);
 const mockUseOrganizationSettings = vi.mocked(useOrganizationSettings);
 const mockUseOrganization = vi.mocked(useOrganization);
@@ -48,12 +45,6 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseFieldConfigs.mockReturnValue({
-      fieldConfigs: mockFieldConfigs,
-      loading: false,
-      error: null,
-      refetch: mockRefetch,
-    });
     mockUseLocations.mockReturnValue({
       locations: [],
       loading: false,
@@ -87,7 +78,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
         refetch: mockRefetch,
       });
 
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={[]}
+          fieldConfigsLoading={false}
+        />
+      );
       expect(
         screen.getByText(/loading invoice template settings/i),
       ).toBeInTheDocument();
@@ -101,14 +97,13 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
         error: null,
         refetch: mockRefetch,
       });
-      mockUseFieldConfigs.mockReturnValue({
-        fieldConfigs: [],
-        loading: true,
-        error: null,
-        refetch: mockRefetch,
-      });
 
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={[]}
+          fieldConfigsLoading={true}
+        />
+      );
       expect(
         screen.getByText(/loading invoice template settings/i),
       ).toBeInTheDocument();
@@ -125,7 +120,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
         refetch: mockRefetch,
       });
 
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       expect(
         screen.getByText(/failed to load invoice template settings/i),
       ).toBeInTheDocument();
@@ -177,7 +177,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should render all main sections", () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
 
       expect(
         screen.getByText(/service address configuration/i),
@@ -191,14 +196,24 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should render preview button", () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       expect(
         screen.getByRole("button", { name: /preview invoice header/i }),
       ).toBeInTheDocument();
     });
 
     it("P2: should not have a manual save button (auto-save pattern)", () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       expect(
         screen.queryByRole("button", { name: /save invoice template settings/i }),
       ).not.toBeInTheDocument();
@@ -248,7 +263,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should auto-save when toggling include option values", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const includeOptionSwitch =
         screen.getByLabelText(/include option values/i);
 
@@ -260,7 +280,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should auto-save when toggling show base price separately", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const showBasePriceSwitch = screen.getByLabelText(
         /show base price separately/i,
       );
@@ -273,7 +298,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should auto-save when toggling billing address enabled", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const billingSwitch = screen.getByLabelText(/show billing address/i);
 
       fireEvent.click(billingSwitch);
@@ -284,7 +314,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should pass correct config data to updateConfig on toggle", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const includeOptionSwitch =
         screen.getByLabelText(/include option values/i);
 
@@ -306,7 +341,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should debounce description format input and save on blur", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const descriptionInput = screen.getByPlaceholderText(
         "{field_label}: {option_value}",
       );
@@ -370,7 +410,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should display validation error when entering invalid description format", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const descriptionInput = screen.getByPlaceholderText(
         "{field_label}: {option_value}",
       );
@@ -389,7 +434,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should not call updateConfig when validation fails", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const descriptionInput = screen.getByPlaceholderText(
         "{field_label}: {option_value}",
       );
@@ -411,7 +461,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should clear validation error when user fixes the input", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const descriptionInput = screen.getByPlaceholderText(
         "{field_label}: {option_value}",
       );
@@ -484,7 +539,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should toggle include option value switch", () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const includeOptionSwitch =
         screen.getByLabelText(/include option values/i);
 
@@ -496,7 +556,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should hide description format input when include option values is off", () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const includeOptionSwitch =
         screen.getByLabelText(/include option values/i);
 
@@ -557,7 +622,12 @@ describe("InvoiceTemplateSettings - P2 UI Component Tests", () => {
     });
 
     it("P2: should open preview dialog when preview button is clicked", async () => {
-      render(<InvoiceTemplateSettings />);
+      render(
+        <InvoiceTemplateSettings
+          fieldConfigs={mockFieldConfigs}
+          fieldConfigsLoading={false}
+        />
+      );
       const previewButton = screen.getByRole("button", {
         name: /preview invoice header/i,
       });
