@@ -180,7 +180,7 @@ Deno.test("P0: should use location.email when location_email_source is location_
   assertEquals(result, ["location@example.com"]);
 });
 
-Deno.test("P0: should use default_email when location email is missing", async () => {
+Deno.test("P0: should return empty when location email missing (default_email deprecated)", async () => {
   const mockSupabase = createMockSupabase();
   const jobContexts: JobContext[] = [
     {
@@ -210,7 +210,8 @@ Deno.test("P0: should use default_email when location email is missing", async (
     fieldConfigMap,
   );
 
-  assertEquals(result, ["default@example.com"]);
+  // default_email is deprecated and fallback was removed
+  assertEquals(result, []);
 });
 
 Deno.test("P0: should return empty array when no email source available and no default", async () => {
@@ -362,7 +363,7 @@ Deno.test("P0: should validate email format (RFC compliant)", async () => {
   assertEquals(result, []);
 });
 
-Deno.test("P0: should fallback to default_email when form field email invalid", async () => {
+Deno.test("P0: should return empty when form field email invalid (default_email deprecated)", async () => {
   const mockSupabase = createMockSupabase();
   const jobContexts: JobContext[] = [
     {
@@ -397,7 +398,8 @@ Deno.test("P0: should fallback to default_email when form field email invalid", 
     fieldConfigMap,
   );
 
-  assertEquals(result, ["default@example.com"]);
+  // default_email is deprecated; invalid form email => no recipient
+  assertEquals(result, []);
 });
 
 Deno.test("P0: should return empty array when no email available", async () => {
@@ -462,7 +464,8 @@ Deno.test("P0: should handle null submission_data gracefully", async () => {
     fieldConfigMap,
   );
 
-  assertEquals(result, ["default@example.com"]);
+  // default_email is deprecated; no submission_data => no recipient
+  assertEquals(result, []);
 });
 
 Deno.test("P0: should handle missing field config in map", async () => {
@@ -492,7 +495,8 @@ Deno.test("P0: should handle missing field config in map", async () => {
     fieldConfigMap,
   );
 
-  assertEquals(result, ["default@example.com"]);
+  // default_email is deprecated; no field config match => no recipient
+  assertEquals(result, []);
 });
 
 Deno.test("P0: should handle empty string emails", async () => {
@@ -525,7 +529,8 @@ Deno.test("P0: should handle empty string emails", async () => {
     fieldConfigMap,
   );
 
-  assertEquals(result, ["default@example.com"]);
+  // default_email is deprecated; empty location email => no recipient
+  assertEquals(result, []);
 });
 
 Deno.test("P0: should trim whitespace from emails", async () => {

@@ -39,7 +39,8 @@ export function SocialProofSection() {
             Trusted by Service Businesses Nationwide
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            See how RivetUp is helping businesses like yours save time and get paid faster.
+            See how RivetUp is helping businesses like yours save time, get paid faster, and stop losing
+            revenue to incomplete or incorrect timesheets.
           </p>
         </div>
 

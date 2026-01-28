@@ -135,21 +135,22 @@ export function WorkflowSection() {
             </div>
             <p className="text-lg mb-4">
               Most field service software just digitizes paperwork. RivetUp automates the entire
-              post-job workflow—emails, invoices, calculations—so you can focus on your customers,
-              not administrative tasks.
+              post-job workflow—review links to clients, emails, invoices, calculations—so you
+              focus on your customers, not admin. You configure everything yourself: forms, pricing,
+              static and one-off locations. No custom builds.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <CheckCircle className="size-4 text-green-600" />
+                <CheckCircle className="size-4 text-green-600 shrink-0" />
                 <span>Zero manual data entry</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle className="size-4 text-green-600" />
-                <span>Automated client communication</span>
+                <CheckCircle className="size-4 text-green-600 shrink-0" />
+                <span>Automatic review links to clients</span>
               </div>
               <div className="flex items-center gap-2">
-                <CheckCircle className="size-4 text-green-600" />
-                <span>Real-time business insights</span>
+                <CheckCircle className="size-4 text-green-600 shrink-0" />
+                <span>You configure it—forms, pricing, locations</span>
               </div>
             </div>
           </div>

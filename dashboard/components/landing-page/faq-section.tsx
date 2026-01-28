@@ -10,6 +10,14 @@ const faqs = [
     answer: "RivetUp offers three pricing plans: Starter at $39/month for solo operators, Professional at $79/month for small teams (most popular), and Business at $149/month for growing companies. All plans include a 14-day free trial with no credit card required.",
   },
   {
+    question: "Can I configure RivetUp myself—or do I need custom development?",
+    answer: "You configure everything yourself. Set up job forms, pricing rules, and locations (static sites like car yards or one-off addresses) in your dashboard. No custom builds, no long waits—you're in control from day one.",
+  },
+  {
+    question: "Do my workers need to install an app?",
+    answer: "The RivetUp mobile app (coming soon) lets workers complete jobs on their phones with optional offline sync. You can also use the web on any device—phones, tablets, or PCs—with no install. Just sign in and go.",
+  },
+  {
     question: "Is there a free trial?",
     answer: "Yes! We offer a 14-day free trial with no credit card required. You can explore all features, set up your job forms, configure pricing rules, and invite workers to test the mobile app.",
   },
@@ -30,8 +38,8 @@ const faqs = [
     answer: "Most businesses are up and running in 15-30 minutes. Our onboarding wizard guides you through setting up workers, configuring job forms, and establishing pricing rules. Our support team is available if you need help.",
   },
   {
-    question: "Can I manage multiple locations?",
-    answer: "Yes, RivetUp supports multiple customer locations with location-specific pricing rules. This is perfect for businesses like car detailers with multiple yards or cleaning services with recurring jobs at different sites.",
+    question: "Can I manage static locations and one-off jobs?",
+    answer: "Yes. RivetUp supports both fixed locations (car yards, recurring sites) and one-off job addresses—each with its own pricing and rules. Perfect for businesses that mix recurring customers with ad-hoc jobs.",
   },
   {
     question: "Is RivetUp good for solo operators?",

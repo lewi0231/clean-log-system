@@ -14,6 +14,8 @@ import {
   Users,
   MapPin,
   Zap,
+  MessageCircle,
+  Settings,
 } from "lucide-react";
 
 const features = [
@@ -30,6 +32,12 @@ const features = [
     benefit: "Get paid faster with automated payment links",
   },
   {
+    icon: MessageCircle,
+    title: "Automatic Review Links to Clients",
+    description: "Review request links are sent to clients automatically when jobs are done—capture feedback and build credibility without extra work.",
+    benefit: "Clients leave reviews; you look after the job",
+  },
+  {
     icon: Calculator,
     title: "Custom Pricing Rules",
     description: "Set pricing by unit, location, service type, or flat rate. Perfect for complex pricing structures.",
@@ -43,15 +51,21 @@ const features = [
   },
   {
     icon: MapPin,
-    title: "Location Management",
-    description: "Manage fixed customer locations (like car yards) with location-specific pricing and requirements.",
-    benefit: "Perfect for businesses with recurring customers",
+    title: "Static & One-Off Locations",
+    description: "Handle fixed sites (car yards, recurring customers) and one-off job addresses—each with its own pricing and rules.",
+    benefit: "One system for yards, sites, and ad‑hoc jobs",
   },
   {
     icon: Zap,
     title: "Real-Time Updates",
     description: "Jobs completed in the field appear instantly in your dashboard. No delays, no confusion.",
     benefit: "Always know what's happening with your business",
+  },
+  {
+    icon: Settings,
+    title: "You Configure It Yourself",
+    description: "Set up forms, pricing, and locations in your dashboard. No custom builds, no long waits—you're in control.",
+    benefit: "Take control without calling a developer",
   },
 ];
 
@@ -64,8 +78,8 @@ export function FeaturesSection() {
             Everything You Need to Run Your Service Business
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Powerful features designed specifically for field service businesses,
-            from solo operators to small teams.
+            Take control with forms, pricing, and locations you configure yourself—plus automatic
+            review links to clients. Built for solo operators and small teams.
           </p>
         </div>
 

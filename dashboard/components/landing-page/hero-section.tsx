@@ -26,8 +26,12 @@ export function HeroSection() {
             <span className="text-primary">Jobs, and Invoicing in One Place</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            Streamline your service business with automated invoicing, mobile job tracking,
-            and flexible pricing rules designed for tradespeople, car detailers, and service contractors.
+            Whether you're a lone operator or manage staff and sub-contractors—enter hours on a phone or tablet
+            before leaving the job. Clients get invoiced correctly, sub-contractors get paid on time,
+            and you stop losing revenue to missing or incorrect timesheets.
+          </p>
+          <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground">
+            Configure forms, pricing, and locations yourself. No custom builds, no waiting—just set up and go.
           </p>
 
           {/* Trust indicators */}
