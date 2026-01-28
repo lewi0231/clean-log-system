@@ -80,11 +80,11 @@ interface SectionEditorProps {
     section: Omit<
       FormSectionWithFields,
       "id" | "organization_id" | "created_at" | "updated_at"
-    >
+    >,
   ) => void;
   onUpdateSection: (
     sectionId: string,
-    updates: Partial<FormSectionWithFields>
+    updates: Partial<FormSectionWithFields>,
   ) => void;
   onDeleteSection: (sectionId: string) => void;
   onReorderSections: (sectionIds: string[]) => void;
@@ -93,7 +93,7 @@ interface SectionEditorProps {
   onRemoveFieldFromSection?: (fieldId: string) => void;
   onUpdateField?: (
     fieldId: string,
-    updates: Partial<FieldConfig>
+    updates: Partial<FieldConfig>,
   ) => void | Promise<void>;
   onReorderFields?: (fieldIds: string[]) => Promise<void>;
   onSectionFieldDragStart?: (fieldId: string) => void;
@@ -157,14 +157,14 @@ export function SectionEditor({
     collapsed_by_default: false,
   });
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(sections.map((s) => s.id))
+    new Set(sections.map((s) => s.id)),
   );
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
   const [sectionOrder, setSectionOrder] = useState<string[]>(() =>
-    sections.map((s) => s.id)
+    sections.map((s) => s.id),
   );
   const [draggedSectionField, setDraggedSectionField] = useState<string | null>(
-    null
+    null,
   );
   const [sectionFieldOrders, setSectionFieldOrders] = useState<
     Map<string, string[]>
@@ -177,7 +177,7 @@ export function SectionEditor({
     Map<string, string>
   >(new Map());
   const [labelInputValues, setLabelInputValues] = useState<Map<string, string>>(
-    new Map()
+    new Map(),
   );
   const [descriptionInputValues, setDescriptionInputValues] = useState<
     Map<string, string>
@@ -196,7 +196,7 @@ export function SectionEditor({
   const { settings } = useOrganizationSettings();
   const fieldMap = useMemo(
     () => new Map(fields.map((field) => [field.id, field])),
-    [fields]
+    [fields],
   );
 
   // Handle options update for select fields - update local state immediately
@@ -221,14 +221,14 @@ export function SectionEditor({
             organization_id: organizationId,
             include_location_restrictions: true,
           },
-        }
+        },
       );
 
       if (error) throw error;
 
       const config = data?.field_configs?.find(
         (fc: FieldConfig & { location_restrictions?: string[] }) =>
-          fc.id === fieldId
+          fc.id === fieldId,
       );
 
       if (
@@ -313,7 +313,7 @@ export function SectionEditor({
             field_config_id: fieldId,
             location_ids: locationIds,
           },
-        }
+        },
       );
 
       if (locationError) {
@@ -354,7 +354,7 @@ export function SectionEditor({
   // Get the current options input value, falling back to field value if not in local state
   const getOptionsInputValue = (
     fieldId: string,
-    field: FieldConfig
+    field: FieldConfig,
   ): string => {
     if (optionsInputValues.has(fieldId)) {
       return optionsInputValues.get(fieldId) || "";
@@ -393,7 +393,7 @@ export function SectionEditor({
   // Get the current description input value, falling back to field value if not in local state
   const getDescriptionInputValue = (
     fieldId: string,
-    field: FieldConfig
+    field: FieldConfig,
   ): string => {
     if (descriptionInputValues.has(fieldId)) {
       return descriptionInputValues.get(fieldId) || "";
@@ -414,7 +414,7 @@ export function SectionEditor({
               organization_id: organizationId,
               include_location_restrictions: true,
             },
-          }
+          },
         );
 
         if (error) throw error;
@@ -433,7 +433,7 @@ export function SectionEditor({
             } else {
               restrictMap.set(fc.id, false);
             }
-          }
+          },
         );
 
         setLocationRestrictionsMap(restrictionsMap);
@@ -459,7 +459,7 @@ export function SectionEditor({
   useEffect(() => {
     if (!draggedSectionField) {
       setSectionFieldOrders(
-        new Map(sections.map((s) => [s.id, s.field_ids || []]))
+        new Map(sections.map((s) => [s.id, s.field_ids || []])),
       );
     }
   }, [sections, draggedSectionField]);
@@ -470,7 +470,7 @@ export function SectionEditor({
       sectionOrder
         .map((id) => sections.find((s) => s.id === id))
         .filter((s): s is FormSectionWithFields => s !== undefined),
-    [sectionOrder, sections]
+    [sectionOrder, sections],
   );
 
   const handleOpenDialog = (section?: FormSectionWithFields) => {
@@ -574,7 +574,7 @@ export function SectionEditor({
   const handleSectionFieldDragOver = (
     e: React.DragEvent,
     sectionId: string,
-    targetFieldId: string
+    targetFieldId: string,
   ) => {
     e.preventDefault();
     if (!draggedSectionField || draggedSectionField === targetFieldId) return;
@@ -610,7 +610,7 @@ export function SectionEditor({
     if (onReorderFields) {
       // Get all fields ordered by their current order_position
       const allFieldsOrdered = [...fields].sort(
-        (a, b) => a.order_position - b.order_position
+        (a, b) => a.order_position - b.order_position,
       );
 
       // Split into: fields before this section, fields in this section (reordered), fields after this section
@@ -619,12 +619,12 @@ export function SectionEditor({
         .filter((f): f is FieldConfig => Boolean(f));
 
       const fieldsBeforeSection = allFieldsOrdered.filter(
-        (f) => f.section_id !== sectionId
+        (f) => f.section_id !== sectionId,
       );
 
       // Find where this section's fields start in the global order
       const firstSectionField = allFieldsOrdered.find(
-        (f) => f.section_id === sectionId
+        (f) => f.section_id === sectionId,
       );
       const sectionStartIndex = firstSectionField
         ? allFieldsOrdered.indexOf(firstSectionField)
@@ -719,7 +719,7 @@ export function SectionEditor({
                   // If dragging a field within the same section, ignore section drag (handled by field drag)
                   else if (draggedSectionField) {
                     const draggedField = fields.find(
-                      (f) => f.id === draggedSectionField
+                      (f) => f.id === draggedSectionField,
                     );
                     // If dragging within the same section, let field reordering handle it
                     if (draggedField?.section_id === section.id) {
@@ -746,7 +746,7 @@ export function SectionEditor({
                   // Handle drop from another section
                   else if (draggedSectionField && onDropFieldToSection) {
                     const draggedField = fields.find(
-                      (f) => f.id === draggedSectionField
+                      (f) => f.id === draggedSectionField,
                     );
                     // Only move if dropping into a different section
                     if (
@@ -755,7 +755,7 @@ export function SectionEditor({
                     ) {
                       await onDropFieldToSection(
                         section.id,
-                        draggedSectionField
+                        draggedSectionField,
                       );
                       setDraggedSectionField(null);
                       onSectionFieldDragEnd?.();
@@ -820,7 +820,7 @@ export function SectionEditor({
                       const orderedSectionFields = orderedFieldIds
                         .map((fieldId) => fieldMap.get(fieldId))
                         .filter((field): field is FieldConfig =>
-                          Boolean(field)
+                          Boolean(field),
                         );
 
                       return (
@@ -829,7 +829,7 @@ export function SectionEditor({
                             {orderedSectionFields.map((field) => {
                               const FieldIcon =
                                 FIELD_TYPES.find(
-                                  (t) => t.type === field.field_type
+                                  (t) => t.type === field.field_type,
                                 )?.icon || Type;
                               const groupId = field.mutually_exclusive_group;
                               const clusterId = field.group_cluster;
@@ -841,7 +841,7 @@ export function SectionEditor({
                                     e.stopPropagation();
                                     handleSectionFieldDragStart(
                                       section.id,
-                                      field.id
+                                      field.id,
                                     );
                                   }}
                                   onDragOver={(e) => {
@@ -850,7 +850,7 @@ export function SectionEditor({
                                     handleSectionFieldDragOver(
                                       e,
                                       section.id,
-                                      field.id
+                                      field.id,
                                     );
                                   }}
                                   onDragEnd={(e) => {
@@ -922,9 +922,10 @@ export function SectionEditor({
                                               </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                              Fields sharing a cluster act as one
-                                              option inside their exclusive group
-                                              (e.g., wiped + soaped details).
+                                              Fields sharing a cluster act as
+                                              one option inside their exclusive
+                                              group (e.g., wiped + soaped
+                                              details).
                                             </TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
@@ -939,12 +940,12 @@ export function SectionEditor({
                                             <MapPin className="h-2.5 w-2.5 mr-0.5" />
                                             {
                                               locationRestrictionsMap.get(
-                                                field.id
+                                                field.id,
                                               )!.length
                                             }{" "}
                                             location
                                             {locationRestrictionsMap.get(
-                                              field.id
+                                              field.id,
                                             )!.length !== 1
                                               ? "s"
                                               : ""}
@@ -993,12 +994,12 @@ export function SectionEditor({
                                               <Input
                                                 value={getLabelInputValue(
                                                   field.id,
-                                                  field
+                                                  field,
                                                 )}
                                                 onChange={(e) =>
                                                   handleLabelChange(
                                                     field.id,
-                                                    e.target.value
+                                                    e.target.value,
                                                   )
                                                 }
                                               />
@@ -1012,12 +1013,12 @@ export function SectionEditor({
                                               <Textarea
                                                 value={getDescriptionInputValue(
                                                   field.id,
-                                                  field
+                                                  field,
                                                 )}
                                                 onChange={(e) =>
                                                   handleDescriptionChange(
                                                     field.id,
-                                                    e.target.value
+                                                    e.target.value,
                                                   )
                                                 }
                                                 rows={2}
@@ -1032,7 +1033,7 @@ export function SectionEditor({
                                               <Select
                                                 value={field.field_type}
                                                 onValueChange={async (
-                                                  v: string
+                                                  v: string,
                                                 ) => {
                                                   if (onUpdateField) {
                                                     await onUpdateField(
@@ -1040,7 +1041,7 @@ export function SectionEditor({
                                                       {
                                                         field_type:
                                                           v as FieldType,
-                                                      }
+                                                      },
                                                     );
                                                   }
                                                 }}
@@ -1057,7 +1058,7 @@ export function SectionEditor({
                                                       >
                                                         {label}
                                                       </SelectItem>
-                                                    )
+                                                    ),
                                                   )}
                                                 </SelectContent>
                                               </Select>
@@ -1074,12 +1075,12 @@ export function SectionEditor({
                                                 <Input
                                                   value={getOptionsInputValue(
                                                     field.id,
-                                                    field
+                                                    field,
                                                   )}
                                                   onChange={(e) =>
                                                     handleOptionsChange(
                                                       field.id,
-                                                      e.target.value
+                                                      e.target.value,
                                                     )
                                                   }
                                                   placeholder="Option 1, Option 2, Option 3"
@@ -1098,7 +1099,7 @@ export function SectionEditor({
                                                     field.section_id || "none"
                                                   }
                                                   onValueChange={async (
-                                                    v: string
+                                                    v: string,
                                                   ) => {
                                                     if (onUpdateField) {
                                                       await onUpdateField(
@@ -1108,7 +1109,7 @@ export function SectionEditor({
                                                             v === "none"
                                                               ? null
                                                               : v,
-                                                        }
+                                                        },
                                                       );
                                                     }
                                                   }}
@@ -1141,14 +1142,14 @@ export function SectionEditor({
                                               <Switch
                                                 checked={field.required}
                                                 onCheckedChange={async (
-                                                  checked: boolean
+                                                  checked: boolean,
                                                 ) => {
                                                   if (onUpdateField) {
                                                     await onUpdateField(
                                                       field.id,
                                                       {
                                                         required: checked,
-                                                      }
+                                                      },
                                                     );
                                                   }
                                                 }}
@@ -1174,7 +1175,7 @@ export function SectionEditor({
                                                       ?.allow_multiple || false
                                                   }
                                                   onCheckedChange={async (
-                                                    checked: boolean
+                                                    checked: boolean,
                                                   ) => {
                                                     if (onUpdateField) {
                                                       // Preserve other validation rules when toggling allow_multiple
@@ -1185,28 +1186,27 @@ export function SectionEditor({
                                                         checked
                                                           ? {
                                                               ...existingRules,
-                                                              allow_multiple:
-                                                                true,
+                                                              allow_multiple: true,
                                                             }
                                                           : Object.fromEntries(
                                                               Object.entries(
-                                                                existingRules
+                                                                existingRules,
                                                               ).filter(
                                                                 ([key]) =>
                                                                   key !==
-                                                                  "allow_multiple"
-                                                              )
+                                                                  "allow_multiple",
+                                                              ),
                                                             );
                                                       await onUpdateField(
                                                         field.id,
                                                         {
                                                           validation_rules:
                                                             Object.keys(
-                                                              updatedRules
+                                                              updatedRules,
                                                             ).length > 0
                                                               ? updatedRules
                                                               : null,
-                                                        }
+                                                        },
                                                       );
                                                     }
                                                   }}
@@ -1223,23 +1223,23 @@ export function SectionEditor({
                                                     id={`restrict-locations-${field.id}`}
                                                     checked={
                                                       restrictToLocationsMap.get(
-                                                        field.id
+                                                        field.id,
                                                       ) || false
                                                     }
                                                     onCheckedChange={(
-                                                      checked
+                                                      checked,
                                                     ) => {
                                                       setRestrictToLocationsMap(
                                                         (prev) => {
                                                           const next = new Map(
-                                                            prev
+                                                            prev,
                                                           );
                                                           next.set(
                                                             field.id,
-                                                            checked
+                                                            checked,
                                                           );
                                                           return next;
-                                                        }
+                                                        },
                                                       );
                                                       if (!checked) {
                                                         setLocationRestrictionsMap(
@@ -1248,10 +1248,10 @@ export function SectionEditor({
                                                               new Map(prev);
                                                             next.set(
                                                               field.id,
-                                                              []
+                                                              [],
                                                             );
                                                             return next;
-                                                          }
+                                                          },
                                                         );
                                                       }
                                                     }}
@@ -1266,63 +1266,88 @@ export function SectionEditor({
                                                   </Label>
                                                 </div>
                                                 {restrictToLocationsMap.get(
-                                                  field.id
+                                                  field.id,
                                                 ) && (
                                                   <div className="space-y-2 pl-6 border-l-2 border-muted">
                                                     {locations.length === 0 ? (
                                                       <p className="text-xs text-muted-foreground">
-                                                        No locations available. Create locations first.
+                                                        No locations available.
+                                                        Create locations first.
                                                       </p>
                                                     ) : (
                                                       <div className="rounded-md border border-input bg-transparent shadow-sm">
                                                         <div className="max-h-48 overflow-y-auto p-2">
                                                           {locations
                                                             .filter(
-                                                              (loc) => loc.active
+                                                              (loc) =>
+                                                                loc.active,
                                                             )
                                                             .map((location) => {
-                                                              const isSelected = (
-                                                                locationRestrictionsMap.get(
-                                                                  field.id
-                                                                ) || []
-                                                              ).includes(
-                                                                location.id
-                                                              );
+                                                              const isSelected =
+                                                                (
+                                                                  locationRestrictionsMap.get(
+                                                                    field.id,
+                                                                  ) || []
+                                                                ).includes(
+                                                                  location.id,
+                                                                );
                                                               return (
                                                                 <div
-                                                                  key={location.id}
+                                                                  key={
+                                                                    location.id
+                                                                  }
                                                                   className={cn(
                                                                     "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                                                                    isSelected && "bg-accent/50"
+                                                                    isSelected &&
+                                                                      "bg-accent/50",
                                                                   )}
                                                                   onClick={() => {
                                                                     const currentIds =
                                                                       locationRestrictionsMap.get(
-                                                                        field.id
+                                                                        field.id,
                                                                       ) || [];
-                                                                    if (isSelected) {
+                                                                    if (
+                                                                      isSelected
+                                                                    ) {
                                                                       setLocationRestrictionsMap(
-                                                                        (prev) => {
-                                                                          const next = new Map(prev);
+                                                                        (
+                                                                          prev,
+                                                                        ) => {
+                                                                          const next =
+                                                                            new Map(
+                                                                              prev,
+                                                                            );
                                                                           next.set(
                                                                             field.id,
                                                                             currentIds.filter(
-                                                                              (id) => id !== location.id
-                                                                            )
+                                                                              (
+                                                                                id,
+                                                                              ) =>
+                                                                                id !==
+                                                                                location.id,
+                                                                            ),
                                                                           );
                                                                           return next;
-                                                                        }
+                                                                        },
                                                                       );
                                                                     } else {
                                                                       setLocationRestrictionsMap(
-                                                                        (prev) => {
-                                                                          const next = new Map(prev);
+                                                                        (
+                                                                          prev,
+                                                                        ) => {
+                                                                          const next =
+                                                                            new Map(
+                                                                              prev,
+                                                                            );
                                                                           next.set(
                                                                             field.id,
-                                                                            [...currentIds, location.id]
+                                                                            [
+                                                                              ...currentIds,
+                                                                              location.id,
+                                                                            ],
                                                                           );
                                                                           return next;
-                                                                        }
+                                                                        },
                                                                       );
                                                                     }
                                                                   }}
@@ -1336,40 +1361,66 @@ export function SectionEditor({
                                                                     htmlFor={`section-location-${field.id}-${location.id}`}
                                                                     className="text-xs font-normal cursor-pointer flex-1"
                                                                   >
-                                                                    {location.name}
+                                                                    {
+                                                                      location.name
+                                                                    }
                                                                   </Label>
                                                                   <input
                                                                     type="checkbox"
                                                                     id={`section-location-${field.id}-${location.id}`}
-                                                                    checked={isSelected}
-                                                                    onChange={(e) => {
+                                                                    checked={
+                                                                      isSelected
+                                                                    }
+                                                                    onChange={(
+                                                                      e,
+                                                                    ) => {
                                                                       const currentIds =
                                                                         locationRestrictionsMap.get(
-                                                                          field.id
+                                                                          field.id,
                                                                         ) || [];
-                                                                      if (e.target.checked) {
+                                                                      if (
+                                                                        e.target
+                                                                          .checked
+                                                                      ) {
                                                                         setLocationRestrictionsMap(
-                                                                          (prev) => {
-                                                                            const next = new Map(prev);
+                                                                          (
+                                                                            prev,
+                                                                          ) => {
+                                                                            const next =
+                                                                              new Map(
+                                                                                prev,
+                                                                              );
                                                                             next.set(
                                                                               field.id,
-                                                                              [...currentIds, location.id]
+                                                                              [
+                                                                                ...currentIds,
+                                                                                location.id,
+                                                                              ],
                                                                             );
                                                                             return next;
-                                                                          }
+                                                                          },
                                                                         );
                                                                       } else {
                                                                         setLocationRestrictionsMap(
-                                                                          (prev) => {
-                                                                            const next = new Map(prev);
+                                                                          (
+                                                                            prev,
+                                                                          ) => {
+                                                                            const next =
+                                                                              new Map(
+                                                                                prev,
+                                                                              );
                                                                             next.set(
                                                                               field.id,
                                                                               currentIds.filter(
-                                                                                (id) => id !== location.id
-                                                                              )
+                                                                                (
+                                                                                  id,
+                                                                                ) =>
+                                                                                  id !==
+                                                                                  location.id,
+                                                                              ),
                                                                             );
                                                                             return next;
-                                                                          }
+                                                                          },
                                                                         );
                                                                       }
                                                                     }}
@@ -1391,7 +1442,7 @@ export function SectionEditor({
                                             <Collapsible
                                               open={
                                                 advancedSectionsOpen.get(
-                                                  field.id
+                                                  field.id,
                                                 ) || false
                                               }
                                               onOpenChange={(open) => {
@@ -1400,7 +1451,7 @@ export function SectionEditor({
                                                     const next = new Map(prev);
                                                     next.set(field.id, open);
                                                     return next;
-                                                  }
+                                                  },
                                                 );
                                               }}
                                             >
@@ -1414,7 +1465,7 @@ export function SectionEditor({
                                                     Advanced Options
                                                   </span>
                                                   {advancedSectionsOpen.get(
-                                                    field.id
+                                                    field.id,
                                                   ) ? (
                                                     <ChevronDown className="w-3 h-3" />
                                                   ) : (
@@ -1428,24 +1479,28 @@ export function SectionEditor({
                                                   <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1">
                                                       <Label className="text-xs">
-                                                        Mutually Exclusive Cluster
+                                                        Mutually Exclusive
+                                                        Cluster
                                                       </Label>
                                                       <p className="text-[11px] text-muted-foreground mt-1">
                                                         Assign this field to a
                                                         cluster where only one
-                                                        option can be selected at a
-                                                        time. All clusters share a
-                                                        single implicit group behind
-                                                        the scenes.
+                                                        option can be selected
+                                                        at a time. All clusters
+                                                        share a single implicit
+                                                        group behind the scenes.
                                                       </p>
                                                     </div>
                                                   </div>
                                                   <p className="text-[11px] text-muted-foreground italic">
-                                                    💡 Need to create a new cluster name? Click the{" "}
+                                                    💡 Need to create a new
+                                                    cluster name? Click the{" "}
                                                     <span className="font-medium text-primary">
-                                                      Selection Group Settings
+                                                      Field Group Settings
                                                     </span>{" "}
-                                                    button at the top of the page to create option names first.
+                                                    button at the top of the
+                                                    page to create option names
+                                                    first.
                                                   </p>
                                                   {(() => {
                                                     // Get all clusters from all fields AND created clusters
@@ -1455,15 +1510,15 @@ export function SectionEditor({
                                                           fields
                                                             .map(
                                                               (f) =>
-                                                                f.group_cluster
+                                                                f.group_cluster,
                                                             )
                                                             .filter(
                                                               (
-                                                                c
+                                                                c,
                                                               ): c is string =>
-                                                                Boolean(c)
-                                                            )
-                                                        )
+                                                                Boolean(c),
+                                                            ),
+                                                        ),
                                                       );
                                                     // Combine with created clusters that haven't been assigned yet
                                                     const allClusters =
@@ -1471,7 +1526,7 @@ export function SectionEditor({
                                                         new Set([
                                                           ...clustersFromFields,
                                                           ...createdClusters,
-                                                        ])
+                                                        ]),
                                                       ).sort();
 
                                                     // Convert cluster ID to display name
@@ -1484,7 +1539,7 @@ export function SectionEditor({
                                                               word
                                                                 .charAt(0)
                                                                 .toUpperCase() +
-                                                              word.slice(1)
+                                                              word.slice(1),
                                                           )
                                                           .join(" ");
                                                       };
@@ -1497,7 +1552,7 @@ export function SectionEditor({
                                                             "none"
                                                           }
                                                           onValueChange={async (
-                                                            value: string
+                                                            value: string,
                                                           ) => {
                                                             if (!onUpdateField)
                                                               return;
@@ -1511,7 +1566,7 @@ export function SectionEditor({
                                                                     null,
                                                                   group_cluster:
                                                                     null,
-                                                                }
+                                                                },
                                                               );
                                                             } else {
                                                               await onUpdateField(
@@ -1521,7 +1576,7 @@ export function SectionEditor({
                                                                     DEFAULT_EXCLUSIVE_GROUP,
                                                                   group_cluster:
                                                                     value,
-                                                                }
+                                                                },
                                                               );
                                                             }
                                                           }}
@@ -1544,10 +1599,10 @@ export function SectionEditor({
                                                                   }
                                                                 >
                                                                   {getClusterDisplayName(
-                                                                    clusterId
+                                                                    clusterId,
                                                                   )}
                                                                 </SelectItem>
-                                                              )
+                                                              ),
                                                             )}
                                                           </SelectContent>
                                                         </Select>
@@ -1555,12 +1610,12 @@ export function SectionEditor({
                                                           value={
                                                             field.group_cluster
                                                               ? getClusterDisplayName(
-                                                                  field.group_cluster
+                                                                  field.group_cluster,
                                                                 )
                                                               : ""
                                                           }
                                                           onChange={async (
-                                                            e
+                                                            e,
                                                           ) => {
                                                             // Allow typing freely; apply on blur
                                                             if (
@@ -1575,7 +1630,7 @@ export function SectionEditor({
                                                                       null,
                                                                     group_cluster:
                                                                       null,
-                                                                  }
+                                                                  },
                                                                 );
                                                               if (
                                                                 result instanceof
@@ -1596,11 +1651,11 @@ export function SectionEditor({
                                                                   .toLowerCase()
                                                                   .replace(
                                                                     /[^a-z0-9]+/g,
-                                                                    "_"
+                                                                    "_",
                                                                   )
                                                                   .replace(
                                                                     /^_|_$/g,
-                                                                    ""
+                                                                    "",
                                                                   );
 
                                                               await onUpdateField(
@@ -1610,7 +1665,7 @@ export function SectionEditor({
                                                                     DEFAULT_EXCLUSIVE_GROUP,
                                                                   group_cluster:
                                                                     clusterId,
-                                                                }
+                                                                },
                                                               );
                                                             }
                                                           }}
@@ -1637,7 +1692,7 @@ export function SectionEditor({
                                                         {
                                                           conditional_logic:
                                                             logic,
-                                                        }
+                                                        },
                                                       );
                                                     }
                                                   }}

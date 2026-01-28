@@ -134,7 +134,7 @@ export default function MobileConfigPage() {
                   className="cursor-pointer"
                 >
                   <Settings className="w-4 h-4 mr-2" />
-                  Selection Group Settings
+                  Field Group Settings
                 </Button>
                 <TourTriggerButton />
               </div>
@@ -197,7 +197,7 @@ export default function MobileConfigPage() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-2">
-              <DialogTitle>Selection Group Settings</DialogTitle>
+              <DialogTitle>Field Group Settings</DialogTitle>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
