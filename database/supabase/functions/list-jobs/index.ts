@@ -38,6 +38,8 @@ serve(async (req) => {
         feedback_email_sent,
         feedback_email_sent_at,
         submitted_by_email,
+        last_updated_at,
+        last_updated_by,
         location:location_id (
           id,
           name,

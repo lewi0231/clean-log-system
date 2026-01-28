@@ -283,12 +283,13 @@ serve(async (req) => {
       });
     }
 
-    // Create the job
+    // Create the job (submitted_by_email = whoever submitted: admin via dashboard or worker via mobile)
     const jobInsertData = {
       organization_id: organizationId,
       location_id: normalizedLocationId,
       submission_data: submissionDataJsonb,
       completed_at: new Date().toISOString(),
+      submitted_by_email: userEmail,
     };
     logger.debug("Inserting job", {
       organizationId,
