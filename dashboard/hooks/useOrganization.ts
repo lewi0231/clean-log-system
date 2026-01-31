@@ -1,13 +1,13 @@
 "use client";
 
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 interface OrganizationData {
   organizationId: string;
-  organizationUserId: string;
-  userRole: string;
+  organizationUserId: string | null;
+  userRole: string | null;
 }
 
 async function fetchOrganization(
@@ -19,20 +19,11 @@ async function fetchOrganization(
     userId,
   });
 
-  const { data, error } = await supabase.functions.invoke(
-    "get-organization-id",
-    {
-      body: { email },
-    },
-  );
-
-  if (error) {
-    log.error("useOrganization: Edge function error", {
-      error,
-      message: error.message || "Unknown edge function error",
-    });
-    throw new Error(error.message || "Failed to fetch organization");
-  }
+  const data = await invokeEdgeFunction<{
+    organization_id?: string;
+    organization_user_id?: string;
+    role?: string;
+  }>("get-organization-id", { email });
 
   if (data?.organization_id) {
     log.info("useOrganization: Organization found", {

@@ -12,6 +12,10 @@ import {
 } from "@/components/ui/card";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import {
+  invokeEdgeFunction,
+  invokeEdgeFunctionSafe,
+} from "@/lib/supabase/invoke-edge-function";
 import { AlertCircle, CheckCircle2, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -53,14 +57,11 @@ function VerifyEmailContent() {
   useEffect(() => {
     const checkVerificationStatus = async () => {
       try {
-        // Log the full URL for debugging
-        const fullUrl = window.location.href;
         const hash = window.location.hash;
         log.debug("VerifyEmail: Checking verification status", {
-          fullUrl,
-          hash,
           pathname: window.location.pathname,
-          search: window.location.search,
+          hasHash: !!hash,
+          hasSearch: !!window.location.search,
         });
 
         // Check if there's a verification token in the URL hash (from email link)
@@ -76,7 +77,8 @@ function VerifyEmailContent() {
         const type = hashParams.get("type") || searchParams.get("type");
         const accessToken = hashParams.get("access_token");
 
-        log.debug("VerifyEmail: Extracted tokens", {
+        // Never log tokens or full URLs/hashes.
+        log.debug("VerifyEmail: Extracted token presence", {
           hasTokenHash: !!tokenHash,
           type,
           hasAccessToken: !!accessToken,
@@ -257,25 +259,22 @@ function VerifyEmailContent() {
           if (isAdminInvite && user.email) {
             try {
               log.debug("VerifyEmail: Accepting admin invitation", {
-                email: user.email,
                 userId: user.id,
               });
 
-              const { error: acceptError } = await supabase.functions.invoke(
+              const result = await invokeEdgeFunctionSafe<{ success: boolean }>(
                 "accept-admin-invitation",
                 {
-                  body: {
-                    email: user.email,
-                    auth_user_id: user.id,
-                  },
+                  email: user.email,
+                  auth_user_id: user.id,
                 },
               );
-
-              if (acceptError) {
+              if (result.error) {
                 log.warn("VerifyEmail: Failed to accept admin invitation", {
-                  error: acceptError.message,
+                  message: result.error.message,
+                  code: result.error.code,
+                  status: result.error.status,
                 });
-                // Don't block - user is verified, they can still use the system
               } else {
                 log.info("VerifyEmail: Admin invitation accepted successfully");
               }
@@ -314,7 +313,7 @@ function VerifyEmailContent() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [router, isVerified]);
+  }, [router, isVerified, isAdminInvite]);
 
   const handleResendEmail = async () => {
     if (!email) {
@@ -330,38 +329,17 @@ function VerifyEmailContent() {
       log.debug("VerifyEmail: Resending verification email", { email });
 
       // Use the custom edge function that sends the same email template as signup
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ message?: string }>(
         "resend-activation-link",
-        {
-          body: { email },
-        },
+        { email },
       );
 
-      if (error) {
-        // Handle different error types from Supabase functions
-        const errorMessage =
-          error.message ||
-          (error as { context?: { message?: string } }).context?.message ||
-          "Failed to resend verification email. Please try again.";
-        log.error("VerifyEmail: Failed to resend verification email", {
-          error: errorMessage,
-          errorDetails: JSON.stringify(error),
-        });
-        setResendError(errorMessage);
-      } else if (data?.error) {
-        // Check if the response contains an error from the edge function
-        log.error("VerifyEmail: Edge function returned error", {
-          error: data.error,
-        });
-        setResendError(data.error);
-      } else {
-        log.info("VerifyEmail: Verification email resent successfully", {
-          message: data?.message,
-        });
-        setResendSuccess(true);
-        // Clear success message after 5 seconds
-        setTimeout(() => setResendSuccess(false), 5000);
-      }
+      log.info("VerifyEmail: Verification email resent successfully", {
+        message: data?.message,
+      });
+      setResendSuccess(true);
+      // Clear success message after 5 seconds
+      setTimeout(() => setResendSuccess(false), 5000);
     } catch (error) {
       log.error("VerifyEmail: Unexpected error resending email", {
         error: error instanceof Error ? error.message : "Unknown error",

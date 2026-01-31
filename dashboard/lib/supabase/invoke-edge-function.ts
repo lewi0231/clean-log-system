@@ -28,6 +28,11 @@ type InvokeResult<T> = { data: T; error: null } | {
     error: EdgeFunctionError;
 };
 
+function makeEdgeFunctionError(message: string): EdgeFunctionError {
+    const err = new EdgeFunctionError(message);
+    return err;
+}
+
 async function toEdgeFunctionError(
     err: unknown,
     functionName: string,
@@ -37,7 +42,7 @@ async function toEdgeFunctionError(
         try {
             const body = await err.context.json();
             // Support both custom { error } and RFC 7807 Problem Details { detail }
-            const message = (body && typeof body === "object"
+            const message: string = (body && typeof body === "object"
                 ? ("detail" in body &&
                         typeof (body as { detail?: unknown }).detail ===
                             "string"
@@ -53,12 +58,13 @@ async function toEdgeFunctionError(
                     : err.message)
                 : err.message) ||
                 `Edge Function '${functionName}' returned an error`;
-            return new EdgeFunctionError(message, {
-                status: err.status,
-                details: body,
-            });
+            const out = makeEdgeFunctionError(message);
+            // FunctionsHttpError doesn't type `status`, but `context` is a Response.
+            out.status = err.context?.status;
+            out.details = body;
+            return out;
         } catch {
-            return new EdgeFunctionError(
+            return makeEdgeFunctionError(
                 err.message ||
                     `Edge Function '${functionName}' returned an error`,
             );
@@ -66,25 +72,23 @@ async function toEdgeFunctionError(
     }
 
     if (err instanceof FunctionsRelayError) {
-        return new EdgeFunctionError(
+        const out = makeEdgeFunctionError(
             err.message || `Relay error calling '${functionName}'`,
-            {
-                code: "relay_error",
-            },
         );
+        out.code = "relay_error";
+        return out;
     }
 
     if (err instanceof FunctionsFetchError) {
-        return new EdgeFunctionError(
+        const out = makeEdgeFunctionError(
             err.message || `Network error calling '${functionName}'`,
-            {
-                code: "fetch_error",
-            },
         );
+        out.code = "fetch_error";
+        return out;
     }
 
     if (err instanceof Error) {
-        return new EdgeFunctionError(
+        return makeEdgeFunctionError(
             err.message || `Unknown error calling '${functionName}'`,
         );
     }
@@ -115,17 +119,14 @@ async function toEdgeFunctionError(
             }
         }
 
-        const extractedMessage = extracted && typeof extracted === "object" &&
-                ("error" in extracted || "message" in extracted)
-            ? (typeof (extracted as Record<string, unknown>).error === "string"
-                ? (extracted as Record<string, unknown>).error
-                : typeof (extracted as Record<string, unknown>).message ===
-                        "string"
-                ? (extracted as Record<string, unknown>).message
-                : undefined)
-            : undefined;
+        let extractedMessage: string | undefined;
+        if (extracted && typeof extracted === "object") {
+            const rec = extracted as Record<string, unknown>;
+            if (typeof rec.error === "string") extractedMessage = rec.error;
+            else if (typeof rec.message === "string") extractedMessage = rec.message;
+        }
 
-        const message = extractedMessage ||
+        const message: string = extractedMessage ??
             (typeof maybe.message === "string"
                 ? maybe.message
                 : `Unknown error calling '${functionName}'`);
@@ -135,16 +136,16 @@ async function toEdgeFunctionError(
             ? maybe.statusCode
             : undefined;
         const code = typeof maybe.code === "string" ? maybe.code : undefined;
-        return new EdgeFunctionError(message, {
-            status,
-            code,
-            details: extracted ?? err,
-        });
+        const out = makeEdgeFunctionError(message);
+        out.status = status;
+        out.code = code;
+        out.details = extracted ?? err;
+        return out;
     }
 
-    return new EdgeFunctionError(`Unknown error calling '${functionName}'`, {
-        details: err,
-    });
+    const out = makeEdgeFunctionError(`Unknown error calling '${functionName}'`);
+    out.details = err;
+    return out;
 }
 
 /**

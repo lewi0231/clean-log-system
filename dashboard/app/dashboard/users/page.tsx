@@ -136,6 +136,8 @@ export default function UsersPage() {
       await updateOrganizationUser({
         id: userId,
         ...userData,
+        // API type expects string | undefined (not null)
+        phone: userData.phone ?? undefined,
       });
       toast.success("User updated successfully");
     } catch (error) {

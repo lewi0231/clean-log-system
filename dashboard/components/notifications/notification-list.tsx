@@ -46,10 +46,13 @@ export default function NotificationList({
 
     // Navigate to related entity if available
     if (notification.related_entity_type && notification.related_entity_id) {
+      // Prefer deep-linking to the specific entity where possible.
+      // Fall back to the relevant list page.
       const routes: Record<string, string> = {
         worker: "/dashboard/users",
         job: "/dashboard/completed-jobs",
-        invoice: "/dashboard/invoices",
+        // Invoicing lives at /dashboard/invoicing (and /dashboard/invoicing/[id])
+        invoice: `/dashboard/invoicing/${notification.related_entity_id}`,
       };
 
       const route = routes[notification.related_entity_type];
