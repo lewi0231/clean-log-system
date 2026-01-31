@@ -163,16 +163,11 @@ export class JobsService {
         jobId,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "send-feedback-email",
-        {
-          body: { job_id: jobId },
-        },
-      );
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        error?: string;
+        emailId?: string;
+      }>("send-feedback-email", { job_id: jobId });
 
       if (!data || !data.success) {
         throw new Error(data?.error || "Failed to send feedback email");
@@ -180,7 +175,8 @@ export class JobsService {
 
       log.info("JobsService: Feedback email sent successfully", {
         jobId,
-        emailId: data.emailId,
+        // Avoid logging provider IDs; only log presence.
+        hasEmailId: !!data.emailId,
       });
     } catch (err) {
       log.error("JobsService: Failed to send feedback email", {

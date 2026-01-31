@@ -8,6 +8,7 @@ import type {
   PricingType,
   WorkerPaymentType,
 } from "@/lib/types";
+import { log } from "@/lib/logger";
 import { useEffect, useState } from "react";
 
 interface UseFieldPricingOptions {
@@ -184,16 +185,19 @@ export function useFieldPricing(
           error.message.includes("already exists") ||
           error.message.includes("unique constraint"))
       ) {
-        console.log(
-          "[Pricing Debug] Unique constraint error, attempting to find existing rule for date:",
-          {
-            fieldConfigId,
-            locationId: targetLocationId,
-            locationHierarchyId: targetLocationHierarchyId,
-            pricingContext: targetPricingContext,
-            effectiveDate: targetEffectiveDate,
-          },
-        );
+        const pricingDebug = process.env.NEXT_PUBLIC_PRICING_DEBUG === "true";
+        if (pricingDebug) {
+          log.debug(
+            "[Pricing Debug] Unique constraint error; searching existing rule for date",
+            {
+              fieldConfigId,
+              locationId: targetLocationId,
+              locationHierarchyId: targetLocationHierarchyId,
+              pricingContext: targetPricingContext,
+              effectiveDate: targetEffectiveDate,
+            },
+          );
+        }
 
         // Refetch to see if a rule exists now
         await fetchFieldPricing();

@@ -19,6 +19,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { log } from "@/lib/logger";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -81,7 +82,11 @@ export default function MarkPaymentPaidDialog({
       setNotes("");
       onSuccess?.();
     } catch (error) {
-      console.error("Failed to mark payment as paid:", error);
+      log.error("WorkerPayments: Failed to mark payment as paid", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        organizationId,
+        batchId,
+      });
       toast.error(
         error instanceof Error
           ? error.message

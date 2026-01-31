@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { log } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { Loader2, MapPin } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -145,10 +146,12 @@ export function AddressAutocomplete({
 
   const fetchSuggestions = useCallback(
     async (query: string) => {
+      const debug = process.env.NEXT_PUBLIC_ADDRESS_AUTOCOMPLETE_DEBUG === "true";
+
       if (!apiKey) {
-        console.warn(
-          "Geoapify API key not configured. Add NEXT_PUBLIC_GEOAPIFY_API_KEY to your environment variables."
-        );
+        log.warn("AddressAutocomplete: Geoapify API key not configured", {
+          hasKey: false,
+        });
         setSuggestions([]);
         setIsOpen(false);
         return;
@@ -161,7 +164,13 @@ export function AddressAutocomplete({
       }
 
       setIsLoading(true);
-      console.log("Fetching Geoapify suggestions for query:", query.trim());
+      if (debug) {
+        // Never log the raw query; it can contain customer addresses.
+        log.debug("AddressAutocomplete: Fetching Geoapify suggestions", {
+          queryLength: query.trim().length,
+          countryCode,
+        });
+      }
 
       try {
         const params = new URLSearchParams({
@@ -184,19 +193,21 @@ export function AddressAutocomplete({
         if (!response.ok) {
           // Handle rate limiting or other errors gracefully
           if (response.status === 429) {
-            console.warn("Geoapify rate limit reached");
+            log.warn("AddressAutocomplete: Geoapify rate limit reached", {
+              status: response.status,
+            });
           } else if (response.status === 401 || response.status === 403) {
-            console.error(
-              "Geoapify API key authentication failed. Please check your API key and CORS settings in Geoapify dashboard."
-            );
+            log.error("AddressAutocomplete: Geoapify auth failed", {
+              status: response.status,
+            });
           } else {
             const errorText = await response
               .text()
               .catch(() => "Unknown error");
-            console.error(
-              `Geoapify API error (${response.status}):`,
-              errorText
-            );
+            log.error("AddressAutocomplete: Geoapify API error", {
+              status: response.status,
+              error: errorText,
+            });
           }
           setSuggestions([]);
           return;
@@ -204,28 +215,21 @@ export function AddressAutocomplete({
 
         const data = await response.json();
 
-        // Debug: Log full response to understand structure
-        console.log("Geoapify API response:", {
-          hasFeatures: !!data.features,
-          featuresCount: data.features?.length || 0,
-          firstFeature: data.features?.[0],
-          fullResponse: data,
-        });
+        if (debug) {
+          log.debug("AddressAutocomplete: Geoapify response received", {
+            hasFeatures: !!data.features,
+            featuresCount: data.features?.length || 0,
+          });
+        }
 
         // Geoapify returns GeoJSON with features array
         // Each feature has: { type: "Feature", properties: {...}, geometry: {...} }
         const features: GeoapifyAddress[] = data.features || [];
 
-        if (features.length > 0) {
-          console.log("Geoapify suggestions received:", features.length);
-          console.log("First suggestion:", {
-            formatted: features[0].properties?.formatted,
-            address_line1: features[0].properties?.address_line1,
-            city: features[0].properties?.city,
-            state: features[0].properties?.state,
+        if (debug) {
+          log.debug("AddressAutocomplete: Suggestions updated", {
+            count: features.length,
           });
-        } else {
-          console.warn("Geoapify returned no suggestions for query:", query);
         }
 
         setSuggestions(features);
@@ -234,16 +238,13 @@ export function AddressAutocomplete({
       } catch (error) {
         // NetworkError typically indicates CORS or network connectivity issues
         if (error instanceof TypeError && error.message.includes("fetch")) {
-          console.error(
-            "Geoapify API request failed. This is likely a CORS issue. Please check:",
-            "\n1. Your API key is set correctly (NEXT_PUBLIC_GEOAPIFY_API_KEY)",
-            "\n2. CORS is configured in Geoapify dashboard to allow requests from your domain",
-            "\n3. Your API key doesn't have IP address restrictions that block your current IP",
-            "\nError details:",
-            error
-          );
+          log.error("AddressAutocomplete: Geoapify request failed (likely CORS)", {
+            error: error.message,
+          });
         } else {
-          console.error("Error fetching address suggestions:", error);
+          log.error("AddressAutocomplete: Error fetching suggestions", {
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
         }
         setSuggestions([]);
         setIsOpen(false);

@@ -5,8 +5,9 @@ import type { InvoiceDocumentOrgInfo } from "@/components/invoicing/invoice-docu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { log } from "@/lib/logger";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { InvoiceWithJobs } from "@/lib/types";
 import {
   AlertCircle,
@@ -110,14 +111,14 @@ function InvoicePageContent() {
         setLoading(true);
         setError(null);
 
-        const { data, error: fetchError } = await supabase.functions.invoke(
-          "get-invoice-public",
-          {
-            body: { invoice_id: invoiceId },
-          }
-        );
-
-        if (fetchError) throw fetchError;
+        const data = await invokeEdgeFunction<{
+          success?: boolean;
+          invoice?: Record<string, unknown>;
+          calculation?: unknown;
+          template_config?: unknown;
+          hierarchy_metadata?: unknown;
+          organization?: Record<string, unknown>;
+        }>("get-invoice-public", { invoice_id: invoiceId });
 
         if (!data?.success || !data.invoice) {
           throw new Error("Invoice not found");
@@ -149,7 +150,10 @@ function InvoicePageContent() {
           stripe_account_id: org?.stripe_account_id ?? null,
         });
       } catch (err) {
-        console.error("Failed to fetch invoice:", err);
+        log.error("PublicInvoice: Failed to fetch invoice", {
+          error: err instanceof Error ? err.message : "Unknown error",
+          hasInvoiceId: !!invoiceId,
+        });
         setError(err instanceof Error ? err.message : "Failed to load invoice");
       } finally {
         setLoading(false);
@@ -172,19 +176,14 @@ function InvoicePageContent() {
     try {
       setPaymentLinkLoading(true);
 
-      const { data, error: linkError } = await supabase.functions.invoke(
-        "create-payment-link",
-        {
-          body: {
-            invoice_id: invoice.id,
-            organization_id: invoice.organization_id,
-            success_url: `${window.location.origin}/invoice/${invoice.id}?payment=success`,
-            cancel_url: `${window.location.origin}/invoice/${invoice.id}?payment=cancelled`,
-          },
-        }
-      );
-
-      if (linkError) throw linkError;
+      const data = await invokeEdgeFunction<{
+        payment_link?: { url?: string };
+      }>("create-payment-link", {
+        invoice_id: invoice.id,
+        organization_id: invoice.organization_id,
+        success_url: `${window.location.origin}/invoice/${invoice.id}?payment=success`,
+        cancel_url: `${window.location.origin}/invoice/${invoice.id}?payment=cancelled`,
+      });
 
       if (data?.payment_link?.url) {
         window.location.href = data.payment_link.url;
@@ -192,7 +191,10 @@ function InvoicePageContent() {
         throw new Error("Failed to create payment link");
       }
     } catch (err) {
-      console.error("Failed to create payment link:", err);
+      log.error("PublicInvoice: Failed to create payment link", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        invoiceId: invoice?.id,
+      });
     } finally {
       setPaymentLinkLoading(false);
     }

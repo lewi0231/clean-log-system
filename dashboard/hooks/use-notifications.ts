@@ -4,6 +4,7 @@ import {
   NotificationService,
   type Notification,
 } from "@/lib/services/notification.service";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
@@ -105,7 +106,10 @@ export function useNotifications(): UseNotificationsResult {
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+      log.error("Notifications: Failed to mark as read", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        notificationId,
+      });
     }
   };
 
@@ -119,7 +123,11 @@ export function useNotifications(): UseNotificationsResult {
       );
       setUnreadCount(0);
     } catch (err) {
-      console.error("Failed to mark all notifications as read:", err);
+      log.error("Notifications: Failed to mark all as read", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        organizationId,
+        organizationUserId,
+      });
     }
   };
 
