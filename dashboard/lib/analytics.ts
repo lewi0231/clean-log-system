@@ -3,11 +3,17 @@
 
 interface AnalyticsEvent {
   name: string;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
   category?: string;
   label?: string;
   value?: number;
 }
+
+type GtagFn = (
+  command: "event",
+  eventName: string,
+  params?: Record<string, unknown>,
+) => void;
 
 class Analytics {
   private isEnabled: boolean = process.env.NODE_ENV === 'production';
@@ -21,8 +27,9 @@ class Analytics {
 
     // Here you would integrate with your analytics provider
     // Example: Google Analytics 4
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', event.name, {
+    const w = window as unknown as { gtag?: GtagFn } | undefined;
+    if (typeof window !== 'undefined' && typeof w?.gtag === "function") {
+      w.gtag('event', event.name, {
         event_category: event.category,
         event_label: event.label,
         value: event.value,
@@ -40,7 +47,7 @@ class Analytics {
   }
 
   // Track page views
-  pageView(page: string, properties?: Record<string, any>) {
+  pageView(page: string, properties?: Record<string, unknown>) {
     this.track({
       name: 'page_view',
       category: 'navigation',
@@ -52,7 +59,11 @@ class Analytics {
   }
 
   // Track button clicks
-  buttonClick(buttonName: string, location: string, properties?: Record<string, any>) {
+  buttonClick(
+    buttonName: string,
+    location: string,
+    properties?: Record<string, unknown>,
+  ) {
     this.track({
       name: 'button_click',
       category: 'interaction',
@@ -65,7 +76,7 @@ class Analytics {
   }
 
   // Track form submissions
-  formSubmit(formName: string, properties?: Record<string, any>) {
+  formSubmit(formName: string, properties?: Record<string, unknown>) {
     this.track({
       name: 'form_submit',
       category: 'conversion',

@@ -10,7 +10,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ChevronDown, HelpCircle } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const faqEntries = [
   {
@@ -303,7 +303,15 @@ const faqEntries = [
 ];
 
 export default function HelpPage() {
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [openIds, setOpenIds] = useState<Set<string>>(() => {
+    // Initialize from the URL hash (no effect needed, avoids setState-in-effect lint rule).
+    const hash =
+      typeof window !== "undefined" ? window.location.hash.slice(1) : "";
+    if (hash && faqEntries.some((e) => e.id === hash)) {
+      return new Set([hash]);
+    }
+    return new Set();
+  });
 
   const toggle = (id: string) => {
     setOpenIds((prev) => {
@@ -317,13 +325,9 @@ export default function HelpPage() {
     });
   };
 
-  // Expand the FAQ indicated by the URL hash on mount
-  useEffect(() => {
-    const hash = typeof window !== "undefined" ? window.location.hash.slice(1) : "";
-    if (hash && faqEntries.some((e) => e.id === hash)) {
-      setOpenIds((prev) => new Set([...prev, hash]));
-    }
-  }, []);
+  // NOTE: If we want to support changing the hash while staying on this page,
+  // we can add a window 'hashchange' listener here (without calling setState
+  // synchronously inside the effect body).
 
   return (
     <div className="space-y-6">
