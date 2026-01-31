@@ -21,6 +21,7 @@ import useOrganization from "@/hooks/useOrganization";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { Calculator } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function WorkerPaymentsPage() {
   const {
@@ -89,7 +90,12 @@ function WorkerPaymentsPageContent({
         addPayment(result, jobIds);
       } catch (error) {
         console.error("Failed to save payment:", error);
-        // Still add to local state for now, but log error
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to save payment. Showing results locally.",
+        );
+        // Still add to local state for now
         addPayment(result, jobIds);
       }
     }
