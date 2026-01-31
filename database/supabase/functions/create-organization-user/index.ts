@@ -13,7 +13,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { createServiceRoleClient, getAuthUserByEmail } from "../_utils/supabase.ts";
 import { validateRequiredFields, validateRole } from "../_utils/validation.ts";
 
 // Load environment variables from .env file (for local development)
@@ -87,90 +87,99 @@ serve(async (req) => {
     // Get organization name for email
     const organizationName = await getOrganizationName(supabase, organization_id);
 
-    // Use Supabase's inviteUserByEmail to send invitation
-    // This handles token generation and email sending
-    const siteUrl = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
-    const redirectTo = `${siteUrl}/verify-email?type=admin_invite&email=${encodeURIComponent(email)}`;
+    // If the user already exists in Supabase Auth, link them directly.
+    // This avoids confusing "invite" flows for existing accounts and preserves
+    // the expectation that they can log in with their existing credentials.
+    const { data: existingAuthUserData, error: existingAuthUserError } =
+      await getAuthUserByEmail(supabase, email);
 
-    const { data: inviteData, error: inviteError } = await supabase.auth.admin
-      .inviteUserByEmail(email, {
-        redirectTo,
-        data: {
-          role: role,
-          user_type: "admin",
-          organization_id: organization_id,
-          first_name: first_name,
-          last_name: last_name,
-        },
+    if (existingAuthUserError) {
+      // Not fatal: some Supabase errors for "not found" can surface here depending on version.
+      // We'll treat "no user" as the common case and continue to invite flow below.
+      logger.warn("Unable to check auth user existence; continuing invite flow", {
+        organization_id,
+        // Avoid logging PII beyond what's needed for debugging.
+        hasEmail: !!email,
+        message:
+          existingAuthUserError instanceof Error
+            ? existingAuthUserError.message
+            : String(existingAuthUserError),
       });
+    }
 
-    if (inviteError) {
-      // Check if user already exists in auth (maybe from another org or as a worker)
-      if (inviteError.message?.includes("already been registered")) {
-        // User exists in auth, we can still create the organization_user record
-        // They'll need to use their existing password to log in
-        logger.info(
-          "User already exists in auth, creating organization_user link",
-          { email },
-        );
+    if (existingAuthUserData?.user) {
+      // Create organization_user entry with existing auth_user_id
+      // Set status to 'active' since they already have an account
+      const { data: organizationUser, error: createError } = await supabase
+        .from("organization_user")
+        .insert({
+          organization_id,
+          email,
+          role,
+          first_name,
+          last_name,
+          phone: phone || null,
+          status: "active",
+          auth_user_id: existingAuthUserData.user.id,
+          invited_at: new Date().toISOString(),
+          activated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-        // Get existing auth user
-        const { data: authUser, error: authError } = await supabase.auth.admin
-          .getUserByEmail(email);
-
-        if (authError || !authUser?.user) {
-          logger.error("Failed to get existing auth user", authError, { email });
-          return errorResponse("Failed to process invitation", 500);
-        }
-
-        // Create organization_user entry with existing auth_user_id
-        // Set status to 'active' since they already have an account
-        const { data: organizationUser, error: createError } = await supabase
-          .from("organization_user")
-          .insert({
-            organization_id,
-            email,
-            role,
-            first_name,
-            last_name,
-            phone: phone || null,
-            status: "active",
-            auth_user_id: authUser.user.id,
-            invited_at: new Date().toISOString(),
-            activated_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          logger.error("Error creating organization user", createError, {
-            organization_id,
-            email,
-            role,
-          });
-          throw createError;
-        }
-
-        logger.info("Organization user created (existing auth user)", {
-          organization_user_id: organizationUser?.id,
+      if (createError) {
+        logger.error("Error creating organization user", createError, {
           organization_id,
           email,
           role,
         });
-
-        return jsonResponse({
-          success: true,
-          organization_user: organizationUser,
-          existing_user: true,
-          message: "User already has an account. They can log in with their existing credentials.",
-        });
+        throw createError;
       }
 
-      logger.error("Error inviting user", inviteError, {
+      logger.info("Organization user created (existing auth user)", {
+        organization_user_id: organizationUser?.id,
         organization_id,
         email,
+        role,
       });
-      throw inviteError;
+
+      return jsonResponse({
+        success: true,
+        organization_user: organizationUser,
+        existing_user: true,
+        message:
+          "User already has an account. They can log in with their existing credentials.",
+      });
+    }
+
+    // Generate an invitation link via Supabase Auth, then send it using our branded email.
+    // Best practice: use `generateLink({ type: "invite" })` for custom email providers to
+    // avoid sending both Supabase's default email and our branded one.
+    const siteUrl = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
+    const redirectTo =
+      `${siteUrl}/verify-email?type=admin_invite&email=${
+        encodeURIComponent(email)
+      }`;
+
+    const { data: linkData, error: linkError } = await supabase.auth.admin
+      .generateLink({
+        type: "invite",
+        email,
+        options: {
+          redirectTo,
+        },
+      });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      logger.error("Failed to generate invitation link", linkError, {
+        organization_id,
+        email,
+        role,
+      });
+      return errorResponse(
+        "Failed to generate invitation link. Please try again later.",
+        500,
+      );
     }
 
     // Create organization_user entry with pending status
@@ -199,12 +208,10 @@ serve(async (req) => {
       throw createError;
     }
 
-    // Send custom invitation email (in addition to Supabase's default)
-    // This provides a branded experience with organization name
-    const invitationLink = inviteData?.user?.confirmation_sent_at
-      ? `${siteUrl}/verify-email?type=admin_invite&email=${encodeURIComponent(email)}`
-      : redirectTo;
-
+    // Send branded invitation email containing the real Supabase `action_link`.
+    // This prevents recipients receiving two invites and ensures the link contains
+    // the required token/hash.
+    const invitationLink = linkData.properties.action_link;
     const emailResult = await sendAdminInvitationEmail(
       {
         email,
@@ -222,7 +229,7 @@ serve(async (req) => {
         error: emailResult.error,
         email,
       });
-      // Don't fail the request - Supabase already sent an email
+      // Don't fail the request - user was created; admin can resend later.
     }
 
     logger.info("Organization user created successfully", {

@@ -46,6 +46,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 type NodeType = "company" | "region";
 
@@ -355,8 +356,8 @@ export default function LocationHierarchyManager() {
       });
     } catch (err) {
       console.error("Failed to save node:", err);
-      alert(
-        err instanceof Error ? err.message : "Failed to save location hierarchy"
+      toast.error(
+        err instanceof Error ? err.message : "Failed to save location hierarchy",
       );
     } finally {
       setSaving(false);
@@ -373,10 +374,10 @@ export default function LocationHierarchyManager() {
       setNodeToDelete(null);
     } catch (err) {
       console.error("Failed to delete node:", err);
-      alert(
+      toast.error(
         err instanceof Error
           ? err.message
-          : "Failed to delete location hierarchy"
+          : "Failed to delete location hierarchy",
       );
     } finally {
       setDeleting(false);

@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { Worker } from "@/lib/types";
 import type {
   CreateWorkerRequest,
@@ -22,16 +22,10 @@ export class WorkersService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<ListWorkersAndLocationsResponse>(
         "list-workers-and-locations",
-        {
-          body: request,
-        }
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch workers and locations");
@@ -57,13 +51,10 @@ export class WorkersService {
         name: `${request.first_name} ${request.last_name}`,
       });
 
-      const { data, error } = await supabase.functions.invoke("create-worker", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<{ worker?: Worker }>(
+        "create-worker",
+        request as unknown as Record<string, unknown>,
+      );
 
       if (!data || !data.worker) {
         throw new Error("Failed to create worker");
@@ -90,13 +81,10 @@ export class WorkersService {
         workerId: request.id,
       });
 
-      const { data, error } = await supabase.functions.invoke("update-worker", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<{ worker?: Worker }>(
+        "update-worker",
+        request as unknown as Record<string, unknown>,
+      );
 
       if (!data || !data.worker) {
         throw new Error("Failed to update worker");
@@ -123,13 +111,10 @@ export class WorkersService {
         workerId: request.id,
       });
 
-      const { error } = await supabase.functions.invoke("delete-worker", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      await invokeEdgeFunction<{ success?: boolean }>(
+        "delete-worker",
+        request as unknown as Record<string, unknown>,
+      );
 
       log.info("WorkersService: Worker deleted successfully", {
         workerId: request.id,
@@ -154,16 +139,10 @@ export class WorkersService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ success?: boolean }>(
         "resend-worker-invitation",
-        {
-          body: request,
-        }
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success) {
         throw new Error("Failed to resend invitation");

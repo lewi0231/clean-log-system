@@ -298,7 +298,6 @@ export default function UsersPage() {
         open={isWorkerFormOpen}
         onOpenChange={setIsWorkerFormOpen}
         onSuccess={async (workerData, workerId) => {
-          setIsWorkerFormOpen(false);
           if (workerId) {
             await handleUpdateWorker(workerId, workerData);
           } else {
@@ -311,7 +310,6 @@ export default function UsersPage() {
         open={isOrgUserFormOpen}
         onOpenChange={setIsOrgUserFormOpen}
         onSuccess={async (userData, userId) => {
-          setIsOrgUserFormOpen(false);
           if (userId) {
             await handleUpdateOrgUser(userId, userData);
           } else {

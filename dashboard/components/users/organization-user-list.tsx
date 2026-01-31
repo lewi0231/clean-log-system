@@ -98,11 +98,6 @@ export default function OrganizationUserList({
       log.error("OrganizationUserList: Failed to resend invitation", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert(
-        `Failed to resend invitation: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
     } finally {
       setIsResending(false);
     }
@@ -118,18 +113,10 @@ export default function OrganizationUserList({
         userId: convertingUser.id,
       });
       setConvertingUser(null);
-      alert(
-        `${formatName(convertingUser)} can now use the mobile app with their existing login credentials.`
-      );
     } catch (err) {
       log.error("OrganizationUserList: Failed to convert user to worker", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert(
-        `Failed to convert user to worker: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
     } finally {
       setIsConverting(false);
     }
@@ -144,11 +131,9 @@ export default function OrganizationUserList({
     },
     userId?: string
   ) => {
-    setIsFormOpen(false);
     if (userId && editingUser) {
       await onUpdateUser(userId, userData);
     }
-    setEditingUser(null);
   };
 
   const formatName = (user: OrganizationUser): string => {

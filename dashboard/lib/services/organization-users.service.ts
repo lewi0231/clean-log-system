@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { OrganizationUser } from "@/lib/types";
 import type {
   CreateOrganizationUserRequest,
@@ -22,16 +22,10 @@ export class OrganizationUsersService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<ListOrganizationUsersResponse>(
         "list-organization-users",
-        {
-          body: request,
-        }
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch organization users");
@@ -65,16 +59,9 @@ export class OrganizationUsersService {
         role: request.role,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "create-organization-user",
-        {
-          body: request,
-        }
-      );
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<{
+        organization_user?: OrganizationUser;
+      }>("create-organization-user", request as unknown as Record<string, unknown>);
 
       if (!data || !data.organization_user) {
         throw new Error("Failed to create organization user");
@@ -109,16 +96,9 @@ export class OrganizationUsersService {
         userId: request.id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "update-organization-user",
-        {
-          body: request,
-        }
-      );
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<{
+        organization_user?: OrganizationUser;
+      }>("update-organization-user", request as unknown as Record<string, unknown>);
 
       if (!data || !data.organization_user) {
         throw new Error("Failed to update organization user");
@@ -151,16 +131,10 @@ export class OrganizationUsersService {
         userId: request.id,
       });
 
-      const { error } = await supabase.functions.invoke(
+      await invokeEdgeFunction<{ success?: boolean }>(
         "delete-organization-user",
-        {
-          body: request,
-        }
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       log.info(
         "OrganizationUsersService: Organization user deleted successfully",
@@ -190,16 +164,10 @@ export class OrganizationUsersService {
         userId: request.organization_user_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ success?: boolean; message?: string }>(
         "resend-admin-invitation",
-        {
-          body: request,
-        }
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data?.success) {
         throw new Error(data?.message || "Failed to resend invitation");
@@ -235,19 +203,16 @@ export class OrganizationUsersService {
         userId: organizationUserId,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "convert-admin-to-worker",
-        {
-          body: {
-            organization_user_id: organizationUserId,
-            organization_id: organizationId,
-          },
-        }
-      );
-
-      if (error) {
-        throw error;
-      }
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        message?: string;
+        worker?: { id?: string };
+        worker_id?: string;
+        already_worker?: boolean;
+      }>("convert-admin-to-worker", {
+        organization_user_id: organizationUserId,
+        organization_id: organizationId,
+      });
 
       if (!data?.success) {
         throw new Error(data?.message || "Failed to convert user to worker");

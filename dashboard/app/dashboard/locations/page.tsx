@@ -19,6 +19,7 @@ import { Layers, MapPin, Plus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 export default function LocationsPage() {
   const {
@@ -56,10 +57,18 @@ export default function LocationsPage() {
     fixed_price_currency?: string | null;
   }) => {
     if (!organizationId) return;
-    await createLocation({
-      organization_id: organizationId,
-      ...locationData,
-    });
+    try {
+      await createLocation({
+        organization_id: organizationId,
+        ...locationData,
+      });
+      toast.success("Location created");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to create location",
+      );
+      throw err;
+    }
   };
 
   const handleUpdateLocation = async (
@@ -78,14 +87,30 @@ export default function LocationsPage() {
       fixed_price_currency?: string | null;
     }
   ) => {
-    await updateLocation({
-      id: locationId,
-      ...locationData,
-    });
+    try {
+      await updateLocation({
+        id: locationId,
+        ...locationData,
+      });
+      toast.success("Location updated");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update location",
+      );
+      throw err;
+    }
   };
 
   const handleDeleteLocation = async (locationId: string) => {
-    await deleteLocation({ id: locationId });
+    try {
+      await deleteLocation({ id: locationId });
+      toast.success("Location deleted");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete location",
+      );
+      throw err;
+    }
   };
 
   if (orgLoading) {
@@ -181,7 +206,6 @@ export default function LocationsPage() {
         open={isLocationFormOpen}
         onOpenChange={setIsLocationFormOpen}
         onSuccess={async (locationData, locationId) => {
-          setIsLocationFormOpen(false);
           if (locationId) {
             await handleUpdateLocation(locationId, locationData);
           } else {

@@ -9,7 +9,7 @@ import {
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createNotification } from "../_utils/notifications.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { createServiceRoleClient, getAuthUserByEmail } from "../_utils/supabase.ts";
 
 // Load environment variables from .env file (for local development)
 await loadEnvIfLocal();
@@ -50,8 +50,10 @@ serve(async (req) => {
     let userId = auth_user_id;
 
     if (!userId) {
-      const { data: authUser, error: authError } = await supabase.auth.admin
-        .getUserByEmail(email);
+      const { data: authUser, error: authError } = await getAuthUserByEmail(
+        supabase,
+        email,
+      );
 
       if (authError || !authUser?.user) {
         logger.warn("Auth user not found for email", { email });

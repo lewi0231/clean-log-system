@@ -113,7 +113,14 @@ export default function WorkerForm({
         workerId: worker?.id,
       });
 
-      // Reset form
+      // Include active status in edit mode
+      const dataToSend = isEditMode
+        ? { ...validatedData, active }
+        : validatedData;
+
+      await onSuccess(dataToSend, worker?.id);
+
+      // Only reset/close after a successful mutation
       setFirstName("");
       setLastName("");
       setEmail("");
@@ -121,13 +128,6 @@ export default function WorkerForm({
       setActive(false);
       setErrors({});
       onOpenChange(false);
-
-      // Include active status in edit mode
-      const dataToSend = isEditMode
-        ? { ...validatedData, active }
-        : validatedData;
-
-      await onSuccess(dataToSend, worker?.id);
     } catch (error) {
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("WorkerForm: Submission failed", { error: error.message });

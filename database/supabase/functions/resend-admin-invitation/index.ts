@@ -101,93 +101,24 @@ serve(async (req) => {
     const redirectTo =
       `${siteUrl}/verify-email?type=admin_invite&email=${encodeURIComponent(orgUser.email)}`;
 
-    // Try to resend the invitation
-    const { data: inviteData, error: inviteError } = await supabase.auth.admin
-      .inviteUserByEmail(orgUser.email, {
-        redirectTo,
-        data: {
-          role: orgUser.role,
-          user_type: "admin",
-          organization_id: organization_id,
-          first_name: orgUser.first_name,
-          last_name: orgUser.last_name,
-        },
+    // Best practice: for branded/custom email providers, generate the invite link and
+    // send it yourself (avoid sending Supabase's default email too).
+    const { data: linkData, error: linkError } = await supabase.auth.admin
+      .generateLink({
+        type: "invite",
+        email: orgUser.email,
+        options: { redirectTo },
       });
 
-    if (inviteError) {
-      // If user already exists in auth but hasn't verified, we can generate a new link
-      if (inviteError.message?.includes("already been registered")) {
-        // Generate a magic link for password reset/setup
-        const { data: linkData, error: linkError } = await supabase.auth.admin
-          .generateLink({
-            type: "magiclink",
-            email: orgUser.email,
-            options: {
-              redirectTo,
-            },
-          });
-
-        if (linkError || !linkData?.properties?.action_link) {
-          logger.error("Failed to generate magic link", linkError, {
-            email: orgUser.email,
-          });
-          return errorResponse(
-            "Failed to generate new invitation link. Please try again later.",
-            500,
-          );
-        }
-
-        // Send custom email with the magic link
-        const emailResult = await sendAdminInvitationEmail(
-          {
-            email: orgUser.email,
-            firstName: orgUser.first_name || "",
-            lastName: orgUser.last_name || "",
-            organizationName: organizationName || "Your Organization",
-            invitationLink: linkData.properties.action_link,
-            role: orgUser.role,
-          },
-          false,
-        );
-
-        if (!emailResult.success) {
-          logger.warn("Failed to send invitation email", {
-            error: emailResult.error,
-            email: orgUser.email,
-          });
-          return errorResponse(
-            "Failed to send invitation email. Please try again.",
-            500,
-          );
-        }
-
-        // Update invited_at timestamp
-        await supabase
-          .from("organization_user")
-          .update({ invited_at: new Date().toISOString() })
-          .eq("id", organization_user_id);
-
-        logger.info("Invitation resent successfully (existing user)", {
-          organization_user_id,
-          email: orgUser.email,
-        });
-
-        return jsonResponse({
-          success: true,
-          message: "Invitation email resent successfully",
-        });
-      }
-
-      logger.error("Error inviting user", inviteError, {
+    if (linkError || !linkData?.properties?.action_link) {
+      logger.error("Failed to generate invitation link", linkError, {
         email: orgUser.email,
       });
-      throw inviteError;
+      return errorResponse(
+        "Failed to generate new invitation link. Please try again later.",
+        500,
+      );
     }
-
-    // Send custom branded email
-    const invitationLink = inviteData?.user?.confirmation_sent_at
-      ? `${siteUrl}/verify-email?type=admin_invite&email=${encodeURIComponent(orgUser.email)}`
-      : redirectTo;
 
     const emailResult = await sendAdminInvitationEmail(
       {
@@ -195,7 +126,7 @@ serve(async (req) => {
         firstName: orgUser.first_name || "",
         lastName: orgUser.last_name || "",
         organizationName: organizationName || "Your Organization",
-        invitationLink,
+        invitationLink: linkData.properties.action_link,
         role: orgUser.role,
       },
       false,
@@ -206,7 +137,10 @@ serve(async (req) => {
         error: emailResult.error,
         email: orgUser.email,
       });
-      // Don't fail - Supabase already sent an email
+      return errorResponse(
+        "Failed to send invitation email. Please try again.",
+        500,
+      );
     }
 
     // Update invited_at timestamp

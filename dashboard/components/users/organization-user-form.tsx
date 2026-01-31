@@ -108,17 +108,6 @@ export default function OrganizationUserForm({
         userId: user?.id,
       });
 
-      // Reset form
-      if (!isEditMode) {
-        setFirstName("");
-        setLastName("");
-        setEmail("");
-        setPhone("");
-      }
-      setRole("viewer");
-      setErrors({});
-      onOpenChange(false);
-
       const dataToSend = isEditMode
         ? {
             role: validatedData.role,
@@ -135,6 +124,17 @@ export default function OrganizationUserForm({
           };
 
       await onSuccess(dataToSend, user?.id);
+
+      // Only reset/close after a successful mutation
+      if (!isEditMode) {
+        setFirstName("");
+        setLastName("");
+        setEmail("");
+        setPhone("");
+        setRole("viewer");
+      }
+      setErrors({});
+      onOpenChange(false);
     } catch (error) {
       if (error instanceof Error && error.message !== "Validation failed") {
         log.error("OrganizationUserForm: Submission failed", {
