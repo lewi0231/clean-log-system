@@ -326,7 +326,8 @@ function VerifyEmailContent() {
       setResendError(null);
       setResendSuccess(false);
 
-      log.debug("VerifyEmail: Resending verification email", { email });
+      // Never log PII (emails) from auth flows.
+      log.debug("VerifyEmail: Resending verification email", { hasEmail: !!email });
 
       // Use the custom edge function that sends the same email template as signup
       const data = await invokeEdgeFunction<{ message?: string }>(

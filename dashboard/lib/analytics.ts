@@ -20,10 +20,7 @@ class Analytics {
 
   // Track custom events
   track(event: AnalyticsEvent) {
-    if (!this.isEnabled) {
-      console.log('Analytics Event:', event);
-      return;
-    }
+    if (!this.isEnabled) return;
 
     // Here you would integrate with your analytics provider
     // Example: Google Analytics 4
@@ -42,8 +39,7 @@ class Analytics {
     //   (window as any).mixpanel.track(event.name, event.properties);
     // }
 
-    // For now, just log to console in development
-    console.log('Analytics Event:', event);
+    // Intentionally no-op beyond provider integration.
   }
 
   // Track page views

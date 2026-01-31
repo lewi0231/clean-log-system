@@ -66,8 +66,9 @@ export default function SignUp() {
       const validatedData = validateInput();
 
       log.debug("SignUp: Calling register-organization function", {
-        email: validatedData.email,
-        organisation: validatedData.organisation,
+        // Never log emails; organization name can be sensitive too, so log only presence.
+        hasEmail: !!validatedData.email,
+        hasOrganisation: !!validatedData.organisation,
       });
 
       const data = await invokeEdgeFunction<{
@@ -107,27 +108,19 @@ export default function SignUp() {
         });
         setGeneralError(error.message);
       } else if (error instanceof Error && error.message !== "Validation failed") {
-        log.error("SignUp: Signup process failed", { 
+        log.error("SignUp: Signup process failed", {
           error: error.message,
-          errorObject: error,
-          stack: error.stack 
         });
         setGeneralError(error.message);
       } else if (error && typeof error === "object" && "message" in error) {
         // Handle error objects that aren't Error instances
         const errorMessage = String(error.message);
-        log.error("SignUp: Signup process failed", { 
-          error: errorMessage,
-          errorObject: error 
-        });
+        log.error("SignUp: Signup process failed", { error: errorMessage });
         setGeneralError(errorMessage);
       } else {
         // Handle unknown error types
         const errorMessage = error ? String(error) : "An unknown error occurred";
-        log.error("SignUp: Signup process failed", { 
-          error: errorMessage,
-          errorObject: error 
-        });
+        log.error("SignUp: Signup process failed", { error: errorMessage });
         setGeneralError(errorMessage);
       }
     } finally {

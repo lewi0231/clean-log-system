@@ -9,7 +9,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckCircle2, Mail, Smartphone } from "lucide-react";
-import Link from "next/link";
 
 export default function WorkerSignupSuccessPage() {
   return (
@@ -35,17 +34,8 @@ export default function WorkerSignupSuccessPage() {
                 To get started, you&apos;ll need to download and log in to our
                 mobile application. You can download it here:
               </p>
-              <Button asChild className="w-full" variant="default">
-                <Link
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    // Placeholder - will be updated with actual mobile app link
-                    alert("Mobile app download link coming soon!");
-                  }}
-                >
-                  Download Mobile App
-                </Link>
+              <Button className="w-full" variant="default" disabled>
+                Download Mobile App (Coming Soon)
               </Button>
             </div>
 

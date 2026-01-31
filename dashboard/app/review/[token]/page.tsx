@@ -14,7 +14,11 @@ import {
   getRatingDimensionDescription,
   getRatingDimensionLabel,
 } from "@/lib/constants/rating-config";
-import { supabase } from "@/lib/supabase";
+import { log } from "@/lib/logger";
+import {
+  EdgeFunctionError,
+  invokeEdgeFunction,
+} from "@/lib/supabase/invoke-edge-function";
 import { CheckCircle2, Loader2, Star } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -65,24 +69,14 @@ export default function ReviewPage() {
       }
 
       try {
-        const { data, error: fetchError } = await supabase.functions.invoke(
-          "get-job-by-token",
-          {
-            body: { token },
-          }
-        );
-
-        if (fetchError) {
-          setError(
-            fetchError.message ||
-              "Failed to load job details. Please check your link."
-          );
-          setLoading(false);
-          return;
-        }
+        const data = await invokeEdgeFunction<{
+          success?: boolean;
+          job?: JobDetails;
+          error?: string;
+        }>("get-job-by-token", { token });
 
         if (!data?.success || !data?.job) {
-          setError("Invalid or expired feedback link");
+          setError(data?.error || "Invalid or expired feedback link");
           setLoading(false);
           return;
         }
@@ -96,8 +90,17 @@ export default function ReviewPage() {
 
         setJobDetails(data.job);
       } catch (err) {
-        console.error("Error fetching job details:", err);
-        setError("Failed to load job details. Please try again.");
+        const message =
+          err instanceof EdgeFunctionError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to load job details. Please try again.";
+        log.error("Review: Failed to load job details", {
+          error: message,
+          hasToken: !!token,
+        });
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -163,24 +166,15 @@ export default function ReviewPage() {
         );
       }
 
-      const { data, error: submitError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ success?: boolean; error?: string }>(
         "submit-feedback",
         {
-          body: {
-            token,
-            rating: ratingsToSubmit.overall, // Keep for backward compatibility
-            ratings: ratingsToSubmit, // New multi-dimensional ratings
-            comment: comment.trim() || null,
-          },
-        }
+          token,
+          rating: ratingsToSubmit.overall, // Keep for backward compatibility
+          ratings: ratingsToSubmit, // New multi-dimensional ratings
+          comment: comment.trim() || null,
+        },
       );
-
-      if (submitError) {
-        setError(
-          submitError.message || "Failed to submit feedback. Please try again."
-        );
-        return;
-      }
 
       if (!data?.success) {
         setError(data?.error || "Failed to submit feedback. Please try again.");
@@ -189,8 +183,17 @@ export default function ReviewPage() {
 
       setSuccess(true);
     } catch (err) {
-      console.error("Error submitting feedback:", err);
-      setError("An unexpected error occurred. Please try again.");
+      const message =
+        err instanceof EdgeFunctionError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "An unexpected error occurred. Please try again.";
+      log.error("Review: Failed to submit feedback", {
+        error: message,
+        hasToken: !!token,
+      });
+      setError(message);
     } finally {
       setSubmitting(false);
     }
