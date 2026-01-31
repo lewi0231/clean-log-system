@@ -136,11 +136,12 @@ serve(async (req) => {
     }
 
     // 5. Link user to organization (include auth_user_id so RLS policies work)
+    // Normalize email to lowercase for consistent lookup (auth may normalize differently)
     const { error: _orgUserLinkError } = await supabase
       .from("organization_user")
       .insert({
         organization_id: org.id,
-        email: admin_email,
+        email: admin_email.trim().toLowerCase(),
         role: "admin",
         auth_user_id: authData.user?.id ?? null,
         status: "active",

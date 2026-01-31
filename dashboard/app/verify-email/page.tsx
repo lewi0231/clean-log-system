@@ -89,7 +89,7 @@ function VerifyEmailContent() {
             {
               type,
               hasTokenHash: !!tokenHash,
-            }
+            },
           );
 
           try {
@@ -106,7 +106,7 @@ function VerifyEmailContent() {
                 code: verifyError.status,
               });
               setResendError(
-                `Verification failed: ${verifyError.message}. Please try resending the email.`
+                `Verification failed: ${verifyError.message}. Please try resending the email.`,
               );
               setIsChecking(false);
               // Clear the hash/params so user can try again
@@ -132,7 +132,7 @@ function VerifyEmailContent() {
                   : "Unknown error",
             });
             setResendError(
-              "An error occurred during verification. Please try again."
+              "An error occurred during verification. Please try again.",
             );
             setIsChecking(false);
             return;
@@ -143,7 +143,7 @@ function VerifyEmailContent() {
         // The SSR client doesn't automatically process hash tokens
         if (accessToken && !tokenHash) {
           log.debug(
-            "VerifyEmail: Found access_token in hash, setting session explicitly"
+            "VerifyEmail: Found access_token in hash, setting session explicitly",
           );
 
           try {
@@ -162,7 +162,7 @@ function VerifyEmailContent() {
                   error: setSessionError.message,
                 });
                 setResendError(
-                  `Failed to establish session: ${setSessionError.message}`
+                  `Failed to establish session: ${setSessionError.message}`,
                 );
                 setIsChecking(false);
                 return;
@@ -177,7 +177,7 @@ function VerifyEmailContent() {
               window.history.replaceState(
                 null,
                 "",
-                window.location.pathname + window.location.search
+                window.location.pathname + window.location.search,
               );
 
               // Wait a moment for session to be fully established
@@ -193,7 +193,7 @@ function VerifyEmailContent() {
                   : "Unknown error",
             });
             setResendError(
-              "An error occurred while establishing your session. Please try again."
+              "An error occurred while establishing your session. Please try again.",
             );
             setIsChecking(false);
             return;
@@ -208,15 +208,30 @@ function VerifyEmailContent() {
         } = await supabase.auth.getUser();
 
         if (userError) {
-          // Only log if it's not the expected "no session" case
-          if (userError.message !== "Auth session missing!") {
+          // Expected "no session" cases: unverified users or stale/invalid sessions
+          // "User from sub claim in JWT does not exist" = stale JWT (e.g. after DB reset)
+          const isExpectedNoSession =
+            userError.message === "Auth session missing!" ||
+            userError.message === "User from sub claim in JWT does not exist";
+
+          if (isExpectedNoSession) {
+            if (
+              userError.message === "User from sub claim in JWT does not exist"
+            ) {
+              // Clear stale session so polling works correctly
+              await supabase.auth.signOut();
+              log.debug(
+                "VerifyEmail: Cleared stale session (user no longer exists)",
+              );
+            } else {
+              log.debug(
+                "VerifyEmail: No user session (expected for unverified users)",
+              );
+            }
+          } else {
             log.error("VerifyEmail: Error getting user", {
               error: userError.message,
             });
-          } else {
-            log.debug(
-              "VerifyEmail: No user session (expected for unverified users)"
-            );
           }
         } else if (userData) {
           user = userData;
@@ -245,7 +260,7 @@ function VerifyEmailContent() {
                 email: user.email,
                 userId: user.id,
               });
-              
+
               const { error: acceptError } = await supabase.functions.invoke(
                 "accept-admin-invitation",
                 {
@@ -253,7 +268,7 @@ function VerifyEmailContent() {
                     email: user.email,
                     auth_user_id: user.id,
                   },
-                }
+                },
               );
 
               if (acceptError) {
@@ -319,7 +334,7 @@ function VerifyEmailContent() {
         "resend-activation-link",
         {
           body: { email },
-        }
+        },
       );
 
       if (error) {
@@ -352,7 +367,7 @@ function VerifyEmailContent() {
         error: error instanceof Error ? error.message : "Unknown error",
       });
       setResendError(
-        error instanceof Error ? error.message : "Failed to resend email"
+        error instanceof Error ? error.message : "Failed to resend email",
       );
     } finally {
       setIsResending(false);
@@ -376,7 +391,7 @@ function VerifyEmailContent() {
   if (isVerified) {
     const redirectPath = isAdminInvite ? "/dashboard" : "/onboarding";
     const redirectLabel = isAdminInvite ? "Dashboard" : "Onboarding";
-    
+
     return (
       <div className="h-screen w-full flex justify-center items-center px-4">
         <Card className="w-full max-w-md">
@@ -385,10 +400,12 @@ function VerifyEmailContent() {
               <CheckCircle2 className="h-16 w-16 text-green-500" />
             </div>
             <CardTitle className="text-center">
-              {isAdminInvite ? "Account Activated!" : "Email Verified Successfully!"}
+              {isAdminInvite
+                ? "Account Activated!"
+                : "Email Verified Successfully!"}
             </CardTitle>
             <CardDescription className="text-center">
-              {isAdminInvite 
+              {isAdminInvite
                 ? "Your account has been set up. You can now access the dashboard."
                 : "Your email address has been confirmed. You're all set to get started!"}
               <br />
@@ -424,7 +441,8 @@ function VerifyEmailContent() {
                 <span className="font-semibold">
                   {email || "your email address"}
                 </span>
-                . Please check your inbox and click the link to set up your account.
+                . Please check your inbox and click the link to set up your
+                account.
               </>
             ) : (
               <>

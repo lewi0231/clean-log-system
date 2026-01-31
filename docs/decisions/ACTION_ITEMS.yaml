@@ -1,0 +1,27 @@
+# JobFlow - Action Items Registry
+# Managed under Agent Excellence Framework
+# Last Updated: 2026-01-31
+
+metadata:
+  project: JobFlow
+  repo: lewi0231/clean-log-system
+  product: "Clean Log System"
+
+action_items:
+  # Add your tasks here using this format:
+  # - id: PROJ-001
+  #   title: "Task title"
+  #   description: "What needs to be done"
+  #   owner:
+  #     type: agent  # or: human, cto, ceo, etc.
+  #     name: AI Agent
+  #   status: pending  # pending, in_progress, completed
+  #   priority: 1  # 1 = highest
+  #   category: technical  # technical, design, business, etc.
+
+summary:
+  total_tasks: 0
+  by_status:
+    pending: 0
+    in_progress: 0
+    completed: 0

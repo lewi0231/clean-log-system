@@ -10,7 +10,9 @@ export type NotificationType =
   | "job_completed"
   | "invoice_generated"
   | "payment_received"
-  | "review_submitted";
+  | "review_submitted"
+  | "admin_activated"
+  | "worker_created";
 
 export interface CreateNotificationParams {
   organization_id: string;

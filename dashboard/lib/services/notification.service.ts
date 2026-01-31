@@ -15,7 +15,9 @@ export interface Notification {
     | "job_completed"
     | "invoice_generated"
     | "payment_received"
-    | "review_submitted";
+    | "review_submitted"
+    | "admin_activated"
+    | "worker_created";
   title: string;
   message: string;
   related_entity_type?: string;

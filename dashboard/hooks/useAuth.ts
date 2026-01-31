@@ -4,9 +4,11 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 async function getAuthUser(): Promise<User | null> {
+  log.debug("useAuth: Fetching user...");
   const {
     data: { user },
     error,
@@ -30,13 +32,47 @@ async function getAuthUser(): Promise<User | null> {
 }
 
 export function useAuth() {
+  const queryClient = useQueryClient();
+
   // Query for initial user state
   const query = useQuery({
     queryKey: ["auth-user"],
     queryFn: getAuthUser,
-    staleTime: Infinity, // User state managed by subscription
+    staleTime: 5 * 60 * 1000, // 5 minutes - allow refetch after navigation
     gcTime: Infinity,
     retry: false, // Don't retry auth failures
+  });
+
+  // Listen for auth state changes and invalidate the query
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      log.debug("useAuth: Auth state changed", {
+        event,
+        hasSession: !!session,
+        userId: session?.user?.id,
+      });
+
+      // Invalidate the auth query to refetch user data
+      if (
+        event === "SIGNED_IN" || event === "TOKEN_REFRESHED" ||
+        event === "SIGNED_OUT"
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [queryClient]);
+
+  log.debug("useAuth: Current state", {
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    hasUser: !!query.data,
+    userId: query.data?.id,
   });
 
   return {

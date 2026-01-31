@@ -22,7 +22,10 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import {
+  EdgeFunctionError,
+  invokeEdgeFunction,
+} from "@/lib/supabase/invoke-edge-function";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -124,13 +127,10 @@ export function OnboardingWizard() {
     try {
       log.info("Onboarding: Submitting onboarding data", { data });
 
-      const { error } = await supabase.functions.invoke("complete-onboarding", {
-        body: data,
-      });
-
-      if (error) {
-        throw error;
-      }
+      await invokeEdgeFunction<{ success: boolean; organizationId: string }>(
+        "complete-onboarding",
+        data as unknown as Record<string, unknown>,
+      );
 
       log.info("Onboarding: Completed successfully");
       toast.success("Welcome! Let's get you set up.");
@@ -138,14 +138,14 @@ export function OnboardingWizard() {
       // Redirect to dashboard (checklist will appear automatically)
       router.push("/dashboard");
     } catch (err) {
-      log.error("Onboarding: Failed to complete", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      toast.error(
-        err instanceof Error
+      const message =
+        err instanceof EdgeFunctionError
           ? err.message
-          : "Failed to complete onboarding. Please try again."
-      );
+          : err instanceof Error
+            ? err.message
+            : "Failed to complete onboarding. Please try again.";
+      log.error("Onboarding: Failed to complete", { error: message });
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -171,9 +171,7 @@ export function OnboardingWizard() {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <div className="space-y-2">
-            <CardTitle className="text-2xl">
-              Welcome to Fieldly
-            </CardTitle>
+            <CardTitle className="text-2xl">Welcome to Fieldly</CardTitle>
             <CardDescription>
               Let&apos;s get your account set up. This will only take a few
               minutes.

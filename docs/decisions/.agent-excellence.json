@@ -1,0 +1,20 @@
+{
+  "version": "4.8.1",
+  "projectName": "JobFlow",
+  "initialized": "2026-01-22T22:13:22.191Z",
+  "lastSync": "2026-01-28T05:58:24.467Z",
+  "coreFiles": [
+    "AGENT_EXCELLENCE_CORE.md",
+    "CONTEXT_MANAGEMENT.md",
+    "DEBUGGING_METHODOLOGY.md",
+    "PLATFORM_GOTCHAS.md",
+    "MDC_SPECIFICATION.md",
+    "HUMAN_PROTOCOL.md"
+  ],
+  "projectFiles": [
+    "PROJECT_LEARNINGS.md",
+    "AGENT_START_PROMPT.mdc",
+    "AGENT_HANDOVER.mdc"
+  ],
+  "useMdc": true
+}

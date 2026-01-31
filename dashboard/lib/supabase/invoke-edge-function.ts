@@ -36,11 +36,22 @@ async function toEdgeFunctionError(
     if (err instanceof FunctionsHttpError) {
         try {
             const body = await err.context.json();
-            const message =
-                (body && typeof body === "object" && "error" in body &&
-                        typeof body.error === "string"
-                    ? body.error
-                    : err.message) ||
+            // Support both custom { error } and RFC 7807 Problem Details { detail }
+            const message = (body && typeof body === "object"
+                ? ("detail" in body &&
+                        typeof (body as { detail?: unknown }).detail ===
+                            "string"
+                    ? (body as { detail: string }).detail
+                    : "error" in body &&
+                            typeof (body as { error?: unknown }).error ===
+                                "string"
+                    ? (body as { error: string }).error
+                    : "message" in body &&
+                            typeof (body as { message?: unknown }).message ===
+                                "string"
+                    ? (body as { message: string }).message
+                    : err.message)
+                : err.message) ||
                 `Edge Function '${functionName}' returned an error`;
             return new EdgeFunctionError(message, {
                 status: err.status,
@@ -104,15 +115,15 @@ async function toEdgeFunctionError(
             }
         }
 
-        const extractedMessage =
-            extracted && typeof extracted === "object" &&
+        const extractedMessage = extracted && typeof extracted === "object" &&
                 ("error" in extracted || "message" in extracted)
-                ? (typeof (extracted as Record<string, unknown>).error === "string"
-                    ? (extracted as Record<string, unknown>).error
-                    : typeof (extracted as Record<string, unknown>).message === "string"
-                    ? (extracted as Record<string, unknown>).message
-                    : undefined)
-                : undefined;
+            ? (typeof (extracted as Record<string, unknown>).error === "string"
+                ? (extracted as Record<string, unknown>).error
+                : typeof (extracted as Record<string, unknown>).message ===
+                        "string"
+                ? (extracted as Record<string, unknown>).message
+                : undefined)
+            : undefined;
 
         const message = extractedMessage ||
             (typeof maybe.message === "string"

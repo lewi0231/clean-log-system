@@ -79,8 +79,9 @@ serve(async (req: Request) => {
       const orgUser = await getOrganizationUserByEmail(
         supabase,
         membership.userEmail,
+        organization_id,
       );
-      if (orgUser && orgUser.organization_id === organization_id) {
+      if (orgUser) {
         organizationUserId = orgUser.id;
       }
     }

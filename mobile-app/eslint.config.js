@@ -13,7 +13,7 @@ module.exports = defineConfig([
       "import/resolver": {
         typescript: {
           alwaysTryTypes: true,
-          project: path.resolve(path.dirname, "./tsconfig.json"),
+          project: path.resolve(__dirname, "./tsconfig.json"),
         },
       },
     },

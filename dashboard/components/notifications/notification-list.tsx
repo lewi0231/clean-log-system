@@ -26,6 +26,8 @@ const notificationIcons: Record<Notification["type"], React.ReactNode> = {
   invoice_generated: <FileText className="h-4 w-4 text-purple-500" />,
   payment_received: <Wallet className="h-4 w-4 text-emerald-500" />,
   review_submitted: <MessageSquare className="h-4 w-4 text-amber-500" />,
+  admin_activated: <User className="h-4 w-4 text-indigo-500" />,
+  worker_created: <User className="h-4 w-4 text-teal-500" />,
 };
 
 export default function NotificationList({
