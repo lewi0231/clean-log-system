@@ -12,7 +12,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
@@ -85,22 +84,10 @@ function AcceptInvitePage() {
       try {
         // Never log tokens or other secrets.
         log.debug("Accept Invite: Fetching invitation details", { hasToken: !!token });
-        const { data, error: fetchError } = await supabase.functions.invoke(
+        const data = await invokeEdgeFunction<{ invitation?: { worker_email?: string } }>(
           "get-worker",
-          {
-            body: token,
-          }
+          token,
         );
-
-        if (fetchError) {
-          log.error("Accept Invite: Failed to fetch invitation", fetchError);
-          setError(
-            fetchError.message ||
-              "Failed to load invitation. Please check your link."
-          );
-          setFetchingInvitation(false);
-          return;
-        }
 
         if (data?.invitation) {
           setWorkerEmail(data.invitation.worker_email);
@@ -108,8 +95,14 @@ function AcceptInvitePage() {
           log.debug("Accept Invite: Invitation loaded", { hasEmail: true });
         }
       } catch (err) {
-        log.error("Accept Invite: Error fetching invitation", err);
-        setError("Failed to load invitation. Please try again.");
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to load invitation. Please try again.";
+        log.error("Accept Invite: Error fetching invitation", {
+          error: message,
+        });
+        setError(message);
       } finally {
         setFetchingInvitation(false);
       }

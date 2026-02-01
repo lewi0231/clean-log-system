@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 
 export interface CalculateWorkerPaymentsRequest {
     organization_id: string;
@@ -99,14 +99,10 @@ export class WorkerPaymentService {
                 jobCount: request.job_ids.length,
             });
 
-            const { data, error } = await supabase.functions.invoke(
+            const data = await invokeEdgeFunction<CalculateWorkerPaymentsResponse>(
                 "calculate-worker-payment",
-                {
-                    body: request,
-                },
+                request as unknown as Record<string, unknown>,
             );
-
-            if (error) throw error;
 
             if (!data || !data.success) {
                 throw new Error("Failed to calculate worker payments");
@@ -254,18 +250,14 @@ export class WorkerPaymentService {
                 jobCount: jobIds.length,
             });
 
-            const { data, error } = await supabase.functions.invoke(
-                "save-worker-payment",
-                {
-                    body: {
-                        organization_id: organizationId,
-                        calculation: calculation.calculation,
-                        job_ids: jobIds,
-                    },
-                },
-            );
-
-            if (error) throw error;
+            const data = await invokeEdgeFunction<{
+                success?: boolean;
+                batch_id?: string;
+            }>("save-worker-payment", {
+                organization_id: organizationId,
+                calculation: calculation.calculation,
+                job_ids: jobIds,
+            });
 
             if (!data || !data.success) {
                 throw new Error("Failed to save worker payment");
@@ -273,7 +265,7 @@ export class WorkerPaymentService {
 
             return {
                 success: true,
-                batch_id: data.batch_id,
+                batch_id: data.batch_id as string,
             };
         } catch (err) {
             log.error(
@@ -313,28 +305,30 @@ export class WorkerPaymentService {
         },
     ): Promise<{ success: boolean }> {
         try {
+            // Don't log payment references / notes.
             log.debug("WorkerPaymentService: Updating payment status", {
                 organizationId,
-                ...params,
+                paymentId: params.paymentId,
+                batchId: params.batchId,
+                status: params.status,
+                paymentMethod: params.paymentMethod,
+                hasPaymentReference: !!params.paymentReference,
+                hasNotes: !!params.notes,
             });
 
-            const { data, error } = await supabase.functions.invoke(
+            const data = await invokeEdgeFunction<{ success?: boolean }>(
                 "update-worker-payment-status",
                 {
-                    body: {
-                        organization_id: organizationId,
-                        payment_id: params.paymentId,
-                        batch_id: params.batchId,
-                        status: params.status,
-                        payment_method: params.paymentMethod,
-                        payment_reference: params.paymentReference,
-                        payment_date: params.paymentDate,
-                        notes: params.notes,
-                    },
+                    organization_id: organizationId,
+                    payment_id: params.paymentId,
+                    batch_id: params.batchId,
+                    status: params.status,
+                    payment_method: params.paymentMethod,
+                    payment_reference: params.paymentReference,
+                    payment_date: params.paymentDate,
+                    notes: params.notes,
                 },
             );
-
-            if (error) throw error;
 
             if (!data || !data.success) {
                 throw new Error("Failed to update payment status");
@@ -371,18 +365,16 @@ export class WorkerPaymentService {
                 ...options,
             });
 
-            const { data, error } = await supabase.functions.invoke(
-                "list-worker-payments",
-                {
-                    body: {
-                        organization_id: organizationId,
-                        page: options?.page ?? 1,
-                        limit: options?.limit ?? 50,
-                    },
-                },
-            );
-
-            if (error) throw error;
+            const data = await invokeEdgeFunction<{
+                success?: boolean;
+                batches?: PaymentRecord[];
+                total?: number;
+                hasMore?: boolean;
+            }>("list-worker-payments", {
+                organization_id: organizationId,
+                page: options?.page ?? 1,
+                limit: options?.limit ?? 50,
+            });
 
             if (!data || !data.success) {
                 throw new Error("Failed to list worker payments");

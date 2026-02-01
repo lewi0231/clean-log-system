@@ -10,7 +10,6 @@ import type {
   UpdateJobRequest,
   UpdateJobResponse,
 } from "@/lib/types/api";
-import { supabase } from "../supabase";
 
 export class JobsService {
   /**
@@ -121,17 +120,10 @@ export class JobsService {
         jobId: request.job_id,
       });
 
-      const { data, error } = await supabase.functions.invoke("get-job-edits", {
-        body: request,
-      });
-
-      if (error) {
-        log.error("JobsService: Error fetching job edit history", {
-          error: error.message || "Unknown error",
-          jobId: request.job_id,
-        });
-        throw error;
-      }
+      const data = await invokeEdgeFunction<GetJobEditsResponse>(
+        "get-job-edits",
+        request as unknown as Record<string, unknown>,
+      );
 
       if (!data || !data.success) {
         log.error("JobsService: No data returned from get-job-edits", {

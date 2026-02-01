@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { LocationHierarchyNode } from "@/lib/types";
 
 interface ListLocationHierarchyRequest {
@@ -37,21 +37,17 @@ export class LocationHierarchyService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "list-location-hierarchy",
-        {
-          body: request,
-        },
-      );
-
-      if (error) throw error;
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        nodes?: LocationHierarchyNode[];
+      }>("list-location-hierarchy", request as unknown as Record<string, unknown>);
 
       if (!data || !data.success) {
         throw new Error("Failed to list location hierarchy");
       }
 
       return {
-        nodes: data.nodes as LocationHierarchyNode[],
+        nodes: (data.nodes ?? []) as LocationHierarchyNode[],
       };
     } catch (err) {
       log.error("LocationHierarchyService: Failed to list hierarchy", {
@@ -70,14 +66,13 @@ export class LocationHierarchyService {
         type: request.type,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        node?: LocationHierarchyNode;
+      }>(
         "create-location-hierarchy",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) throw error;
 
       if (!data || !data.success || !data.node) {
         throw new Error("Failed to create location hierarchy node");
@@ -100,14 +95,13 @@ export class LocationHierarchyService {
         id: request.id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        node?: LocationHierarchyNode;
+      }>(
         "update-location-hierarchy",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) throw error;
 
       if (!data || !data.success || !data.node) {
         throw new Error("Failed to update location hierarchy node");
@@ -128,14 +122,10 @@ export class LocationHierarchyService {
         id: request.id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "delete-location-hierarchy",
-        {
-          body: request,
-        },
-      );
-
-      if (error) throw error;
+      const data = await invokeEdgeFunction<{
+        success?: boolean;
+        message?: string;
+      }>("delete-location-hierarchy", request as unknown as Record<string, unknown>);
 
       if (!data || !data.success) {
         throw new Error(

@@ -156,13 +156,13 @@ async function toEdgeFunctionError(
  */
 export async function invokeEdgeFunction<TResponse>(
     functionName: string,
-    body?: Record<string, unknown>,
+    body?: unknown,
 ): Promise<TResponse> {
     log.debug("invokeEdgeFunction: invoking", { functionName });
 
     const { data, error } = await supabase.functions.invoke(
         functionName,
-        body ? { body } : undefined,
+        body === undefined || body === null ? undefined : ({ body } as never),
     );
 
     if (error) {
@@ -182,7 +182,7 @@ export async function invokeEdgeFunction<TResponse>(
  */
 export async function invokeEdgeFunctionSafe<TResponse>(
     functionName: string,
-    body?: Record<string, unknown>,
+    body?: unknown,
 ): Promise<InvokeResult<TResponse>> {
     try {
         const data = await invokeEdgeFunction<TResponse>(functionName, body);

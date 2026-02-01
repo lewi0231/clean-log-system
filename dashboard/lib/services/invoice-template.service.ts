@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   BillingAddressConfig,
   InvoiceEmailRecipientConfig,
@@ -46,18 +46,10 @@ export class InvoiceTemplateService {
         organizationId,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<GetInvoiceTemplateConfigResponse>(
         "get-invoice-template-config",
-        {
-          body: {
-            organization_id: organizationId,
-          },
-        },
+        { organization_id: organizationId },
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success || !data.config) {
         throw new Error("Failed to get invoice template config");
@@ -86,16 +78,10 @@ export class InvoiceTemplateService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<UpdateInvoiceTemplateConfigResponse>(
         "update-invoice-template-config",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success || !data.config) {
         throw new Error("Failed to update invoice template config");

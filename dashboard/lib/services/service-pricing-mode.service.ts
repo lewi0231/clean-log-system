@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { ServicePricingMode } from "@/lib/types";
 
 export interface ListServicePricingModesRequest {
@@ -33,14 +33,11 @@ export class ServicePricingModeService {
                 },
             );
 
-            const { data, error } = await supabase.functions.invoke(
-                "list-service-pricing-modes",
-                {
-                    body: request,
-                },
-            );
-
-            if (error) throw error;
+            const data = await invokeEdgeFunction<{
+                success?: boolean;
+                error?: string;
+                service_pricing_modes?: ServicePricingMode[];
+            }>("list-service-pricing-modes", request as unknown as Record<string, unknown>);
 
             if (!data?.success) {
                 throw new Error(
@@ -74,14 +71,11 @@ export class ServicePricingModeService {
                 },
             );
 
-            const { data, error } = await supabase.functions.invoke(
-                "upsert-service-pricing-mode",
-                {
-                    body: request,
-                },
-            );
-
-            if (error) throw error;
+            const data = await invokeEdgeFunction<{
+                success?: boolean;
+                error?: string;
+                service_pricing_mode?: ServicePricingMode;
+            }>("upsert-service-pricing-mode", request as unknown as Record<string, unknown>);
 
             if (!data?.success) {
                 throw new Error(
@@ -110,14 +104,10 @@ export class ServicePricingModeService {
                 },
             );
 
-            const { data, error } = await supabase.functions.invoke(
+            const data = await invokeEdgeFunction<{ success?: boolean; error?: string }>(
                 "delete-service-pricing-mode",
-                {
-                    body: { id },
-                },
+                { id },
             );
-
-            if (error) throw error;
 
             if (!data?.success) {
                 throw new Error(

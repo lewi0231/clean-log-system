@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
     ListFeedbackRequest,
     ListFeedbackResponse,
@@ -17,16 +17,10 @@ export class FeedbackService {
                 organizationId: request.organization_id,
             });
 
-            const { data, error } = await supabase.functions.invoke(
+            const data = await invokeEdgeFunction<ListFeedbackResponse>(
                 "list-feedback",
-                {
-                    body: request,
-                },
+                request as unknown as Record<string, unknown>,
             );
-
-            if (error) {
-                throw error;
-            }
 
             if (!data || !data.success) {
                 throw new Error("Failed to fetch feedback");
