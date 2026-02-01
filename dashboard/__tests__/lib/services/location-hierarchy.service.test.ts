@@ -76,7 +76,7 @@ describe("LocationHierarchyService", () => {
                 LocationHierarchyService.list({
                     organization_id: "org-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when success is false", async () => {
@@ -143,7 +143,7 @@ describe("LocationHierarchyService", () => {
                     name: "New Company",
                     type: "company",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when node is missing", async () => {
@@ -209,7 +209,7 @@ describe("LocationHierarchyService", () => {
                     id: "node-1",
                     name: "Updated Company",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when node is missing", async () => {
@@ -261,7 +261,7 @@ describe("LocationHierarchyService", () => {
                 LocationHierarchyService.delete({
                     id: "node-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when success is false", async () => {

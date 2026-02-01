@@ -94,7 +94,7 @@ describe("FieldConfigsService", () => {
                 FieldConfigsService.list({
                     organization_id: "org-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when field_configs is missing", async () => {

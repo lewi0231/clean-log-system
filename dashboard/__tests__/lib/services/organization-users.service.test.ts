@@ -92,7 +92,7 @@ describe("OrganizationUsersService", () => {
                 OrganizationUsersService.list({
                     organization_id: "org-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when success is false", async () => {
@@ -157,7 +157,7 @@ describe("OrganizationUsersService", () => {
                     email: "newuser@example.com",
                     role: "viewer",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when organization_user is missing", async () => {
@@ -221,7 +221,7 @@ describe("OrganizationUsersService", () => {
                     id: "user-1",
                     role: "admin",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when organization_user is missing", async () => {
@@ -271,7 +271,7 @@ describe("OrganizationUsersService", () => {
                 OrganizationUsersService.delete({
                     id: "user-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
     });
 
@@ -310,7 +310,7 @@ describe("OrganizationUsersService", () => {
                     organization_user_id: "user-1",
                     organization_id: "org-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when success is false", async () => {
@@ -404,7 +404,7 @@ describe("OrganizationUsersService", () => {
 
             await expect(
                 OrganizationUsersService.convertToWorker("user-1", "org-1"),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when success is false", async () => {

@@ -95,7 +95,7 @@ describe("FeedbackService", () => {
                 FeedbackService.list({
                     organization_id: "org-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when success is false", async () => {

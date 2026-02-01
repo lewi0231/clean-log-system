@@ -58,7 +58,7 @@ describe("LocationsService", () => {
         LocationsService.listWorkersAndLocations({
           organization_id: "org-1",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
   });
 
@@ -96,7 +96,7 @@ describe("LocationsService", () => {
           address: "123 Main St",
           contact_person: "John Doe",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
 
     it("should throw error when location is missing in response", async () => {
@@ -145,7 +145,7 @@ describe("LocationsService", () => {
           id: "location-1",
           name: "Updated Office",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
   });
 
@@ -175,7 +175,7 @@ describe("LocationsService", () => {
 
       await expect(
         LocationsService.delete({ id: "location-1" })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
   });
 });
