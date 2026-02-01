@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { Location } from "@/lib/types";
 import type {
   CreateLocationRequest,
@@ -21,16 +21,10 @@ export class LocationsService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<ListWorkersAndLocationsResponse>(
         "list-workers-and-locations",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch workers and locations");
@@ -79,16 +73,10 @@ export class LocationsService {
         }
       }
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ location?: Location }>(
         "create-location",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.location) {
         throw new Error("Failed to create location");
@@ -144,16 +132,10 @@ export class LocationsService {
         }
       }
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ location?: Location }>(
         "update-location",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.location) {
         throw new Error("Failed to update location");
@@ -180,13 +162,7 @@ export class LocationsService {
         locationId: request.id,
       });
 
-      const { error } = await supabase.functions.invoke("delete-location", {
-        body: request,
-      });
-
-      if (error) {
-        throw error;
-      }
+      await invokeEdgeFunction("delete-location", request as unknown as Record<string, unknown>);
 
       log.info("LocationsService: Location deleted successfully", {
         locationId: request.id,

@@ -93,23 +93,26 @@ export async function middleware(request: NextRequest) {
     // Create session object for compatibility with existing code
     const session = user ? { user } : null;
 
-    // #region agent log - Debug middleware auth
-    console.log("[MIDDLEWARE DEBUG]", {
-        pathname,
-        hasSession: !!session,
-        sessionUserId: session?.user?.id,
-        sessionUserEmail: session?.user?.email,
-        isPublicRoute,
-        cookies: request.cookies.getAll().map((c) => c.name),
-        hypothesisId: "MIDDLEWARE",
-    });
-    // #endregion
+    // Middleware runs server-side and may log to production infrastructure.
+    // Never log PII (emails) or tokens. Gate debug logs behind an explicit env var.
+    const middlewareDebug = process.env.MIDDLEWARE_DEBUG === "true";
+    if (middlewareDebug) {
+        console.log("[MIDDLEWARE DEBUG]", {
+            pathname,
+            hasSession: !!session,
+            sessionUserId: session?.user?.id,
+            isPublicRoute,
+            hypothesisId: "MIDDLEWARE",
+        });
+    }
 
     // If user is authenticated and trying to access login/signup, redirect to dashboard
     if (session && (pathname === "/login" || pathname === "/signup")) {
-        console.log(
-            "[MIDDLEWARE DEBUG] Redirecting authenticated user from login/signup to dashboard",
-        );
+        if (middlewareDebug) {
+            console.log(
+                "[MIDDLEWARE DEBUG] Redirecting authenticated user from login/signup to dashboard",
+            );
+        }
         const redirectUrl = new URL("/dashboard", request.url);
         return NextResponse.redirect(redirectUrl);
     }
@@ -117,9 +120,11 @@ export async function middleware(request: NextRequest) {
     // If it's a dashboard route, require authentication
     if (pathname.startsWith("/dashboard") && !isPublicRoute) {
         if (!session) {
-            console.log(
-                "[MIDDLEWARE DEBUG] No session for dashboard route, redirecting to login",
-            );
+            if (middlewareDebug) {
+                console.log(
+                    "[MIDDLEWARE DEBUG] No session for dashboard route, redirecting to login",
+                );
+            }
             // Redirect to login with return URL
             const redirectUrl = new URL("/login", request.url);
             redirectUrl.searchParams.set("redirect", pathname);
@@ -129,13 +134,11 @@ export async function middleware(request: NextRequest) {
         // Check email verification status for authenticated users
         // Allow access but the dashboard will show restrictions for unverified users
         if (session.user && !session.user.email_confirmed_at) {
-            console.log(
-                "[MIDDLEWARE DEBUG] User email not verified",
-                {
+            if (middlewareDebug) {
+                console.log("[MIDDLEWARE DEBUG] User email not verified", {
                     userId: session.user.id,
-                    email: session.user.email,
-                },
-            );
+                });
+            }
             // Don't redirect - allow access but dashboard will show verification banner
             // This follows the "hybrid approach" - allow access but restrict features
         }

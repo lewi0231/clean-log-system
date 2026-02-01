@@ -210,7 +210,7 @@ describe("PaymentService", () => {
                 PaymentService.list({
                     organization_id: "org-1",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
     });
 
@@ -447,7 +447,7 @@ describe("PaymentService", () => {
                     payment_reference: "TRANS-123",
                     payment_date: "2025-01-15",
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
     });
 });

@@ -71,6 +71,7 @@ export default function FieldPricingList({
   fieldTypeFilter,
   organizationId,
 }: FieldPricingListProps) {
+  const pricingDebug = process.env.NEXT_PUBLIC_PRICING_DEBUG === "true";
   const { pricingContext, showBothContexts } = usePricingScope();
   const {
     fieldPricing: customerPricing,
@@ -225,17 +226,17 @@ export default function FieldPricingList({
           const isLocationOverride = !!(locationId || locationHierarchyId);
           const existingCustomerRule = customerEntry?.record;
 
-          console.log("[Pricing Debug] Saving customer pricing:", {
-            fieldConfigId: fieldConfig.id,
-            fieldName: fieldConfig.label,
-            price: customerPrice,
-            isLocationOverride,
-            locationId,
-            locationHierarchyId,
-            existingRuleId: existingCustomerRule?.id,
-            existingPrice: existingCustomerRule?.customer_price,
-            pricingContext: "customer",
-          });
+          if (pricingDebug) {
+            log.debug("[Pricing Debug] Saving customer pricing", {
+              fieldConfigId: fieldConfig.id,
+              price: customerPrice,
+              isLocationOverride,
+              locationId,
+              locationHierarchyId,
+              existingRuleId: existingCustomerRule?.id,
+              pricingContext: "customer",
+            });
+          }
 
           await upsertCustomerPricing(fieldConfig.id, customerPrice, {
             appliesToFieldType: fieldConfig.field_type,
@@ -260,17 +261,17 @@ export default function FieldPricingList({
           const isLocationOverride = !!(locationId || locationHierarchyId);
           const existingWorkerRule = workerEntry?.record;
 
-          console.log("[Pricing Debug] Saving worker pricing:", {
-            fieldConfigId: fieldConfig.id,
-            fieldName: fieldConfig.label,
-            price: workerPrice,
-            isLocationOverride,
-            locationId,
-            locationHierarchyId,
-            existingRuleId: existingWorkerRule?.id,
-            existingPrice: existingWorkerRule?.customer_price,
-            pricingContext: "worker",
-          });
+          if (pricingDebug) {
+            log.debug("[Pricing Debug] Saving worker pricing", {
+              fieldConfigId: fieldConfig.id,
+              price: workerPrice,
+              isLocationOverride,
+              locationId,
+              locationHierarchyId,
+              existingRuleId: existingWorkerRule?.id,
+              pricingContext: "worker",
+            });
+          }
 
           await upsertWorkerPricing(fieldConfig.id, workerPrice, {
             appliesToFieldType: fieldConfig.field_type,
@@ -322,17 +323,17 @@ export default function FieldPricingList({
         const existingRule = pricingEntry?.record;
         const isLocationOverride = !!(locationId || locationHierarchyId);
 
-        console.log("[Pricing Debug] Saving pricing:", {
-          fieldConfigId: fieldConfig.id,
-          fieldName: fieldConfig.label,
-          price,
-          isLocationOverride,
-          locationId,
-          locationHierarchyId,
-          existingRuleId: existingRule?.id,
-          existingPrice: existingRule?.customer_price,
-          pricingContext,
-        });
+        if (pricingDebug) {
+          log.debug("[Pricing Debug] Saving pricing", {
+            fieldConfigId: fieldConfig.id,
+            price,
+            isLocationOverride,
+            locationId,
+            locationHierarchyId,
+            existingRuleId: existingRule?.id,
+            pricingContext,
+          });
+        }
 
         await upsertPricing(fieldConfig.id, price, {
           appliesToFieldType: fieldConfig.field_type,
@@ -573,13 +574,15 @@ export default function FieldPricingList({
                   ? "customer"
                   : "worker");
 
-              console.log("[Pricing Debug] Deleting location override:", {
-                ruleId: id,
-                fieldConfigId: fieldConfig.id,
-                overrideContext,
-                pricingContext,
-                showBothContexts,
-              });
+              if (pricingDebug) {
+                log.debug("[Pricing Debug] Deleting location override", {
+                  ruleId: id,
+                  fieldConfigId: fieldConfig.id,
+                  overrideContext,
+                  pricingContext,
+                  showBothContexts,
+                });
+              }
 
               // Use the correct delete function based on the override's context
               if (overrideContext === "customer") {

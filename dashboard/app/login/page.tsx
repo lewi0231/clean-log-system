@@ -30,7 +30,8 @@ function LoginForm() {
 
   const handleLogin = async () => {
     try {
-      log.info("Login: Starting login process", { email });
+      // Never log PII (emails) from auth flows.
+      log.info("Login: Starting login process", { hasEmail: !!email });
       setIsLoading(true);
       setErrors({});
 
@@ -55,7 +56,6 @@ function LoginForm() {
       if (signInError) {
         log.error("Login: Sign in failed", {
           error: signInError.message,
-          email,
         });
         // Most auth errors relate to invalid credentials - assign to password field
         setErrors({ password: signInError.message });
@@ -64,7 +64,6 @@ function LoginForm() {
 
       log.info("Login: User signed in successfully", {
         userId: data.user?.id,
-        email: data.user?.email,
       });
 
       setEmail("");

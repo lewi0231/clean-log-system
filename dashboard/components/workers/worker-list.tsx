@@ -29,6 +29,7 @@ import { log } from "@/lib/logger";
 import { Worker } from "@/lib/types";
 import { Mail, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import WorkerForm from "./worker-form";
 
 interface WorkerListProps {
@@ -86,15 +87,15 @@ export default function WorkerList({
         workerId: resendingWorker.id,
       });
       setResendingWorker(null);
-      alert(`Invitation email has been sent to ${resendingWorker.email}`);
+      toast.success(`Invitation email has been sent to ${resendingWorker.email}`);
     } catch (err) {
       log.error("WorkerList: Failed to resend invitation", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      alert(
+      toast.error(
         `Failed to resend invitation: ${
           err instanceof Error ? err.message : "Unknown error"
-        }`
+        }`,
       );
     } finally {
       setIsResending(false);
@@ -111,11 +112,9 @@ export default function WorkerList({
     },
     workerId?: string
   ) => {
-    setIsFormOpen(false);
     if (workerId && editingWorker) {
       await onUpdateWorker(workerId, workerData);
     }
-    setEditingWorker(null);
   };
 
   if (loading) {

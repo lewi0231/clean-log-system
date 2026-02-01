@@ -8,6 +8,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
   nonNegativeNumberSchema,
@@ -186,6 +187,24 @@ serve(async (req: Request) => {
       amount,
       is_fully_paid: isFullyPaid,
     });
+
+    // Notify admins when invoice is fully paid (non-blocking)
+    if (isFullyPaid) {
+      const notificationResult = await createNotification(supabase, {
+        organization_id: invoice.organization_id,
+        type: "payment_received",
+        title: "Invoice paid",
+        message: "An invoice has been paid.",
+        related_entity_type: "invoice",
+        related_entity_id: invoice_id,
+      });
+      if (!notificationResult.success) {
+        logger.warn("Failed to create payment notification", {
+          error: notificationResult.error,
+          invoice_id,
+        });
+      }
+    }
 
     return jsonResponse({
       success: true,

@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -82,33 +82,27 @@ function AcceptInvitePage() {
       }
 
       try {
-        log.debug("Accept Invite: Fetching invitation details", { token });
-        const { data, error: fetchError } = await supabase.functions.invoke(
+        // Never log tokens or other secrets.
+        log.debug("Accept Invite: Fetching invitation details", { hasToken: !!token });
+        const data = await invokeEdgeFunction<{ invitation?: { worker_email?: string } }>(
           "get-worker",
-          {
-            body: token,
-          }
+          token,
         );
-
-        if (fetchError) {
-          log.error("Accept Invite: Failed to fetch invitation", fetchError);
-          setError(
-            fetchError.message ||
-              "Failed to load invitation. Please check your link."
-          );
-          setFetchingInvitation(false);
-          return;
-        }
 
         if (data?.invitation) {
           setWorkerEmail(data.invitation.worker_email);
-          log.debug("Accept Invite: Invitation loaded", {
-            email: data.invitation.worker_email,
-          });
+          // Never log PII (emails).
+          log.debug("Accept Invite: Invitation loaded", { hasEmail: true });
         }
       } catch (err) {
-        log.error("Accept Invite: Error fetching invitation", err);
-        setError("Failed to load invitation. Please try again.");
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Failed to load invitation. Please try again.";
+        log.error("Accept Invite: Error fetching invitation", {
+          error: message,
+        });
+        setError(message);
       } finally {
         setFetchingInvitation(false);
       }
@@ -125,39 +119,26 @@ function AcceptInvitePage() {
 
       const validatedData = validate();
       log.debug("Accept Invite: Calling accept-worker-invitation", {
-        token,
+        hasToken: !!token,
       });
 
-      const { data, error: acceptError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ success?: boolean; error?: string }>(
         "accept-worker-invitation",
         {
-          body: {
-            invitation_token: token,
-            password: validatedData.password,
-            address: validatedData.address,
-            abn: validatedData.abn,
-          },
-        }
+          invitation_token: token,
+          password: validatedData.password,
+          address: validatedData.address,
+          abn: validatedData.abn,
+        },
       );
 
-      if (acceptError) {
-        log.error(
-          "Accept Invite: accept worker invitation failed",
-          acceptError.message
-        );
-        setError(
-          acceptError.message || "Failed to create account. Please try again."
-        );
-        return;
-      }
-
       if (data?.error) {
-        log.error("Accept Invite: Server returned error", data.error);
+        log.warn("Accept Invite: Server returned error", { message: data.error });
         setError(data.error);
         return;
       }
 
-      log.info("Accept Invite: Worker invitation accepted", data);
+      log.info("Accept Invite: Worker invitation accepted");
 
       // Redirect to success page
       router.push("/worker/signup-success");

@@ -46,15 +46,17 @@ export async function getAuthUser(
 
 /**
  * Get organization ID from admin user (by email in organization_user table)
+ * Uses case-insensitive matching since auth may normalize email differently than stored value
  */
 export async function getOrganizationIdFromAdmin(
   supabase: SupabaseClient,
   email: string,
 ): Promise<string | null> {
+  const normalizedEmail = email.trim().toLowerCase();
   const { data: orgUser, error: orgUserError } = await supabase
     .from("organization_user")
     .select("organization_id")
-    .eq("email", email)
+    .ilike("email", normalizedEmail)
     .maybeSingle();
 
   if (orgUserError || !orgUser) {
@@ -65,17 +67,26 @@ export async function getOrganizationIdFromAdmin(
 }
 
 /**
- * Get organization user details (id, organization_id, role) by email
+ * Get organization user details (id, organization_id, role) by email.
+ * If organizationId is provided, returns the org_user for that org only (required when user is in multiple orgs).
+ * Uses case-insensitive matching since auth may normalize email differently than stored value.
  */
 export async function getOrganizationUserByEmail(
   supabase: SupabaseClient,
   email: string,
+  organizationId?: string,
 ): Promise<{ id: string; organization_id: string; role: string } | null> {
-  const { data: orgUser, error: orgUserError } = await supabase
+  const normalizedEmail = email.trim().toLowerCase();
+  let query = supabase
     .from("organization_user")
     .select("id, organization_id, role")
-    .eq("email", email)
-    .maybeSingle();
+    .ilike("email", normalizedEmail);
+
+  if (organizationId) {
+    query = query.eq("organization_id", organizationId);
+  }
+
+  const { data: orgUser, error: orgUserError } = await query.maybeSingle();
 
   if (orgUserError || !orgUser) {
     return null;
@@ -154,6 +165,7 @@ export async function getOrganizationIdFromUser(
 /**
  * Verify that a user (by email or auth_user_id) belongs to a specific organization
  * Returns true if user is a member, false otherwise
+ * Uses case-insensitive email matching since auth may normalize email differently than stored value.
  */
 export async function verifyOrganizationMembership(
   supabase: SupabaseClient,
@@ -161,13 +173,14 @@ export async function verifyOrganizationMembership(
   userEmail?: string | null,
   authUserId?: string | null,
 ): Promise<boolean> {
-  // Try admin membership by email
+  // Try admin membership by email (case-insensitive)
   if (userEmail) {
+    const normalizedEmail = userEmail.trim().toLowerCase();
     const { data: orgUser, error: orgUserError } = await supabase
       .from("organization_user")
       .select("id")
       .eq("organization_id", organizationId)
-      .eq("email", userEmail)
+      .ilike("email", normalizedEmail)
       .maybeSingle();
 
     if (!orgUserError && orgUser) {

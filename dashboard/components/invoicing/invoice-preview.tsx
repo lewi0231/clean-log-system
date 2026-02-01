@@ -2,7 +2,8 @@
 
 import { InvoiceDocument } from "@/components/invoicing/invoice-document";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
-import { supabase } from "@/lib/supabase";
+import { log } from "@/lib/logger";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   BillingAddressConfig,
   InvoiceWithJobs,
@@ -82,12 +83,10 @@ export default function InvoicePreview({
 
     async function fetchOrgInfo(): Promise<void> {
       try {
-        const { data, error } = await supabase.functions.invoke(
+        const data = await invokeEdgeFunction<{ settings?: Partial<OrganizationInfo> }>(
           "get-organization-settings",
-          { body: { organization_id: organizationId } },
+          { organization_id: organizationId },
         );
-
-        if (error) throw error;
 
         if (data?.settings) {
           setOrgInfo({
@@ -109,7 +108,10 @@ export default function InvoicePreview({
           });
         }
       } catch (err) {
-        console.error("Failed to fetch organization info:", err);
+        log.error("InvoicePreview: Failed to fetch organization info", {
+          error: err instanceof Error ? err.message : "Unknown error",
+          organizationId,
+        });
       }
     }
 

@@ -146,9 +146,9 @@ export default function InvoicePage({ params }: InvoicePageProps) {
         <div className="mb-6">
           <Alert className="border-amber-200 bg-amber-50 text-amber-900">
             <AlertTitle>Test invoice</AlertTitle>
-            <AlertDescription className="text-nowrap inline">
+            <AlertDescription className="whitespace-nowrap inline">
               This invoice was generated for testing and{" "}
-              <b className="">cannot</b> be sent to customers.
+              <b>cannot</b> be sent to customers.
             </AlertDescription>
           </Alert>
         </div>

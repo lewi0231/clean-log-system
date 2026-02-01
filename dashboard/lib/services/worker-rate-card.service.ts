@@ -4,8 +4,7 @@
  * Uses edge function to bypass RLS (service_role only)
  */
 
-import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 
 export type ModifierType = "per_unit" | "flat" | "multiplier" | "team_percentage";
 
@@ -64,22 +63,14 @@ export class WorkerRateCardService {
    * List all rate cards for an organization
    */
   static async list(organizationId: string): Promise<WorkerRateCard[]> {
-    const { data, error } = await supabase.functions.invoke(
-      "manage-worker-rate-card",
-      {
-        body: {
-          action: "list",
-          organization_id: organizationId,
-        },
-      }
-    );
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to list rate cards", {
-        error: error.message,
-      });
-      throw new Error(error.message);
-    }
+    const data = await invokeEdgeFunction<{
+      success?: boolean;
+      error?: string;
+      rate_cards?: WorkerRateCard[];
+    }>("manage-worker-rate-card", {
+      action: "list",
+      organization_id: organizationId,
+    });
 
     if (!data?.success) {
       throw new Error(data?.error || "Failed to list rate cards");
@@ -132,31 +123,23 @@ export class WorkerRateCardService {
    * Create a new rate card
    */
   static async create(request: CreateRateCardRequest): Promise<WorkerRateCard> {
-    const { data, error } = await supabase.functions.invoke(
-      "manage-worker-rate-card",
-      {
-        body: {
-          action: "create",
-          organization_id: request.organization_id,
-          worker_id: request.worker_id,
-          modifier_type: request.modifier_type,
-          modifier_value: request.modifier_value,
-          currency: request.currency,
-          effective_from: request.effective_from,
-          effective_to: request.effective_to,
-          role_title: request.role_title,
-          notes: request.notes,
-          field_config_ids: request.field_config_ids,
-        },
-      }
-    );
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to create rate card", {
-        error: error.message,
-      });
-      throw new Error(error.message);
-    }
+    const data = await invokeEdgeFunction<{
+      success?: boolean;
+      error?: string;
+      rate_card?: WorkerRateCard;
+    }>("manage-worker-rate-card", {
+      action: "create",
+      organization_id: request.organization_id,
+      worker_id: request.worker_id,
+      modifier_type: request.modifier_type,
+      modifier_value: request.modifier_value,
+      currency: request.currency,
+      effective_from: request.effective_from,
+      effective_to: request.effective_to,
+      role_title: request.role_title,
+      notes: request.notes,
+      field_config_ids: request.field_config_ids,
+    });
 
     if (!data?.success) {
       throw new Error(data?.error || "Failed to create rate card");
@@ -172,32 +155,23 @@ export class WorkerRateCardService {
     organizationId: string,
     request: UpdateRateCardRequest
   ): Promise<WorkerRateCard> {
-    const { data, error } = await supabase.functions.invoke(
-      "manage-worker-rate-card",
-      {
-        body: {
-          action: "update",
-          organization_id: organizationId,
-          id: request.id,
-          modifier_type: request.modifier_type,
-          modifier_value: request.modifier_value,
-          effective_from: request.effective_from,
-          effective_to: request.effective_to,
-          role_title: request.role_title,
-          is_active: request.is_active,
-          notes: request.notes,
-          field_config_ids: request.field_config_ids,
-        },
-      }
-    );
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to update rate card", {
-        error: error.message,
-        id: request.id,
-      });
-      throw new Error(error.message);
-    }
+    const data = await invokeEdgeFunction<{
+      success?: boolean;
+      error?: string;
+      rate_card?: WorkerRateCard;
+    }>("manage-worker-rate-card", {
+      action: "update",
+      organization_id: organizationId,
+      id: request.id,
+      modifier_type: request.modifier_type,
+      modifier_value: request.modifier_value,
+      effective_from: request.effective_from,
+      effective_to: request.effective_to,
+      role_title: request.role_title,
+      is_active: request.is_active,
+      notes: request.notes,
+      field_config_ids: request.field_config_ids,
+    });
 
     if (!data?.success) {
       throw new Error(data?.error || "Failed to update rate card");
@@ -210,24 +184,14 @@ export class WorkerRateCardService {
    * Deactivate a rate card (soft delete)
    */
   static async deactivate(organizationId: string, id: string): Promise<void> {
-    const { data, error } = await supabase.functions.invoke(
-      "manage-worker-rate-card",
-      {
-        body: {
-          action: "deactivate",
-          organization_id: organizationId,
-          id,
-        },
-      }
-    );
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to deactivate rate card", {
-        error: error.message,
-        id,
-      });
-      throw new Error(error.message);
-    }
+    const data = await invokeEdgeFunction<{
+      success?: boolean;
+      error?: string;
+    }>("manage-worker-rate-card", {
+      action: "deactivate",
+      organization_id: organizationId,
+      id,
+    });
 
     if (!data?.success) {
       throw new Error(data?.error || "Failed to deactivate rate card");
@@ -238,24 +202,14 @@ export class WorkerRateCardService {
    * Delete a rate card (hard delete)
    */
   static async delete(organizationId: string, id: string): Promise<void> {
-    const { data, error } = await supabase.functions.invoke(
-      "manage-worker-rate-card",
-      {
-        body: {
-          action: "delete",
-          organization_id: organizationId,
-          id,
-        },
-      }
-    );
-
-    if (error) {
-      log.error("WorkerRateCardService: Failed to delete rate card", {
-        error: error.message,
-        id,
-      });
-      throw new Error(error.message);
-    }
+    const data = await invokeEdgeFunction<{
+      success?: boolean;
+      error?: string;
+    }>("manage-worker-rate-card", {
+      action: "delete",
+      organization_id: organizationId,
+      id,
+    });
 
     if (!data?.success) {
       throw new Error(data?.error || "Failed to delete rate card");

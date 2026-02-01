@@ -7,6 +7,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import {
   checkRateLimit,
   RATE_LIMIT_CONFIGS,
@@ -95,10 +96,10 @@ serve(async (req: Request) => {
 
     const supabase = createServiceRoleClient();
 
-    // Find job by token
+    // Find job by token (need organization_id for admin notification)
     const { data: job, error: jobError } = await supabase
       .from("job")
-      .select("id")
+      .select("id, organization_id")
       .eq("feedback_token", token)
       .single();
 
@@ -151,6 +152,24 @@ serve(async (req: Request) => {
         insertError.message || "Failed to submit feedback",
         500,
       );
+    }
+
+    // Notify admins that a client submitted a review (non-blocking)
+    if (job.organization_id) {
+      const notificationResult = await createNotification(supabase, {
+        organization_id: job.organization_id,
+        type: "review_submitted",
+        title: "Review received",
+        message: "A client has submitted a review for a completed job.",
+        related_entity_type: "job",
+        related_entity_id: job.id,
+      });
+      if (!notificationResult.success) {
+        logger.warn("Failed to create review notification", {
+          error: notificationResult.error,
+          job_id: job.id,
+        });
+      }
     }
 
     return jsonResponse({

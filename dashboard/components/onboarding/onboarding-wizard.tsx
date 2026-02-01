@@ -22,10 +22,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import {
+  EdgeFunctionError,
+  invokeEdgeFunction,
+} from "@/lib/supabase/invoke-edge-function";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 interface OnboardingData {
@@ -122,15 +125,25 @@ export function OnboardingWizard() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      log.info("Onboarding: Submitting onboarding data", { data });
-
-      const { error } = await supabase.functions.invoke("complete-onboarding", {
-        body: data,
+      // Never log sensitive fields like ABNs.
+      log.info("Onboarding: Submitting onboarding data", {
+        industry_type: data.industry_type,
+        employee_count: data.employee_count,
+        has_locations: data.has_locations,
+        has_workers: data.has_workers,
+        worker_payment_method: data.worker_payment_method,
+        worker_payment_frequency: data.worker_payment_frequency,
+        invoice_frequency: data.invoice_frequency,
+        invoice_weekly_day: data.invoice_weekly_day,
+        invoice_monthly_day: data.invoice_monthly_day,
+        auto_generate_invoices: data.auto_generate_invoices,
+        has_abn: !!data.abn,
       });
 
-      if (error) {
-        throw error;
-      }
+      await invokeEdgeFunction<{ success: boolean; organizationId: string }>(
+        "complete-onboarding",
+        data as unknown as Record<string, unknown>,
+      );
 
       log.info("Onboarding: Completed successfully");
       toast.success("Welcome! Let's get you set up.");
@@ -138,14 +151,14 @@ export function OnboardingWizard() {
       // Redirect to dashboard (checklist will appear automatically)
       router.push("/dashboard");
     } catch (err) {
-      log.error("Onboarding: Failed to complete", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      toast.error(
-        err instanceof Error
+      const message =
+        err instanceof EdgeFunctionError
           ? err.message
-          : "Failed to complete onboarding. Please try again."
-      );
+          : err instanceof Error
+            ? err.message
+            : "Failed to complete onboarding. Please try again.";
+      log.error("Onboarding: Failed to complete", { error: message });
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -171,9 +184,7 @@ export function OnboardingWizard() {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <div className="space-y-2">
-            <CardTitle className="text-2xl">
-              Welcome to Fieldly
-            </CardTitle>
+            <CardTitle className="text-2xl">Welcome to Fieldly</CardTitle>
             <CardDescription>
               Let&apos;s get your account set up. This will only take a few
               minutes.
@@ -391,13 +402,6 @@ function Step3WorkerPayment({
 }) {
   // Auto-set has_workers based on employee_count (already answered in step 1)
   const hasWorkers = data.employee_count !== "none";
-
-  // Use useEffect to update has_workers when employee_count changes
-  useEffect(() => {
-    if (data.has_workers !== hasWorkers) {
-      updateData({ has_workers: hasWorkers });
-    }
-  }, [data.employee_count, data.has_workers, hasWorkers, updateData]);
 
   if (!hasWorkers) {
     return (

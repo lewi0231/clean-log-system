@@ -110,6 +110,16 @@ Actions available based on invoice status:
 - **Overdue**: View, Resend, Send Reminder
 - **Cancelled**: View only
 
+## Troubleshooting: "Test" on invoices
+
+If invoices show "test" in front, it can mean two different things:
+
+1. **Invoice number starts with "TEST"**  
+   Invoice numbers use the format `{ORG_CODE}-{YEAR}-{SEQUENCE}` (e.g. `ABC-2025-0001`). If your organization’s **org code** is literally `TEST`, then every invoice number will look like `TEST-2025-0001`. That’s the org code, not a test flag. To change it, update the organization’s code in your organization/signup settings (where `org_code` is set). Note: org code is often used for worker login (e.g. PIN + org code), so changing it may affect that.
+
+2. **Red "TEST" badge next to status**  
+   A red **TEST** badge appears when the invoice has `is_test === true`. That happens when the invoice was created from one or more **test jobs** (jobs created via the “Test Invoice” flow on the Pricing page, or jobs with `is_test` set). By default, test invoices are hidden unless “Show test data” is on. If you see the badge: either you have “Show test data” enabled and some invoices are test, or you created invoices from jobs that were marked as test. To avoid that, create invoices only from normal completed jobs (not from the Test Invoice modal). Test jobs are excluded from the completed jobs list when “Show test data” is off.
+
 ## Related Components
 
 - `dashboard/components/invoicing/invoice-list.tsx` - Main list component

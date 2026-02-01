@@ -80,7 +80,7 @@ describe("InvoiceTemplateService", () => {
 
             await expect(
                 InvoiceTemplateService.getConfig("org-1"),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when config is missing", async () => {
@@ -222,7 +222,7 @@ describe("InvoiceTemplateService", () => {
                     organization_id: "org-1",
                     show_logo: false,
                 }),
-            ).rejects.toEqual(mockError);
+            ).rejects.toMatchObject(mockError);
         });
 
         it("should throw error when config is missing", async () => {

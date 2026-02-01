@@ -4,6 +4,8 @@ import {
   NotificationService,
   type Notification,
 } from "@/lib/services/notification.service";
+import { log } from "@/lib/logger";
+import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
 
@@ -50,7 +52,41 @@ export function useNotifications(): UseNotificationsResult {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  // Poll for new notifications every 30 seconds
+  // Refetch when user returns to the tab (covers Realtime gaps and ensures fresh data)
+  useEffect(() => {
+    const handleFocus = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [fetchNotifications]);
+
+  // Realtime: refetch when a new notification is inserted for this user
+  useEffect(() => {
+    if (!organizationUserId) return;
+
+    const channel = supabase
+      .channel("notifications")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notification",
+          filter: `receiver_id=eq.${organizationUserId}`,
+        },
+        () => {
+          void fetchNotifications();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [organizationUserId, fetchNotifications]);
+
+  // Fallback poll every 30 seconds (e.g. if Realtime is not enabled for table)
   useEffect(() => {
     if (!organizationId || !organizationUserId) return;
 
@@ -70,7 +106,10 @@ export function useNotifications(): UseNotificationsResult {
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
-      console.error("Failed to mark notification as read:", err);
+      log.error("Notifications: Failed to mark as read", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        notificationId,
+      });
     }
   };
 
@@ -84,7 +123,11 @@ export function useNotifications(): UseNotificationsResult {
       );
       setUnreadCount(0);
     } catch (err) {
-      console.error("Failed to mark all notifications as read:", err);
+      log.error("Notifications: Failed to mark all as read", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        organizationId,
+        organizationUserId,
+      });
     }
   };
 

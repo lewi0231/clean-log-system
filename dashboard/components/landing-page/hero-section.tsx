@@ -26,7 +26,7 @@ export function HeroSection() {
             <span className="text-primary">Jobs, and Invoicing in One Place</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            Whether you're a lone operator or manage staff and sub-contractors—enter hours on a phone or tablet
+            Whether you&apos;re a lone operator or manage staff and sub-contractors—enter hours on a phone or tablet
             before leaving the job. Clients get invoiced correctly, sub-contractors get paid on time,
             and you stop losing revenue to missing or incorrect timesheets.
           </p>

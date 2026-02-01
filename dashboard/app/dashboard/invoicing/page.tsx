@@ -29,7 +29,10 @@ export default function InvoicingPage() {
   const { organizationUsers } = useOrganizationUsers();
   const isAdmin = useMemo(() => {
     if (!user?.email || !organizationUsers.length) return false;
-    const currentUser = organizationUsers.find((ou) => ou.email === user.email);
+    const email = user.email.trim().toLowerCase();
+    const currentUser = organizationUsers.find(
+      (ou) => ou.email.trim().toLowerCase() === email,
+    );
     return currentUser?.role === "admin";
   }, [user, organizationUsers]);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);

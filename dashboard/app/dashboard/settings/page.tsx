@@ -37,10 +37,12 @@ import {
 } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ErrorState } from "@/components/ui/error-state";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { isSendInvoicesImmediatelyEnabled } from "@/lib/utils";
 import {
   getRatingConfigPreset,
@@ -133,16 +135,10 @@ export default function SettingsPage() {
     try {
       log.debug("Settings: Fetching organization settings");
 
-      const { data, error: fetchError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "get-organization-settings",
-        {
-          body: { organization_id: organizationId },
-        },
+        { organization_id: organizationId },
       );
-
-      if (fetchError) {
-        throw fetchError;
-      }
 
       if (data?.settings) {
         // Parse business_address if it exists (format: "Street, City, State Postcode")
@@ -240,6 +236,14 @@ export default function SettingsPage() {
       log.error("Settings: Failed to fetch organization settings", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
+      setErrorDialog({
+        open: true,
+        title: "Load Failed",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Failed to load organization settings. Please try again.",
+      });
     }
   };
 
@@ -296,24 +300,19 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Updating business mode", { mode });
 
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            business_mode: mode,
-          },
+          organization_id: organizationId,
+          business_mode: mode,
         },
       );
 
-      if (updateError) {
-        throw updateError;
-      }
-
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
-          business_mode: data.settings.business_mode,
+          business_mode: updated.business_mode ?? prev.business_mode,
         }));
       }
 
@@ -330,29 +329,21 @@ export default function SettingsPage() {
       throw new Error("Organization ID is required");
     }
 
-    log.info("Settings: Updating organization name", { name });
+    log.info("Settings: Updating organization name", { hasName: !!name.trim() });
 
-    const { data, error: updateError } = await supabase.functions.invoke(
+    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
       "update-organization-settings",
       {
-        body: {
-          organization_id: organizationId,
-          name,
-        },
+        organization_id: organizationId,
+        name,
       },
     );
 
-    if (updateError) {
-      log.error("Settings: Failed to update organization name", {
-        error: updateError,
-      });
-      throw updateError;
-    }
-
-    if (data?.settings) {
+    const updated = data.settings;
+    if (updated) {
       setSettings((prev) => ({
         ...prev,
-        name: data.settings.name,
+        name: updated.name ?? prev.name,
       }));
     }
 
@@ -364,29 +355,21 @@ export default function SettingsPage() {
       throw new Error("Organization ID is required");
     }
 
-    log.info("Settings: Updating ABN", { abn });
+    log.info("Settings: Updating ABN", { hasAbn: !!abn.trim() });
 
-    const { data, error: updateError } = await supabase.functions.invoke(
+    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
       "update-organization-settings",
       {
-        body: {
-          organization_id: organizationId,
-          abn: abn || null,
-        },
+        organization_id: organizationId,
+        abn: abn || null,
       },
     );
 
-    if (updateError) {
-      log.error("Settings: Failed to update ABN", {
-        error: updateError,
-      });
-      throw updateError;
-    }
-
-    if (data?.settings) {
+    const updated = data.settings;
+    if (updated) {
       setSettings((prev) => ({
         ...prev,
-        abn: data.settings.abn,
+        abn: updated.abn ?? prev.abn,
       }));
     }
 
@@ -542,19 +525,13 @@ export default function SettingsPage() {
       // Update organization to remove logo_url
       // Note: The old logo file will remain in storage but won't be referenced
       // You may want to create a cleanup function later to remove orphaned files
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            logo_url: null,
-          },
+          organization_id: organizationId,
+          logo_url: null,
         },
       );
-
-      if (updateError) {
-        throw updateError;
-      }
 
       // Update local state
       if (data?.settings) {
@@ -583,29 +560,23 @@ export default function SettingsPage() {
       throw new Error("Organization ID is required");
     }
 
-    log.info("Settings: Updating primary contact email", { email });
+    log.info("Settings: Updating primary contact email", {
+      hasEmail: !!email.trim(),
+    });
 
-    const { data, error: updateError } = await supabase.functions.invoke(
+    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
       "update-organization-settings",
       {
-        body: {
-          organization_id: organizationId,
-          primary_contact_email: email || null,
-        },
+        organization_id: organizationId,
+        primary_contact_email: email || null,
       },
     );
 
-    if (updateError) {
-      log.error("Settings: Failed to update primary contact email", {
-        error: updateError,
-      });
-      throw updateError;
-    }
-
-    if (data?.settings) {
+    const updated = data.settings;
+    if (updated) {
       setSettings((prev) => ({
         ...prev,
-        primary_contact_email: data.settings.primary_contact_email,
+        primary_contact_email: updated.primary_contact_email ?? null,
       }));
     }
 
@@ -621,29 +592,23 @@ export default function SettingsPage() {
       throw new Error("Organization ID is required");
     }
 
-    log.info("Settings: Updating primary contact phone", { phone });
+    log.info("Settings: Updating primary contact phone", {
+      hasPhone: !!phone.trim(),
+    });
 
-    const { data, error: updateError } = await supabase.functions.invoke(
+    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
       "update-organization-settings",
       {
-        body: {
-          organization_id: organizationId,
-          primary_contact_phone: phone || null,
-        },
+        organization_id: organizationId,
+        primary_contact_phone: phone || null,
       },
     );
 
-    if (updateError) {
-      log.error("Settings: Failed to update primary contact phone", {
-        error: updateError,
-      });
-      throw updateError;
-    }
-
-    if (data?.settings) {
+    const updated = data.settings;
+    if (updated) {
       setSettings((prev) => ({
         ...prev,
-        primary_contact_phone: data.settings.primary_contact_phone,
+        primary_contact_phone: updated.primary_contact_phone ?? null,
       }));
     }
 
@@ -660,25 +625,20 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Updating predefined locations setting", { checked });
 
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            use_predefined_locations: checked,
-          },
+          organization_id: organizationId,
+          use_predefined_locations: checked,
         },
       );
 
-      if (updateError) {
-        throw updateError;
-      }
-
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
           use_predefined_locations:
-            data.settings.use_predefined_locations ?? true,
+            updated.use_predefined_locations ?? true,
         }));
       }
 
@@ -703,21 +663,19 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating invoice send immediately", { checked });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            invoice_send_immediately: checked,
-          },
+          organization_id: organizationId,
+          invoice_send_immediately: checked,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
           invoice_send_immediately:
-            data.settings.invoice_send_immediately ?? false,
+            updated.invoice_send_immediately ?? false,
         }));
       }
       queryClient.invalidateQueries({
@@ -740,21 +698,19 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating auto-generate invoices", { checked });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            auto_generate_invoices_immediately: checked,
-          },
+          organization_id: organizationId,
+          auto_generate_invoices_immediately: checked,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
           auto_generate_invoices_immediately:
-            data.settings.auto_generate_invoices_immediately ?? false,
+            updated.auto_generate_invoices_immediately ?? false,
         }));
       }
       queryClient.invalidateQueries({
@@ -779,21 +735,19 @@ export default function SettingsPage() {
       log.info("Settings: Updating feedback email send immediately", {
         checked,
       });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            feedback_email_send_immediately: checked,
-          },
+          organization_id: organizationId,
+          feedback_email_send_immediately: checked,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
           feedback_email_send_immediately:
-            data.settings.feedback_email_send_immediately ?? false,
+            updated.feedback_email_send_immediately ?? false,
         }));
       }
       queryClient.invalidateQueries({
@@ -822,21 +776,19 @@ export default function SettingsPage() {
         type: newType,
         dimensions: newConfig.dimensions,
       });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            rating_config: newConfig,
-          },
+          organization_id: organizationId,
+          rating_config: newConfig,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
           rating_config:
-            data.settings.rating_config ?? {
+            updated.rating_config ?? {
               type: "single",
               dimensions: ["overall"],
             },
@@ -863,25 +815,23 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating GST registered", { checked });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            gst_registered: checked,
-          },
+          organization_id: organizationId,
+          gst_registered: checked,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
-          gst_registered: data.settings.gst_registered ?? false,
+          gst_registered: updated.gst_registered ?? false,
         }));
         if (initialSettings) {
           setInitialSettings({
             ...initialSettings,
-            gst_registered: data.settings.gst_registered ?? false,
+            gst_registered: updated.gst_registered ?? false,
           });
         }
       }
@@ -905,25 +855,23 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating GST inclusive", { checked });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            gst_inclusive: checked,
-          },
+          organization_id: organizationId,
+          gst_inclusive: checked,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
-          gst_inclusive: data.settings.gst_inclusive ?? true,
+          gst_inclusive: updated.gst_inclusive ?? true,
         }));
         if (initialSettings) {
           setInitialSettings({
             ...initialSettings,
-            gst_inclusive: data.settings.gst_inclusive ?? true,
+            gst_inclusive: updated.gst_inclusive ?? true,
           });
         }
       }
@@ -955,25 +903,23 @@ export default function SettingsPage() {
     }
     try {
       log.info("Settings: Updating GST rate", { rate });
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            gst_rate_percent: rate,
-          },
+          organization_id: organizationId,
+          gst_rate_percent: rate,
         },
       );
-      if (error) throw error;
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
-          gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+          gst_rate_percent: updated.gst_rate_percent ?? 10,
         }));
         if (initialSettings) {
           setInitialSettings({
             ...initialSettings,
-            gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+            gst_rate_percent: updated.gst_rate_percent ?? 10,
           });
         }
       }
@@ -1099,31 +1045,27 @@ export default function SettingsPage() {
     const formattedAddress = formatBusinessAddress(businessAddressFields);
 
     log.info("Settings: Updating business address", {
-      address: formattedAddress,
-      fields: businessAddressFields,
+      // Never log addresses.
+      hasAddress: !!formattedAddress,
+      hasStreet: !!businessAddressFields.street.trim(),
+      hasCity: !!businessAddressFields.city.trim(),
+      hasState: !!businessAddressFields.state.trim(),
+      hasPostcode: !!businessAddressFields.postcode.trim(),
     });
 
-    const { data, error: updateError } = await supabase.functions.invoke(
+    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
       "update-organization-settings",
       {
-        body: {
-          organization_id: organizationId,
-          business_address: formattedAddress || null,
-        },
+        organization_id: organizationId,
+        business_address: formattedAddress || null,
       },
     );
 
-    if (updateError) {
-      log.error("Settings: Failed to update business address", {
-        error: updateError,
-      });
-      throw updateError;
-    }
-
-    if (data?.settings) {
+    const updated = data.settings;
+    if (updated) {
       setSettings((prev) => ({
         ...prev,
-        business_address: data.settings.business_address,
+        business_address: updated.business_address ?? prev.business_address,
       }));
     }
 
@@ -1153,20 +1095,14 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Disconnecting Stripe account");
 
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            stripe_account_id: null,
-            payment_provider: null,
-          },
+          organization_id: organizationId,
+          stripe_account_id: null,
+          payment_provider: null,
         },
       );
-
-      if (updateError) {
-        throw updateError;
-      }
 
       if (data?.settings) {
         setSettings((prev) => ({
@@ -1207,26 +1143,21 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Updating currency", { currency, locale });
 
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            currency,
-            locale,
-          },
+          organization_id: organizationId,
+          currency,
+          locale,
         },
       );
 
-      if (updateError) {
-        throw updateError;
-      }
-
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
-          currency: data.settings.currency,
-          locale: data.settings.locale,
+          currency: updated.currency ?? prev.currency,
+          locale: updated.locale ?? prev.locale,
         }));
       }
 
@@ -1290,58 +1221,51 @@ export default function SettingsPage() {
 
     setSaving(true);
     try {
+      // Never log bank details; only log presence flags.
       log.info("Settings: Saving bank transfer settings", {
-        bsb: settings.bank_transfer_bsb,
-        accountNumber: settings.bank_transfer_account_number ? "***" : null,
-        accountName: settings.bank_transfer_account_name,
+        hasBsb: !!settings.bank_transfer_bsb?.trim(),
+        hasAccountNumber: !!settings.bank_transfer_account_number?.trim(),
+        hasAccountName: !!settings.bank_transfer_account_name?.trim(),
         showOnInvoices: settings.show_bank_transfer_on_invoices,
       });
 
-      const { data, error: updateError } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
         "update-organization-settings",
         {
-          body: {
-            organization_id: organizationId,
-            bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
-            bank_transfer_account_number:
-              settings.bank_transfer_account_number?.trim() || null,
-            bank_transfer_account_name:
-              settings.bank_transfer_account_name?.trim() || null,
-            show_bank_transfer_on_invoices:
-              settings.show_bank_transfer_on_invoices,
-          },
+          organization_id: organizationId,
+          bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
+          bank_transfer_account_number:
+            settings.bank_transfer_account_number?.trim() || null,
+          bank_transfer_account_name:
+            settings.bank_transfer_account_name?.trim() || null,
+          show_bank_transfer_on_invoices: settings.show_bank_transfer_on_invoices,
         },
       );
 
-      if (updateError) {
-        log.error("Settings: Failed to save bank transfer settings", {
-          error: updateError,
-        });
-        throw updateError;
-      }
-
-      if (data?.settings) {
+      const updated = data.settings;
+      if (updated) {
         setSettings((prev) => ({
           ...prev,
-          bank_transfer_bsb: data.settings.bank_transfer_bsb,
+          bank_transfer_bsb: updated.bank_transfer_bsb ?? null,
           bank_transfer_account_number:
-            data.settings.bank_transfer_account_number,
-          bank_transfer_account_name: data.settings.bank_transfer_account_name,
+            updated.bank_transfer_account_number ?? null,
+          bank_transfer_account_name:
+            updated.bank_transfer_account_name ?? null,
           show_bank_transfer_on_invoices:
-            data.settings.show_bank_transfer_on_invoices,
+            updated.show_bank_transfer_on_invoices ?? true,
         }));
 
         // Update initial settings to mark as saved
         if (initialSettings) {
           setInitialSettings({
             ...initialSettings,
-            bank_transfer_bsb: data.settings.bank_transfer_bsb,
+            bank_transfer_bsb: updated.bank_transfer_bsb ?? null,
             bank_transfer_account_number:
-              data.settings.bank_transfer_account_number,
+              updated.bank_transfer_account_number ?? null,
             bank_transfer_account_name:
-              data.settings.bank_transfer_account_name,
+              updated.bank_transfer_account_name ?? null,
             show_bank_transfer_on_invoices:
-              data.settings.show_bank_transfer_on_invoices,
+              updated.show_bank_transfer_on_invoices ?? true,
           });
         }
         setHasUnsavedChanges(false);
@@ -1387,13 +1311,10 @@ export default function SettingsPage() {
 
   if (orgError || !organizationId) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-destructive">
-            {orgError || "Failed to load organization"}
-          </p>
-        </div>
-      </div>
+      <ErrorState
+        message={orgError || "Failed to load organization"}
+        fullScreen
+      />
     );
   }
 
@@ -1777,22 +1698,19 @@ export default function SettingsPage() {
                       const value = parseInt(e.target.value, 10);
                       if (isNaN(value) || value < 1 || value > 365) return;
                       try {
-                        const { error } = await supabase.functions.invoke(
+                        await invokeEdgeFunction(
                           "update-organization-settings",
                           {
-                            body: {
-                              organization_id: organizationId,
-                              default_invoice_due_days: value,
-                            },
+                            organization_id: organizationId,
+                            default_invoice_due_days: value,
                           },
                         );
-                        if (error) throw error;
                         queryClient.invalidateQueries({
                           queryKey: organizationSettingsKey(organizationId),
                         });
                       } catch (err) {
                         log.error("Failed to update invoice due days", {
-                          error: err,
+                          error: err instanceof Error ? err.message : err,
                         });
                         setErrorDialog({
                           open: true,

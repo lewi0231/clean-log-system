@@ -367,6 +367,15 @@ entrypoint = "./functions/register-organization/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/register-organization/*.html" ]
+
+# Bypass runtime JWT verification - function does its own auth via getAuthUser(token)
+# Required after Supabase CLI upgrade: runtime ES256 key format causes TypeError
+[functions.complete-onboarding]
+enabled = true
+verify_jwt = false
+import_map = "./functions/complete-onboarding/deno.json"
+entrypoint = "./functions/complete-onboarding/index.ts"
+
 [functions.get-organization-id]
 enabled = true
 verify_jwt = false
@@ -798,3 +807,89 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/submit-feedback/deno.json"
 entrypoint = "./functions/submit-feedback/index.ts"
+
+# Additional functions - bypass runtime JWT verification (they handle their own auth)
+[functions.accept-admin-invitation]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/accept-admin-invitation/index.ts"
+
+[functions.resend-activation-link]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/resend-activation-link/index.ts"
+
+[functions.delete-test-data]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/delete-test-data/index.ts"
+
+[functions.generate-invoice-pdf]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/generate-invoice-pdf/index.ts"
+
+[functions.get-invoice-public]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/get-invoice-public/index.ts"
+
+[functions.get-onboarding-data]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/get-onboarding-data/index.ts"
+
+[functions.get-user-role]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/get-user-role/index.ts"
+
+[functions.list-payments]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/list-payments/index.ts"
+
+[functions.list-worker-payments]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/list-worker-payments/index.ts"
+
+[functions.manage-worker-rate-card]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/manage-worker-rate-card/index.ts"
+
+[functions.mark-overdue-invoices]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/mark-overdue-invoices/index.ts"
+
+[functions.record-manual-payment]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/record-manual-payment/index.ts"
+
+[functions.save-worker-payment]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/save-worker-payment/index.ts"
+
+[functions.send-invoice-reminder]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/send-invoice-reminder/index.ts"
+
+[functions.submit-beta-feedback]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/submit-beta-feedback/index.ts"
+
+[functions.convert-admin-to-worker]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/convert-admin-to-worker/index.ts"
+
+[functions.update-worker-payment-status]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/update-worker-payment-status/index.ts"

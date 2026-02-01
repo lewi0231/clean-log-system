@@ -9,7 +9,10 @@ export type NotificationType =
   | "worker_active"
   | "job_completed"
   | "invoice_generated"
-  | "payment_received";
+  | "payment_received"
+  | "review_submitted"
+  | "admin_activated"
+  | "worker_created";
 
 export interface CreateNotificationParams {
   organization_id: string;
@@ -51,6 +54,10 @@ export async function createNotification(
       }
 
       if (!admins || admins.length === 0) {
+        console.debug("[createNotification] No admins/owners found for org", {
+          organization_id: params.organization_id,
+          type: params.type,
+        });
         return { success: true, notificationCount: 0 };
       }
 
@@ -70,9 +77,20 @@ export async function createNotification(
         .insert(notifications);
 
       if (error) {
+        console.warn("[createNotification] Insert failed", {
+          organization_id: params.organization_id,
+          type: params.type,
+          error: error.message,
+        });
         return { success: false, error: error.message };
       }
 
+      console.debug("[createNotification] Created for admins", {
+        organization_id: params.organization_id,
+        type: params.type,
+        notificationCount: notifications.length,
+        receiver_ids: notifications.map((n) => n.receiver_id),
+      });
       return { success: true, notificationCount: notifications.length };
     } else {
       // Single notification for specific user

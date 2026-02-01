@@ -1,6 +1,6 @@
 "use client";
 
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { useQuery } from "@tanstack/react-query";
 import useOrganization from "./useOrganization";
 
@@ -21,23 +21,20 @@ export function useOnboardingStatus() {
             }
 
             // Use edge function to get onboarding data (bypasses RLS)
-            const { data: result, error: fetchError } = await supabase.functions
-                .invoke(
-                    "get-onboarding-data",
-                );
-
-            if (fetchError) {
-                throw fetchError;
-            }
+            const result = await invokeEdgeFunction<{
+                success?: boolean;
+                onboarding_completed_at?: string | null;
+                onboarding_data?: Record<string, unknown> | null;
+            }>("get-onboarding-data");
 
             if (!result?.success) {
                 throw new Error("Failed to fetch onboarding data");
             }
 
             return {
-                completed: result.onboarding_completed_at !== null,
-                completedAt: result.onboarding_completed_at,
-                data: result.onboarding_data,
+                completed: result.onboarding_completed_at != null,
+                completedAt: result.onboarding_completed_at ?? null,
+                data: result.onboarding_data ?? null,
             };
         },
         enabled: !!organizationId && !orgLoading,

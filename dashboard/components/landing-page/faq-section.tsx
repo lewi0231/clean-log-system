@@ -110,7 +110,7 @@ export function FAQSection() {
             <a href="/contact" className="text-primary hover:underline">
               Contact our support team
             </a>{" "}
-            and we'll be happy to help.
+            and we&apos;ll be happy to help.
           </p>
         </div>
       </div>

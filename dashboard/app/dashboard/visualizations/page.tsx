@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ErrorState } from "@/components/ui/error-state";
 import {
   ChartSkeleton,
@@ -46,19 +47,30 @@ export default function VisualizationPage() {
   const loading = jobsLoading || fieldConfigsLoading;
   const error = jobsError || fieldConfigsError;
 
-  // Process chart data
-  const chartData: ProcessedChartData | null = useMemo(() => {
+  const processed = useMemo((): {
+    data: ProcessedChartData | null;
+    error: string | null;
+  } => {
     if (!chartConfig.fieldConfigId || jobs.length === 0) {
-      return null;
+      return { data: null, error: null };
     }
 
     try {
-      return processJobDataForChart(jobs, chartConfig, fieldConfigs);
+      return {
+        data: processJobDataForChart(jobs, chartConfig, fieldConfigs),
+        error: null,
+      };
     } catch (err) {
       log.error("VisualizationPage: Failed to process chart data", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
-      return null;
+      return {
+        data: null,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Failed to process data for the selected configuration",
+      };
     }
   }, [jobs, chartConfig, fieldConfigs]);
 
@@ -146,23 +158,33 @@ export default function VisualizationPage() {
                 <div className="flex items-center justify-center h-[400px] text-muted-foreground">
                   Select a field to visualize
                 </div>
-              ) : !chartData || chartData.data.length === 0 ? (
+              ) : processed.error ? (
+                <div className="space-y-4">
+                  <Alert variant="destructive">
+                    <AlertTitle>Unable to build chart</AlertTitle>
+                    <AlertDescription>{processed.error}</AlertDescription>
+                  </Alert>
+                  <div className="flex items-center justify-center h-[320px] text-muted-foreground">
+                    Try changing the field, grouping, or time period.
+                  </div>
+                </div>
+              ) : !processed.data || processed.data.data.length === 0 ? (
                 <div className="flex items-center justify-center h-[400px] text-muted-foreground">
                   No data available for the selected configuration
                 </div>
               ) : (
                 <>
                   {chartConfig.chartType === "area" && (
-                    <AreaChartComponent data={chartData} title={chartTitle} />
+                    <AreaChartComponent data={processed.data} title={chartTitle} />
                   )}
                   {chartConfig.chartType === "line" && (
-                    <LineChartComponent data={chartData} title={chartTitle} />
+                    <LineChartComponent data={processed.data} title={chartTitle} />
                   )}
                   {chartConfig.chartType === "bar" && (
-                    <BarChartComponent data={chartData} title={chartTitle} />
+                    <BarChartComponent data={processed.data} title={chartTitle} />
                   )}
                   {chartConfig.chartType === "pie" && (
-                    <PieChartComponent data={chartData} title={chartTitle} />
+                    <PieChartComponent data={processed.data} title={chartTitle} />
                   )}
                 </>
               )}

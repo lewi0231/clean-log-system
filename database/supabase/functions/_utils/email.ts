@@ -1999,7 +1999,13 @@ export async function sendAdminInvitationEmail(
     html: string;
     tags?: Array<{ name: string; value: string }>;
   } = {
-    from: `${data.organizationName} <invitations@${configResult.config.resendFromDomain}>`,
+    // Future note: we intend to send admin/org emails from a dedicated
+    // "admin users (organizations)" domain for a more professional experience.
+    // For now, allow an override while defaulting to `RESEND_FROM_DOMAIN`.
+    from: `${data.organizationName} <invitations@${
+      Deno.env.get("RESEND_ADMIN_INVITES_FROM_DOMAIN") ||
+      configResult.config.resendFromDomain
+    }>`,
     to: [testRecipient],
     subject: emailSubject,
     html,

@@ -4,6 +4,27 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 /**
+ * Supabase JS type definitions in Deno can lag behind the hosted API surface.
+ * In this repo we rely on `auth.admin.getUserByEmail()` in a few edge functions.
+ *
+ * Centralize the (safe) type cast here so callsites stay clean.
+ */
+export async function getAuthUserByEmail(
+  supabase: SupabaseClient,
+  email: string,
+): Promise<
+  { data: { user: { id: string } | null } | null; error: unknown | null }
+> {
+  const admin = supabase.auth.admin as unknown as {
+    getUserByEmail: (
+      email: string,
+    ) => Promise<{ data: { user: { id: string } | null } | null; error: unknown | null }>;
+  };
+
+  return await admin.getUserByEmail(email);
+}
+
+/**
  * Create a Supabase client with service role key (admin access)
  */
 export function createServiceRoleClient(): SupabaseClient {

@@ -12,8 +12,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
 import { formatZodErrors, signUpSchema } from "@/lib/validations";
+import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -66,37 +66,17 @@ export default function SignUp() {
       const validatedData = validateInput();
 
       log.debug("SignUp: Calling register-organization function", {
-        email: validatedData.email,
-        organisation: validatedData.organisation,
+        // Never log emails; organization name can be sensitive too, so log only presence.
+        hasEmail: !!validatedData.email,
+        hasOrganisation: !!validatedData.organisation,
       });
 
-      const { data, error } = await supabase.functions.invoke(
-        "register-organization",
-        {
-          body: validatedData,
-        }
-      );
+      const data = await invokeEdgeFunction<{
+        organization?: { id?: string; org_code?: string };
+        error?: string;
+      }>("register-organization", validatedData as unknown as Record<string, unknown>);
 
-      if (error) {
-        // Handle different error types from Supabase functions
-        const errorMessage =
-          error.message ||
-          (error as { context?: { message?: string } }).context?.message ||
-          "Registration failed. Please try again.";
-        log.error("SignUp: Organization registration failed", {
-          error: errorMessage,
-          errorDetails: JSON.stringify(error),
-        });
-        throw new Error(errorMessage);
-      }
-
-      // Check if the response contains an error from the edge function
-      if (data?.error) {
-        log.error("SignUp: Edge function returned error", {
-          error: data.error,
-        });
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
       log.info("SignUp: Organization registered successfully", {
         organizationId: data?.organization?.id,
@@ -120,28 +100,27 @@ export default function SignUp() {
       )}`;
     } catch (error) {
       // Errors are already set in validateInput via setErrors
-      if (error instanceof Error && error.message !== "Validation failed") {
-        log.error("SignUp: Signup process failed", { 
+      if (error instanceof EdgeFunctionError) {
+        log.error("SignUp: Signup process failed", {
           error: error.message,
-          errorObject: error,
-          stack: error.stack 
+          code: error.code,
+          status: error.status,
+        });
+        setGeneralError(error.message);
+      } else if (error instanceof Error && error.message !== "Validation failed") {
+        log.error("SignUp: Signup process failed", {
+          error: error.message,
         });
         setGeneralError(error.message);
       } else if (error && typeof error === "object" && "message" in error) {
         // Handle error objects that aren't Error instances
         const errorMessage = String(error.message);
-        log.error("SignUp: Signup process failed", { 
-          error: errorMessage,
-          errorObject: error 
-        });
+        log.error("SignUp: Signup process failed", { error: errorMessage });
         setGeneralError(errorMessage);
       } else {
         // Handle unknown error types
         const errorMessage = error ? String(error) : "An unknown error occurred";
-        log.error("SignUp: Signup process failed", { 
-          error: errorMessage,
-          errorObject: error 
-        });
+        log.error("SignUp: Signup process failed", { error: errorMessage });
         setGeneralError(errorMessage);
       }
     } finally {

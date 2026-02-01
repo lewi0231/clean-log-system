@@ -64,7 +64,7 @@ describe("WorkersService", () => {
         WorkersService.listWorkersAndLocations({
           organization_id: "org-1",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
 
     it("should throw error when success flag is missing", async () => {
@@ -134,7 +134,7 @@ describe("WorkersService", () => {
           email: "john@example.com",
           phone: "1234567890",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
 
     it("should throw error when worker is missing in response", async () => {
@@ -188,7 +188,7 @@ describe("WorkersService", () => {
           id: "worker-1",
           name: "Jane Doe",
         })
-      ).rejects.toEqual(mockError);
+      ).rejects.toMatchObject(mockError);
     });
 
     it("should throw error when worker is missing in response", async () => {
@@ -227,9 +227,9 @@ describe("WorkersService", () => {
         error: mockError,
       });
 
-      await expect(WorkersService.delete({ id: "worker-1" })).rejects.toEqual(
-        mockError
-      );
+      await expect(
+        WorkersService.delete({ id: "worker-1" }),
+      ).rejects.toMatchObject(mockError);
     });
   });
 });

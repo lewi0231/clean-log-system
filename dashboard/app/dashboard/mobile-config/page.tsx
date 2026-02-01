@@ -36,6 +36,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { PageHeaderSkeleton } from "@/components/ui/skeleton-loaders";
+import { ErrorState } from "@/components/ui/error-state";
 
 // 4. Hooks
 import { useMobileConfig } from "@/hooks/use-mobile-config";
@@ -45,8 +46,10 @@ import useOrganization from "@/hooks/useOrganization";
 
 // 5. Services/Utils
 import { organizationSettingsKey } from "@/app/query-provider";
-import { supabase } from "@/lib/supabase";
+import { log } from "@/lib/logger";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { getTemplateDescription } from "@/lib/templates";
+import { toast } from "sonner";
 
 export default function MobileConfigPage() {
   const [advancedOptionsModalOpen, setAdvancedOptionsModalOpen] =
@@ -103,13 +106,10 @@ export default function MobileConfigPage() {
 
   if (orgError || !organizationId) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-destructive">
-            {orgError || "Failed to load organization"}
-          </p>
-        </div>
-      </div>
+      <ErrorState
+        message={orgError || "Failed to load organization"}
+        fullScreen
+      />
     );
   }
 
@@ -240,16 +240,26 @@ export default function MobileConfigPage() {
             }
             onUpdateDefaultExclusiveGroupLabel={async (label) => {
               if (!organizationId) return;
-              const { error } = await supabase.functions.invoke(
-                "update-organization-settings",
-                {
-                  body: {
+              try {
+                await invokeEdgeFunction<{ success?: boolean }>(
+                  "update-organization-settings",
+                  {
                     organization_id: organizationId,
                     default_exclusive_group_label: label,
                   },
-                },
-              );
-              if (error) throw error;
+                );
+                toast.success("Field group label updated");
+              } catch (err) {
+                log.error("MobileConfig: Failed to update group label", {
+                  message: err instanceof Error ? err.message : "Unknown error",
+                });
+                toast.error(
+                  err instanceof Error
+                    ? err.message
+                    : "Failed to update field group label",
+                );
+                throw err;
+              }
               // Invalidate settings query to refetch updated data
               queryClient.invalidateQueries({
                 queryKey: organizationSettingsKey(organizationId),

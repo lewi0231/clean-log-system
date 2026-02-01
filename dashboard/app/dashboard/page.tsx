@@ -13,6 +13,7 @@ import {
 import { useInvoices } from "@/hooks/use-invoices";
 import { useLocations } from "@/hooks/use-locations";
 import { useWorkers } from "@/hooks/use-workers";
+import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import useOrganization from "@/hooks/useOrganization";
 import { AlertTriangle, Building2, FileText, Users } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ export default function Dashboard() {
     loading: orgLoading,
     error: orgError,
   } = useOrganization();
+  const { formatCurrency } = useOrganizationCurrency();
   const { workers, loading: workersLoading } = useWorkers();
   const { locations, loading: locationsLoading } = useLocations();
   const { invoices, loading: invoicesLoading } = useInvoices();
@@ -153,7 +155,7 @@ export default function Dashboard() {
             </div>
             <p className="text-xs text-muted-foreground">
               {stats.overdueCount > 0
-                ? `$${stats.overdueTotal.toFixed(2)} outstanding`
+                ? `${formatCurrency(stats.overdueTotal)} outstanding`
                 : "No overdue invoices"}
             </p>
             <Button

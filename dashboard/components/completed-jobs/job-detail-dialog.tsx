@@ -15,6 +15,7 @@ import CalculatePaymentDialog from "@/components/worker-payments/calculate-payme
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import type { FieldConfig } from "@clean-log/shared/types";
+import { log } from "@/lib/logger";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
 import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import {
@@ -327,7 +328,10 @@ export default function JobDetailDialog({
         // Silently handle errors - edit history is optional
         // This prevents errors from breaking the dialog if migration hasn't been run
         if (!cancelled) {
-          console.warn("Failed to fetch edit history (this is optional)", err);
+          log.warn("JobDetailDialog: Failed to fetch edit history (optional)", {
+            error: err instanceof Error ? err.message : "Unknown error",
+            jobId: job.id,
+          });
           setEditHistory([]);
         }
       } finally {
@@ -390,7 +394,10 @@ export default function JobDetailDialog({
                           });
                           onEditSuccess?.();
                         } catch (err) {
-                          console.error("Failed to send feedback email", err);
+                          log.error("JobDetailDialog: Failed to send feedback email", {
+                            error: err instanceof Error ? err.message : "Unknown error",
+                            jobId: job.id,
+                          });
                           toast.error("Failed to send feedback email", {
                             description:
                               err instanceof Error

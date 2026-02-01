@@ -89,7 +89,7 @@ serve(async (req) => {
 
     // 2. Create admin user in Supabase Auth
     // email_confirm: false requires email verification before full access
-    const { data: _authData, error: authError } = await supabase.auth.admin
+    const { data: authData, error: authError } = await supabase.auth.admin
       .createUser({
         email: admin_email,
         password: password,
@@ -135,13 +135,17 @@ serve(async (req) => {
       );
     }
 
-    // 5. Link user to organization
+    // 5. Link user to organization (include auth_user_id so RLS policies work)
+    // Normalize email to lowercase for consistent lookup (auth may normalize differently)
     const { error: _orgUserLinkError } = await supabase
       .from("organization_user")
       .insert({
         organization_id: org.id,
-        email: admin_email,
+        email: admin_email.trim().toLowerCase(),
         role: "admin",
+        auth_user_id: authData.user?.id ?? null,
+        status: "active",
+        activated_at: new Date().toISOString(),
       });
 
     if (_orgUserLinkError) throw _orgUserLinkError;

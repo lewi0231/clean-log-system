@@ -12,7 +12,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { createServiceRoleClient, getAuthUserByEmail } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 // Load environment variables from .env file (for local development)
@@ -42,8 +42,10 @@ serve(async (req) => {
     const supabase = createServiceRoleClient();
 
     // 1. Check if user exists in Supabase Auth
-    const { data: authUser, error: getUserError } = await supabase.auth.admin
-      .getUserByEmail(email);
+    const { data: authUser, error: getUserError } = await getAuthUserByEmail(
+      supabase,
+      email,
+    );
 
     if (getUserError || !authUser.user) {
       logger.warn("User not found for activation link resend", {

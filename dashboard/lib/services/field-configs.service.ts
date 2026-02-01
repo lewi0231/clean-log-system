@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
+import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { ListFieldConfigsRequest } from "@/lib/types/api";
 import type { FieldConfig } from "@clean-log/shared/types";
 
@@ -13,16 +13,10 @@ export class FieldConfigsService {
         organizationId: request.organization_id,
       });
 
-      const { data, error } = await supabase.functions.invoke(
+      const data = await invokeEdgeFunction<{ field_configs?: FieldConfig[] }>(
         "list-field-configs",
-        {
-          body: request,
-        },
+        request as unknown as Record<string, unknown>,
       );
-
-      if (error) {
-        throw error;
-      }
 
       if (!data || !data.field_configs) {
         throw new Error("Failed to fetch field configs");

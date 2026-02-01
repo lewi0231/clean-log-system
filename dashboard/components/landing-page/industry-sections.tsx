@@ -4,9 +4,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Car, Wrench, Sparkles } from "lucide-react";
@@ -27,7 +24,7 @@ const industries = [
       "Worker performance tracking",
     ],
     testimonial: {
-      quote: "\"RivetUp transformed how we manage our car yard detailing. The mobile app means our workers can log jobs on-site, and invoices go out automatically. We've cut our admin time in half.\"",
+      quote: "RivetUp transformed how we manage our car yard detailing. The mobile app means our workers can log jobs on-site, and invoices go out automatically. We've cut our admin time in half.",
       name: "Sarah Chen",
       business: "Auto Detail Pro, Melbourne",
     },
@@ -46,7 +43,7 @@ const industries = [
       "Instant invoice generation",
     ],
     testimonial: {
-      quote: "\"As a solo electrician, I needed something simple that worked on my phone and handled complex pricing. RivetUp lets me track time, add materials, and send professional invoices—all from the job site.\"",
+      quote: "As a solo electrician, I needed something simple that worked on my phone and handled complex pricing. RivetUp lets me track time, add materials, and send professional invoices—all from the job site.",
       name: "Mike Thompson",
       business: "Thompson Electrical Services",
     },
@@ -65,7 +62,7 @@ const industries = [
       "Batch invoicing",
     ],
     testimonial: {
-      quote: "\"Managing 15 workers across 20 locations used to be chaos. Now with RivetUp, I can see all jobs in real-time, track worker performance, and invoice customers automatically.\"",
+      quote: "Managing 15 workers across 20 locations used to be chaos. Now with RivetUp, I can see all jobs in real-time, track worker performance, and invoice customers automatically.",
       name: "Lisa Rodriguez",
       business: "CleanSpace Commercial",
     },
@@ -81,7 +78,7 @@ export function IndustrySections() {
             Designed for Your Industry
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            RivetUp adapts to how your business works, whether you're a car detailer,
+            RivetUp adapts to how your business works, whether you&apos;re a car detailer,
             tradesperson, or cleaning service.
           </p>
         </div>
@@ -121,7 +118,7 @@ export function IndustrySections() {
                   <Card className="mb-6">
                     <CardContent className="pt-6">
                       <blockquote className="text-sm italic text-muted-foreground mb-3">
-                        "{industry.testimonial.quote}"
+                        {industry.testimonial.quote}
                       </blockquote>
                       <div>
                         <div className="font-semibold text-sm">{industry.testimonial.name}</div>

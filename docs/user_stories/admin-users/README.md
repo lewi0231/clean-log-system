@@ -39,6 +39,14 @@ Dashboard users (admins and viewers) are team members who access the web dashboa
 - Maintaining dual access (dashboard + mobile)
 - Seamless conversion with data synchronization
 
+### 006 - Admin In-App Notifications
+**Focus**: When and who gets notified for organization events
+- Worker creates job → all admins
+- Admin creates job / invoice → other admins
+- Payment received / client review → all admins
+- Admin changes settings, form fields, pricing, locations, users → other admins
+- Defines new notification types and "other admins only" pattern
+
 ## Key Features Covered
 
 - **Multi-role Support**: Admin and Viewer user types with different permissions
@@ -46,6 +54,7 @@ Dashboard users (admins and viewers) are team members who access the web dashboa
 - **Status Tracking**: Clear visibility into user account states
 - **Contact Management**: Complete contact information for all team members
 - **Role Flexibility**: Easy conversion between dashboard and mobile worker roles
+- **In-App Notifications**: Admins notified for jobs, payments, reviews, and configuration changes (see [006](./006-admin-notifications.md))
 
 ## Dependencies
 
@@ -70,10 +79,12 @@ These user stories depend on:
 3. **003** - Contact information (Data completeness)
 4. **004** - Information display (UX improvement)
 5. **005** - Role conversion (Advanced feature)
+6. **006** - Admin in-app notifications (When/who gets notified; extend existing notification system)
 
 ## Related Areas
 
-- **Workers**: Mobile app user management
+- **Workers**: Mobile app user management; [Worker notification system (worker becomes active)](../workers/002-worker-active-notification-system.md)
 - **Authentication**: Login and security systems
 - **Email System**: Notification and invitation delivery
 - **Database**: User data storage and relationships
+- **Notification system**: [Architecture and reliability](../../decisions/notification-system.md)

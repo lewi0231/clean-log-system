@@ -53,7 +53,7 @@ export function MobileAppSection() {
               Easy to Use—On Phones, Tablets, and PCs
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Whether you're a lone operator or manage staff and sub-contractors, entering hours is easy
+              Whether you&apos;re a lone operator or manage staff and sub-contractors, entering hours is easy
               on a data-connected phone or tablet before leaving the job. Your clients get invoiced correctly,
               your sub-contractors get paid accordingly—and you keep control from one simple admin panel.
             </p>

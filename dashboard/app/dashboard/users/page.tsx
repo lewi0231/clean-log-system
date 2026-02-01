@@ -136,6 +136,8 @@ export default function UsersPage() {
       await updateOrganizationUser({
         id: userId,
         ...userData,
+        // API type expects string | undefined (not null)
+        phone: userData.phone ?? undefined,
       });
       toast.success("User updated successfully");
     } catch (error) {
@@ -296,7 +298,6 @@ export default function UsersPage() {
         open={isWorkerFormOpen}
         onOpenChange={setIsWorkerFormOpen}
         onSuccess={async (workerData, workerId) => {
-          setIsWorkerFormOpen(false);
           if (workerId) {
             await handleUpdateWorker(workerId, workerData);
           } else {
@@ -309,7 +310,6 @@ export default function UsersPage() {
         open={isOrgUserFormOpen}
         onOpenChange={setIsOrgUserFormOpen}
         onSuccess={async (userData, userId) => {
-          setIsOrgUserFormOpen(false);
           if (userId) {
             await handleUpdateOrgUser(userId, userData);
           } else {

@@ -73,7 +73,7 @@ export function SocialProofSection() {
               </CardHeader>
               <CardContent className="flex-1">
                 <CardDescription className="text-base mb-4 italic">
-                  "{testimonial.quote}"
+                  {testimonial.quote}
                 </CardDescription>
                 <div>
                   <CardTitle className="text-sm">{testimonial.name}</CardTitle>

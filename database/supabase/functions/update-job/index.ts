@@ -168,6 +168,8 @@ serve(async (req: Request) => {
       submission_data?: Record<string, unknown>;
       location_id?: string | null;
       completed_at?: string;
+      last_updated_at?: string;
+      last_updated_by?: string;
     } = {};
 
     if (submission_data !== undefined) {
@@ -228,8 +230,12 @@ serve(async (req: Request) => {
       updateData.completed_at = completed_at;
     }
 
-    // Update the job if there are fields to update
+    let jobRowUpdated = false;
+
+    // Update the job if there are fields to update (always set last_updated when we touch the job)
     if (Object.keys(updateData).length > 0) {
+      updateData.last_updated_at = new Date().toISOString();
+      updateData.last_updated_by = userEmail;
       logger.debug("Updating job", {
         jobId,
         updateFields: Object.keys(updateData),
@@ -251,6 +257,7 @@ serve(async (req: Request) => {
         throw updateError;
       }
 
+      jobRowUpdated = true;
       logger.info("Job updated successfully", {
         jobId: updatedJob.id,
         organizationId,
@@ -335,6 +342,23 @@ serve(async (req: Request) => {
           count: normalizedWorkerIds.length,
         });
       }
+
+      // Record who/when edited when only worker_ids changed (job row not updated above)
+      if (!jobRowUpdated) {
+        const { error: auditError } = await supabaseAdmin
+          .from("job")
+          .update({
+            last_updated_at: new Date().toISOString(),
+            last_updated_by: userEmail,
+          })
+          .eq("id", jobId);
+        if (auditError) {
+          logger.warn("Failed to set last_updated on job after worker change", {
+            jobId,
+            error: auditError,
+          });
+        }
+      }
     }
 
     // Fetch updated job with relationships
@@ -348,6 +372,8 @@ serve(async (req: Request) => {
         submission_data,
         completed_at,
         created_at,
+        last_updated_at,
+        last_updated_by,
         location:location_id (
           id,
           name,

@@ -88,11 +88,9 @@ export default function LocationList({
     },
     locationId?: string,
   ) => {
-    setIsFormOpen(false);
     if (locationId && editingLocation) {
       await onUpdateLocation(locationId, locationData);
     }
-    setEditingLocation(null);
   };
 
   if (loading) {

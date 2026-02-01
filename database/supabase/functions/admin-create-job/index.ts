@@ -18,6 +18,7 @@ import type {
   JobContext,
 } from "../_utils/invoice-email.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
@@ -301,6 +302,27 @@ serve(async (req) => {
       jobId: job.id,
       organizationId: job.organization_id,
     });
+
+    // Notify admins that a job was created (non-blocking)
+    const notificationResult = await createNotification(supabaseAdmin, {
+      organization_id: job.organization_id,
+      type: "job_completed",
+      title: "Job submitted",
+      message: "A new job was created.",
+      related_entity_type: "job",
+      related_entity_id: job.id,
+    });
+    if (!notificationResult.success) {
+      logger.warn("Failed to create job notification", {
+        error: notificationResult.error,
+        jobId: job.id,
+      });
+    } else {
+      logger.debug("Job notification created", {
+        jobId: job.id,
+        notificationCount: notificationResult.notificationCount,
+      });
+    }
 
     // Create job_worker entries if worker_ids provided
     if (normalizedWorkerIds.length > 0) {
