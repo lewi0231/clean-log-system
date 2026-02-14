@@ -6,6 +6,21 @@ import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMockLocation } from "../lib/fixtures";
 
+const mockSupabase = vi.hoisted(() => {
+  const subscribe = vi.fn();
+  const on = vi.fn().mockReturnValue({ subscribe });
+  const channel = vi.fn().mockReturnValue({ on });
+  const removeChannel = vi.fn();
+  return { channel, removeChannel };
+});
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    channel: (...args: unknown[]) => mockSupabase.channel(...args),
+    removeChannel: (...args: unknown[]) => mockSupabase.removeChannel(...args),
+  },
+}));
+
 vi.mock("@/lib/services", () => ({
   LocationsService: {
     create: vi.fn(),

@@ -18,9 +18,19 @@ supabase link
 
 ## Run Tests
 
-All edge function tests use Deno's built-in test runner. The `deno.json` file at the database root configures all required imports.
+All edge function tests use Deno's built-in test runner. The `deno.json` file at the database root configures all required imports and tasks.
 
-### From database directory (recommended):
+### Using deno task (recommended — includes --allow-all for network access):
+
+```bash
+# Run all tests (unit + integration, with required permissions)
+deno task test
+
+# Run only integration tests (requires Supabase running)
+deno task test:integration
+```
+
+### From database directory (manual):
 
 ```bash
 # Run all tests in all test directories
@@ -45,5 +55,7 @@ deno test --allow-all supabase/functions/_utils/__tests__/invoice-email.test.ts
 cd supabase/functions/_utils/__tests__
 deno test --allow-all feedback-email.test.ts
 ```
+
+**Note:** Integration tests that connect to Supabase require `--allow-net` and `--allow-env`. Use `deno task test` or `deno task test:integration` for proper permissions.
 
 The root `deno.json` file in the database directory automatically configures all required imports (`@std/assert`, `@supabase/supabase-js`, `stripe`, etc.).

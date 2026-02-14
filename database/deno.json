@@ -10,5 +10,9 @@
   "compilerOptions": {
     "lib": ["deno.window"],
     "strict": true
+  },
+  "tasks": {
+    "test": "deno test --allow-all supabase/functions/**/__tests__/*.test.ts",
+    "test:integration": "deno test --allow-all --allow-env --allow-net supabase/functions/__tests__/*-integration.test.ts"
   }
 }
