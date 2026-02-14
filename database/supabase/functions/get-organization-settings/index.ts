@@ -35,7 +35,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes",
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -105,6 +105,7 @@ serve(async (req) => {
         gst_registered: orgSettings?.gst_registered ?? false,
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
+        edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
       },
     });
   } catch (error) {

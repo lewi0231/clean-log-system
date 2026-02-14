@@ -101,8 +101,7 @@ serve(async (req) => {
       );
     }
 
-    // Fetch organization settings to check if predefined locations are required
-    // and get the colleague confirmation timeout setting
+    // Fetch organization and organization_settings to check configuration
     logger.debug("Fetching organization settings", {
       organizationId,
     });
@@ -119,12 +118,23 @@ serve(async (req) => {
       throw orgError;
     }
 
+    // Fetch organization_settings for edit window minutes
+    const { data: orgSettings } = await supabaseAdmin
+      .from("organization_settings")
+      .select("edit_window_minutes")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
     const usePredefinedLocations = organization?.use_predefined_locations ??
       true;
     // Default to 24 hours if not set
     const confirmationTimeoutHours = organization?.colleague_confirmation_timeout_hours ?? 24;
+    // Default to 180 minutes (3 hours) if not set
+    const editWindowMinutes = orgSettings?.edit_window_minutes ?? 180;
     logger.debug("Organization settings fetched", {
       usePredefinedLocations,
+      confirmationTimeoutHours,
+      editWindowMinutes,
     });
 
     // Parse request body
@@ -305,9 +315,9 @@ serve(async (req) => {
     const autoApproveAt = needsConfirmation
       ? new Date(now.getTime() + confirmationTimeoutHours * 60 * 60 * 1000).toISOString()
       : null;
-    // Edit window is always 3 hours
+    // Edit window uses organization setting (default 180 minutes = 3 hours)
     const editWindowExpiresAt = needsConfirmation
-      ? new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString()
+      ? new Date(now.getTime() + editWindowMinutes * 60 * 1000).toISOString()
       : null;
 
     // Create the job (submitted_by_email = whoever submitted: admin via dashboard or worker via mobile)

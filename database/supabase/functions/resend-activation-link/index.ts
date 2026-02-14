@@ -42,15 +42,16 @@ serve(async (req) => {
     const supabase = createServiceRoleClient();
 
     // 1. Check if user exists in Supabase Auth
-    const { data: authUser, error: getUserError } = await getAuthUserByEmail(
+    const { data: authData, error: getUserError } = await getAuthUserByEmail(
       supabase,
       email,
     );
 
-    if (getUserError || !authUser.user) {
+    const user = authData?.user;
+    if (getUserError || !user) {
       logger.warn("User not found for activation link resend", {
         email,
-        error: getUserError?.message,
+        error: getUserError && typeof getUserError === "object" && "message" in getUserError ? (getUserError as { message: string }).message : undefined,
       });
       // Don't reveal if user exists or not for security
       return jsonResponse({
@@ -60,10 +61,10 @@ serve(async (req) => {
     }
 
     // 2. Check if user is already verified
-    if (authUser.user.email_confirmed_at) {
+    if (user.email_confirmed_at) {
       logger.info("User already verified, skipping activation link resend", {
         email,
-        userId: authUser.user.id,
+        userId: user.id,
       });
       return jsonResponse({
         success: true,
@@ -87,14 +88,14 @@ serve(async (req) => {
     }
 
     // 4. Generate new verification link
-    // Use type "email" for resending verification (doesn't require password)
+    // Use type "magiclink" for resending verification (one-time link, no password required)
     const siteUrl = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
     const redirectTo = `${siteUrl}/verify-email?email=${encodeURIComponent(email)}`;
 
     const { data: linkData, error: verificationLinkError } = await supabase.auth
       .admin
       .generateLink({
-        type: "email",
+        type: "magiclink",
         email: email,
         options: {
           redirectTo: redirectTo,
@@ -104,7 +105,7 @@ serve(async (req) => {
     if (verificationLinkError || !linkData?.properties?.action_link) {
       logger.error("Failed to generate verification link", verificationLinkError, {
         email,
-        userId: authUser.user.id,
+        userId: user.id,
       });
       return errorResponse(
         "Failed to generate verification link. Please try again later.",
@@ -125,7 +126,7 @@ serve(async (req) => {
     if (!emailResult.success) {
       logger.error("Failed to send verification email", {
         email,
-        userId: authUser.user.id,
+        userId: user.id,
         error: emailResult.error,
       });
       // Still return success to user (don't reveal email sending issues)
@@ -138,7 +139,7 @@ serve(async (req) => {
 
     logger.info("Activation link resent successfully", {
       email,
-      userId: authUser.user.id,
+      userId: user.id,
       emailId: emailResult.emailId,
     });
 

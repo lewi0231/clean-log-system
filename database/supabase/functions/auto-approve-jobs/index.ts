@@ -12,10 +12,10 @@ import { createServiceRoleClient } from "../_utils/supabase.ts";
  *
  * This function should be triggered by a cron job (e.g., every 5 minutes).
  *
- * Cron setup in Supabase:
+ * Cron setup in Supabase (every 5 min):
  *   SELECT cron.schedule(
  *     'auto-approve-jobs',
- *     '*/5 * * * *',
+ *     '0-59/5 * * * *',
  *     $$SELECT extensions.http_post(
  *       'https://<project-ref>.supabase.co/functions/v1/auto-approve-jobs',
  *       '{}',

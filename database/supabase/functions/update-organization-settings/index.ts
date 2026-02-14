@@ -51,6 +51,7 @@ serve(async (req) => {
       gst_registered,
       gst_inclusive,
       gst_rate_percent,
+      edit_window_minutes,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -358,6 +359,17 @@ serve(async (req) => {
         settingsUpdate.default_invoice_due_days = days;
       }
 
+      if (edit_window_minutes !== undefined) {
+        const minutes = Number(edit_window_minutes);
+        if (isNaN(minutes) || minutes < 15 || minutes > 1440) {
+          return errorResponse(
+            "edit_window_minutes must be a number between 15 and 1440",
+            400,
+          );
+        }
+        settingsUpdate.edit_window_minutes = minutes;
+      }
+
       if (existingSettings) {
         const { error: settingsError } = await supabase
           .from("organization_settings")
@@ -483,7 +495,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes",
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -552,6 +564,7 @@ serve(async (req) => {
         gst_registered: orgSettings?.gst_registered ?? false,
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
+        edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
       },
     });
   } catch (error) {

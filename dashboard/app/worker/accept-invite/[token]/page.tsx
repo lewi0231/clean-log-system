@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
@@ -187,10 +188,9 @@ function AcceptInvitePage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">Create a Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
                 name="password"
-                type="password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);

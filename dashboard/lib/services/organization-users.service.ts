@@ -218,16 +218,21 @@ export class OrganizationUsersService {
         throw new Error(data?.message || "Failed to convert user to worker");
       }
 
+      const workerId = data.worker?.id ?? data.worker_id;
+      if (!workerId) {
+        throw new Error("No worker ID returned from conversion");
+      }
+
       log.info(
         "OrganizationUsersService: User converted to worker successfully",
         {
           userId: organizationUserId,
-          workerId: data.worker?.id,
+          workerId,
         }
       );
 
       return {
-        workerId: data.worker?.id || data.worker_id,
+        workerId,
         alreadyWorker: data.already_worker || false,
       };
     } catch (err) {

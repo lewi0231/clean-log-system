@@ -21,7 +21,11 @@ export function extractAuthToken(req: Request): string | null {
  */
 export async function getAuthUser(
   token: string,
-): Promise<{ id: string; email?: string } | null> {
+): Promise<{
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+} | null> {
   const logger = createLoggerWithoutRequest({ functionName: "getAuthUser" });
   const supabaseAnon = createAnonClient();
   if (!supabaseAnon) {
@@ -39,7 +43,11 @@ export async function getAuthUser(
       return null;
     }
 
-    return { id: user.id, email: user.email };
+    return {
+      id: user.id,
+      email: user.email,
+      user_metadata: user.user_metadata,
+    };
   } catch (error) {
     logger.error("Error verifying auth token", error);
     return null;

@@ -171,7 +171,8 @@ serve(async (req) => {
     });
 
     // Notify all admins about the flagged job
-    const locationName = job.location?.name || "Unknown location";
+    const location = Array.isArray(job.location) ? job.location[0] : job.location;
+    const locationName = (location as { name?: string } | null)?.name ?? "Unknown location";
     const notificationResult = await createNotification(supabase, {
       organization_id: job.organization_id,
       type: "job_flagged",

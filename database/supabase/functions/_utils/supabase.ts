@@ -13,12 +13,12 @@ export async function getAuthUserByEmail(
   supabase: SupabaseClient,
   email: string,
 ): Promise<
-  { data: { user: { id: string } | null } | null; error: unknown | null }
+  { data: { user: { id: string; email_confirmed_at?: string | null } | null } | null; error: unknown | null }
 > {
   const admin = supabase.auth.admin as unknown as {
     getUserByEmail: (
       email: string,
-    ) => Promise<{ data: { user: { id: string } | null } | null; error: unknown | null }>;
+    ) => Promise<{ data: { user: { id: string; email_confirmed_at?: string | null } | null } | null; error: unknown | null }>;
   };
 
   return await admin.getUserByEmail(email);

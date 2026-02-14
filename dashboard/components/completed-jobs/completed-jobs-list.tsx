@@ -160,10 +160,21 @@ export default function CompletedJobsList({
     return [...standard, ...unsectioned, ...sectioned];
   }, [submissionDataKeys, fieldConfigs, sections, fieldConfigMap]);
 
+  // Helper to format a timestamp compactly
+  const formatTimeCompact = (isoString: string): string => {
+    try {
+      const d = new Date(isoString);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return isoString;
+    }
+  };
+
   const formatValue = (
     value: unknown,
     fieldExists: boolean,
     fieldName?: string,
+    jobWorkers?: Array<{ id: string; name: string }>,
   ): string | React.ReactNode => {
     // If field doesn't exist in this job's submission_data, show N/A indicator
     if (!fieldExists) {
@@ -239,6 +250,56 @@ export default function CompletedJobsList({
       if (value.length === 0) {
         return "-";
       }
+
+      // Handle worker_times array: [{ worker_id, start_time, finish_time }, ...]
+      if (
+        fieldName === "worker_times" &&
+        value.every(
+          (item) =>
+            typeof item === "object" &&
+            item !== null &&
+            "worker_id" in item &&
+            ("start_time" in item || "finish_time" in item),
+        )
+      ) {
+        // Build a worker name map
+        const workerNameMap = new Map<string, string>();
+        if (jobWorkers) {
+          jobWorkers.forEach((w) => workerNameMap.set(w.id, w.name));
+        }
+
+        // Format as compact list: "Worker1: 9:00-17:00, Worker2: 10:00-18:00"
+        return (
+          <div className="space-y-1 text-xs">
+            {value.map(
+              (
+                item: {
+                  worker_id: string;
+                  start_time?: string;
+                  finish_time?: string;
+                },
+                idx: number,
+              ) => {
+                const workerName =
+                  workerNameMap.get(item.worker_id) || "Unknown";
+                const startStr = item.start_time
+                  ? formatTimeCompact(item.start_time)
+                  : "?";
+                const finishStr = item.finish_time
+                  ? formatTimeCompact(item.finish_time)
+                  : "?";
+                return (
+                  <div key={idx}>
+                    <span className="font-medium">{workerName}:</span>{" "}
+                    {startStr} - {finishStr}
+                  </div>
+                );
+              },
+            )}
+          </div>
+        );
+      }
+
       // Check if it's an array of objects with brand/quantity structure
       if (
         value.every(
@@ -436,7 +497,7 @@ export default function CompletedJobsList({
                             : "text-center"
                         }
                       >
-                        {formatValue(value, fieldExists, key)}
+                        {formatValue(value, fieldExists, key, job.workers)}
                       </TableCell>
                     );
                   })}

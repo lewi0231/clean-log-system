@@ -233,7 +233,30 @@ export default function JobDetailDialog({
     return [...standard, ...unsectioned, ...sectioned];
   }, [submissionDataKeys, fieldConfigs, sections, fieldConfigMap, job]);
 
-  const formatValue = (value: unknown): string | React.ReactNode => {
+  // Build a map of worker_id -> worker_name from job.workers
+  const workerNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (job?.workers) {
+      job.workers.forEach((w) => {
+        map.set(w.id, w.name);
+      });
+    }
+    return map;
+  }, [job?.workers]);
+
+  // Helper to format a timestamp in a human-readable way
+  const formatTime = (isoString: string): string => {
+    try {
+      return new Date(isoString).toLocaleString();
+    } catch {
+      return isoString;
+    }
+  };
+
+  const formatValue = (
+    value: unknown,
+    fieldName?: string
+  ): string | React.ReactNode => {
     if (value === null || value === undefined) {
       return <span className="text-muted-foreground italic">Not provided</span>;
     }
@@ -258,6 +281,55 @@ export default function JobDetailDialog({
       if (value.length === 0) {
         return <span className="text-muted-foreground italic">None</span>;
       }
+
+      // Handle worker_times array: [{ worker_id, start_time, finish_time }, ...]
+      if (
+        fieldName === "worker_times" &&
+        value.every(
+          (item) =>
+            typeof item === "object" &&
+            item !== null &&
+            "worker_id" in item &&
+            ("start_time" in item || "finish_time" in item)
+        )
+      ) {
+        return (
+          <div className="space-y-2">
+            {value.map(
+              (
+                item: {
+                  worker_id: string;
+                  start_time?: string;
+                  finish_time?: string;
+                },
+                idx: number
+              ) => {
+                const workerName =
+                  workerNameMap.get(item.worker_id) || "Unknown Worker";
+                return (
+                  <div
+                    key={idx}
+                    className="text-sm border-l-2 border-muted pl-2"
+                  >
+                    <div className="font-medium">{workerName}</div>
+                    {item.start_time && (
+                      <div className="text-muted-foreground">
+                        Start: {formatTime(item.start_time)}
+                      </div>
+                    )}
+                    {item.finish_time && (
+                      <div className="text-muted-foreground">
+                        Finish: {formatTime(item.finish_time)}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            )}
+          </div>
+        );
+      }
+
       // Handle arrays of objects (like grouped breakdown)
       if (
         value.every(
@@ -541,7 +613,9 @@ export default function JobDetailDialog({
                         <div className="text-sm font-medium text-muted-foreground">
                           {formatFieldLabel(key)}
                         </div>
-                        <div className="text-base">{formatValue(value)}</div>
+                        <div className="text-base">
+                          {formatValue(value, key)}
+                        </div>
                       </div>
                     );
                   })}

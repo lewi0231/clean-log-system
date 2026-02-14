@@ -112,6 +112,7 @@ export default function SettingsPage() {
     currency: "AUD",
     locale: "en-AU",
     default_exclusive_group_label: null,
+    edit_window_minutes: 180,
   });
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -186,6 +187,7 @@ export default function SettingsPage() {
           locale: data.settings.locale ?? "en-AU",
           default_exclusive_group_label:
             data.settings.default_exclusive_group_label ?? null,
+          edit_window_minutes: data.settings.edit_window_minutes ?? 180,
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
 
@@ -228,6 +230,7 @@ export default function SettingsPage() {
           locale: data.settings.locale ?? "en-AU",
           default_exclusive_group_label:
             data.settings.default_exclusive_group_label ?? null,
+          edit_window_minutes: data.settings.edit_window_minutes ?? 180,
         };
         setInitialSettings(initialSnapshot);
         setHasUnsavedChanges(false);
@@ -1893,6 +1896,79 @@ export default function SettingsPage() {
                   View customer ratings
                   <ExternalLink className="h-3 w-3" />
                 </Link>
+              </div>
+
+              <Separator />
+
+              {/* Job Edit Window Settings */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="edit-window-minutes"
+                    className="text-base font-semibold"
+                  >
+                    Job Edit Window
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    When a worker submits a job with colleagues, they have this
+                    amount of time to withdraw the job before colleagues are
+                    notified to confirm. This helps prevent mistakes from being
+                    sent for confirmation.
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Select
+                    value={String(settings.edit_window_minutes ?? 180)}
+                    onValueChange={async (value) => {
+                      const minutes = parseInt(value, 10);
+                      setSettings((prev) => ({
+                        ...prev,
+                        edit_window_minutes: minutes,
+                      }));
+                      try {
+                        await invokeEdgeFunction(
+                          "update-organization-settings",
+                          {
+                            organization_id: organizationId,
+                            edit_window_minutes: minutes,
+                          },
+                        );
+                        queryClient.invalidateQueries({
+                          queryKey: organizationSettingsKey(organizationId),
+                        });
+                      } catch (err) {
+                        log.error("Failed to update edit window", {
+                          error: err instanceof Error ? err.message : err,
+                        });
+                        setErrorDialog({
+                          open: true,
+                          title: "Update Failed",
+                          message:
+                            err instanceof Error
+                              ? err.message
+                              : "Failed to update edit window setting.",
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 minutes</SelectItem>
+                      <SelectItem value="30">30 minutes</SelectItem>
+                      <SelectItem value="60">1 hour</SelectItem>
+                      <SelectItem value="120">2 hours</SelectItem>
+                      <SelectItem value="180">3 hours (default)</SelectItem>
+                      <SelectItem value="360">6 hours</SelectItem>
+                      <SelectItem value="720">12 hours</SelectItem>
+                      <SelectItem value="1440">24 hours</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">
+                    after job submission
+                  </span>
+                </div>
               </div>
 
               <Separator />

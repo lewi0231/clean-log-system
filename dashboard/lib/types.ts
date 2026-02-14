@@ -112,6 +112,8 @@ export interface OrganizationSettings {
   gst_registered: boolean;
   gst_inclusive: boolean;
   gst_rate_percent: number;
+  // Job approval workflow settings
+  edit_window_minutes: number;
 }
 
 // Job approval workflow types

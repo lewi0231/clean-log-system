@@ -150,6 +150,35 @@ serve(async (req) => {
       throw createError;
     }
 
+    // Update auth user's user_metadata to include worker_id
+    // This is critical for worker-related edge functions that use user_metadata.worker_id
+    // (e.g., list-pending-confirmations, withdraw-job, create-job)
+    const { error: updateAuthError } = await supabase.auth.admin.updateUserById(
+      orgUser.auth_user_id,
+      {
+        user_metadata: {
+          role: "worker",
+          organization_id: organization_id,
+          worker_id: newWorker.id,
+        },
+      }
+    );
+
+    if (updateAuthError) {
+      logger.error("Error updating auth user metadata", updateAuthError, {
+        organization_user_id,
+        worker_id: newWorker.id,
+      });
+      // Don't throw - worker was created, just log the warning
+      // The worker will still work via auth_user_id lookup in useCurrentWorker
+      logger.warn("Worker created but auth user_metadata not updated - some features may not work");
+    } else {
+      logger.info("Auth user metadata updated with worker_id", {
+        auth_user_id: orgUser.auth_user_id,
+        worker_id: newWorker.id,
+      });
+    }
+
     // Create notification for admins
     const notificationResult = await createNotification(supabase, {
       organization_id: organization_id,

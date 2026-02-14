@@ -67,7 +67,7 @@ serve(async (req) => {
       return errorResponse("job_id and action are required", 400);
     }
 
-    const { job_id, action, admin_notes } = body;
+    const { job_id, action, admin_notes: _admin_notes } = body;
 
     // Validate action
     if (action !== "approve" && action !== "cancel") {
@@ -149,13 +149,14 @@ serve(async (req) => {
     });
 
     // Get all workers on the job to notify them
-    const { data: jobWorkers } = await supabase
+    const { data: _jobWorkers } = await supabase
       .from("job_worker")
       .select("worker:worker_id (id, auth_user_id)")
       .eq("job_id", job_id);
 
     // Notify workers about the resolution
-    const locationName = job.location?.name || "Unknown location";
+    const location = Array.isArray(job.location) ? job.location[0] : job.location;
+    const locationName = (location as { name?: string } | null)?.name ?? "Unknown location";
     const notificationType = action === "approve"
       ? "job_resolved_approved"
       : "job_resolved_cancelled";

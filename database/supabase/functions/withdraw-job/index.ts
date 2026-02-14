@@ -154,7 +154,8 @@ serve(async (req) => {
 
     // Notify colleagues about the withdrawal
     if (colleagues && colleagues.length > 0) {
-      const locationName = job.location?.name || "a location";
+      const location = Array.isArray(job.location) ? job.location[0] : job.location;
+      const locationName = (location as { name?: string } | null)?.name ?? "a location";
       const notificationResult = await createNotification(supabase, {
         organization_id: job.organization_id,
         type: "job_withdrawn",

@@ -4,7 +4,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
-import { Session } from "@supabase/supabase-js";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -41,8 +40,7 @@ interface Job {
 }
 
 export default function JobsScreen() {
-  const { user } = useAuth();
-  const [session, setSession] = useState<Session | null>(null);
+  const { user, session } = useAuth();
   const { worker } = useCurrentWorker();
   const { organizationId } = useOrganization();
   const { isAdmin } = useUserRole();
@@ -51,21 +49,6 @@ export default function JobsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [withdrawingJobId, setWithdrawingJobId] = useState<string | null>(null);
-
-  // Get session for authenticated requests
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      setSession(currentSession);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   const fetchJobs = useCallback(async () => {
     if (!user || !organizationId) {

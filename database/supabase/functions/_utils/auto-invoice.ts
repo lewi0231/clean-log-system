@@ -288,6 +288,33 @@ export async function autoGenerateInvoiceForJob(
       };
     }
 
+    // Check if job is approved (only generate invoices for approved jobs)
+    const { data: jobData, error: jobError } = await supabaseAdmin
+      .from("job")
+      .select("approval_status")
+      .eq("id", jobId)
+      .single();
+
+    if (jobError) {
+      logger.error("Error fetching job approval status", { jobId, error: jobError });
+      return {
+        success: false,
+        error: `Failed to fetch job: ${jobError.message}`,
+      };
+    }
+
+    if (jobData.approval_status !== "approved") {
+      logger.debug("Job is not approved, skipping invoice generation", {
+        jobId,
+        approvalStatus: jobData.approval_status,
+      });
+      return {
+        success: true,
+        skipped: true,
+        skipReason: `Job approval_status is '${jobData.approval_status}', only approved jobs can be invoiced`,
+      };
+    }
+
     logger.info("Auto-generating invoice for job", { jobId, organizationId });
 
     // Get calculation - either from mock (for testing) or from calculate-invoice function
