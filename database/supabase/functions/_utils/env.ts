@@ -2,6 +2,7 @@
 // Handles conditional dotenv loading for local development
 
 import { load } from "dotenv";
+import { createLoggerWithoutRequest } from "./logger.ts";
 
 /**
  * Load environment variables from .env file if available (local development)
@@ -11,6 +12,7 @@ import { load } from "dotenv";
  * Note: In Deno, we need to manually set environment variables after loading them
  */
 export async function loadEnvIfLocal(): Promise<void> {
+  const logger = createLoggerWithoutRequest({ functionName: "loadEnvIfLocal" });
   // Try .env from current directory first (functions/.env)
   // This is where Supabase Edge Functions expect the .env file
   const possibleEnvFilePaths = [
@@ -30,11 +32,10 @@ export async function loadEnvIfLocal(): Promise<void> {
       if (result && Object.keys(result).length > 0) {
         loadedEnv = result;
         loadedPath = envPath;
-        console.log(
-          `[ENV] Loaded environment from: ${envPath} (${
-            Object.keys(result).length
-          } vars)`,
-        );
+        logger.info("Loaded environment file", {
+          path: envPath,
+          varCount: Object.keys(result).length,
+        });
         break; // Successfully loaded, stop trying other paths
       }
     } catch (error) {
@@ -44,7 +45,10 @@ export async function loadEnvIfLocal(): Promise<void> {
       }
       // Log other errors but continue
       if (error instanceof Error) {
-        console.warn(`[ENV] Error loading from ${envPath}:`, error.message);
+        logger.warn("Error loading environment file", {
+          path: envPath,
+          error: error.message,
+        });
       }
     }
   }
@@ -58,31 +62,29 @@ export async function loadEnvIfLocal(): Promise<void> {
       const oldValue = Deno.env.get(key);
       Deno.env.set(key, value);
       setCount++;
-      // Log important vars for debugging
+      // Avoid logging values; only log safe booleans for known flags
       if (key === "SKIP_EMAIL_SENDING") {
-        console.log(
-          `[ENV] Set ${key}=${value} (was: ${oldValue || "undefined"})`,
-        );
+        logger.debug("Applied SKIP_EMAIL_SENDING from env file", {
+          willSkip: value === "true",
+          wasSet: oldValue !== undefined,
+        });
       }
     }
-    console.log(
-      `[ENV] Set ${setCount} environment variables from ${loadedPath}`,
-    );
-    console.log(
-      `[ENV] SKIP_EMAIL_SENDING is now: ${Deno.env.get("SKIP_EMAIL_SENDING")}`,
-    );
+    logger.info("Applied environment variables from file", {
+      path: loadedPath,
+      setCount,
+    });
   } else {
-    console.log(
-      "[ENV] No .env file found or file was empty, using existing environment variables",
+    logger.info(
+      "No .env file found or file was empty; using existing environment variables",
     );
     const currentSkip = Deno.env.get("SKIP_EMAIL_SENDING");
-    console.log(
-      `[ENV] Current SKIP_EMAIL_SENDING value: ${currentSkip || "undefined"}`,
-    );
+    logger.debug("Current SKIP_EMAIL_SENDING", {
+      isSet: Boolean(currentSkip),
+      willSkip: currentSkip === "true",
+    });
     if (!currentSkip) {
-      console.warn(
-        "[ENV] WARNING: SKIP_EMAIL_SENDING is not set! Emails will be sent.",
-      );
+      logger.warn("SKIP_EMAIL_SENDING is not set; emails may be sent");
     }
   }
 }

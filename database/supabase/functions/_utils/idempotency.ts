@@ -13,6 +13,7 @@
 
 import { createServiceRoleClient } from "./supabase.ts";
 import { CORS_HEADERS, ProblemDetails } from "./http.ts";
+import { createLoggerWithoutRequest } from "./logger.ts";
 
 interface IdempotencyResult {
   isNew: boolean;
@@ -51,6 +52,7 @@ export async function checkIdempotencyKey(
   req: Request,
   idempotencyKey: string,
 ): Promise<IdempotencyResult> {
+  const logger = createLoggerWithoutRequest({ functionName: "checkIdempotencyKey" });
   const supabase = createServiceRoleClient();
   const url = new URL(req.url);
   const path = url.pathname;
@@ -68,7 +70,7 @@ export async function checkIdempotencyKey(
 
   if (error && error.code !== "PGRST116") {
     // Error other than "not found" - treat as new to avoid blocking valid requests
-    console.error("Idempotency check error:", error);
+    logger.error("Idempotency check error", undefined, { error: error.message });
     return { isNew: true };
   }
 
@@ -108,6 +110,7 @@ export async function storeIdempotencyKey(
   response: Response,
   ttlHours = 24,
 ): Promise<void> {
+  const logger = createLoggerWithoutRequest({ functionName: "storeIdempotencyKey" });
   const supabase = createServiceRoleClient();
   const url = new URL(req.url);
   const path = url.pathname;
@@ -157,7 +160,7 @@ export async function storeIdempotencyKey(
 
   if (insertError) {
     // Log error but don't fail the request
-    console.error("Failed to store idempotency key:", insertError);
+    logger.warn("Failed to store idempotency key", { error: insertError.message });
   }
 }
 

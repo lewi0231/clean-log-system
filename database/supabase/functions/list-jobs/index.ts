@@ -1,10 +1,12 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { listJobsSchema, validateRequest } from "../_utils/zod-schemas.ts";
 import type { JobWorker, JobWorkerQueryResult, Worker } from "../types.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "list-jobs" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -121,7 +123,7 @@ serve(async (req) => {
       .in("job_id", jobIds);
 
     if (feedbackError) {
-      console.error("Error fetching feedback:", feedbackError);
+      logger.warn("Error fetching feedback", { error: feedbackError.message });
       // Don't fail the entire request if feedback fetch fails
     }
 
@@ -141,7 +143,7 @@ serve(async (req) => {
       jobs: jobsWithWorkers || [],
     });
   } catch (error) {
-    console.error("List jobs error:", error);
+    logger.error("List jobs error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to list jobs",
     );

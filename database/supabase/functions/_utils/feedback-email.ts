@@ -10,6 +10,7 @@ import {
   isTestMode,
   validateEmailConfig,
 } from "./email.ts";
+import { createLoggerWithoutRequest } from "./logger.ts";
 import {
   getInvoiceEmailRecipient,
   type InvoiceEmailRecipientConfig,
@@ -66,6 +67,7 @@ export async function sendFeedbackRequestEmail(
   data: FeedbackEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendFeedbackRequestEmail" });
   // Validate email config
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -183,10 +185,10 @@ The ${data.organizationName} Team
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log("[TEST MODE] Feedback email redirected to test address", {
-      testRecipient,
-      originalRecipient: data.recipientEmail,
+    logger.info("Test mode: feedback email redirected", {
       jobId: data.jobId,
+      hasRecipient: Boolean(testRecipient),
+      hasOriginalRecipient: Boolean(data.recipientEmail),
     });
   }
 
@@ -254,25 +256,23 @@ The ${data.organizationName} Team
 
     if (emailId) {
       if (testMode) {
-        console.log("[TEST MODE] Feedback email sent to test address", {
+        logger.info("Feedback email sent (test mode)", {
           mode: "test",
           emailType: "feedback",
-          testRecipient,
-          originalRecipient: data.recipientEmail,
           jobId: data.jobId,
           emailId,
           timestamp: new Date().toISOString(),
         });
       } else {
-        console.log("Feedback email sent successfully:", emailId);
+        logger.info("Feedback email sent", { emailId, jobId: data.jobId });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true }; // Consider it successful even without ID
     }
   } catch (error) {
-    console.error("Failed to send feedback email:", error);
+    logger.error("Failed to send feedback email", error);
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     if (throwOnError) {
       throw new Error(errorMsg);

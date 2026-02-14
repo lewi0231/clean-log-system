@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -19,6 +20,8 @@ interface ListPricingRulesRequest {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "list-pricing-rules" });
 
   try {
     const body = (await req.json()) as ListPricingRulesRequest;
@@ -173,7 +176,7 @@ serve(async (req) => {
       pricing_rules: filteredRules,
     });
   } catch (error) {
-    console.error("List pricing rules error:", error);
+    logger.error("List pricing rules error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to list pricing rules",
     );

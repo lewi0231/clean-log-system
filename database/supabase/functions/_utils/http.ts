@@ -1,6 +1,8 @@
 // HTTP utilities for Edge Functions
 // Provides CORS headers, response builders, and error handlers
 
+import { createLoggerWithoutRequest } from "./logger.ts";
+
 export const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -178,6 +180,7 @@ export async function withCorsAndErrorHandling(
   req: Request,
   handler: (req: Request) => Promise<Response>,
 ): Promise<Response> {
+  const logger = createLoggerWithoutRequest({ functionName: "withCorsAndErrorHandling" });
   // Handle CORS preflight
   const corsResponse = handleCors(req);
   if (corsResponse) {
@@ -188,7 +191,7 @@ export async function withCorsAndErrorHandling(
     return await handler(req);
   } catch (error) {
     // Note: This should use structured logger, but keeping for backward compatibility
-    console.error("Handler error:", error);
+    logger.error("Handler error", error);
     const errorMessage = extractErrorMessage(error);
     const statusCode = getErrorStatusCode(error);
     return errorResponse(errorMessage, statusCode);

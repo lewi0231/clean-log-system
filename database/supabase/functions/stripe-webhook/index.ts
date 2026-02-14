@@ -151,7 +151,9 @@ serve(async (req) => {
           .eq("stripe_checkout_session_id", session.id);
 
         if (linkUpdateError) {
-          console.error("Error updating payment_link:", linkUpdateError);
+          logger.warn("Error updating payment_link", {
+            error: linkUpdateError.message,
+          });
         }
 
         // Create payment record
@@ -230,7 +232,9 @@ serve(async (req) => {
               .single();
 
             if (paymentError) {
-              console.error("Error creating payment record:", paymentError);
+              logger.error("Error creating payment record", undefined, {
+                error: paymentError.message,
+              });
             } else {
               // Update invoice total_paid and payment_count
               const newTotalPaid = (invoice.total_paid || 0) + amount;
@@ -252,7 +256,9 @@ serve(async (req) => {
                 .eq("id", invoiceId);
 
               if (invoiceUpdateError) {
-                console.error("Error updating invoice:", invoiceUpdateError);
+                logger.error("Error updating invoice", undefined, {
+                  error: invoiceUpdateError.message,
+                });
               }
 
               logger.info("Payment processed successfully", {
@@ -275,10 +281,9 @@ serve(async (req) => {
                   },
                 );
                 if (!notificationResult.success) {
-                  console.warn(
-                    "Failed to create payment notification:",
-                    notificationResult.error,
-                  );
+                  logger.warn("Failed to create payment notification", {
+                    error: notificationResult.error,
+                  });
                 }
               }
 
@@ -416,10 +421,10 @@ serve(async (req) => {
                         invoiceForEmail.organization_id,
                       );
                     } catch (err) {
-                      console.error(
-                        `Failed to get organization name for org ${invoiceForEmail.organization_id}:`,
-                        err,
-                      );
+                      logger.warn("Failed to get organization name for org", {
+                        organization_id: invoiceForEmail.organization_id,
+                        error: err instanceof Error ? err.message : String(err),
+                      });
                       organizationName = "Organization";
                     }
 
@@ -444,10 +449,11 @@ serve(async (req) => {
                           paymentMethodDisplay = "Link";
                         }
                       } catch (pmError) {
-                        console.warn(
-                          "Failed to retrieve payment method details:",
-                          pmError,
-                        );
+                        logger.warn("Failed to retrieve payment method details", {
+                          error: pmError instanceof Error
+                            ? pmError.message
+                            : String(pmError),
+                        });
                       }
                     }
 
@@ -470,29 +476,25 @@ serve(async (req) => {
                     });
 
                     if (emailResult.success) {
-                      console.log(
-                        `Payment confirmation email sent successfully for invoice ${invoiceForEmail.invoice_number} (Email ID: ${
-                          emailResult.emailId || "unknown"
-                        })`,
-                      );
+                      logger.info("Payment confirmation email sent", {
+                        invoice_number: invoiceForEmail.invoice_number,
+                        has_email_id: Boolean(emailResult.emailId),
+                      });
                     } else {
-                      console.error(
-                        `Failed to send payment confirmation email for invoice ${invoiceForEmail.invoice_number}:`,
-                        emailResult.error,
-                      );
+                      logger.warn("Failed to send payment confirmation email", {
+                        invoice_number: invoiceForEmail.invoice_number,
+                        error: emailResult.error,
+                      });
                       // Don't fail webhook processing if email fails
                     }
                   } else {
-                    console.warn(
-                      `No email recipients found for payment confirmation for invoice ${invoiceForEmail.invoice_number}`,
-                    );
+                    logger.warn("No email recipients found for payment confirmation", {
+                      invoice_number: invoiceForEmail.invoice_number,
+                    });
                   }
                 }
               } catch (emailError) {
-                console.error(
-                  "Error sending payment confirmation email:",
-                  emailError,
-                );
+                logger.error("Error sending payment confirmation email", emailError);
                 // Don't fail webhook processing if email fails
               }
             }
@@ -514,7 +516,9 @@ serve(async (req) => {
           .eq("stripe_payment_intent_id", paymentIntent.id);
 
         if (updateError) {
-          console.error("Error updating payment status:", updateError);
+          logger.error("Error updating payment status", undefined, {
+            error: updateError.message,
+          });
         }
         break;
       }
@@ -639,7 +643,7 @@ serve(async (req) => {
       .eq("event_id", event.id)
       .then(({ error }) => {
         if (error) {
-          console.error("Error updating webhook event status:", error);
+          logger.warn("Error updating webhook event status", { error: error.message });
         }
       });
 
@@ -664,7 +668,9 @@ serve(async (req) => {
           .eq("event_id", event.id);
       }
     } catch (updateError) {
-      console.error("Error updating webhook event status:", updateError);
+      logger.warn("Error updating webhook event status", {
+        error: updateError instanceof Error ? updateError.message : String(updateError),
+      });
       // Don't fail the response if we can't update the status
     }
 

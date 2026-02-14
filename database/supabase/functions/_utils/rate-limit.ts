@@ -7,6 +7,7 @@
 
 import { createServiceRoleClient } from "./supabase.ts";
 import { CORS_HEADERS, ProblemDetails } from "./http.ts";
+import { createLoggerWithoutRequest } from "./logger.ts";
 
 interface RateLimitConfig {
   maxRequests: number;
@@ -115,6 +116,7 @@ async function checkDatabaseRateLimit(
   maxRequests: number,
   windowMs: number,
 ): Promise<RateLimitResult> {
+  const logger = createLoggerWithoutRequest({ functionName: "checkDatabaseRateLimit" });
   const supabase = createServiceRoleClient();
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
@@ -131,7 +133,7 @@ async function checkDatabaseRateLimit(
 
   if (fetchError && fetchError.code !== "PGRST116") {
     // Error other than "not found" - allow request but log error
-    console.error("Rate limit check error:", fetchError);
+    logger.error("Rate limit check error", undefined, { error: fetchError.message });
     return {
       allowed: true,
       remaining: maxRequests,
@@ -162,7 +164,7 @@ async function checkDatabaseRateLimit(
       .eq("id", existing.id);
 
     if (updateError) {
-      console.error("Rate limit update error:", updateError);
+      logger.warn("Rate limit update error", { error: updateError.message });
     }
 
     const resetAt = new Date(existing.window_start);
@@ -189,7 +191,7 @@ async function checkDatabaseRateLimit(
     });
 
   if (insertError) {
-    console.error("Rate limit insert error:", insertError);
+    logger.warn("Rate limit insert error", { error: insertError.message });
     // Allow request if insert fails
     return {
       allowed: true,

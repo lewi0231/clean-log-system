@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import {
   getInvoiceDetailsSchema,
@@ -8,6 +9,7 @@ import {
 } from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "get-invoice-details" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -246,7 +248,7 @@ serve(async (req) => {
       hierarchy_metadata: hierarchyMetadata,
     });
   } catch (error) {
-    console.error("Get invoice details error:", error);
+    logger.error("Get invoice details error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to get invoice details",
     );

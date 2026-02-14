@@ -2,6 +2,7 @@
 // Provides email sending functionality using Resend API
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createLoggerWithoutRequest } from "./logger.ts";
 
 export interface EmailConfig {
   apiKey: string;
@@ -32,13 +33,14 @@ export interface EmailValidationResult {
  * Validate email configuration environment variables
  */
 export function validateEmailConfig(): EmailValidationResult {
+  const logger = createLoggerWithoutRequest({ functionName: "validateEmailConfig" });
   const apiKey = Deno.env.get("RESEND_API_KEY");
   const resendFromDomain = Deno.env.get("RESEND_FROM_DOMAIN");
   const workerInvitationBaseUrl = Deno.env.get("WORKER_INVITATION_BASE_URL");
 
   // Check if environment variables are set AND not the string "null" or "undefined"
   if (!apiKey || apiKey === "null" || apiKey === "undefined") {
-    console.error("RESEND_API_KEY is not set or invalid!");
+    logger.error("RESEND_API_KEY is not set or invalid");
     return {
       valid: false,
       error: "Email service is not configured",
@@ -50,7 +52,7 @@ export function validateEmailConfig(): EmailValidationResult {
     resendFromDomain === "null" ||
     resendFromDomain === "undefined"
   ) {
-    console.error("RESEND_FROM_DOMAIN is not set or invalid!");
+    logger.error("RESEND_FROM_DOMAIN is not set or invalid");
     return {
       valid: false,
       error: "Email service configuration error: RESEND_FROM_DOMAIN is not set",
@@ -62,7 +64,7 @@ export function validateEmailConfig(): EmailValidationResult {
     workerInvitationBaseUrl === "null" ||
     workerInvitationBaseUrl === "undefined"
   ) {
-    console.error("WORKER_INVITATION_BASE_URL is not set or invalid!");
+    logger.error("WORKER_INVITATION_BASE_URL is not set or invalid");
     return {
       valid: false,
       error: "Configuration error: WORKER_INVITATION_BASE_URL is not set",
@@ -237,6 +239,7 @@ export async function sendWorkerInvitationEmail(
   data: WorkerInvitationData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendWorkerInvitationEmail" });
   // Validate configuration
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -280,14 +283,11 @@ export async function sendWorkerInvitationEmail(
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log(
-      "[TEST MODE] Worker invitation email redirected to test address",
-      {
-        testRecipient,
-        originalRecipient: data.workerEmail,
-        invitationToken: data.invitationToken,
-      },
-    );
+    logger.info("Test mode: worker invitation email redirected", {
+      testRecipient,
+      originalRecipient: data.workerEmail,
+      invitationToken: data.invitationToken,
+    });
   }
 
   //   TODO - Troubleshoot why template isn't working.
@@ -321,7 +321,8 @@ export async function sendWorkerInvitationEmail(
 
   const requestBodyStr = JSON.stringify(requestBody);
   if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
-    console.error("Request body contains null values:", requestBodyStr);
+    // Never log full request bodies (can contain emails/tokens).
+    logger.error("Request body contains null values");
     const error = "Request contains null values";
     if (throwOnError) {
       throw new Error(error);
@@ -335,7 +336,7 @@ export async function sendWorkerInvitationEmail(
     emailData.from.includes("null") ||
     emailData.from.includes("undefined")
   ) {
-    console.error("Invalid fromEmail:", emailData.from);
+    logger.error("Invalid fromEmail", undefined, { from: emailData.from });
     const error = "Invalid from email address";
     if (throwOnError) {
       throw new Error(error);
@@ -344,8 +345,9 @@ export async function sendWorkerInvitationEmail(
   }
 
   try {
-    console.log("Sending invitation email to:", data.workerEmail);
-    console.log("Template variables:", emailData.templateVariables);
+    logger.info("Sending worker invitation email", {
+      to: data.workerEmail,
+    });
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -366,12 +368,11 @@ export async function sendWorkerInvitationEmail(
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
         rawResponse: errorText,
-        requestBody: requestBodyStr,
       });
 
       const errorMessage = (errorBody &&
@@ -402,28 +403,22 @@ export async function sendWorkerInvitationEmail(
 
     if (emailId) {
       if (testMode) {
-        console.log(
-          "[TEST MODE] Worker invitation email sent to test address",
-          {
-            mode: "test",
-            emailType: "invitation",
-            testRecipient,
-            originalRecipient: data.workerEmail,
-            invitationToken: data.invitationToken,
-            emailId,
-            timestamp: new Date().toISOString(),
-          },
-        );
+        logger.info("Test mode: worker invitation email sent", {
+          testRecipient,
+          originalRecipient: data.workerEmail,
+          invitationToken: data.invitationToken,
+          emailId,
+        });
       } else {
-        console.log("Invitation email sent successfully:", emailId);
+        logger.info("Worker invitation email sent", { emailId });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID", { emailResponse });
       return { success: true }; // Consider it successful even without ID
     }
   } catch (error) {
-    console.error("Failed to send invitation email:", error);
+    logger.error("Failed to send invitation email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send invitation email";
@@ -441,6 +436,7 @@ export async function sendEmailVerificationEmail(
   data: EmailVerificationData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendEmailVerificationEmail" });
   // Validate configuration
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -474,13 +470,10 @@ export async function sendEmailVerificationEmail(
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log(
-      "[TEST MODE] Verification email redirected to test address",
-      {
-        testRecipient,
-        originalRecipient: data.email,
-      },
-    );
+    logger.info("Test mode: verification email redirected", {
+      hasRecipient: Boolean(testRecipient),
+      hasOriginalRecipient: Boolean(data.email),
+    });
   }
 
   const html = `
@@ -528,7 +521,7 @@ export async function sendEmailVerificationEmail(
   }
 
   try {
-    console.log("Sending verification email to:", data.email);
+    logger.info("Sending verification email", { hasRecipient: Boolean(data.email) });
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -548,7 +541,7 @@ export async function sendEmailVerificationEmail(
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
@@ -573,14 +566,14 @@ export async function sendEmailVerificationEmail(
     const emailId = emailResponse.id;
 
     if (emailId) {
-      console.log("Verification email sent successfully:", emailId);
+      logger.info("Verification email sent", { emailId });
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true };
     }
   } catch (error) {
-    console.error("Failed to send verification email:", error);
+    logger.error("Failed to send verification email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send verification email";
@@ -598,6 +591,7 @@ export async function getOrganizationName(
   supabase: SupabaseClient,
   organizationId: string,
 ): Promise<string> {
+  const logger = createLoggerWithoutRequest({ functionName: "getOrganizationName" });
   const { data: organization, error: orgError } = await supabase
     .from("organization")
     .select("name")
@@ -605,7 +599,7 @@ export async function getOrganizationName(
     .single();
 
   if (orgError) {
-    console.error("Failed to fetch organization name:", orgError);
+    logger.warn("Failed to fetch organization name", { error: orgError.message });
   }
 
   // Ensure orgName is always a non-null string
@@ -697,25 +691,23 @@ export async function sendInvoiceEmail(
   data: InvoiceEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendInvoiceEmail" });
   // Check if email sending should be skipped entirely (for integration tests)
   // This prevents hitting Resend rate limits during testing
   // Check this FIRST before any validation or processing
   const skipEmailSendingEnv = Deno.env.get("SKIP_EMAIL_SENDING");
   const skipEmailSending = skipEmailSendingEnv === "true";
 
-  // Debug logging to verify env var is being read
-  console.log("[SKIP EMAIL DEBUG] Checking SKIP_EMAIL_SENDING:", {
-    value: skipEmailSendingEnv,
+  logger.debug("Checked SKIP_EMAIL_SENDING", {
+    hasValue: skipEmailSendingEnv !== undefined,
     willSkip: skipEmailSending,
-    allEnvKeys: Object.keys(Deno.env.toObject()).filter((k) =>
-      k.includes("SKIP") || k.includes("RESEND")
-    ),
   });
 
   if (skipEmailSending) {
-    console.log("[SKIP EMAIL] Email sending skipped for integration tests", {
+    logger.info("Email sending skipped for integration tests", {
+      emailType: "invoice",
       invoiceNumber: data.invoiceNumber,
-      recipients: data.recipientEmails,
+      recipientCount: data.recipientEmails?.length ?? 0,
     });
     // Return success without actually sending
     return { success: true, emailId: `mock-email-${Date.now()}` };
@@ -743,7 +735,7 @@ export async function sendInvoiceEmail(
   // Validate all recipient emails
   for (const email of data.recipientEmails) {
     if (!isValidEmail(email)) {
-      const error = `Invalid recipient email: ${email}`;
+      const error = "Invalid recipient email";
       if (throwOnError) {
         throw new Error(error);
       }
@@ -796,10 +788,10 @@ export async function sendInvoiceEmail(
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log("[TEST MODE] Invoice email redirected to test addresses", {
-      testRecipients,
-      originalRecipients: data.recipientEmails,
+    logger.info("Test mode: invoice email redirected", {
       invoiceNumber: data.invoiceNumber,
+      testRecipientCount: testRecipients.length,
+      originalRecipientCount: data.recipientEmails.length,
     });
   }
 
@@ -878,7 +870,7 @@ export async function sendInvoiceEmail(
 
   const requestBodyStr = JSON.stringify(requestBody);
   if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
-    console.error("Request body contains null values:", requestBodyStr);
+    logger.error("Request body contains null values");
     const error = "Request contains null values";
     if (throwOnError) {
       throw new Error(error);
@@ -892,7 +884,7 @@ export async function sendInvoiceEmail(
     fromEmail.includes("null") ||
     fromEmail.includes("undefined")
   ) {
-    console.error("Invalid fromEmail:", fromEmail);
+    logger.error("Invalid from email address");
     const error = "Invalid from email address";
     if (throwOnError) {
       throw new Error(error);
@@ -902,15 +894,15 @@ export async function sendInvoiceEmail(
 
   try {
     if (testMode) {
-      console.log("[TEST MODE] Sending invoice email to test addresses", {
+      logger.info("Sending invoice email (test mode)", {
         invoiceNumber: data.invoiceNumber,
-        testRecipients,
-        originalRecipients: data.recipientEmails,
+        testRecipientCount: testRecipients.length,
+        originalRecipientCount: data.recipientEmails.length,
       });
     } else {
-      console.log("Sending invoice email:", {
+      logger.info("Sending invoice email", {
         invoiceNumber: data.invoiceNumber,
-        recipients: data.recipientEmails,
+        recipientCount: data.recipientEmails.length,
       });
     }
 
@@ -932,7 +924,7 @@ export async function sendInvoiceEmail(
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
@@ -966,25 +958,25 @@ export async function sendInvoiceEmail(
 
     if (emailId) {
       if (testMode) {
-        console.log("[TEST MODE] Invoice email sent to test addresses", {
+        logger.info("Invoice email sent (test mode)", {
           mode: "test",
           emailType: "invoice",
-          testRecipients,
-          originalRecipients: data.recipientEmails,
+          testRecipientCount: testRecipients.length,
+          originalRecipientCount: data.recipientEmails.length,
           invoiceNumber: data.invoiceNumber,
           emailId,
           timestamp: new Date().toISOString(),
         });
       } else {
-        console.log("Invoice email sent successfully:", emailId);
+        logger.info("Invoice email sent", { emailId, invoiceNumber: data.invoiceNumber });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true }; // Consider it successful even without ID
     }
   } catch (error) {
-    console.error("Failed to send invoice email:", error);
+    logger.error("Failed to send invoice email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send invoice email";
@@ -1003,6 +995,7 @@ export async function sendPaymentConfirmationEmail(
   data: PaymentConfirmationEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendPaymentConfirmationEmail" });
   // Validate configuration
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -1025,7 +1018,7 @@ export async function sendPaymentConfirmationEmail(
   // Validate all recipient emails
   for (const email of data.recipientEmails) {
     if (!isValidEmail(email)) {
-      const error = `Invalid recipient email: ${email}`;
+      const error = "Invalid recipient email";
       if (throwOnError) {
         throw new Error(error);
       }
@@ -1072,14 +1065,12 @@ export async function sendPaymentConfirmationEmail(
   const skipEmailSending = skipEmailSendingEnv === "true";
 
   if (skipEmailSending) {
-    console.log(
-      "[SKIP EMAIL] Payment confirmation email sending skipped for integration tests",
-      {
-        invoiceNumber: data.invoiceNumber,
-        transactionId: data.transactionId,
-        recipients: data.recipientEmails,
-      },
-    );
+    logger.info("Email sending skipped for integration tests", {
+      emailType: "payment_confirmation",
+      invoiceNumber: data.invoiceNumber,
+      transactionId: data.transactionId,
+      recipientCount: data.recipientEmails?.length ?? 0,
+    });
     // Return success without actually sending
     return { success: true, emailId: `mock-payment-email-${Date.now()}` };
   }
@@ -1098,15 +1089,12 @@ export async function sendPaymentConfirmationEmail(
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log(
-      "[TEST MODE] Payment confirmation email redirected to test addresses",
-      {
-        testRecipients,
-        originalRecipients: data.recipientEmails,
-        invoiceNumber: data.invoiceNumber,
-        transactionId: data.transactionId,
-      },
-    );
+    logger.info("Test mode: payment confirmation email redirected", {
+      invoiceNumber: data.invoiceNumber,
+      transactionId: data.transactionId,
+      testRecipientCount: testRecipients.length,
+      originalRecipientCount: data.recipientEmails.length,
+    });
   }
 
   // Build email HTML with receipt-style layout
@@ -1214,7 +1202,7 @@ export async function sendPaymentConfirmationEmail(
 
   const requestBodyStr = JSON.stringify(requestBody);
   if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
-    console.error("Request body contains null values:", requestBodyStr);
+    logger.error("Request body contains null values");
     const error = "Request contains null values";
     if (throwOnError) {
       throw new Error(error);
@@ -1228,7 +1216,7 @@ export async function sendPaymentConfirmationEmail(
     fromEmail.includes("null") ||
     fromEmail.includes("undefined")
   ) {
-    console.error("Invalid fromEmail:", fromEmail);
+    logger.error("Invalid from email address");
     const error = "Invalid from email address";
     if (throwOnError) {
       throw new Error(error);
@@ -1238,20 +1226,17 @@ export async function sendPaymentConfirmationEmail(
 
   try {
     if (testMode) {
-      console.log(
-        "[TEST MODE] Sending payment confirmation email to test addresses",
-        {
-          invoiceNumber: data.invoiceNumber,
-          transactionId: data.transactionId,
-          testRecipients,
-          originalRecipients: data.recipientEmails,
-        },
-      );
-    } else {
-      console.log("Sending payment confirmation email:", {
+      logger.info("Sending payment confirmation email (test mode)", {
         invoiceNumber: data.invoiceNumber,
         transactionId: data.transactionId,
-        recipients: data.recipientEmails,
+        testRecipientCount: testRecipients.length,
+        originalRecipientCount: data.recipientEmails.length,
+      });
+    } else {
+      logger.info("Sending payment confirmation email", {
+        invoiceNumber: data.invoiceNumber,
+        transactionId: data.transactionId,
+        recipientCount: data.recipientEmails.length,
       });
     }
 
@@ -1273,7 +1258,7 @@ export async function sendPaymentConfirmationEmail(
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
@@ -1308,29 +1293,30 @@ export async function sendPaymentConfirmationEmail(
 
     if (emailId) {
       if (testMode) {
-        console.log(
-          "[TEST MODE] Payment confirmation email sent to test addresses",
-          {
-            mode: "test",
-            emailType: "payment",
-            testRecipients,
-            originalRecipients: data.recipientEmails,
-            invoiceNumber: data.invoiceNumber,
-            transactionId: data.transactionId,
-            emailId,
-            timestamp: new Date().toISOString(),
-          },
-        );
+        logger.info("Payment confirmation email sent (test mode)", {
+          mode: "test",
+          emailType: "payment",
+          testRecipientCount: testRecipients.length,
+          originalRecipientCount: data.recipientEmails.length,
+          invoiceNumber: data.invoiceNumber,
+          transactionId: data.transactionId,
+          emailId,
+          timestamp: new Date().toISOString(),
+        });
       } else {
-        console.log("Payment confirmation email sent successfully:", emailId);
+        logger.info("Payment confirmation email sent", {
+          emailId,
+          invoiceNumber: data.invoiceNumber,
+          transactionId: data.transactionId,
+        });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true }; // Consider it successful even without ID
     }
   } catch (error) {
-    console.error("Failed to send payment confirmation email:", error);
+    logger.error("Failed to send payment confirmation email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send payment confirmation email";
@@ -1348,6 +1334,7 @@ export async function sendAdminInvoiceNotificationEmail(
   data: AdminInvoiceNotificationData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendAdminInvoiceNotificationEmail" });
   // Validate configuration
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -1370,7 +1357,7 @@ export async function sendAdminInvoiceNotificationEmail(
   // Validate all recipient emails
   for (const email of data.recipientEmails) {
     if (!isValidEmail(email)) {
-      const error = `Invalid recipient email: ${email}`;
+      const error = "Invalid recipient email";
       if (throwOnError) {
         throw new Error(error);
       }
@@ -1383,14 +1370,11 @@ export async function sendAdminInvoiceNotificationEmail(
   const skipEmailSending = skipEmailSendingEnv === "true";
 
   if (skipEmailSending) {
-    console.log(
-      "[SKIP EMAIL] Admin invoice notification email skipped",
-      {
-        organizationName: data.organizationName,
-        invoiceCount: data.invoiceCount,
-        recipients: data.recipientEmails,
-      },
-    );
+    logger.info("Email sending skipped for integration tests", {
+      emailType: "admin_invoice_notification",
+      invoiceCount: data.invoiceCount,
+      recipientCount: data.recipientEmails?.length ?? 0,
+    });
     return { success: true, emailId: `mock-admin-notification-${Date.now()}` };
   }
 
@@ -1520,14 +1504,11 @@ This is an automated notification from ${data.organizationName}.
 
   try {
     if (testMode) {
-      console.log(
-        "[TEST MODE] Sending admin notification email to test addresses",
-        {
-          testRecipients,
-          originalRecipients: data.recipientEmails,
-          invoiceCount: data.invoiceCount,
-        },
-      );
+      logger.info("Sending admin invoice notification email (test mode)", {
+        invoiceCount: data.invoiceCount,
+        testRecipientCount: testRecipients.length,
+        originalRecipientCount: data.recipientEmails.length,
+      });
     }
 
     const res = await fetch("https://api.resend.com/emails", {
@@ -1548,7 +1529,7 @@ This is an automated notification from ${data.organizationName}.
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
@@ -1582,28 +1563,28 @@ This is an automated notification from ${data.organizationName}.
 
     if (emailId) {
       if (testMode) {
-        console.log(
-          "[TEST MODE] Admin notification email sent to test addresses",
-          {
-            mode: "test",
-            emailType: "admin_notification",
-            testRecipients,
-            originalRecipients: data.recipientEmails,
-            invoiceCount: data.invoiceCount,
-            emailId,
-            timestamp: new Date().toISOString(),
-          },
-        );
+        logger.info("Admin invoice notification email sent (test mode)", {
+          mode: "test",
+          emailType: "admin_notification",
+          testRecipientCount: testRecipients.length,
+          originalRecipientCount: data.recipientEmails.length,
+          invoiceCount: data.invoiceCount,
+          emailId,
+          timestamp: new Date().toISOString(),
+        });
       } else {
-        console.log("Admin notification email sent successfully:", emailId);
+        logger.info("Admin invoice notification email sent", {
+          emailId,
+          invoiceCount: data.invoiceCount,
+        });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true };
     }
   } catch (error) {
-    console.error("Failed to send admin notification email:", error);
+    logger.error("Failed to send admin invoice notification email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send admin notification email";
@@ -1622,14 +1603,16 @@ export async function sendInvoiceReminderEmail(
   data: InvoiceReminderEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendInvoiceReminderEmail" });
   // Check if email sending should be skipped
   const skipEmailSendingEnv = Deno.env.get("SKIP_EMAIL_SENDING");
   const skipEmailSending = skipEmailSendingEnv === "true";
 
   if (skipEmailSending) {
-    console.log("[SKIP EMAIL] Invoice reminder email skipped for integration tests", {
+    logger.info("Email sending skipped for integration tests", {
+      emailType: "invoice_reminder",
       invoiceNumber: data.invoiceNumber,
-      recipients: data.recipientEmails,
+      recipientCount: data.recipientEmails?.length ?? 0,
     });
     return { success: true, emailId: `mock-reminder-email-${Date.now()}` };
   }
@@ -1656,7 +1639,7 @@ export async function sendInvoiceReminderEmail(
   // Validate all recipient emails
   for (const email of data.recipientEmails) {
     if (!isValidEmail(email)) {
-      const error = `Invalid recipient email: ${email}`;
+      const error = "Invalid recipient email";
       if (throwOnError) {
         throw new Error(error);
       }
@@ -1712,11 +1695,11 @@ export async function sendInvoiceReminderEmail(
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log("[TEST MODE] Invoice reminder email redirected to test addresses", {
-      testRecipients,
-      originalRecipients: data.recipientEmails,
+    logger.info("Test mode: invoice reminder email redirected", {
       invoiceNumber: data.invoiceNumber,
       daysOverdue: data.daysOverdue,
+      testRecipientCount: testRecipients.length,
+      originalRecipientCount: data.recipientEmails.length,
     });
   }
 
@@ -1805,7 +1788,7 @@ export async function sendInvoiceReminderEmail(
 
   const requestBodyStr = JSON.stringify(requestBody);
   if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
-    console.error("Request body contains null values:", requestBodyStr);
+    logger.error("Request body contains null values");
     const error = "Request contains null values";
     if (throwOnError) {
       throw new Error(error);
@@ -1814,11 +1797,12 @@ export async function sendInvoiceReminderEmail(
   }
 
   try {
-    console.log("Sending invoice reminder email:", {
+    logger.info("Sending invoice reminder email", {
       invoiceNumber: data.invoiceNumber,
       daysOverdue: data.daysOverdue,
       reminderCount: data.reminderCount,
-      recipients: testMode ? testRecipients : data.recipientEmails,
+      recipientCount: testRecipients.length,
+      testMode,
     });
 
     const res = await fetch("https://api.resend.com/emails", {
@@ -1839,7 +1823,7 @@ export async function sendInvoiceReminderEmail(
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
@@ -1865,26 +1849,29 @@ export async function sendInvoiceReminderEmail(
 
     if (emailId) {
       if (testMode) {
-        console.log("[TEST MODE] Invoice reminder email sent to test addresses", {
+        logger.info("Invoice reminder email sent (test mode)", {
           mode: "test",
           emailType: "invoice_reminder",
-          testRecipients,
-          originalRecipients: data.recipientEmails,
+          testRecipientCount: testRecipients.length,
+          originalRecipientCount: data.recipientEmails.length,
           invoiceNumber: data.invoiceNumber,
           daysOverdue: data.daysOverdue,
           emailId,
           timestamp: new Date().toISOString(),
         });
       } else {
-        console.log("Invoice reminder email sent successfully:", emailId);
+        logger.info("Invoice reminder email sent", {
+          emailId,
+          invoiceNumber: data.invoiceNumber,
+        });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true };
     }
   } catch (error) {
-    console.error("Failed to send invoice reminder email:", error);
+    logger.error("Failed to send invoice reminder email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send invoice reminder email";
@@ -1915,6 +1902,7 @@ export async function sendAdminInvitationEmail(
   data: AdminInvitationEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
+  const logger = createLoggerWithoutRequest({ functionName: "sendAdminInvitationEmail" });
   // Validate configuration
   const configResult = validateEmailConfig();
   if (!configResult.valid || !configResult.config) {
@@ -1949,13 +1937,10 @@ export async function sendAdminInvitationEmail(
 
   // Log test mode redirection if enabled
   if (testMode) {
-    console.log(
-      "[TEST MODE] Admin invitation email redirected to test address",
-      {
-        testRecipient,
-        originalRecipient: data.email,
-      },
-    );
+    logger.info("Test mode: admin invitation email redirected", {
+      hasRecipient: Boolean(testRecipient),
+      hasOriginalRecipient: Boolean(data.email),
+    });
   }
 
   const userName = data.firstName
@@ -2017,7 +2002,7 @@ export async function sendAdminInvitationEmail(
   }
 
   try {
-    console.log("Sending admin invitation email to:", data.email);
+    logger.info("Sending admin invitation email", { hasRecipient: Boolean(data.email) });
 
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -2037,7 +2022,7 @@ export async function sendAdminInvitationEmail(
         errorBody = { message: errorText };
       }
 
-      console.error("Resend API error:", {
+      logger.error("Resend API error", undefined, {
         status: res.status,
         statusText: res.statusText,
         error: errorBody,
@@ -2063,23 +2048,21 @@ export async function sendAdminInvitationEmail(
 
     if (emailId) {
       if (testMode) {
-        console.log("[TEST MODE] Admin invitation email sent successfully:", {
+        logger.info("Admin invitation email sent (test mode)", {
           emailType: "admin_invitation",
-          testRecipient,
-          originalRecipient: data.email,
           emailId,
           timestamp: new Date().toISOString(),
         });
       } else {
-        console.log("Admin invitation email sent successfully:", emailId);
+        logger.info("Admin invitation email sent", { emailId });
       }
       return { success: true, emailId };
     } else {
-      console.warn("Resend response missing ID:", emailResponse);
+      logger.warn("Resend response missing ID");
       return { success: true };
     }
   } catch (error) {
-    console.error("Failed to send admin invitation email:", error);
+    logger.error("Failed to send admin invitation email", error);
     const errorMessage = error instanceof Error
       ? error.message
       : "Failed to send admin invitation email";

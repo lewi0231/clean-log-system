@@ -8,10 +8,12 @@ import {
   DEFAULT_SERVICE_ADDRESS_CONFIG,
   getDefaultInvoiceTemplateConfig,
 } from "../_utils/invoice-template-defaults.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "get-invoice-template-config" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -72,7 +74,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Get invoice template config error:", error);
+    logger.error("Get invoice template config error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to get invoice template config",
     );

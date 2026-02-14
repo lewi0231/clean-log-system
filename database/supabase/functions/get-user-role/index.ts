@@ -6,9 +6,11 @@ import {
   getOrganizationIdFromWorker,
 } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req: Request) => {
+  const logger = createLogger(req, { functionName: "get-user-role" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -90,7 +92,7 @@ serve(async (req: Request) => {
       user_type: null,
     });
   } catch (error) {
-    console.error("Get user role error:", error);
+    logger.error("Get user role error", error);
     return errorResponse(
       error instanceof Error ? error.message : "Failed to get user role"
     );

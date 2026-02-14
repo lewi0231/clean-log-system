@@ -1,8 +1,10 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "get-worker" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -68,7 +70,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Get worker invitation error:", error);
+    logger.error("Get worker invitation error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to fetch invitation"
     );

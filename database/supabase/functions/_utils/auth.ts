@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAnonClient, createServiceRoleClient } from "./supabase.ts";
+import { createLoggerWithoutRequest } from "./logger.ts";
 
 /**
  * Extract Bearer token from request authorization header
@@ -21,9 +22,10 @@ export function extractAuthToken(req: Request): string | null {
 export async function getAuthUser(
   token: string,
 ): Promise<{ id: string; email?: string } | null> {
+  const logger = createLoggerWithoutRequest({ functionName: "getAuthUser" });
   const supabaseAnon = createAnonClient();
   if (!supabaseAnon) {
-    console.warn("SUPABASE_ANON_KEY not available, cannot verify token");
+    logger.warn("SUPABASE_ANON_KEY not available, cannot verify token");
     return null;
   }
 
@@ -39,7 +41,7 @@ export async function getAuthUser(
 
     return { id: user.id, email: user.email };
   } catch (error) {
-    console.error("Error verifying auth token:", error);
+    logger.error("Error verifying auth token", error);
     return null;
   }
 }

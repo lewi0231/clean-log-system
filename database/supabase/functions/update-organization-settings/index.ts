@@ -490,7 +490,9 @@ serve(async (req) => {
 
     // Don't throw if settings don't exist
     if (orgSettingsError && orgSettingsError.code !== "PGRST116") {
-      console.warn("Error fetching organization_settings", orgSettingsError);
+      logger.warn("Error fetching organization_settings", {
+        error: orgSettingsError.message,
+      });
     }
 
     // Parse rating_config with default fallback
@@ -553,7 +555,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("Update organization settings error:", error);
+    logger.error("Update organization settings error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to update organization settings",
     );

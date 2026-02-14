@@ -5,6 +5,7 @@ import {
   verifyOrganizationMembership,
 } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -15,6 +16,7 @@ interface ListWorkerPaymentsRequest {
 }
 
 serve(async (req: Request) => {
+  const logger = createLogger(req, { functionName: "list-worker-payments" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -73,7 +75,7 @@ serve(async (req: Request) => {
       .eq("organization_id", organization_id);
 
     if (countError) {
-      console.error("Error counting payment batches:", countError);
+      logger.warn("Error counting payment batches", { error: countError.message });
     }
 
     // Fetch payment batches with related payments (with pagination)
@@ -205,7 +207,7 @@ serve(async (req: Request) => {
       hasMore,
     });
   } catch (error) {
-    console.error("List worker payments error:", error);
+    logger.error("List worker payments error", error);
     return errorResponse(
       error instanceof Error ? error.message : "Failed to list worker payments",
     );

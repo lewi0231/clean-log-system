@@ -5,6 +5,7 @@ import {
   sendEmailVerificationEmail,
 } from "../_utils/email.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -46,6 +47,7 @@ async function ensureUniqueOrgCode(
 }
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "register-organization" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -117,10 +119,9 @@ serve(async (req) => {
       });
 
     if (verificationLinkError) {
-      console.error(
-        "Failed to generate verification link:",
-        verificationLinkError,
-      );
+      logger.warn("Failed to generate verification link", {
+        error: verificationLinkError.message,
+      });
       // Don't fail registration if link generation fails - user can request resend later
     } else if (linkData?.properties?.action_link) {
       // 4. Send verification email
@@ -165,7 +166,7 @@ serve(async (req) => {
         `Your organization code is: ${orgCode}. Give this to your employees for mobile app login.`,
     });
   } catch (error) {
-    console.error("Registration error:", error);
+    logger.error("Registration error", error);
     return errorResponse(
       error instanceof Error ? error : "Registration failed",
     );

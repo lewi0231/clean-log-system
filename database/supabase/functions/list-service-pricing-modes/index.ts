@@ -1,11 +1,14 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  const logger = createLogger(req, { functionName: "list-service-pricing-modes" });
 
   try {
     const body = await req.json();
@@ -76,7 +79,7 @@ serve(async (req) => {
       service_pricing_modes: servicePricingModes || [],
     });
   } catch (error) {
-    console.error("List service pricing modes error:", error);
+    logger.error("List service pricing modes error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to list service pricing modes",
     );

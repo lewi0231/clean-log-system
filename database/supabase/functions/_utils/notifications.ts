@@ -4,6 +4,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { createLoggerWithoutRequest } from "./logger.ts";
 
 export type NotificationType =
   | "worker_active"
@@ -40,6 +41,7 @@ export async function createNotification(
   supabase: SupabaseClient,
   params: CreateNotificationParams,
 ): Promise<CreateNotificationResult> {
+  const logger = createLoggerWithoutRequest({ functionName: "createNotification" });
   try {
     // If receiver_id is not specified, create notifications for all admins
     if (!params.receiver_id) {
@@ -54,7 +56,7 @@ export async function createNotification(
       }
 
       if (!admins || admins.length === 0) {
-        console.debug("[createNotification] No admins/owners found for org", {
+        logger.debug("No admins/owners found for org", {
           organization_id: params.organization_id,
           type: params.type,
         });
@@ -77,7 +79,7 @@ export async function createNotification(
         .insert(notifications);
 
       if (error) {
-        console.warn("[createNotification] Insert failed", {
+        logger.warn("Insert failed", {
           organization_id: params.organization_id,
           type: params.type,
           error: error.message,
@@ -85,11 +87,10 @@ export async function createNotification(
         return { success: false, error: error.message };
       }
 
-      console.debug("[createNotification] Created for admins", {
+      logger.debug("Created notifications for admins", {
         organization_id: params.organization_id,
         type: params.type,
         notificationCount: notifications.length,
-        receiver_ids: notifications.map((n) => n.receiver_id),
       });
       return { success: true, notificationCount: notifications.length };
     } else {

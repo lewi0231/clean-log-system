@@ -1,10 +1,12 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createNotification } from "../_utils/notifications.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "accept-worker-invitation" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -78,7 +80,7 @@ serve(async (req) => {
         .eq("id", invitation.worker.id);
 
       if (updateError) {
-        console.error("Update worker error:", updateError);
+        logger.error("Update worker error", undefined, { error: updateError.message });
         return errorResponse("Failed to update worker", 500);
       }
 
@@ -92,7 +94,7 @@ serve(async (req) => {
         .eq("id", invitation_token);
 
       if (acceptError) {
-        console.error("Accept invitation error:", acceptError);
+        logger.error("Accept invitation error", undefined, { error: acceptError.message });
         return errorResponse("Failed to mark invitation as accepted", 500);
       }
 
@@ -119,7 +121,9 @@ serve(async (req) => {
 
       if (!notificationResult.success) {
         // Log but don't fail the request - notification is non-critical
-        console.warn("Failed to create notification:", notificationResult.error);
+        logger.warn("Failed to create notification", {
+          error: notificationResult.error,
+        });
       }
 
       return jsonResponse({
@@ -131,7 +135,7 @@ serve(async (req) => {
         },
       });
     } catch (error) {
-      console.error("Accept invitation error:", error);
+      logger.error("Accept invitation error", error);
       return errorResponse(
         error instanceof Error ? error : "Failed to accept invitation",
       );

@@ -1,9 +1,11 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "list-field-configs" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -111,7 +113,7 @@ serve(async (req) => {
       field_configs: sanitized,
     });
   } catch (error) {
-    console.error("List field configs error:", error);
+    logger.error("List field configs error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to list field configs",
     );

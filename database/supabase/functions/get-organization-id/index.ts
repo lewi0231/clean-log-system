@@ -7,9 +7,11 @@ import {
   getOrganizationUserByEmail,
 } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "get-organization-id" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -21,9 +23,9 @@ serve(async (req) => {
     try {
       const body = await req.json();
       email = (body.email as string) || null;
-      console.log("[get-organization-id] Email from body:", email);
+      logger.debug("Parsed body email presence", { hasEmail: !!email });
     } catch {
-      console.log("[get-organization-id] No body or failed to parse");
+      logger.debug("No JSON body or failed to parse");
     }
 
     // Try to get auth user from token
@@ -32,20 +34,21 @@ serve(async (req) => {
     let authEmail: string | null = null;
 
     if (token) {
-      console.log("[get-organization-id] Token found, validating...");
+      logger.debug("Auth token found; validating");
       const authUser = await getAuthUser(token);
       if (authUser) {
         authUserId = authUser.id;
         authEmail = authUser.email ?? null;
-        console.log("[get-organization-id] Auth user found:", {
-          id: authUserId,
-          email: authEmail,
+        // Never log user email/token; only presence flags and IDs.
+        logger.debug("Auth user found", {
+          authUserId,
+          hasEmail: !!authEmail,
         });
       } else {
-        console.log("[get-organization-id] Token validation failed");
+        logger.warn("Auth token validation failed");
       }
     } else {
-      console.log("[get-organization-id] No auth token in request");
+      logger.debug("No auth token in request");
     }
 
     // Use email from body, or fall back to auth email
@@ -55,27 +58,23 @@ serve(async (req) => {
     let organizationId: string | null = null;
     if (lookupEmail) {
       organizationId = await getOrganizationIdFromAdmin(supabase, lookupEmail);
-      console.log(
-        "[get-organization-id] Admin lookup by email:",
-        lookupEmail,
-        "->",
-        organizationId,
-      );
+      logger.debug("Admin lookup attempted", {
+        hasLookupEmail: true,
+        foundOrganizationId: !!organizationId,
+      });
     }
 
     // Strategy 2: Try worker by auth_user_id
     if (!organizationId && authUserId) {
       organizationId = await getOrganizationIdFromWorker(supabase, authUserId);
-      console.log(
-        "[get-organization-id] Worker lookup by auth_user_id:",
+      logger.debug("Worker lookup attempted", {
         authUserId,
-        "->",
-        organizationId,
-      );
+        foundOrganizationId: !!organizationId,
+      });
     }
 
     if (!organizationId) {
-      console.log("[get-organization-id] Organization not found");
+      logger.warn("Organization not found");
       return errorResponse("Organization not found", 404);
     }
 
@@ -93,15 +92,15 @@ serve(async (req) => {
         organizationUserId = orgUser.id;
         role = orgUser.role;
       }
-      console.log("[get-organization-id] OrgUser lookup:", {
-        organizationUserId,
+      logger.debug("Org user lookup completed", {
+        hasOrganizationUserId: !!organizationUserId,
         role,
       });
     }
 
-    console.log("[get-organization-id] Success:", {
-      organization_id: organizationId,
-      organization_user_id: organizationUserId,
+    logger.info("Resolved organization context", {
+      organizationId,
+      hasOrganizationUserId: !!organizationUserId,
       role,
     });
 
@@ -111,7 +110,7 @@ serve(async (req) => {
       role: role,
     });
   } catch (error) {
-    console.error("[get-organization-id] Error:", error);
+    logger.error("Unhandled error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to get organization ID",
     );

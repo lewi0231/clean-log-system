@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -99,6 +100,8 @@ serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  const logger = createLogger(req, { functionName: "list-pricing-history" });
+
   try {
     const body = (await req.json()) as ListPricingHistoryRequest;
     const validation = validateRequiredFields(body, ["organization_id"]);
@@ -156,8 +159,7 @@ serve(async (req: Request) => {
     const { data: auditEntries, error: auditError } = await query;
 
     if (auditError) {
-      console.error("Error querying pricing_rule_audit:", {
-        error: auditError,
+      logger.error("Error querying pricing_rule_audit", undefined, {
         message: auditError.message,
         code: auditError.code,
         hint: auditError.hint,
@@ -411,7 +413,10 @@ serve(async (req: Request) => {
             userEmailMap.set(userId, user.user.email);
           }
         } catch (error) {
-          console.warn(`Failed to look up user email for ${userId}:`, error);
+          logger.warn("Failed to look up user email", {
+            hasUserId: Boolean(userId),
+            error: error instanceof Error ? error.message : String(error),
+          });
           // Continue with other users
         }
       }
@@ -435,29 +440,6 @@ serve(async (req: Request) => {
 
       // Determine the price values
       const getPrice = (data: PricingData | null): number | null => {
-        fetch(
-          "http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              location: "list-pricing-history/index.ts:436",
-              message: "getPrice called",
-              data: {
-                hasData: !!data,
-                basePrice: data?.base_price,
-                basePriceType: typeof data?.base_price,
-                pricingType: data?.pricing_type,
-                percentageRate: data?.percentage_rate,
-              },
-              timestamp: Date.now(),
-              sessionId: "debug-session",
-              runId: "run1",
-              hypothesisId: "A",
-            }),
-          },
-        ).catch(() => {});
-        // #endregion
         if (!data) return null;
         // For percentage pricing, use percentage_rate
         // Check explicitly for null/undefined, not truthy (0 is valid)
@@ -470,32 +452,6 @@ serve(async (req: Request) => {
         }
         // Otherwise use base_price
         // Check explicitly for null/undefined, not truthy (0 is valid)
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              location: "list-pricing-history/index.ts:443",
-              message: "base_price check (post-fix)",
-              data: {
-                basePrice: data.base_price,
-                basePriceNull: data.base_price === null,
-                basePriceUndefined: data.base_price === undefined,
-                willReturn:
-                  data.base_price !== null && data.base_price !== undefined
-                    ? Number(data.base_price)
-                    : null,
-              },
-              timestamp: Date.now(),
-              sessionId: "debug-session",
-              runId: "post-fix",
-              hypothesisId: "A",
-            }),
-          },
-        ).catch(() => {});
-        // #endregion
         return data.base_price !== null && data.base_price !== undefined
           ? Number(data.base_price)
           : null;
@@ -503,31 +459,6 @@ serve(async (req: Request) => {
 
       const oldPrice = getPrice(oldData);
       const newPrice = getPrice(newData);
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "list-pricing-history/index.ts:447",
-            message: "Price extraction results",
-            data: {
-              oldPrice,
-              newPrice,
-              oldPriceType: typeof oldPrice,
-              newPriceType: typeof newPrice,
-              oldDataBasePrice: oldData?.base_price,
-              newDataBasePrice: newData?.base_price,
-            },
-            timestamp: Date.now(),
-            sessionId: "debug-session",
-            runId: "run1",
-            hypothesisId: "A",
-          }),
-        },
-      ).catch(() => {});
-      // #endregion
 
       // Determine change type
       let changeType: "created" | "updated" | "expired" = "updated";
@@ -632,38 +563,6 @@ serve(async (req: Request) => {
         ? userEmailMap.get(changedByUserId as string) || undefined
         : undefined;
 
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "list-pricing-history/index.ts:545",
-            message: "Building history entry (post-fix)",
-            data: {
-              oldPrice,
-              newPrice,
-              // Fixed: Only use oldPrice as fallback for DELETE actions, not when newPrice is 0
-              fallbackNewPrice: newPrice !== null
-                ? newPrice
-                : changeType === "expired"
-                ? oldPrice ?? 0
-                : 0,
-              willUseOldPrice: newPrice === null &&
-                oldPrice !== null &&
-                changeType === "expired",
-              oldDataBasePrice: oldData?.base_price,
-              newDataBasePrice: newData?.base_price,
-            },
-            timestamp: Date.now(),
-            sessionId: "debug-session",
-            runId: "post-fix",
-            hypothesisId: "B",
-          }),
-        },
-      ).catch(() => {});
-      // #endregion
       return {
         id: entry.id.toString(),
         field_name: fieldName,
@@ -691,7 +590,6 @@ serve(async (req: Request) => {
       pricing_history: pricingHistory,
     });
   } catch (error) {
-    console.error("List pricing history error:", error);
     const errorMessage = error instanceof Error
       ? error.message
       : typeof error === "object" && error !== null && "message" in error
@@ -699,11 +597,7 @@ serve(async (req: Request) => {
       : typeof error === "string"
       ? error
       : "Failed to list pricing history";
-    console.error("Error details:", {
-      message: errorMessage,
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logger.error("List pricing history error", error, { message: errorMessage });
     return errorResponse(errorMessage, 500);
   }
 });

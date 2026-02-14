@@ -53,6 +53,7 @@ export interface AutoInvoiceOptions {
 export async function isAutoGenerateEnabled(
   supabaseAdmin: SupabaseClientType,
   organizationId: string,
+  logger?: AutoInvoiceOptions["logger"],
 ): Promise<boolean> {
   const { data: orgSettings, error } = await supabaseAdmin
     .from("organization_settings")
@@ -62,7 +63,10 @@ export async function isAutoGenerateEnabled(
 
   if (error) {
     // Log error but return false to be safe
-    console.error("Error checking auto_generate_invoices_immediately:", error);
+    logger?.warn("Error checking auto_generate_invoices_immediately", {
+      organizationId,
+      error: error.message,
+    });
     return false;
   }
 
@@ -236,6 +240,7 @@ export async function autoGenerateInvoiceForJob(
     const autoGenerateEnabled = await isAutoGenerateEnabled(
       supabaseAdmin,
       organizationId,
+      logger,
     );
 
     logger.debug("Checking auto-generate invoices setting", {

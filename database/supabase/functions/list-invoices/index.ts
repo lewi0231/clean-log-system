@@ -1,9 +1,11 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { listInvoicesSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
+  const logger = createLogger(req, { functionName: "list-invoices" });
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -113,7 +115,7 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error("List invoices error:", error);
+    logger.error("List invoices error", error);
     return errorResponse(
       error instanceof Error ? error : "Failed to list invoices",
     );

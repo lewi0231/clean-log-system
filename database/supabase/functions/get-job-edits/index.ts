@@ -1,13 +1,14 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
+import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req: Request) => {
-  console.log("📥 Get Job Edits: Request received", {
+  const logger = createLogger(req, { functionName: "get-job-edits" });
+  logger.debug("Request received", {
     method: req.method,
-    url: req.url,
     hasAuthHeader: !!req.headers.get("authorization"),
   });
 
@@ -19,7 +20,7 @@ serve(async (req: Request) => {
     const token = extractAuthToken(req);
 
     if (!token) {
-      console.error("❌ Get Job Edits: No authentication token provided");
+      logger.warn("No authentication token provided");
       return errorResponse("Authentication required", 401);
     }
 
@@ -29,17 +30,13 @@ serve(async (req: Request) => {
     const authUser = await getAuthUser(token);
 
     if (!authUser || !authUser.email) {
-      console.error(
-        "❌ Get Job Edits: User not found after token verification",
-      );
+      logger.warn("User not found after token verification");
       return errorResponse("User not found", 401);
     }
 
     const userEmail = authUser.email;
-    console.log("✅ Get Job Edits: Token verified", {
-      userId: authUser.id,
-      email: userEmail,
-    });
+    // Never log emails; the logger would mask them, but we avoid emitting them entirely.
+    logger.debug("Token verified", { userId: authUser.id });
 
     // Get organization_id from organization_user table
     const { data: orgUser, error: orgUserError } = await supabaseAdmin
@@ -49,21 +46,17 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (orgUserError) {
-      console.error("❌ Get Job Edits: Error fetching organization user", {
-        error: orgUserError.message,
-      });
+      logger.error("Error fetching organization user", orgUserError);
       throw orgUserError;
     }
 
     if (!orgUser) {
-      console.error("❌ Get Job Edits: Organization user not found", {
-        email: userEmail,
-      });
+      logger.warn("Organization user not found");
       return errorResponse("Organization user not found", 404);
     }
 
     const organizationId = orgUser.organization_id;
-    console.log("✅ Get Job Edits: Organization user found", {
+    logger.debug("Organization user found", {
       organizationId,
       role: orgUser.role,
     });
@@ -72,14 +65,10 @@ serve(async (req: Request) => {
     let body;
     try {
       body = await req.json();
-      console.log("📦 Get Job Edits: Request body parsed", {
-        hasJobId: !!body.job_id,
-      });
+      logger.debug("Request body parsed", { hasJobId: !!body.job_id });
     } catch (parseError) {
-      console.error("❌ Get Job Edits: Failed to parse request body", {
-        error: parseError instanceof Error
-          ? parseError.message
-          : String(parseError),
+      logger.warn("Failed to parse request body", {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
       });
       return errorResponse("Invalid request body", 400);
     }
@@ -101,14 +90,12 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (jobError) {
-      console.error("❌ Get Job Edits: Error fetching job", {
-        error: jobError.message,
-      });
+      logger.error("Error fetching job", jobError);
       throw jobError;
     }
 
     if (!job) {
-      console.error("❌ Get Job Edits: Job not found or access denied", {
+      logger.warn("Job not found or access denied", {
         jobId: job_id,
         organizationId,
       });
@@ -129,14 +116,10 @@ serve(async (req: Request) => {
     if (editsError) {
       // Log error but don't fail - return empty array instead
       // This allows the feature to work even if migration hasn't been run
-      console.warn(
-        "⚠️ Get Job Edits: Error fetching edit history (returning empty array)",
-        {
-          error: editsError.message,
-          code: editsError.code,
-          hint: editsError.hint,
-        },
-      );
+      logger.warn("Error fetching edit history; returning empty array", {
+        error: editsError.message,
+        code: editsError.code,
+      });
 
       // Return empty array instead of failing
       return jsonResponse({
@@ -145,7 +128,7 @@ serve(async (req: Request) => {
       });
     }
 
-    console.log("✅ Get Job Edits: Edit history fetched successfully", {
+    logger.debug("Edit history fetched", {
       jobId: job_id,
       editCount: edits?.length || 0,
     });
@@ -155,10 +138,7 @@ serve(async (req: Request) => {
       edits: edits || [],
     });
   } catch (error) {
-    console.error("❌ Get Job Edits: Unhandled error", {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logger.error("Unhandled error", error);
 
     const errorMessage = error instanceof Error
       ? error.message
