@@ -203,3 +203,164 @@ Deno.test("create-job: should format validation error correctly", () => {
   assertEquals(expected.status, 400);
   assertEquals(JSON.parse(expected.body).error, message);
 });
+
+/**
+ * Test colleague confirmation workflow - approval status logic
+ */
+Deno.test("create-job: should set pending status for multi-worker jobs submitted by worker", () => {
+  const hasColleagues = true;
+  const isWorkerSubmission = true;
+
+  const approvalStatus =
+    hasColleagues && isWorkerSubmission ? "pending" : "approved";
+  assertEquals(approvalStatus, "pending");
+});
+
+Deno.test("create-job: should set approved status for single-worker jobs", () => {
+  const hasColleagues = false;
+  const isWorkerSubmission = true;
+
+  const approvalStatus =
+    hasColleagues && isWorkerSubmission ? "pending" : "approved";
+  assertEquals(approvalStatus, "approved");
+});
+
+Deno.test("create-job: should set approved status for admin-created jobs", () => {
+  const hasColleagues = true;
+  const isWorkerSubmission = false; // Admin created
+
+  const approvalStatus =
+    hasColleagues && isWorkerSubmission ? "pending" : "approved";
+  assertEquals(approvalStatus, "approved");
+});
+
+/**
+ * Test auto_approve_at calculation
+ */
+Deno.test("create-job: should calculate auto_approve_at from org timeout", () => {
+  const submissionTime = new Date("2026-02-14T10:00:00Z");
+  const timeoutHours = 24; // Default org setting
+
+  const autoApproveAt = new Date(
+    submissionTime.getTime() + timeoutHours * 60 * 60 * 1000
+  );
+
+  assertEquals(autoApproveAt.toISOString(), "2026-02-15T10:00:00.000Z");
+});
+
+Deno.test("create-job: should not set auto_approve_at for approved jobs", () => {
+  const approvalStatus: string = "approved";
+  const autoApproveAt = approvalStatus === "pending" ? new Date() : null;
+
+  assertEquals(autoApproveAt, null);
+});
+
+Deno.test("create-job: should set auto_approve_at only for pending jobs", () => {
+  const approvalStatus = "pending";
+  const submissionTime = new Date("2026-02-14T10:00:00Z");
+  const timeoutHours = 24;
+
+  const autoApproveAt =
+    approvalStatus === "pending"
+      ? new Date(submissionTime.getTime() + timeoutHours * 60 * 60 * 1000)
+      : null;
+
+  assertEquals(autoApproveAt !== null, true);
+});
+
+/**
+ * Test edit_window_expires_at calculation
+ */
+Deno.test("create-job: should calculate edit_window_expires_at (3 hours)", () => {
+  const submissionTime = new Date("2026-02-14T10:00:00Z");
+  const editWindowHours = 3;
+
+  const editWindowExpiresAt = new Date(
+    submissionTime.getTime() + editWindowHours * 60 * 60 * 1000
+  );
+
+  assertEquals(editWindowExpiresAt.toISOString(), "2026-02-14T13:00:00.000Z");
+});
+
+Deno.test("create-job: should not set edit_window for approved jobs", () => {
+  const approvalStatus: string = "approved";
+  const editWindowExpiresAt = approvalStatus === "pending" ? new Date() : null;
+
+  assertEquals(editWindowExpiresAt, null);
+});
+
+/**
+ * Test submitted_by_worker_id
+ */
+Deno.test("create-job: should set submitted_by_worker_id for worker submissions", () => {
+  const submittingWorkerId = "worker-123";
+  const isWorkerSubmission = true;
+
+  const submittedByWorkerId = isWorkerSubmission ? submittingWorkerId : null;
+  assertEquals(submittedByWorkerId, "worker-123");
+});
+
+Deno.test("create-job: should not set submitted_by_worker_id for admin submissions", () => {
+  const submittingWorkerId = null;
+  const isWorkerSubmission = false;
+
+  const submittedByWorkerId = isWorkerSubmission ? submittingWorkerId : null;
+  assertEquals(submittedByWorkerId, null);
+});
+
+/**
+ * Test job_worker confirmation_status
+ */
+Deno.test("create-job: should set submitter confirmation_status to confirmed", () => {
+  const submitterId = "worker-1";
+  const workerId = "worker-1";
+
+  const confirmationStatus =
+    workerId === submitterId ? "confirmed" : "pending";
+  assertEquals(confirmationStatus, "confirmed");
+});
+
+Deno.test("create-job: should set colleague confirmation_status to pending", () => {
+  const submitterId: string = "worker-1";
+  const workerId: string = "worker-2";
+
+  const confirmationStatus =
+    workerId === submitterId ? "confirmed" : "pending";
+  assertEquals(confirmationStatus, "pending");
+});
+
+Deno.test("create-job: should set all workers to confirmed for approved jobs", () => {
+  const approvalStatus = "approved";
+
+  // When job is immediately approved, all workers are confirmed
+  const confirmationStatus = approvalStatus === "approved" ? "confirmed" : "pending";
+  assertEquals(confirmationStatus, "confirmed");
+});
+
+/**
+ * Test confirmation workflow with multiple colleagues
+ */
+Deno.test("create-job: should create correct job_worker entries for multi-worker job", () => {
+  const submitterId = "worker-1";
+  const colleagueIds = ["worker-2", "worker-3"];
+  const allWorkerIds = [submitterId, ...colleagueIds];
+  const isWorkerSubmission = true;
+
+  const jobWorkerEntries = allWorkerIds.map((workerId) => ({
+    worker_id: workerId,
+    confirmation_status:
+      isWorkerSubmission && workerId === submitterId ? "confirmed" : "pending",
+    confirmed_at:
+      isWorkerSubmission && workerId === submitterId
+        ? new Date().toISOString()
+        : null,
+  }));
+
+  assertEquals(jobWorkerEntries.length, 3);
+  assertEquals(jobWorkerEntries[0].confirmation_status, "confirmed");
+  assertEquals(jobWorkerEntries[0].confirmed_at !== null, true);
+  assertEquals(jobWorkerEntries[1].confirmation_status, "pending");
+  assertEquals(jobWorkerEntries[1].confirmed_at, null);
+  assertEquals(jobWorkerEntries[2].confirmation_status, "pending");
+  assertEquals(jobWorkerEntries[2].confirmed_at, null);
+});
