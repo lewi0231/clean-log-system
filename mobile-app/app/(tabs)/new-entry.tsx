@@ -43,6 +43,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Switch,
   Text,
   View,
 } from "react-native";
@@ -173,6 +174,12 @@ export default function NewEntryScreen() {
   const [startTime, setStartTime] = useState<Date | undefined>(undefined);
   const [finishTime, setFinishTime] = useState<Date>(() => new Date());
 
+  // Per-worker time entry state
+  const [useIndividualTimes, setUseIndividualTimes] = useState(false);
+  const [workerTimes, setWorkerTimes] = useState<
+    Record<string, { startTime: Date | undefined; finishTime: Date | undefined }>
+  >({});
+
   const currentUserColleagueId = useMemo(() => {
     if (!user || !colleagues.length) return null;
     const currentUser = colleagues.find(
@@ -208,6 +215,46 @@ export default function NewEntryScreen() {
       setSelectedColleagues([currentUserColleagueId]);
     }
   }, [currentUserColleagueId]);
+
+  // Sync worker times when colleagues change or shared times change
+  useEffect(() => {
+    if (selectedColleagues.length > 0) {
+      setWorkerTimes((prev) => {
+        const updated = { ...prev };
+        selectedColleagues.forEach((id) => {
+          if (!updated[id]) {
+            // Initialize with shared times as default
+            updated[id] = {
+              startTime: startTime,
+              finishTime: finishTime,
+            };
+          }
+        });
+        // Remove times for colleagues no longer selected
+        Object.keys(updated).forEach((id) => {
+          if (!selectedColleagues.includes(id)) {
+            delete updated[id];
+          }
+        });
+        return updated;
+      });
+    }
+  }, [selectedColleagues, startTime, finishTime]);
+
+  // Handle individual worker time change
+  const handleWorkerTimeChange = (
+    workerId: string,
+    timeType: "startTime" | "finishTime",
+    value: Date | undefined
+  ) => {
+    setWorkerTimes((prev) => ({
+      ...prev,
+      [workerId]: {
+        ...prev[workerId],
+        [timeType]: value,
+      },
+    }));
+  };
 
   const organizedFields = useMemo(() => {
     const sectionMap = new Map<string | null, FieldConfig[]>();
@@ -262,31 +309,63 @@ export default function NewEntryScreen() {
 
     // Validate current step before proceeding
     if (currentStep === 0) {
-      // Step 0: Validate start time is required
-      if (!startTime) {
-        showAlert("Required Field", "Please select a start time to continue.");
-        return;
-      }
       // Validate location is required if predefined locations are enabled
       if (settings?.use_predefined_locations && !selectedLocation) {
         showAlert("Required Field", "Please select a location to continue.");
         return;
       }
-      // Validate finish time is not in the future
-      if (finishTime && finishTime > new Date()) {
-        showAlert(
-          "Invalid Time",
-          "Finish time cannot be in the future. Please select a valid finish time."
-        );
-        return;
-      }
-      // Validate start time is not after finish time
-      if (startTime && finishTime && startTime > finishTime) {
-        showAlert(
-          "Invalid Time",
-          "Start time cannot be after finish time. Please select a valid start time."
-        );
-        return;
+
+      // Validate times based on whether using individual times or shared times
+      if (useIndividualTimes && selectedColleagues.length > 1) {
+        // Validate per-worker times
+        for (const colleagueId of selectedColleagues) {
+          const times = workerTimes[colleagueId];
+          const colleagueName = getColleagueName(colleagueId);
+          const isCurrentUser = colleagueId === currentUserColleagueId;
+          const displayName = isCurrentUser ? "your" : `${colleagueName}'s`;
+
+          if (!times?.startTime) {
+            showAlert(
+              "Required Field",
+              `Please select ${displayName} start time to continue.`
+            );
+            return;
+          }
+          if (times.finishTime && times.finishTime > new Date()) {
+            showAlert(
+              "Invalid Time",
+              `${isCurrentUser ? "Your" : colleagueName + "'s"} finish time cannot be in the future.`
+            );
+            return;
+          }
+          if (times.startTime && times.finishTime && times.startTime > times.finishTime) {
+            showAlert(
+              "Invalid Time",
+              `${isCurrentUser ? "Your" : colleagueName + "'s"} start time cannot be after finish time.`
+            );
+            return;
+          }
+        }
+      } else {
+        // Validate shared times (original behavior)
+        if (!startTime) {
+          showAlert("Required Field", "Please select a start time to continue.");
+          return;
+        }
+        if (finishTime && finishTime > new Date()) {
+          showAlert(
+            "Invalid Time",
+            "Finish time cannot be in the future. Please select a valid finish time."
+          );
+          return;
+        }
+        if (startTime && finishTime && startTime > finishTime) {
+          showAlert(
+            "Invalid Time",
+            "Start time cannot be after finish time. Please select a valid start time."
+          );
+          return;
+        }
       }
       // Validate required fields in step 0 (fields with section_id === null)
       const basicInfoFields = organizedFields.get(null) || [];
@@ -383,12 +462,29 @@ export default function NewEntryScreen() {
       submissionData.location_id = selectedLocation;
     }
 
-    // Add start and finish times as ISO datetime strings (matching dashboard format)
-    if (startTime) {
-      submissionData.start_time = startTime.toISOString();
-    }
-    if (finishTime) {
-      submissionData.finish_time = finishTime.toISOString();
+    // Handle time entries based on toggle state
+    if (useIndividualTimes && selectedColleagues.length > 1) {
+      // Per-worker times - include worker_times array
+      submissionData.worker_times = selectedColleagues.map((workerId) => ({
+        worker_id: workerId,
+        start_time: workerTimes[workerId]?.startTime?.toISOString() || startTime?.toISOString(),
+        finish_time: workerTimes[workerId]?.finishTime?.toISOString() || finishTime?.toISOString(),
+      }));
+      // Also include shared times as fallback
+      if (startTime) {
+        submissionData.start_time = startTime.toISOString();
+      }
+      if (finishTime) {
+        submissionData.finish_time = finishTime.toISOString();
+      }
+    } else {
+      // Shared times for all workers (original behavior)
+      if (startTime) {
+        submissionData.start_time = startTime.toISOString();
+      }
+      if (finishTime) {
+        submissionData.finish_time = finishTime.toISOString();
+      }
     }
 
     if (!validateInputs(submissionData)) {
@@ -445,6 +541,8 @@ export default function NewEntryScreen() {
         setCurrentStep(0);
         setSelectedClusters({});
         setTouchedFields(new Set()); // Reset touched fields
+        setUseIndividualTimes(false); // Reset per-worker times toggle
+        setWorkerTimes({}); // Reset worker times
 
         // Show success alert and navigate after OK is clicked
         showSuccessAndNavigate("Entry submitted successfully!");
@@ -722,101 +820,219 @@ export default function NewEntryScreen() {
           </View>
         )}
 
-        {/* Start Time */}
-        <View>
-          <View className="mb-2">
-            <Text className="text-sm font-medium text-foreground">
-              What time did you start?
-              <Text className="text-destructive ml-1">*</Text>
-            </Text>
-          </View>
-          <View
-            className={`bg-card border rounded-xl h-12 justify-center ${
-              touchedFields.has("startTime") && !startTime
-                ? "border-destructive"
-                : "border-border"
-            }`}
-          >
-            <TimePicker
-              value={startTime}
-              onValueChange={(value) => {
-                setStartTime(value);
-                markFieldAsTouched("startTime");
-              }}
-              placeholder={
-                startTime
-                  ? `${startTime
-                      .getHours()
-                      .toString()
-                      .padStart(2, "0")}:${startTime
-                      .getMinutes()
-                      .toString()
-                      .padStart(2, "0")}`
-                  : "Select start time"
-              }
-              disabled={false}
-              className="bg-transparent border-0 h-12"
-              size="md"
+        {/* Per-worker times toggle - only show when 2+ colleagues selected */}
+        {selectedColleagues.length > 1 && (
+          <View className="flex-row items-center justify-between py-3 px-4 bg-card border border-border rounded-xl">
+            <View className="flex-1 mr-3">
+              <Text className="text-sm font-medium text-foreground">
+                Different times per colleague
+              </Text>
+              <Text className="text-xs text-muted-foreground mt-0.5">
+                Set individual start/finish times for each colleague
+              </Text>
+            </View>
+            <Switch
+              value={useIndividualTimes}
+              onValueChange={setUseIndividualTimes}
+              trackColor={{ false: "#767577", true: "rgb(37 99 235)" }}
+              thumbColor={useIndividualTimes ? "#fff" : "#f4f3f4"}
             />
           </View>
-          {startTime && (
-            <Text className="text-xs text-muted-foreground mt-1">
-              Tap to change
-            </Text>
-          )}
-          {touchedFields.has("startTime") && !startTime && (
-            <Text className="text-sm text-destructive mt-1">
-              Start time is required
-            </Text>
-          )}
-        </View>
+        )}
 
-        {/* Finish Time */}
-        <View>
-          <View className="mb-2">
-            <Text className="text-sm font-medium text-foreground">
-              What time did you finish?
-            </Text>
+        {/* Shared times section - show when NOT using individual times */}
+        {!useIndividualTimes && (
+          <>
+            {/* Start Time */}
+            <View>
+              <View className="mb-2">
+                <Text className="text-sm font-medium text-foreground">
+                  What time did you start?
+                  <Text className="text-destructive ml-1">*</Text>
+                </Text>
+              </View>
+              <View
+                className={`bg-card border rounded-xl h-12 justify-center ${
+                  touchedFields.has("startTime") && !startTime
+                    ? "border-destructive"
+                    : "border-border"
+                }`}
+              >
+                <TimePicker
+                  value={startTime}
+                  onValueChange={(value) => {
+                    setStartTime(value);
+                    markFieldAsTouched("startTime");
+                  }}
+                  placeholder={
+                    startTime
+                      ? `${startTime
+                          .getHours()
+                          .toString()
+                          .padStart(2, "0")}:${startTime
+                          .getMinutes()
+                          .toString()
+                          .padStart(2, "0")}`
+                      : "Select start time"
+                  }
+                  disabled={false}
+                  className="bg-transparent border-0 h-12"
+                  size="md"
+                />
+              </View>
+              {startTime && (
+                <Text className="text-xs text-muted-foreground mt-1">
+                  Tap to change
+                </Text>
+              )}
+              {touchedFields.has("startTime") && !startTime && (
+                <Text className="text-sm text-destructive mt-1">
+                  Start time is required
+                </Text>
+              )}
+            </View>
+
+            {/* Finish Time */}
+            <View>
+              <View className="mb-2">
+                <Text className="text-sm font-medium text-foreground">
+                  What time did you finish?
+                </Text>
+              </View>
+              <View
+                className={`bg-card border rounded-xl h-12 justify-center ${
+                  finishTime && finishTime > new Date()
+                    ? "border-destructive"
+                    : "border-border"
+                }`}
+              >
+                <TimePicker
+                  value={finishTime}
+                  onValueChange={(value) => {
+                    if (value) {
+                      setFinishTime(value);
+                    }
+                  }}
+                  placeholder={
+                    finishTime
+                      ? `${finishTime
+                          .getHours()
+                          .toString()
+                          .padStart(2, "0")}:${finishTime
+                          .getMinutes()
+                          .toString()
+                          .padStart(2, "0")}`
+                      : "Select finish time"
+                  }
+                  disabled={false}
+                  className="bg-transparent border-0 h-12"
+                  size="md"
+                />
+              </View>
+              <Text className="text-xs text-muted-foreground mt-1">
+                {finishTime ? "Tap to change" : "Defaults to current time"}
+              </Text>
+              {finishTime && finishTime > new Date() && (
+                <Text className="text-sm text-destructive mt-1">
+                  Finish time cannot be in the future
+                </Text>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* Per-worker time entries - show when using individual times */}
+        {useIndividualTimes && selectedColleagues.length > 1 && (
+          <View className="flex-col gap-4">
+            {selectedColleagues.map((colleagueId) => {
+              const colleagueName = getColleagueName(colleagueId);
+              const isCurrentUser = colleagueId === currentUserColleagueId;
+              const times = workerTimes[colleagueId] || {
+                startTime: startTime,
+                finishTime: finishTime,
+              };
+
+              return (
+                <View
+                  key={colleagueId}
+                  className="bg-card border border-border rounded-xl p-4"
+                >
+                  {/* Worker header */}
+                  <View className="flex-row items-center gap-2 mb-3 pb-2 border-b border-border/50">
+                    <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
+                      <Text className="text-sm font-semibold text-primary">
+                        {colleagueName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text className="text-base font-medium text-foreground">
+                      {isCurrentUser ? "You" : colleagueName}
+                    </Text>
+                  </View>
+
+                  {/* Start Time */}
+                  <View className="mb-3">
+                    <Text className="text-xs text-muted-foreground mb-1.5">
+                      Start time
+                    </Text>
+                    <View className="bg-background border border-border rounded-lg h-11 justify-center">
+                      <TimePicker
+                        value={times.startTime}
+                        onValueChange={(value) => {
+                          handleWorkerTimeChange(colleagueId, "startTime", value);
+                        }}
+                        placeholder={
+                          times.startTime
+                            ? `${times.startTime
+                                .getHours()
+                                .toString()
+                                .padStart(2, "0")}:${times.startTime
+                                .getMinutes()
+                                .toString()
+                                .padStart(2, "0")}`
+                            : "Select time"
+                        }
+                        disabled={false}
+                        className="bg-transparent border-0 h-11"
+                        size="sm"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Finish Time */}
+                  <View>
+                    <Text className="text-xs text-muted-foreground mb-1.5">
+                      Finish time
+                    </Text>
+                    <View className="bg-background border border-border rounded-lg h-11 justify-center">
+                      <TimePicker
+                        value={times.finishTime}
+                        onValueChange={(value) => {
+                          if (value) {
+                            handleWorkerTimeChange(colleagueId, "finishTime", value);
+                          }
+                        }}
+                        placeholder={
+                          times.finishTime
+                            ? `${times.finishTime
+                                .getHours()
+                                .toString()
+                                .padStart(2, "0")}:${times.finishTime
+                                .getMinutes()
+                                .toString()
+                                .padStart(2, "0")}`
+                            : "Select time"
+                        }
+                        disabled={false}
+                        className="bg-transparent border-0 h-11"
+                        size="sm"
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-          <View
-            className={`bg-card border rounded-xl h-12 justify-center ${
-              finishTime && finishTime > new Date()
-                ? "border-destructive"
-                : "border-border"
-            }`}
-          >
-            <TimePicker
-              value={finishTime}
-              onValueChange={(value) => {
-                if (value) {
-                  setFinishTime(value);
-                }
-              }}
-              placeholder={
-                finishTime
-                  ? `${finishTime
-                      .getHours()
-                      .toString()
-                      .padStart(2, "0")}:${finishTime
-                      .getMinutes()
-                      .toString()
-                      .padStart(2, "0")}`
-                  : "Select finish time"
-              }
-              disabled={false}
-              className="bg-transparent border-0 h-12"
-              size="md"
-            />
-          </View>
-          <Text className="text-xs text-muted-foreground mt-1">
-            {finishTime ? "Tap to change" : "Defaults to current time"}
-          </Text>
-          {finishTime && finishTime > new Date() && (
-            <Text className="text-sm text-destructive mt-1">
-              Finish time cannot be in the future
-            </Text>
-          )}
-        </View>
+        )}
       </View>
     );
   };

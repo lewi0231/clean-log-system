@@ -18,6 +18,8 @@ This document captures project-specific learnings that complement the universal 
 | 1   | Always use React Query (useQuery) for data fetching | react      | 2026-02-14 |
 | 2   | Real-time pattern: Supabase + React Query invalidation | real-time  | 2026-02-14 |
 | 3   | Job Colleague Confirmation Workflow | workflow   | 2026-02-14 |
+| 4   | Deno TypeScript Strict Literal Type Narrowing | typescript | 2026-02-14 |
+| 5   | Testing React Components with Tooltips in Vitest | testing    | 2026-02-14 |
 
 ---
 
@@ -152,6 +154,76 @@ Implemented a confirmation workflow with the following key design decisions:
 
 **Organization setting:**
 - `colleague_confirmation_timeout_hours` (1-168, default 24)
+
+---
+
+### 4. Deno TypeScript Strict Literal Type Narrowing
+
+**Date:** 2026-02-14  
+**Tag:** `typescript`
+
+**Context:**  
+When writing Deno tests for Supabase Edge Functions, TypeScript's strict type checking caused errors when comparing string literal values.
+
+**Learning:**  
+Deno's TypeScript compiler performs aggressive literal type narrowing. When you assign a string literal to a `const`, it becomes that specific literal type, not `string`. This causes TS2367 errors ("This comparison appears to be unintentional") when comparing two different literal values.
+
+**Don't:**
+```typescript
+// ❌ TypeScript narrows to literal types
+const status = "approved";
+const canProcess = status === "pending"; // TS2367: Types have no overlap
+```
+
+**Do:**
+```typescript
+// ✅ Explicitly type as string
+const status: string = "approved";
+const canProcess = status === "pending"; // Works
+
+// ✅ Or use type assertion in comparison
+const status = "approved";
+const canProcess = (status as string) === "pending"; // Works
+```
+
+**When to use each approach:**
+- Use `: string` type annotation when the variable will be compared multiple times
+- Use `as string` when you need a one-off comparison
+- This is only needed in tests where you're testing logic with different status values
+
+---
+
+### 5. Testing React Components with Tooltips in Vitest
+
+**Date:** 2026-02-14  
+**Tag:** `testing`
+
+**Context:**  
+Testing tooltip interactions in React components using `@testing-library/react` and Vitest was failing because JSDOM doesn't properly render tooltip content on hover.
+
+**Learning:**  
+Instead of testing tooltip content visibility (which requires complex async waiting and may not work in JSDOM), test for tooltip trigger presence:
+
+**Don't:**
+```typescript
+// ❌ Unreliable in JSDOM
+await user.hover(screen.getByText("Pending"));
+await waitFor(() => {
+  expect(screen.getByText("Tooltip content")).toBeInTheDocument();
+});
+```
+
+**Do:**
+```typescript
+// ✅ Test that tooltip trigger is properly configured
+const badge = screen.getByText("Pending").closest("div");
+expect(badge).toHaveAttribute("data-state"); // Radix tooltip marker
+```
+
+**Alternative approaches:**
+- Mock the tooltip component entirely
+- Use integration/E2E tests for tooltip content verification
+- Test the data passed to the tooltip rather than the rendered content
 
 ---
 
