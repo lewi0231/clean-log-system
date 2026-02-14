@@ -13,7 +13,15 @@ export type NotificationType =
   | "payment_received"
   | "review_submitted"
   | "admin_activated"
-  | "worker_created";
+  | "worker_created"
+  // Job colleague confirmation workflow types
+  | "job_confirmation_requested"
+  | "job_confirmation_reminder"
+  | "job_flagged"
+  | "job_withdrawn"
+  | "job_resolved_approved"
+  | "job_resolved_cancelled"
+  | "job_auto_approved";
 
 export interface CreateNotificationParams {
   organization_id: string;

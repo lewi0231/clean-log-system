@@ -3,7 +3,38 @@ import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { listJobsSchema, validateRequest } from "../_utils/zod-schemas.ts";
-import type { JobWorker, JobWorkerQueryResult, Worker } from "../types.ts";
+import type { Worker } from "../types.ts";
+
+// Extended types for confirmation workflow
+interface JobWorkerWithConfirmation {
+  job_id: string;
+  worker_id: string;
+  confirmation_status: "confirmed" | "pending" | "flagged";
+  confirmed_at: string | null;
+  flagged_at: string | null;
+  flag_reason: string | null;
+  worker: Worker | null;
+}
+
+interface JobWorkerQueryResultWithConfirmation {
+  job_id: string;
+  worker_id: string;
+  confirmation_status: "confirmed" | "pending" | "flagged";
+  confirmed_at: string | null;
+  flagged_at: string | null;
+  flag_reason: string | null;
+  worker:
+    | Worker
+    | Worker[]
+    | null;
+}
+
+interface WorkerWithConfirmation extends Worker {
+  confirmation_status: "confirmed" | "pending" | "flagged";
+  confirmed_at: string | null;
+  flagged_at: string | null;
+  flag_reason: string | null;
+}
 
 serve(async (req) => {
   const logger = createLogger(req, { functionName: "list-jobs" });
@@ -24,7 +55,7 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
-    // Fetch jobs with location info and invoice data
+    // Fetch jobs with location info, invoice data, and approval status
     let query = supabase
       .from("job")
       .select(
@@ -42,6 +73,10 @@ serve(async (req) => {
         submitted_by_email,
         last_updated_at,
         last_updated_by,
+        approval_status,
+        auto_approve_at,
+        edit_window_expires_at,
+        submitted_by_worker_id,
         location:location_id (
           id,
           name,
@@ -73,9 +108,9 @@ serve(async (req) => {
 
     if (jobsError) throw jobsError;
 
-    // Fetch all job_worker relationships for these jobs
+    // Fetch all job_worker relationships for these jobs with confirmation status
     const jobIds = jobs?.map((job) => job.id) || [];
-    let jobWorkers: JobWorker[] = [];
+    let jobWorkers: JobWorkerWithConfirmation[] = [];
 
     if (jobIds.length > 0) {
       const { data, error: jobWorkersError } = await supabase
@@ -83,6 +118,11 @@ serve(async (req) => {
         .select(
           `
           job_id,
+          worker_id,
+          confirmation_status,
+          confirmed_at,
+          flagged_at,
+          flag_reason,
           worker:worker_id (
             id,
             name,
@@ -97,22 +137,33 @@ serve(async (req) => {
 
       // Type assertion: Supabase may infer worker as array, but it's actually a single object
       // Each job_worker row has exactly one worker_id, so worker should be a single object
-      jobWorkers = ((data || []) as JobWorkerQueryResult[]).map((item) => ({
+      jobWorkers = ((data || []) as JobWorkerQueryResultWithConfirmation[]).map((item) => ({
         job_id: item.job_id,
+        worker_id: item.worker_id,
+        confirmation_status: item.confirmation_status,
+        confirmed_at: item.confirmed_at,
+        flagged_at: item.flagged_at,
+        flag_reason: item.flag_reason,
         worker: Array.isArray(item.worker)
           ? (item.worker[0] as Worker | null)
           : (item.worker as Worker | null),
       }));
     }
 
-    // Group workers by job_id
-    const workersByJobId = new Map<string, Worker[]>();
+    // Group workers by job_id, including confirmation status
+    const workersByJobId = new Map<string, WorkerWithConfirmation[]>();
     jobWorkers.forEach((jw) => {
       if (!workersByJobId.has(jw.job_id)) {
         workersByJobId.set(jw.job_id, []);
       }
       if (jw.worker) {
-        workersByJobId.get(jw.job_id)?.push(jw.worker);
+        workersByJobId.get(jw.job_id)?.push({
+          ...jw.worker,
+          confirmation_status: jw.confirmation_status,
+          confirmed_at: jw.confirmed_at,
+          flagged_at: jw.flagged_at,
+          flag_reason: jw.flag_reason,
+        });
       }
     });
 

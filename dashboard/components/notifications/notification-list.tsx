@@ -4,12 +4,16 @@ import type { Notification } from "@/lib/services/notification.service";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import {
+  AlertTriangle,
   Bell,
   CheckCircle2,
+  Clock,
   FileText,
   MessageSquare,
+  Trash2,
   User,
   Wallet,
+  XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -28,6 +32,14 @@ const notificationIcons: Record<Notification["type"], React.ReactNode> = {
   review_submitted: <MessageSquare className="h-4 w-4 text-amber-500" />,
   admin_activated: <User className="h-4 w-4 text-indigo-500" />,
   worker_created: <User className="h-4 w-4 text-teal-500" />,
+  // Job colleague confirmation workflow notifications
+  job_confirmation_requested: <Clock className="h-4 w-4 text-yellow-500" />,
+  job_confirmation_reminder: <Clock className="h-4 w-4 text-orange-500" />,
+  job_flagged: <AlertTriangle className="h-4 w-4 text-red-500" />,
+  job_withdrawn: <Trash2 className="h-4 w-4 text-gray-500" />,
+  job_resolved_approved: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+  job_resolved_cancelled: <XCircle className="h-4 w-4 text-red-500" />,
+  job_auto_approved: <CheckCircle2 className="h-4 w-4 text-blue-400" />,
 };
 
 export default function NotificationList({

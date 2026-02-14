@@ -114,6 +114,22 @@ export interface OrganizationSettings {
   gst_rate_percent: number;
 }
 
+// Job approval workflow types
+export type JobApprovalStatus = "approved" | "pending" | "flagged" | "cancelled";
+export type JobWorkerConfirmationStatus = "confirmed" | "pending" | "flagged";
+
+export interface JobWorkerWithConfirmation {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  // Confirmation workflow fields
+  confirmation_status: JobWorkerConfirmationStatus;
+  confirmed_at: string | null;
+  flagged_at: string | null;
+  flag_reason: string | null;
+}
+
 export interface Job {
   id: string;
   organization_id: string;
@@ -128,6 +144,11 @@ export interface Job {
   submitted_by_email?: string | null;
   last_updated_at?: string | null;
   last_updated_by?: string | null;
+  // Job approval workflow fields
+  approval_status?: JobApprovalStatus;
+  auto_approve_at?: string | null;
+  edit_window_expires_at?: string | null;
+  submitted_by_worker_id?: string | null;
   location: {
     id: string;
     name: string;
@@ -136,12 +157,7 @@ export interface Job {
     contact_person: string | null;
     phone: string | null;
   } | null;
-  workers: Array<{
-    id: string;
-    name: string;
-    email: string;
-    phone: string | null;
-  }>;
+  workers: JobWorkerWithConfirmation[];
   invoice_job?: Array<{
     invoice: {
       id: string;
