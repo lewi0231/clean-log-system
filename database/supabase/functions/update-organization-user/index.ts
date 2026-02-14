@@ -30,17 +30,39 @@ serve(async (req) => {
       return errorResponse("Organization user ID is required", 400);
     }
 
-    const { id, role } = body;
+    const { id, role, first_name, last_name, phone } = body;
 
-    const updateData: { role?: string } = {};
+    const updateData: {
+      role?: string;
+      first_name?: string;
+      last_name?: string;
+      phone?: string | null;
+    } = {};
 
     if (role !== undefined) {
-      // Validate role
       if (!validateRole(role)) {
         logger.warn("Invalid role provided", { role });
         return errorResponse("Invalid role. Must be 'admin' or 'viewer'", 400);
       }
       updateData.role = role;
+    }
+    if (first_name !== undefined) {
+      const val =
+        typeof first_name === "string" ? first_name.trim() : "";
+      updateData.first_name = val || null;
+    }
+    if (last_name !== undefined) {
+      const val =
+        typeof last_name === "string" ? last_name.trim() : "";
+      updateData.last_name = val || null;
+    }
+    if (phone !== undefined) {
+      updateData.phone =
+        phone === null || phone === ""
+          ? null
+          : typeof phone === "string"
+            ? phone.trim() || null
+            : null;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -102,7 +124,7 @@ serve(async (req) => {
     logger.info("Organization user updated successfully", {
       organization_user_id: id,
       organization_id: existingUser.organization_id,
-      new_role: role,
+      updated_fields: Object.keys(updateData),
     });
 
     return jsonResponse({

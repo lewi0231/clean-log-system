@@ -5,7 +5,7 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 async function getAuthUser(): Promise<User | null> {
   log.debug("useAuth: Fetching user...");
@@ -33,6 +33,7 @@ async function getAuthUser(): Promise<User | null> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
+  const isInitialMount = useRef(true);
 
   // Query for initial user state
   const query = useQuery({
@@ -44,19 +45,28 @@ export function useAuth() {
   });
 
   // Listen for auth state changes and invalidate the query
+  // Skip the initial event to prevent loops (React Query already fetches on mount)
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      // Skip the initial INITIAL_SESSION event - React Query handles the initial fetch
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        log.debug("useAuth: Skipping initial auth event", { event });
+        return;
+      }
+
       log.debug("useAuth: Auth state changed", {
         event,
         hasSession: !!session,
         userId: session?.user?.id,
       });
 
-      // Invalidate the auth query to refetch user data
+      // Invalidate the auth query to refetch user data on actual auth changes
       if (
-        event === "SIGNED_IN" || event === "TOKEN_REFRESHED" ||
+        event === "SIGNED_IN" ||
+        event === "TOKEN_REFRESHED" ||
         event === "SIGNED_OUT"
       ) {
         queryClient.invalidateQueries({ queryKey: ["auth-user"] });
@@ -67,13 +77,6 @@ export function useAuth() {
       subscription.unsubscribe();
     };
   }, [queryClient]);
-
-  log.debug("useAuth: Current state", {
-    isLoading: query.isLoading,
-    isFetching: query.isFetching,
-    hasUser: !!query.data,
-    userId: query.data?.id,
-  });
 
   return {
     user: query.data ?? null,

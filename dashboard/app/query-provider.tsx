@@ -81,3 +81,8 @@ export const workerPaymentHistoryKey = (orgId: string | null): QueryKey => [
   "worker-payment-history",
   orgId,
 ];
+
+export const notificationsKey = (
+  orgId: string | null,
+  receiverId: string | null
+): QueryKey => ["notifications", orgId, receiverId];

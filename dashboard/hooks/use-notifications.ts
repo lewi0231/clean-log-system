@@ -1,13 +1,15 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { notificationsKey } from "@/app/query-provider";
+import { log } from "@/lib/logger";
 import {
   NotificationService,
   type Notification,
 } from "@/lib/services/notification.service";
-import { log } from "@/lib/logger";
-import { supabase } from "@/lib/supabase";
-import { useCallback, useEffect, useState } from "react";
 import useOrganization from "./useOrganization";
+import { useRealtimeNotifications } from "./use-realtime-notifications";
 
 interface UseNotificationsResult {
   notifications: Notification[];
@@ -21,122 +23,132 @@ interface UseNotificationsResult {
 
 export function useNotifications(): UseNotificationsResult {
   const { organizationId, organizationUserId } = useOrganization();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchNotifications = useCallback(async () => {
-    if (!organizationId || !organizationUserId) {
-      setLoading(false);
-      return;
-    }
+  // Subscribe to real-time notification changes (auto-invalidates cache)
+  useRealtimeNotifications(organizationId, organizationUserId ?? null);
 
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await NotificationService.getNotifications(
-        organizationId,
-        organizationUserId
+  // Fetch notifications using React Query
+  const query = useQuery({
+    queryKey: notificationsKey(organizationId, organizationUserId ?? null),
+    enabled: !!organizationId && !!organizationUserId,
+    queryFn: () =>
+      NotificationService.getNotifications(organizationId!, organizationUserId!),
+    // Notifications are time-sensitive, use shorter stale time
+    staleTime: 30_000, // 30 seconds
+    // Refetch on window focus for notifications (override global default)
+    refetchOnWindowFocus: true,
+  });
+
+  // Mutation for marking single notification as read
+  const markAsReadMutation = useMutation({
+    mutationFn: (notificationId: string) =>
+      NotificationService.markAsRead(notificationId),
+    onMutate: async (notificationId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: notificationsKey(organizationId, organizationUserId ?? null),
+      });
+
+      // Snapshot previous value
+      const previousData = queryClient.getQueryData(
+        notificationsKey(organizationId, organizationUserId ?? null)
       );
-      setNotifications(result.notifications);
-      setUnreadCount(result.unreadCount);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch notifications");
-    } finally {
-      setLoading(false);
-    }
-  }, [organizationId, organizationUserId]);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  // Refetch when user returns to the tab (covers Realtime gaps and ensures fresh data)
-  useEffect(() => {
-    const handleFocus = () => {
-      void fetchNotifications();
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [fetchNotifications]);
-
-  // Realtime: refetch when a new notification is inserted for this user
-  useEffect(() => {
-    if (!organizationUserId) return;
-
-    const channel = supabase
-      .channel("notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notification",
-          filter: `receiver_id=eq.${organizationUserId}`,
-        },
-        () => {
-          void fetchNotifications();
-        },
-      )
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [organizationUserId, fetchNotifications]);
-
-  // Fallback poll every 30 seconds (e.g. if Realtime is not enabled for table)
-  useEffect(() => {
-    if (!organizationId || !organizationUserId) return;
-
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [organizationId, organizationUserId, fetchNotifications]);
-
-  const markAsRead = async (notificationId: string) => {
-    try {
-      await NotificationService.markAsRead(notificationId);
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId
-            ? { ...n, read: true, read_at: new Date().toISOString() }
-            : n
-        )
+      // Optimistically update
+      queryClient.setQueryData(
+        notificationsKey(organizationId, organizationUserId ?? null),
+        (old: { notifications: Notification[]; unreadCount: number } | undefined) => {
+          if (!old) return old;
+          return {
+            notifications: old.notifications.map((n) =>
+              n.id === notificationId
+                ? { ...n, read: true, read_at: new Date().toISOString() }
+                : n
+            ),
+            unreadCount: Math.max(0, old.unreadCount - 1),
+          };
+        }
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch (err) {
+
+      return { previousData };
+    },
+    onError: (err, notificationId, context) => {
       log.error("Notifications: Failed to mark as read", {
         error: err instanceof Error ? err.message : "Unknown error",
         notificationId,
       });
-    }
-  };
+      // Rollback on error
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          notificationsKey(organizationId, organizationUserId ?? null),
+          context.previousData
+        );
+      }
+    },
+  });
 
-  const markAllAsRead = async () => {
-    if (!organizationId || !organizationUserId) return;
+  // Mutation for marking all notifications as read
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () =>
+      NotificationService.markAllAsRead(organizationId!, organizationUserId!),
+    onMutate: async () => {
+      await queryClient.cancelQueries({
+        queryKey: notificationsKey(organizationId, organizationUserId ?? null),
+      });
 
-    try {
-      await NotificationService.markAllAsRead(organizationId, organizationUserId);
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, read: true, read_at: new Date().toISOString() }))
+      const previousData = queryClient.getQueryData(
+        notificationsKey(organizationId, organizationUserId ?? null)
       );
-      setUnreadCount(0);
-    } catch (err) {
+
+      // Optimistically mark all as read
+      queryClient.setQueryData(
+        notificationsKey(organizationId, organizationUserId ?? null),
+        (old: { notifications: Notification[]; unreadCount: number } | undefined) => {
+          if (!old) return old;
+          return {
+            notifications: old.notifications.map((n) => ({
+              ...n,
+              read: true,
+              read_at: new Date().toISOString(),
+            })),
+            unreadCount: 0,
+          };
+        }
+      );
+
+      return { previousData };
+    },
+    onError: (err, _, context) => {
       log.error("Notifications: Failed to mark all as read", {
         error: err instanceof Error ? err.message : "Unknown error",
         organizationId,
         organizationUserId,
       });
-    }
+      if (context?.previousData) {
+        queryClient.setQueryData(
+          notificationsKey(organizationId, organizationUserId ?? null),
+          context.previousData
+        );
+      }
+    },
+  });
+
+  const markAsRead = async (notificationId: string) => {
+    await markAsReadMutation.mutateAsync(notificationId);
+  };
+
+  const markAllAsRead = async () => {
+    if (!organizationId || !organizationUserId) return;
+    await markAllAsReadMutation.mutateAsync();
   };
 
   return {
-    notifications,
-    unreadCount,
-    loading,
-    error,
-    refetch: fetchNotifications,
+    notifications: query.data?.notifications ?? [],
+    unreadCount: query.data?.unreadCount ?? 0,
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: () => query.refetch().then(() => undefined),
     markAsRead,
     markAllAsRead,
   };
