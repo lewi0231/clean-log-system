@@ -28,6 +28,13 @@ export function useNotifications(): UseNotificationsResult {
   // Subscribe to real-time notification changes (auto-invalidates cache)
   useRealtimeNotifications(organizationId, organizationUserId ?? null);
 
+  // DEBUG: Log notification query parameters
+  log.info("useNotifications: Query params", {
+    organizationId,
+    organizationUserId,
+    queryEnabled: !!organizationId && !!organizationUserId,
+  });
+
   // Fetch notifications using React Query
   const query = useQuery({
     queryKey: notificationsKey(organizationId, organizationUserId ?? null),

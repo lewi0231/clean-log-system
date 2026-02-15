@@ -21,9 +21,16 @@ export function useRealtimeWorkers(organizationId: string | null) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!organizationId) return;
+    if (!organizationId) {
+      log.info("useRealtimeWorkers: Skipping - no organizationId");
+      return;
+    }
 
     const channelName = `workers:${organizationId}`;
+    log.info("useRealtimeWorkers: Setting up subscription", {
+      channelName,
+      organizationId,
+    });
 
     const channel = supabase
       .channel(channelName)
@@ -36,9 +43,10 @@ export function useRealtimeWorkers(organizationId: string | null) {
           filter: `organization_id=eq.${organizationId}`,
         },
         (payload) => {
-          log.debug("Realtime: Worker change received", {
+          log.info("Realtime: Worker change received", {
             event: payload.eventType,
             organizationId,
+            newRecord: payload.new,
           });
 
           // Refetch to ensure workers list updates immediately (e.g. status inactive→active)
@@ -48,8 +56,13 @@ export function useRealtimeWorkers(organizationId: string | null) {
         }
       )
       .subscribe((status, err) => {
+        log.info("useRealtimeWorkers: Subscription status changed", {
+          status,
+          channel: channelName,
+          error: err?.message,
+        });
         if (status === "SUBSCRIBED") {
-          log.debug("Realtime: Workers subscription active", {
+          log.info("Realtime: Workers subscription active", {
             channel: channelName,
           });
         } else if (status === "CHANNEL_ERROR") {

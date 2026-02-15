@@ -331,6 +331,24 @@ const handleAdd = (data) => {
 - **React Query staleTime:** Default is 2 minutes (see `query-provider.tsx`); override for time-sensitive data like notifications
 - **Always clean up subscriptions:** Use `supabase.removeChannel()` in useEffect cleanup
 
+### Database Migrations
+
+- **NEVER edit an existing migration that has been applied.** Migrations are immutable once deployed. If you need to change schema, create a NEW migration file with the changes.
+- **How to check if a migration has been applied:** Query `supabase_migrations.schema_migrations` table or check `supabase migration list` output.
+- **Safe pattern:** Always create new migrations for schema changes. Use idempotent statements (e.g., `IF NOT EXISTS`, `DO $$ ... END $$`) when adding to publications or creating indexes that might already exist.
+- **Example of idempotent publication addition:**
+  ```sql
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables 
+      WHERE pubname = 'supabase_realtime' AND tablename = 'your_table'
+    ) THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE your_table;
+    END IF;
+  END $$;
+  ```
+
 ---
 
 _Project Learnings for JobFlow_

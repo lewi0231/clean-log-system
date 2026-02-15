@@ -55,6 +55,51 @@ export class NotificationService {
       limit,
     });
 
+    // Check auth state before querying
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    log.info("NotificationService: Executing query", {
+      organizationId,
+      receiverId,
+      limit,
+      hasSession: !!session,
+      authUserId: session?.user?.id ?? null,
+      accessToken: session?.access_token ? "present" : "missing",
+    });
+
+    // DEBUG: Try a simple RPC call to check auth.uid() on the server
+    const { data: authCheck, error: authCheckError } = await supabase.rpc(
+      "get_current_user_id"
+    );
+    log.info("NotificationService: Server auth check", {
+      serverAuthUid: authCheck,
+      error: authCheckError?.message,
+    });
+
+    // DEBUG: Check exactly what the RLS subquery returns
+    const { data: rlsDebug, error: rlsDebugError } = await supabase.rpc(
+      "debug_rls_notification_check"
+    );
+    log.info("NotificationService: RLS subquery debug", {
+      result: rlsDebug,
+      error: rlsDebugError?.message,
+    });
+
+    // DEBUG: First try without receiver_id filter to see if RLS is the issue
+    const { data: allOrgNotifications, error: debugError } = await supabase
+      .from("notification")
+      .select("id, receiver_id, type")
+      .eq("organization_id", organizationId)
+      .limit(5);
+
+    log.info("NotificationService: DEBUG - All org notifications (no receiver filter)", {
+      count: allOrgNotifications?.length ?? 0,
+      notifications: allOrgNotifications,
+      error: debugError?.message,
+    });
+
     const { data, error } = await supabase
       .from("notification")
       .select("*")
@@ -68,9 +113,18 @@ export class NotificationService {
         organizationId,
         receiverId,
         error: error.message,
+        errorCode: error.code,
+        errorDetails: error.details,
       });
       throw new Error(error.message);
     }
+
+    log.info("NotificationService: Query result", {
+      organizationId,
+      receiverId,
+      rowCount: data?.length ?? 0,
+      hasData: !!data,
+    });
 
     const notifications = (data || []) as Notification[];
     const unreadCount = notifications.filter((n) => !n.read).length;

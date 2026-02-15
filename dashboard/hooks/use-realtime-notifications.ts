@@ -23,9 +23,20 @@ export function useRealtimeNotifications(
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!organizationId || !receiverId) return;
+    if (!organizationId || !receiverId) {
+      log.info("useRealtimeNotifications: Skipping - missing params", {
+        organizationId,
+        receiverId,
+      });
+      return;
+    }
 
     const channelName = `notifications:${receiverId}`;
+    log.info("useRealtimeNotifications: Setting up subscription", {
+      channelName,
+      organizationId,
+      receiverId,
+    });
 
     const channel = supabase
       .channel(channelName)
@@ -38,9 +49,10 @@ export function useRealtimeNotifications(
           filter: `receiver_id=eq.${receiverId}`,
         },
         (payload) => {
-          log.debug("Realtime: Notification change received", {
+          log.info("Realtime: Notification change received", {
             event: payload.eventType,
             receiverId,
+            newRecord: payload.new,
           });
 
           // Refetch to ensure notification bell updates immediately
@@ -50,8 +62,13 @@ export function useRealtimeNotifications(
         }
       )
       .subscribe((status, err) => {
+        log.info("useRealtimeNotifications: Subscription status changed", {
+          status,
+          channel: channelName,
+          error: err?.message,
+        });
         if (status === "SUBSCRIBED") {
-          log.debug("Realtime: Notifications subscription active", {
+          log.info("Realtime: Notifications subscription active", {
             channel: channelName,
           });
         } else if (status === "CHANNEL_ERROR") {
