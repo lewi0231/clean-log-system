@@ -1,7 +1,9 @@
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { PricingService } from "@/lib/services/pricing.service";
 import type { PricingRule } from "@/lib/types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
@@ -11,6 +13,21 @@ vi.mock("@/lib/services/pricing.service", () => ({
         upsertRule: vi.fn(),
     },
 }));
+
+function createWrapper() {
+    const queryClient = new QueryClient({
+        defaultOptions: {
+            queries: { retry: false },
+            mutations: { retry: false },
+        },
+    });
+
+    function Wrapper({ children }: { children: ReactNode }) {
+        return createElement(QueryClientProvider, { client: queryClient }, children);
+    }
+    Wrapper.displayName = "QueryClientWrapper";
+    return Wrapper;
+}
 
 // Helper to get today's date at midnight UTC for consistent effective_at matching
 const getTodayMidnightUTC = () => {
@@ -74,7 +91,9 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-        const { result } = renderHook(() => useFieldPricing("org-1"));
+        const { result } = renderHook(() => useFieldPricing("org-1"), {
+            wrapper: createWrapper(),
+        });
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);
@@ -115,7 +134,9 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(newRule);
 
-        const { result } = renderHook(() => useFieldPricing("org-1"));
+        const { result } = renderHook(() => useFieldPricing("org-1"), {
+            wrapper: createWrapper(),
+        });
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);
@@ -153,7 +174,9 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-        const { result } = renderHook(() => useFieldPricing("org-1"));
+        const { result } = renderHook(() => useFieldPricing("org-1"), {
+            wrapper: createWrapper(),
+        });
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);
@@ -187,7 +210,9 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(newRule);
 
-        const { result } = renderHook(() => useFieldPricing("org-1"));
+        const { result } = renderHook(() => useFieldPricing("org-1"), {
+            wrapper: createWrapper(),
+        });
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(0);
@@ -235,7 +260,9 @@ describe("useFieldPricing - Effective Date Updates", () => {
         vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
         vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-        const { result } = renderHook(() => useFieldPricing("org-1"));
+        const { result } = renderHook(() => useFieldPricing("org-1"), {
+            wrapper: createWrapper(),
+        });
 
         await waitFor(() => {
             expect(result.current.fieldPricing).toHaveLength(1);

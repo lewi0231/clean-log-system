@@ -7,7 +7,7 @@ This document captures project-specific learnings that complement the universal 
 | **Framework Version** | 4.8.1                 |
 | **Project**           | JobFlow |
 | **Created**           | 2026-01-31      |
-| **Last Updated**      | 2026-02-14      |
+| **Last Updated**      | 2026-02-15      |
 
 ---
 
@@ -20,6 +20,7 @@ This document captures project-specific learnings that complement the universal 
 | 3   | Job Colleague Confirmation Workflow | workflow   | 2026-02-14 |
 | 4   | Deno TypeScript Strict Literal Type Narrowing | typescript | 2026-02-14 |
 | 5   | Testing React Components with Tooltips in Vitest | testing    | 2026-02-14 |
+| 6   | Don't mix useOptimistic with React Query | react      | 2026-02-15 |
 
 ---
 
@@ -224,6 +225,93 @@ expect(badge).toHaveAttribute("data-state"); // Radix tooltip marker
 - Mock the tooltip component entirely
 - Use integration/E2E tests for tooltip content verification
 - Test the data passed to the tooltip rather than the rendered content
+
+---
+
+### 6. Don't mix useOptimistic with React Query
+
+**Date:** 2026-02-15  
+**Tag:** `react`
+
+**Context:**  
+Implemented optimistic UI for the form builder (create/update/delete field configs) using React 19's `useOptimistic` hook alongside React Query. This caused duplicate key errors and flickering UI.
+
+**Learning:**  
+**Never use React 19's `useOptimistic` with React Query.** They are two competing state management systems that conflict when managing the same data.
+
+**Why they conflict:**
+
+1. `useOptimistic(baseValue, reducer)` takes a "base value" - in our case, `fieldConfigs` from React Query cache
+2. When you call the optimistic setter, it renders: `reducer(baseValue, newItem)` = `[...baseValue, newItem]`
+3. If you also update React Query cache (to prevent flicker), you get:
+   - `baseValue` now contains `newItem`
+   - `useOptimistic` renders: `[...baseValueWithNewItem, newItem]` = **DUPLICATE!**
+
+**Don't:**
+```typescript
+// ❌ Two state systems fighting each other
+const [optimisticItems, setOptimistic] = useOptimistic(
+  items, // from React Query cache
+  (state, newItem) => [...state, newItem]
+);
+
+const handleAdd = (data) => {
+  startTransition(async () => {
+    setOptimistic(newItem);           // Updates optimistic state
+    queryClient.setQueryData(key, /* also adds newItem */);  // CONFLICT!
+    await mutation.mutateAsync(data);
+  });
+};
+```
+
+**Do:**
+```typescript
+// ✅ React Query native optimistic updates
+const mutation = useMutation({
+  mutationFn: createItem,
+  
+  onMutate: async (newItem) => {
+    // Cancel outgoing refetches
+    await queryClient.cancelQueries({ queryKey: ['items'] });
+    
+    // Snapshot for rollback
+    const previousData = queryClient.getQueryData(['items']);
+    
+    // Optimistically update cache
+    queryClient.setQueryData(['items'], (old) => [...old, newItem]);
+    
+    return { previousData };
+  },
+  
+  onError: (err, vars, context) => {
+    // Rollback on failure
+    queryClient.setQueryData(['items'], context.previousData);
+  },
+  
+  onSettled: () => {
+    // Refetch for consistency
+    queryClient.invalidateQueries({ queryKey: ['items'] });
+  },
+});
+
+// Handler just triggers the mutation
+const handleAdd = (data) => {
+  mutation.mutate({ ...data, _tempId: `temp-${Date.now()}` });
+};
+```
+
+**When to use each:**
+
+| Pattern | Use When |
+|---------|----------|
+| React Query `onMutate` | You're already using React Query for data fetching |
+| React 19 `useOptimistic` | You're using React state (`useState`) or Server Actions |
+| Server Actions + `useOptimistic` | Next.js App Router with Server Components |
+
+**Key files:**
+- `dashboard/hooks/use-field-config-mutations.ts` - React Query pattern
+- `dashboard/hooks/use-section-mutations.ts` - React Query pattern
+- `docs/plans/mobile-config-optimistic-ui-plan.md` - Full investigation details
 
 ---
 

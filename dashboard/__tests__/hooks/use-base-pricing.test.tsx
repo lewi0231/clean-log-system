@@ -1,11 +1,27 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useBasePricing } from "@/hooks/use-base-pricing";
 import { PricingService } from "@/lib/services/pricing.service";
 import type { PricingRule } from "@/lib/types";
 import { renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  };
+}
 
 // Helper to get today's date at midnight UTC for consistent effective_at matching
 const getTodayMidnightUTC = () => {
@@ -63,10 +79,12 @@ describe("useBasePricing", () => {
 
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -96,10 +114,12 @@ describe("useBasePricing", () => {
 
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "worker",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "worker",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -116,10 +136,12 @@ describe("useBasePricing", () => {
         new Error("Failed to fetch")
       );
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -142,10 +164,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -184,10 +208,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -221,10 +247,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -266,11 +294,13 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(updatedRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-          locationId: "location-1",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+            locationId: "location-1",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -304,10 +334,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "worker",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "worker",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -335,10 +367,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "worker",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "worker",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -370,10 +404,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -409,10 +445,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([existingRule]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(existingRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -447,10 +485,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -484,10 +524,12 @@ describe("useBasePricing", () => {
 
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -523,10 +565,12 @@ describe("useBasePricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([mockRule]);
       vi.mocked(PricingService.deleteRule).mockResolvedValue(undefined);
 
-      const { result } = renderHook(() =>
-        useBasePricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useBasePricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {

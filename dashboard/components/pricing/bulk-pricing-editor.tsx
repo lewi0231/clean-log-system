@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +40,7 @@ export function BulkPricingEditor({
   onApplied,
   organizationId,
 }: BulkPricingEditorProps) {
+  const queryClient = useQueryClient();
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -99,6 +102,8 @@ export function BulkPricingEditor({
           effective_at: effectiveDate ?? undefined,
         });
       }
+      queryClient.invalidateQueries({ queryKey: ["field-pricing", organizationId] });
+      queryClient.invalidateQueries({ queryKey: ["pricing-history", organizationId] });
       onApplied?.();
       setSelectedFields([]);
       setAmount("");

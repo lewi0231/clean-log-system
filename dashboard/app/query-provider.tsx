@@ -86,3 +86,74 @@ export const notificationsKey = (
   orgId: string | null,
   receiverId: string | null
 ): QueryKey => ["notifications", orgId, receiverId];
+
+// Pricing query keys
+export const fieldPricingKey = (
+  orgId: string | null,
+  options?: {
+    effectiveAt?: string | null;
+    locationHierarchyId?: string | null;
+    locationId?: string | null;
+    pricingContext?: "customer" | "worker";
+  },
+): QueryKey => [
+  "field-pricing",
+  orgId,
+  options?.effectiveAt ?? null,
+  options?.locationHierarchyId ?? null,
+  options?.locationId ?? null,
+  options?.pricingContext ?? "customer",
+];
+
+export const optionPricingKey = (
+  orgId: string | null,
+  fieldConfigId?: string | null,
+  options?: {
+    effectiveAt?: string | null;
+    locationHierarchyId?: string | null;
+    locationId?: string | null;
+    pricingContext?: "customer" | "worker";
+  },
+): QueryKey => [
+  "option-pricing",
+  orgId,
+  fieldConfigId ?? null,
+  options?.effectiveAt ?? null,
+  options?.locationHierarchyId ?? null,
+  options?.locationId ?? null,
+  options?.pricingContext ?? "customer",
+];
+
+export const basePricingKey = (
+  orgId: string | null,
+  options?: {
+    effectiveAt?: string | null;
+    locationHierarchyId?: string | null;
+    locationId?: string | null;
+    pricingContext?: "customer" | "worker";
+  },
+): QueryKey => [
+  "base-pricing",
+  orgId,
+  options?.effectiveAt ?? null,
+  options?.locationHierarchyId ?? null,
+  options?.locationId ?? null,
+  options?.pricingContext ?? "customer",
+];
+
+export const pricingHistoryKey = (
+  orgId: string | null,
+  options?: {
+    dateFrom?: string;
+    dateTo?: string;
+    pricingContext?: "customer" | "worker";
+    refreshToken?: string | number;
+  },
+): QueryKey => [
+  "pricing-history",
+  orgId,
+  options?.dateFrom ?? null,
+  options?.dateTo ?? null,
+  options?.pricingContext ?? null,
+  options?.refreshToken ?? null,
+];

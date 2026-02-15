@@ -1,11 +1,30 @@
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { PricingService } from "@/lib/services/pricing.service";
 import type { PricingRule } from "@/lib/types";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+  return Wrapper;
+}
 
 const createMockPricingRule = (
   overrides?: Partial<PricingRule>
@@ -56,10 +75,12 @@ describe("useFieldPricing", () => {
 
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -87,10 +108,12 @@ describe("useFieldPricing", () => {
 
       vi.mocked(PricingService.listRules).mockResolvedValue(mockRules);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "worker",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "worker",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -113,10 +136,12 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -153,10 +178,12 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -189,10 +216,12 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "worker",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "worker",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -217,10 +246,12 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "worker",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "worker",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -248,10 +279,12 @@ describe("useFieldPricing", () => {
       vi.mocked(PricingService.listRules).mockResolvedValue([]);
       vi.mocked(PricingService.upsertRule).mockResolvedValue(mockRule);
 
-      const { result } = renderHook(() =>
-        useFieldPricing("org-1", {
-          pricingContext: "customer",
-        })
+      const { result } = renderHook(
+        () =>
+          useFieldPricing("org-1", {
+            pricingContext: "customer",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {

@@ -1,15 +1,17 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { fieldPricingKey } from "@/app/query-provider";
 import { PricingService } from "@/lib/services";
 import type { UpsertPricingRuleRequest } from "@/lib/services/pricing.service";
+import { log } from "@/lib/logger";
 import type {
   FieldPricing,
   PricingRule,
   PricingType,
   WorkerPaymentType,
 } from "@/lib/types";
-import { log } from "@/lib/logger";
-import { useEffect, useState } from "react";
 
 interface UseFieldPricingOptions {
   locationId?: string | null;
@@ -46,220 +48,12 @@ interface UseFieldPricingResult {
   deletePricing: (id: string) => Promise<void>;
 }
 
-export function useFieldPricing(
-  organizationId: string | null,
-  options?: UseFieldPricingOptions,
-): UseFieldPricingResult {
-  const [fieldPricing, setFieldPricing] = useState<FieldPricing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchFieldPricing = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Fetch ALL pricing for field scope to show all overrides
-      // We'll filter by scope in the component for the main price display
-      const pricing = await PricingService.listRules({
-        organization_id: organizationId,
-        scopes: ["field"],
-        // Don't filter by location - fetch all to show all overrides
-        location_hierarchy_id: null,
-        location_id: null,
-        effective_at: options?.effectiveAt ?? undefined,
-        pricing_context: options?.pricingContext || "customer",
-      });
-
-      setFieldPricing(pricing.map(transformFieldPricing));
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch field pricing",
-      );
-      setFieldPricing([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const upsertPricing = async (
-    fieldConfigId: string,
-    customerPrice: number,
-    options?: UpsertPricingOptions,
-  ): Promise<FieldPricing> => {
-    if (!organizationId) {
-      throw new Error("Organization ID is required");
-    }
-
-    const targetLocationHierarchyId = options?.locationHierarchyId ?? null;
-    const targetLocationId = options?.locationId ?? null;
-    const targetPricingContext = options?.pricingContext || "customer";
-
-    // Pricing timeline model:
-    // - Multiple rules CAN exist for the same (field, location, context) with DIFFERENT effective_at dates
-    // - This allows scheduling price changes: e.g., $77 from Dec 12, $99 from Dec 15
-    // - The unique constraint includes effective_at to support this
-    // - When saving: match by field/location/context AND effective_at date
-    // - If match found: UPDATE that specific timeline point
-    // - If no match: CREATE a new timeline point
-
-    // Determine the target effective date
-    // IMPORTANT: Don't use new Date() parsing for date-only strings as it causes timezone issues
-    // "2024-12-15" parsed as Date becomes LOCAL midnight, which in UTC+11 is Dec 14 13:00 UTC
-    let targetEffectiveAt: string;
-    let targetEffectiveDate: string; // YYYY-MM-DD for comparison
-
-    if (options?.effectiveAt) {
-      // Check if it's already a date-only string (YYYY-MM-DD)
-      if (/^\d{4}-\d{2}-\d{2}$/.test(options.effectiveAt)) {
-        targetEffectiveDate = options.effectiveAt;
-        // Create a proper UTC timestamp for the start of that day
-        targetEffectiveAt = `${options.effectiveAt}T00:00:00.000Z`;
-      } else {
-        // It's a full timestamp - extract the date part
-        targetEffectiveAt = new Date(options.effectiveAt).toISOString();
-        targetEffectiveDate = targetEffectiveAt.split("T")[0];
-      }
-    } else {
-      // No date specified - use current timestamp
-      targetEffectiveAt = new Date().toISOString();
-      targetEffectiveDate = targetEffectiveAt.split("T")[0];
-    }
-
-    // Find existing rule matching field, location, context, AND effective date
-    const existingRule = fieldPricing.find((rule) => {
-      const ruleContext = rule.source_rule?.pricing_context || "customer";
-      const ruleEffectiveDate = rule.source_rule?.effective_at
-        ? new Date(rule.source_rule.effective_at).toISOString().split("T")[0]
-        : null;
-
-      return (
-        rule.field_config_id === fieldConfigId &&
-        (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
-        (rule.location_id || null) === targetLocationId &&
-        ruleContext === targetPricingContext &&
-        ruleEffectiveDate === targetEffectiveDate // Must match same effective date
-      );
-    });
-
-    const request: UpsertPricingRuleRequest = {
-      id: existingRule?.id, // If exists for this date, update; otherwise create new timeline point
-      organization_id: organizationId,
-      scope: "field",
-      pricing_type: options?.pricingType || "unit",
-      pricing_context: targetPricingContext,
-      field_config_id: fieldConfigId,
-      applies_to_field_type: options?.appliesToFieldType,
-      base_price: customerPrice,
-      currency: options?.currency || "USD",
-      location_hierarchy_id: targetLocationHierarchyId,
-      location_id: targetLocationId,
-      conditions: options?.conditions,
-      expires_at: options?.expirationDate || null,
-      effective_at: targetEffectiveAt, // Use the target effective date for this timeline point
-    };
-
-    // Only include worker_payment fields for customer pricing rules
-    // Worker pricing rules use base_price directly and cannot have worker_payment fields
-    if (targetPricingContext === "customer") {
-      request.worker_payment_type = options?.workerPaymentType || null;
-      request.worker_payment_value = options?.workerPaymentValue ?? null;
-    }
-
-    try {
-      const pricing = await PricingService.upsertRule(request);
-      await fetchFieldPricing();
-      return transformFieldPricing(pricing);
-    } catch (error) {
-      // If we get a unique constraint error, a rule for this exact date may already exist
-      // Refetch and try to find it to update instead
-      if (
-        !existingRule?.id &&
-        error instanceof Error &&
-        (error.message.includes("23505") ||
-          error.message.includes("already exists") ||
-          error.message.includes("unique constraint"))
-      ) {
-        const pricingDebug = process.env.NEXT_PUBLIC_PRICING_DEBUG === "true";
-        if (pricingDebug) {
-          log.debug(
-            "[Pricing Debug] Unique constraint error; searching existing rule for date",
-            {
-              fieldConfigId,
-              locationId: targetLocationId,
-              locationHierarchyId: targetLocationHierarchyId,
-              pricingContext: targetPricingContext,
-              effectiveDate: targetEffectiveDate,
-            },
-          );
-        }
-
-        // Refetch to see if a rule exists now
-        await fetchFieldPricing();
-        const updatedExistingRule = fieldPricing.find((rule) => {
-          const ruleContext = rule.source_rule?.pricing_context || "customer";
-          const ruleEffectiveDate = rule.source_rule?.effective_at
-            ? new Date(rule.source_rule.effective_at).toISOString().split(
-              "T",
-            )[0]
-            : null;
-
-          return (
-            rule.field_config_id === fieldConfigId &&
-            (rule.location_hierarchy_id || null) ===
-              targetLocationHierarchyId &&
-            (rule.location_id || null) === targetLocationId &&
-            ruleContext === targetPricingContext &&
-            ruleEffectiveDate === targetEffectiveDate
-          );
-        });
-
-        if (updatedExistingRule) {
-          // Found it for this date, update with the ID
-          request.id = updatedExistingRule.id;
-          const pricing = await PricingService.upsertRule(request);
-          await fetchFieldPricing();
-          return transformFieldPricing(pricing);
-        }
-      }
-      throw error;
-    }
-  };
-
-  const deletePricing = async (id: string): Promise<void> => {
-    await PricingService.deleteRule(id);
-    await fetchFieldPricing();
-  };
-
-  useEffect(() => {
-    fetchFieldPricing();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    organizationId,
-    options?.effectiveAt,
-    options?.refreshToken,
-  ]);
-
-  return {
-    fieldPricing,
-    loading,
-    error,
-    refetch: fetchFieldPricing,
-    upsertPricing,
-    deletePricing,
-  };
-}
-
-const transformFieldPricing = (rule: PricingRule): FieldPricing => {
+function transformFieldPricing(rule: PricingRule): FieldPricing {
   const isWorkerContext = rule.pricing_context === "worker";
-  const basePrice = rule.pricing_type === "percentage"
-    ? rule.percentage_rate ?? 0
-    : rule.base_price ?? 0;
+  const basePrice =
+    rule.pricing_type === "percentage"
+      ? rule.percentage_rate ?? 0
+      : rule.base_price ?? 0;
 
   return {
     id: rule.id,
@@ -272,8 +66,6 @@ const transformFieldPricing = (rule: PricingRule): FieldPricing => {
     currency: rule.currency,
     applies_to_field_type: rule.applies_to_field_type || null,
     worker_payment_type: rule.worker_payment_type,
-    // For worker context rules, worker_payment_value comes from base_price
-    // For customer context rules, it comes from worker_payment_value field
     worker_payment_value: isWorkerContext
       ? basePrice
       : rule.worker_payment_value,
@@ -282,4 +74,268 @@ const transformFieldPricing = (rule: PricingRule): FieldPricing => {
     location: rule.location,
     location_node: rule.location_node,
   };
-};
+}
+
+export function useFieldPricing(
+  organizationId: string | null,
+  options?: UseFieldPricingOptions,
+): UseFieldPricingResult {
+  const queryClient = useQueryClient();
+
+  const queryKey = fieldPricingKey(organizationId, {
+    effectiveAt: options?.effectiveAt,
+    locationHierarchyId: options?.locationHierarchyId,
+    locationId: options?.locationId,
+    pricingContext: options?.pricingContext,
+  });
+
+  const {
+    data: fieldPricing = [],
+    isLoading,
+    error,
+    refetch: queryRefetch,
+  } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!organizationId) return [];
+      const pricing = await PricingService.listRules({
+        organization_id: organizationId,
+        scopes: ["field"],
+        location_hierarchy_id: null,
+        location_id: null,
+        effective_at: options?.effectiveAt ?? undefined,
+        pricing_context: options?.pricingContext || "customer",
+      });
+      return pricing.map(transformFieldPricing);
+    },
+    enabled: !!organizationId,
+  });
+
+  const upsertMutation = useMutation({
+    mutationFn: async (params: {
+      request: UpsertPricingRuleRequest;
+      existingRule: FieldPricing | null;
+      optimisticFieldPricing: FieldPricing;
+    }) => {
+      const { request } = params;
+      const pricing = await PricingService.upsertRule(request);
+      return transformFieldPricing(pricing);
+    },
+    onMutate: async (params) => {
+      const { request, existingRule, optimisticFieldPricing } = params;
+      await queryClient.cancelQueries({ queryKey });
+      const previousData = queryClient.getQueryData<FieldPricing[]>(queryKey);
+
+      queryClient.setQueryData<FieldPricing[]>(queryKey, (old) => {
+        if (!old) return old;
+        if (existingRule) {
+          return old.map((r) =>
+            r.id === existingRule.id ? optimisticFieldPricing : r,
+          );
+        }
+        return [...old, optimisticFieldPricing];
+      });
+
+      return { previousData, request };
+    },
+    onError: (err, params, context) => {
+      log.error("MobileConfig: Failed to upsert field pricing", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      if (context?.previousData !== undefined) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+      if (organizationId) {
+        queryClient.invalidateQueries({
+          queryKey: ["pricing-history", organizationId],
+        });
+      }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => PricingService.deleteRule(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previousData = queryClient.getQueryData<FieldPricing[]>(queryKey);
+
+      queryClient.setQueryData<FieldPricing[]>(queryKey, (old) =>
+        old ? old.filter((r) => r.id !== id) : old,
+      );
+
+      return { previousData };
+    },
+    onError: (err, _id, context) => {
+      log.error("MobileConfig: Failed to delete field pricing", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      if (context?.previousData !== undefined) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
+      if (organizationId) {
+        queryClient.invalidateQueries({
+          queryKey: ["pricing-history", organizationId],
+        });
+      }
+    },
+  });
+
+  const upsertPricing = async (
+    fieldConfigId: string,
+    customerPrice: number,
+    opts?: UpsertPricingOptions,
+  ): Promise<FieldPricing> => {
+    if (!organizationId) {
+      throw new Error("Organization ID is required");
+    }
+
+    const targetLocationHierarchyId = opts?.locationHierarchyId ?? options?.locationHierarchyId ?? null;
+    const targetLocationId = opts?.locationId ?? options?.locationId ?? null;
+    const targetPricingContext = opts?.pricingContext || options?.pricingContext || "customer";
+
+    let targetEffectiveAt: string;
+    let targetEffectiveDate: string;
+
+    if (opts?.effectiveAt) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(opts.effectiveAt)) {
+        targetEffectiveDate = opts.effectiveAt;
+        targetEffectiveAt = `${opts.effectiveAt}T00:00:00.000Z`;
+      } else {
+        targetEffectiveAt = new Date(opts.effectiveAt).toISOString();
+        targetEffectiveDate = targetEffectiveAt.split("T")[0];
+      }
+    } else {
+      targetEffectiveAt = new Date().toISOString();
+      targetEffectiveDate = targetEffectiveAt.split("T")[0];
+    }
+
+    const existingRule = fieldPricing.find((rule) => {
+      const ruleContext = rule.source_rule?.pricing_context || "customer";
+      const ruleEffectiveDate = rule.source_rule?.effective_at
+        ? new Date(rule.source_rule.effective_at).toISOString().split("T")[0]
+        : null;
+      return (
+        rule.field_config_id === fieldConfigId &&
+        (rule.location_hierarchy_id || null) === targetLocationHierarchyId &&
+        (rule.location_id || null) === targetLocationId &&
+        ruleContext === targetPricingContext &&
+        ruleEffectiveDate === targetEffectiveDate
+      );
+    });
+
+    const request: UpsertPricingRuleRequest = {
+      id: existingRule?.id,
+      organization_id: organizationId,
+      scope: "field",
+      pricing_type: opts?.pricingType || "unit",
+      pricing_context: targetPricingContext,
+      field_config_id: fieldConfigId,
+      applies_to_field_type: opts?.appliesToFieldType,
+      base_price: customerPrice,
+      currency: opts?.currency || "USD",
+      location_hierarchy_id: targetLocationHierarchyId,
+      location_id: targetLocationId,
+      conditions: opts?.conditions,
+      expires_at: opts?.expirationDate || null,
+      effective_at: targetEffectiveAt,
+    };
+
+    if (targetPricingContext === "customer") {
+      request.worker_payment_type = opts?.workerPaymentType || null;
+      request.worker_payment_value = opts?.workerPaymentValue ?? null;
+    }
+
+    const tempId = existingRule?.id ?? `temp-${Date.now()}`;
+    const basePrice =
+      request.pricing_type === "percentage"
+        ? request.percentage_rate ?? 0
+        : request.base_price ?? 0;
+
+    const optimisticSourceRule: PricingRule = {
+      id: tempId,
+      organization_id: organizationId,
+      scope: "field",
+      pricing_type: request.pricing_type,
+      pricing_context: targetPricingContext,
+      field_config_id: fieldConfigId,
+      option_value: null,
+      applies_to_field_type: opts?.appliesToFieldType ?? null,
+      location_hierarchy_id: targetLocationHierarchyId,
+      location_id: targetLocationId,
+      currency: request.currency || "USD",
+      base_price: request.base_price,
+      percentage_rate: request.percentage_rate ?? null,
+      minimum_quantity: null,
+      maximum_quantity: null,
+      tier_definition: null,
+      metadata: {},
+      worker_payment_type: request.worker_payment_type ?? null,
+      worker_payment_value: request.worker_payment_value ?? null,
+      priority: 0,
+      effective_at: targetEffectiveAt,
+      expires_at: request.expires_at ?? null,
+      active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      field_config: existingRule?.field_config,
+      location: existingRule?.location,
+      location_node: existingRule?.location_node,
+    } as PricingRule;
+
+    const optimisticFieldPricing: FieldPricing = {
+      id: tempId,
+      organization_id: organizationId,
+      field_config_id: fieldConfigId,
+      location_id: targetLocationId,
+      location_hierarchy_id: targetLocationHierarchyId,
+      pricing_type: request.pricing_type,
+      customer_price: basePrice,
+      currency: request.currency || "USD",
+      applies_to_field_type: opts?.appliesToFieldType ?? null,
+      worker_payment_type: request.worker_payment_type ?? null,
+      worker_payment_value:
+        targetPricingContext === "worker"
+          ? basePrice
+          : request.worker_payment_value ?? null,
+      source_rule: optimisticSourceRule,
+      field_config: existingRule?.field_config,
+      location: existingRule?.location,
+      location_node: existingRule?.location_node,
+    };
+
+    const result = await upsertMutation.mutateAsync({
+      request,
+      existingRule: existingRule ?? null,
+      optimisticFieldPricing,
+    });
+
+    return result;
+  };
+
+  const deletePricing = async (id: string): Promise<void> => {
+    await deleteMutation.mutateAsync(id);
+  };
+
+  const refetch = async () => {
+    await queryRefetch();
+  };
+
+  return {
+    fieldPricing,
+    loading: isLoading,
+    error: error
+      ? error instanceof Error
+        ? error.message
+        : "Failed to fetch field pricing"
+      : null,
+    refetch,
+    upsertPricing,
+    deletePricing,
+  };
+}

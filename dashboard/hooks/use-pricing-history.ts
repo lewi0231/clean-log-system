@@ -1,8 +1,10 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
+
+import { pricingHistoryKey } from "@/app/query-provider";
 import { PricingService } from "@/lib/services";
 import type { PricingHistoryEntry } from "@/lib/services/pricing.service";
-import { useEffect, useState } from "react";
 
 interface UsePricingHistoryOptions {
   dateFrom?: string;
@@ -22,54 +24,39 @@ export function usePricingHistory(
   organizationId: string | null,
   options?: UsePricingHistoryOptions,
 ): UsePricingHistoryResult {
-  const [historyEntries, setHistoryEntries] = useState<PricingHistoryEntry[]>(
-    [],
-  );
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryKey = pricingHistoryKey(organizationId, {
+    dateFrom: options?.dateFrom,
+    dateTo: options?.dateTo,
+    pricingContext: options?.pricingContext,
+    refreshToken: options?.refreshToken,
+  });
 
-  const fetchHistory = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const history = await PricingService.listHistory(organizationId, {
+  const {
+    data,
+    isLoading,
+    error,
+    refetch: queryRefetch,
+  } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!organizationId) return [];
+      return PricingService.listHistory(organizationId, {
         dateFrom: options?.dateFrom,
         dateTo: options?.dateTo,
         pricingContext: options?.pricingContext,
       });
+    },
+    enabled: !!organizationId,
+  });
 
-      setHistoryEntries(history);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch pricing history",
-      );
-      setHistoryEntries([]);
-    } finally {
-      setLoading(false);
-    }
+  const refetch = async () => {
+    await queryRefetch();
   };
 
-  useEffect(() => {
-    fetchHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    organizationId,
-    options?.dateFrom,
-    options?.dateTo,
-    options?.pricingContext,
-    options?.refreshToken,
-  ]);
-
   return {
-    historyEntries,
-    loading,
-    error,
-    refetch: fetchHistory,
+    historyEntries: data ?? [],
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : "Failed to fetch pricing history") : null,
+    refetch,
   };
 }

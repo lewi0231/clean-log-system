@@ -1,11 +1,30 @@
 import { usePricingHistory } from "@/hooks/use-pricing-history";
 import type { PricingHistoryEntry } from "@/lib/services/pricing.service";
 import { PricingService } from "@/lib/services/pricing.service";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
 vi.mock("@/lib/services/pricing.service");
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  Wrapper.displayName = "QueryClientWrapper";
+  return Wrapper;
+}
 
 const createMockHistoryEntry = (
   overrides?: Partial<PricingHistoryEntry>
@@ -51,7 +70,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       expect(result.current.loading).toBe(true);
       expect(result.current.historyEntries).toEqual([]);
@@ -76,7 +97,9 @@ describe("usePricingHistory", () => {
     it("should handle empty history", async () => {
       vi.mocked(PricingService.listHistory).mockResolvedValue([]);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -92,7 +115,9 @@ describe("usePricingHistory", () => {
         new Error(errorMessage)
       );
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -121,10 +146,12 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() =>
-        usePricingHistory("org-1", {
-          dateFrom: "2024-12-01",
-        })
+      const { result } = renderHook(
+        () =>
+          usePricingHistory("org-1", {
+            dateFrom: "2024-12-01",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -146,10 +173,12 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() =>
-        usePricingHistory("org-1", {
-          dateTo: "2024-12-31",
-        })
+      const { result } = renderHook(
+        () =>
+          usePricingHistory("org-1", {
+            dateTo: "2024-12-31",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -171,11 +200,13 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() =>
-        usePricingHistory("org-1", {
-          dateFrom: "2024-12-01",
-          dateTo: "2024-12-31",
-        })
+      const { result } = renderHook(
+        () =>
+          usePricingHistory("org-1", {
+            dateFrom: "2024-12-01",
+            dateTo: "2024-12-31",
+          }),
+        { wrapper: createWrapper() },
       );
 
       await waitFor(() => {
@@ -202,7 +233,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -225,7 +258,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -248,7 +283,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -270,7 +307,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(initialHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -312,7 +351,9 @@ describe("usePricingHistory", () => {
         .mockResolvedValueOnce(initialHistory)
         .mockRejectedValueOnce(new Error("Refetch failed"));
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -329,9 +370,8 @@ describe("usePricingHistory", () => {
         expect(result.current.error).toBe("Refetch failed");
       });
 
-      // When an error occurs, the hook sets historyEntries to empty array
-      // This matches the hook's implementation behavior
-      expect(result.current.historyEntries).toEqual([]);
+      // React Query keeps previous data when refetch fails (doesn't clear to empty)
+      expect(result.current.historyEntries).toHaveLength(1);
     });
   });
 
@@ -346,7 +386,8 @@ describe("usePricingHistory", () => {
         (props: Props) => usePricingHistory("org-1", { dateFrom: props.dateFrom }),
         {
           initialProps: { dateFrom: undefined } as Props,
-        }
+          wrapper: createWrapper(),
+        },
       );
 
       await waitFor(() => {
@@ -379,7 +420,8 @@ describe("usePricingHistory", () => {
         (props: Props) => usePricingHistory("org-1", { dateTo: props.dateTo }),
         {
           initialProps: { dateTo: undefined } as Props,
-        }
+          wrapper: createWrapper(),
+        },
       );
 
       await waitFor(() => {
@@ -413,7 +455,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -436,7 +480,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -456,7 +502,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -474,7 +522,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -503,7 +553,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -530,7 +582,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -556,7 +610,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -590,7 +646,9 @@ describe("usePricingHistory", () => {
 
       vi.mocked(PricingService.listHistory).mockResolvedValue(mockHistory);
 
-      const { result } = renderHook(() => usePricingHistory("org-1"));
+      const { result } = renderHook(() => usePricingHistory("org-1"), {
+        wrapper: createWrapper(),
+      });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
