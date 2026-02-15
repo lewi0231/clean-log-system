@@ -43,8 +43,8 @@ export function useRealtimeNotifications(
             receiverId,
           });
 
-          // Invalidate the React Query cache to trigger a refetch
-          void queryClient.invalidateQueries({
+          // Refetch to ensure notification bell updates immediately
+          void queryClient.refetchQueries({
             queryKey: notificationsKey(organizationId, receiverId),
           });
         }

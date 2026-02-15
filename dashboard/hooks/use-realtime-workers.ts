@@ -41,8 +41,8 @@ export function useRealtimeWorkers(organizationId: string | null) {
             organizationId,
           });
 
-          // Invalidate the React Query cache to trigger a refetch
-          void queryClient.invalidateQueries({
+          // Refetch to ensure workers list updates immediately (e.g. status inactive→active)
+          void queryClient.refetchQueries({
             queryKey: workersLocationsKey(organizationId),
           });
         }

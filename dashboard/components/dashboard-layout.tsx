@@ -3,6 +3,7 @@
 import { OnboardingChecklist } from "@/components/onboarding/onboarding-checklist";
 import { OnboardingChecklistProvider } from "@/components/onboarding/onboarding-checklist-context";
 import { OnboardingGuard } from "@/components/onboarding/onboarding-guard";
+import { RealtimeSubscriptions } from "@/components/realtime-subscriptions";
 import DashboardSidebar from "./dashboard-sidebar";
 
 interface DashboardLayoutProps {
@@ -13,6 +14,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <OnboardingGuard>
       <OnboardingChecklistProvider>
+        <RealtimeSubscriptions />
         <div className="flex min-h-screen relative">
           <DashboardSidebar />
           <main className="flex-1 ml-64 pt-20">
