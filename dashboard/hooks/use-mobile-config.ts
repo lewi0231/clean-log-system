@@ -16,6 +16,18 @@ import type {
 import { useFieldConfigMutations } from "./use-field-config-mutations";
 import { useSectionMutations } from "./use-section-mutations";
 
+function computeSectionsWithFieldIds(
+  sections: FormSectionWithFields[],
+  fieldConfigs: FieldConfig[],
+): FormSectionWithFields[] {
+  return sections.map((section) => ({
+    ...section,
+    field_ids: fieldConfigs
+      .filter((fc) => fc.section_id === section.id)
+      .map((fc) => fc.id),
+  }));
+}
+
 interface MobileConfigData {
   fieldConfigs: FieldConfig[];
   sections: FormSectionWithFields[];
@@ -169,8 +181,9 @@ export function useMobileConfig(
     onRefetch: refetch,
   });
 
-  // Section mutations
+  // Section mutations (with useOptimistic)
   const {
+    optimisticSections,
     handleAdd: handleAddSection,
     handleUpdate: handleUpdateSection,
     handleDelete: handleDeleteSection,
@@ -181,26 +194,16 @@ export function useMobileConfig(
     onRefetch: refetch,
   });
 
-  // Update section field_ids when field configs change
-  useEffect(() => {
-    if (sections.length > 0 && fieldConfigs.length > 0) {
-      queryClient.setQueryData<MobileConfigData>(
-        mobileConfigKey(organizationId),
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            sections: old.sections.map((section) => ({
-              ...section,
-              field_ids: fieldConfigs
-                .filter((fc: FieldConfig) => fc.section_id === section.id)
-                .map((fc: FieldConfig) => fc.id),
-            })),
-          };
-        },
-      );
-    }
-  }, [fieldConfigs, sections.length, organizationId, queryClient]);
+  // Derive sections with field_ids from optimistic field configs
+  // so drag-to-section and field moves update the UI instantly
+  const optimisticSectionsWithFieldIds = useMemo(
+    () =>
+      computeSectionsWithFieldIds(
+        optimisticSections,
+        optimisticFieldConfigs,
+      ),
+    [optimisticSections, optimisticFieldConfigs],
+  );
 
   const applyTemplateMutation = useMutation({
     mutationFn: async ({
@@ -268,7 +271,7 @@ export function useMobileConfig(
   return {
     fieldConfigs,
     optimisticFieldConfigs,
-    sections,
+    sections: optimisticSectionsWithFieldIds,
     loading: query.isLoading,
     error: query.error ? (query.error as Error).message : null,
     applyingTemplate: applyTemplateMutation.isPending,

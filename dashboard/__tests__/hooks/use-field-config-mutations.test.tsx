@@ -2,7 +2,7 @@ import { createMockFieldConfig } from "@/__tests__/lib/fixtures";
 import { useFieldConfigMutations } from "@/hooks/use-field-config-mutations";
 import { supabase } from "@/lib/supabase";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -62,9 +62,9 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    let promise: Promise<void>;
+    // Handlers now use startTransition internally and don't return a promise
     act(() => {
-      promise = result.current.handleAdd({
+      result.current.handleAdd({
         name: "test_field",
         label: "Test Field",
         field_type: "text",
@@ -80,19 +80,18 @@ describe("useFieldConfigMutations", () => {
       });
     });
 
-    // Wait for the mutation to complete
-    await act(async () => {
-      await promise!;
+    // Wait for the mutation to be called
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "create-field-config",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            name: "test_field",
+            organization_id: "org-1",
+          }),
+        })
+      );
     });
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "create-field-config",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          name: "test_field",
-          organization_id: "org-1",
-        }),
-      })
-    );
   });
 
   it("should optimistically update field config", async () => {
@@ -116,26 +115,25 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    let promise: Promise<void>;
+    // Handlers now use startTransition internally and don't return a promise
     act(() => {
-      promise = result.current.handleUpdate("field-1", {
+      result.current.handleUpdate("field-1", {
         label: "Updated Label",
       });
     });
 
-    // Wait for the mutation to complete
-    await act(async () => {
-      await promise!;
+    // Wait for the mutation to be called
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "update-field-config",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            id: "field-1",
+            label: "Updated Label",
+          }),
+        })
+      );
     });
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "update-field-config",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          id: "field-1",
-          label: "Updated Label",
-        }),
-      })
-    );
   });
 
   it("should optimistically delete field config", async () => {
@@ -156,21 +154,20 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    let promise: Promise<void>;
+    // Handlers now use startTransition internally and don't return a promise
     act(() => {
-      promise = result.current.handleDelete("field-1");
+      result.current.handleDelete("field-1");
     });
 
-    // Wait for the mutation to complete
-    await act(async () => {
-      await promise!;
+    // Wait for the mutation to be called
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "delete-field-config",
+        expect.objectContaining({
+          body: { id: "field-1" },
+        })
+      );
     });
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "delete-field-config",
-      expect.objectContaining({
-        body: { id: "field-1" },
-      })
-    );
   });
 
   it.skip("should optimistically reorder field configs", async () => {
@@ -194,18 +191,21 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleReorder(["field-2", "field-1"]);
+    // Handlers now use startTransition internally and don't return a promise
+    act(() => {
+      result.current.handleReorder(["field-2", "field-1"]);
     });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "reorder-field-configs",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          field_config_ids: ["field-2", "field-1"],
-        }),
-      })
-    );
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "reorder-field-configs",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            field_config_ids: ["field-2", "field-1"],
+          }),
+        })
+      );
+    });
   });
 
   it("should call onRefetch on error", async () => {
@@ -227,14 +227,17 @@ describe("useFieldConfigMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await expect(
-        result.current.handleUpdate("field-1", {
-          label: "Updated",
-        })
-      ).rejects.toBeDefined();
+    // Handlers now use startTransition internally and don't return a promise
+    // Errors are caught internally and onRefetch is called
+    act(() => {
+      result.current.handleUpdate("field-1", {
+        label: "Updated",
+      });
     });
 
-    expect(onRefetch).toHaveBeenCalled();
+    // Wait for onRefetch to be called after the error
+    await waitFor(() => {
+      expect(onRefetch).toHaveBeenCalled();
+    });
   });
 });

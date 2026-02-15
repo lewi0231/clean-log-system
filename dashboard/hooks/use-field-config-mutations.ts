@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { startTransition, useOptimistic } from "react";
+import { useCallback, useMemo } from "react";
 
 import { mobileConfigKey } from "@/app/query-provider";
 import { log } from "@/lib/logger";
@@ -13,31 +13,11 @@ import type {
     ValidationRules,
 } from "@clean-log/shared";
 
-type OptimisticAction<T> =
-    | { type: "add"; item: T }
-    | { type: "update"; item: T }
-    | { type: "delete"; id: string }
-    | { type: "reorder"; items: T[] };
-
-function fieldConfigsReducer(
-    state: FieldConfig[],
-    action: OptimisticAction<FieldConfig>,
-): FieldConfig[] {
-    switch (action.type) {
-        case "add":
-            return [...state, action.item];
-        case "update":
-            return state.map((
-                fc,
-            ) => (fc.id === action.item.id ? action.item : fc));
-        case "delete":
-            return state.filter((fc) => fc.id !== action.id);
-        case "reorder":
-            return action.items;
-        default:
-            return state;
-    }
-}
+// Type for the cached mobile config data
+type MobileConfigData = {
+    fieldConfigs: FieldConfig[];
+    sections: { id: string; field_ids: string[] }[];
+};
 
 interface UseFieldConfigMutationsOptions {
     organizationId: string | null;
@@ -45,6 +25,15 @@ interface UseFieldConfigMutationsOptions {
     onRefetch?: () => Promise<void>;
 }
 
+/**
+ * Hook for managing field config mutations with React Query's native optimistic updates.
+ * 
+ * IMPORTANT: We use React Query's onMutate/onError/onSettled pattern instead of
+ * React 19's useOptimistic hook because:
+ * 1. React Query already manages the cache - mixing useOptimistic causes duplicates
+ * 2. React Query's pattern provides automatic rollback on error
+ * 3. No conflict between two state management systems
+ */
 export function useFieldConfigMutations({
     organizationId,
     fieldConfigs,
@@ -52,20 +41,12 @@ export function useFieldConfigMutations({
 }: UseFieldConfigMutationsOptions) {
     const queryClient = useQueryClient();
 
-    const [optimisticFieldConfigs, updateOptimisticFieldConfigs] =
-        useOptimistic(
-            fieldConfigs,
-            fieldConfigsReducer,
-        );
+    // Helper to get the query key
+    const getQueryKey = useCallback(() => {
+        return organizationId ? mobileConfigKey(organizationId) : null;
+    }, [organizationId]);
 
-    const invalidateCache = () => {
-        if (organizationId) {
-            queryClient.invalidateQueries({
-                queryKey: mobileConfigKey(organizationId),
-            });
-        }
-    };
-
+    // Create mutation with optimistic update
     const createMutation = useMutation({
         mutationFn: async (fieldConfigData: {
             name: string;
@@ -80,6 +61,7 @@ export function useFieldConfigMutations({
             section_id: string | null;
             conditional_logic: ConditionalLogic | null;
             order_position: number;
+            _tempId: string; // Temp ID for optimistic update
         }) => {
             if (!organizationId) {
                 throw new Error("Organization ID is required");
@@ -94,12 +76,78 @@ export function useFieldConfigMutations({
                 },
             );
             if (error) throw error;
+            return { tempId: fieldConfigData._tempId };
+        },
+        // Optimistic update: immediately add to cache
+        onMutate: async (newFieldConfig) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
+
+            // Cancel any outgoing refetches
+            await queryClient.cancelQueries({ queryKey });
+
+            // Snapshot the previous value for rollback
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            // Create the optimistic field config
+            const optimisticFieldConfig: FieldConfig = {
+                id: newFieldConfig._tempId,
+                organization_id: organizationId!,
+                name: newFieldConfig.name,
+                label: newFieldConfig.label,
+                field_type: newFieldConfig.field_type,
+                description: newFieldConfig.description,
+                required: newFieldConfig.required,
+                validation_rules: newFieldConfig.validation_rules,
+                options: newFieldConfig.options,
+                mutually_exclusive_group: newFieldConfig.mutually_exclusive_group,
+                group_cluster: newFieldConfig.group_cluster,
+                section_id: newFieldConfig.section_id,
+                conditional_logic: newFieldConfig.conditional_logic,
+                order_position: newFieldConfig.order_position,
+                version: 1,
+                active: true,
+                archived_at: null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+
+            // Optimistically update the cache
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    fieldConfigs: [...old.fieldConfigs, optimisticFieldConfig],
+                };
+            });
+
+            // Return context for potential rollback
+            return { previousData };
+        },
+        // Rollback on error
+        onError: (err, _newFieldConfig, context) => {
+            log.error("MobileConfig: Failed to create field config", {
+                error: err instanceof Error ? err.message : "Unknown error",
+            });
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        // Always refetch after mutation to get real server data
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
         },
         onSuccess: () => {
-            invalidateCache();
+            log.info("MobileConfig: Field config created successfully");
         },
     });
 
+    // Update mutation with optimistic update
     const updateMutation = useMutation({
         mutationFn: async ({
             fieldConfigId,
@@ -118,12 +166,51 @@ export function useFieldConfigMutations({
                 },
             );
             if (error) throw error;
+            return { fieldConfigId };
+        },
+        onMutate: async ({ fieldConfigId, fieldConfigData }) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
+
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    fieldConfigs: old.fieldConfigs.map((fc) =>
+                        fc.id === fieldConfigId
+                            ? { ...fc, ...fieldConfigData, updated_at: new Date().toISOString() }
+                            : fc,
+                    ),
+                };
+            });
+
+            return { previousData };
+        },
+        onError: (err, _variables, context) => {
+            log.error("MobileConfig: Failed to update field config", {
+                error: err instanceof Error ? err.message : "Unknown error",
+            });
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
         },
         onSuccess: () => {
-            invalidateCache();
+            log.info("MobileConfig: Field config updated successfully");
         },
     });
 
+    // Delete mutation with optimistic update
     const deleteMutation = useMutation({
         mutationFn: async (fieldConfigId: string) => {
             const { error } = await supabase.functions.invoke(
@@ -133,12 +220,47 @@ export function useFieldConfigMutations({
                 },
             );
             if (error) throw error;
+            return { fieldConfigId };
+        },
+        onMutate: async (fieldConfigId) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
+
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    fieldConfigs: old.fieldConfigs.filter((fc) => fc.id !== fieldConfigId),
+                };
+            });
+
+            return { previousData };
+        },
+        onError: (err, _fieldConfigId, context) => {
+            log.error("MobileConfig: Failed to delete field config", {
+                error: err instanceof Error ? err.message : "Unknown error",
+            });
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
         },
         onSuccess: () => {
-            invalidateCache();
+            log.info("MobileConfig: Field config deleted successfully");
         },
     });
 
+    // Reorder mutation with optimistic update
     const reorderMutation = useMutation({
         mutationFn: async (fieldConfigIds: string[]) => {
             if (!organizationId) {
@@ -154,150 +276,103 @@ export function useFieldConfigMutations({
                 },
             );
             if (error) throw error;
+            return { fieldConfigIds };
         },
-        onSuccess: () => {
-            invalidateCache();
+        onMutate: async (fieldConfigIds) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
+
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
+                if (!old) return old;
+                const idToConfig = new Map(old.fieldConfigs.map((fc) => [fc.id, fc]));
+                const reordered = fieldConfigIds
+                    .map((id) => idToConfig.get(id))
+                    .filter((fc): fc is FieldConfig => fc !== undefined);
+                const remaining = old.fieldConfigs.filter(
+                    (fc) => !fieldConfigIds.includes(fc.id),
+                );
+                return {
+                    ...old,
+                    fieldConfigs: [...reordered, ...remaining],
+                };
+            });
+
+            return { previousData };
         },
-    });
-
-    const handleAdd = async (fieldConfigData: {
-        name: string;
-        label: string;
-        field_type: FieldType;
-        description: string | null;
-        required: boolean;
-        validation_rules: ValidationRules | null;
-        options: string[] | null;
-        mutually_exclusive_group: string | null;
-        group_cluster: string | null;
-        section_id: string | null;
-        conditional_logic: ConditionalLogic | null;
-        order_position: number;
-    }) => {
-        if (!organizationId) return;
-
-        // Optimistically add field config
-        const optimisticFieldConfig: FieldConfig = {
-            id: `temp-${Date.now()}`,
-            organization_id: organizationId,
-            ...fieldConfigData,
-            version: 1,
-            active: true,
-            archived_at: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
-
-        // Call optimistic update in a transition (required by React 19)
-        startTransition(() => {
-            updateOptimisticFieldConfigs({
-                type: "add",
-                item: optimisticFieldConfig,
-            });
-        });
-
-        try {
-            // Execute async mutation (startTransition doesn't need to wrap it for our use case)
-            await createMutation.mutateAsync(fieldConfigData);
-            await onRefetch?.();
-            log.info("MobileConfig: Field config created successfully");
-        } catch (err) {
-            log.error("MobileConfig: Failed to create field config", {
-                error: err instanceof Error ? err.message : "Unknown error",
-            });
-            await onRefetch?.();
-            throw err;
-        }
-    };
-
-    const handleUpdate = async (
-        fieldConfigId: string,
-        fieldConfigData: Partial<FieldConfig>,
-    ) => {
-        const existingFieldConfig = optimisticFieldConfigs.find(
-            (fc) => fc.id === fieldConfigId,
-        );
-        if (!existingFieldConfig) return;
-
-        // Optimistically update field config
-        const optimisticFieldConfig: FieldConfig = {
-            ...existingFieldConfig,
-            ...fieldConfigData,
-            updated_at: new Date().toISOString(),
-        };
-
-        // Call optimistic update in a transition (required by React 19)
-        startTransition(() => {
-            updateOptimisticFieldConfigs({
-                type: "update",
-                item: optimisticFieldConfig,
-            });
-        });
-
-        try {
-            // Execute async mutation
-            await updateMutation.mutateAsync({
-                fieldConfigId,
-                fieldConfigData,
-            });
-            log.info("MobileConfig: Field config updated successfully");
-        } catch (err) {
-            log.error("MobileConfig: Failed to update field config", {
-                error: err instanceof Error ? err.message : "Unknown error",
-            });
-            await onRefetch?.();
-            throw err;
-        }
-    };
-
-    const handleDelete = async (fieldConfigId: string) => {
-        // Optimistically delete field config - call in a transition (required by React 19)
-        startTransition(() => {
-            updateOptimisticFieldConfigs({ type: "delete", id: fieldConfigId });
-        });
-
-        try {
-            // Execute async mutation
-            await deleteMutation.mutateAsync(fieldConfigId);
-            await onRefetch?.();
-            log.info("MobileConfig: Field config deleted successfully");
-        } catch (err) {
-            log.error("MobileConfig: Failed to delete field config", {
-                error: err instanceof Error ? err.message : "Unknown error",
-            });
-            await onRefetch?.();
-            throw err;
-        }
-    };
-
-    const handleReorder = async (fieldConfigIds: string[]) => {
-        if (!organizationId) return;
-
-        // Optimistically reorder - use current optimistic state
-        const reorderedConfigs = fieldConfigIds
-            .map((id) => optimisticFieldConfigs.find((fc) => fc.id === id))
-            .filter((fc): fc is FieldConfig => fc !== undefined);
-
-        // Call optimistic update in a transition (required by React 19)
-        startTransition(() => {
-            updateOptimisticFieldConfigs({
-                type: "reorder",
-                items: reorderedConfigs,
-            });
-        });
-
-        try {
-            // Execute async mutation
-            await reorderMutation.mutateAsync(fieldConfigIds);
-            log.info("MobileConfig: Field configs reordered successfully");
-        } catch (err) {
+        onError: (err, _fieldConfigIds, context) => {
             log.error("MobileConfig: Failed to reorder field configs", {
                 error: err instanceof Error ? err.message : "Unknown error",
             });
-            await onRefetch?.();
-            throw err;
-        }
-    };
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
+        },
+        onSuccess: () => {
+            log.info("MobileConfig: Field configs reordered successfully");
+        },
+    });
+
+    // Handler functions that trigger the mutations
+    const handleAdd = useCallback(
+        (fieldConfigData: {
+            name: string;
+            label: string;
+            field_type: FieldType;
+            description: string | null;
+            required: boolean;
+            validation_rules: ValidationRules | null;
+            options: string[] | null;
+            mutually_exclusive_group: string | null;
+            group_cluster: string | null;
+            section_id: string | null;
+            conditional_logic: ConditionalLogic | null;
+            order_position: number;
+        }) => {
+            if (!organizationId) return;
+            createMutation.mutate({
+                ...fieldConfigData,
+                _tempId: `temp-${Date.now()}`,
+            });
+        },
+        [organizationId, createMutation],
+    );
+
+    const handleUpdate = useCallback(
+        (fieldConfigId: string, fieldConfigData: Partial<FieldConfig>) => {
+            updateMutation.mutate({ fieldConfigId, fieldConfigData });
+        },
+        [updateMutation],
+    );
+
+    const handleDelete = useCallback(
+        (fieldConfigId: string) => {
+            deleteMutation.mutate(fieldConfigId);
+        },
+        [deleteMutation],
+    );
+
+    const handleReorder = useCallback(
+        (fieldConfigIds: string[]) => {
+            if (!organizationId) return;
+            reorderMutation.mutate(fieldConfigIds);
+        },
+        [organizationId, reorderMutation],
+    );
+
+    // Use the fieldConfigs directly from props (which comes from React Query cache)
+    // The optimistic updates are applied directly to the cache via onMutate
+    const optimisticFieldConfigs = useMemo(() => fieldConfigs, [fieldConfigs]);
 
     return {
         optimisticFieldConfigs,

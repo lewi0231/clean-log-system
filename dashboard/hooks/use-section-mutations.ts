@@ -1,16 +1,18 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo } from "react";
 
 import { mobileConfigKey } from "@/app/query-provider";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import type { FormSectionWithFields } from "@clean-log/shared";
 
-interface MobileConfigData {
-    fieldConfigs: unknown[];
+// Type for the cached mobile config data
+type MobileConfigData = {
+    fieldConfigs: { id: string; section_id: string | null }[];
     sections: FormSectionWithFields[];
-}
+};
 
 interface UseSectionMutationsOptions {
     organizationId: string | null;
@@ -18,6 +20,15 @@ interface UseSectionMutationsOptions {
     onRefetch?: () => Promise<void>;
 }
 
+/**
+ * Hook for managing section mutations with React Query's native optimistic updates.
+ * 
+ * IMPORTANT: We use React Query's onMutate/onError/onSettled pattern instead of
+ * React 19's useOptimistic hook because:
+ * 1. React Query already manages the cache - mixing useOptimistic causes duplicates
+ * 2. React Query's pattern provides automatic rollback on error
+ * 3. No conflict between two state management systems
+ */
 export function useSectionMutations({
     organizationId,
     sections,
@@ -25,20 +36,19 @@ export function useSectionMutations({
 }: UseSectionMutationsOptions) {
     const queryClient = useQueryClient();
 
-    const invalidateCache = () => {
-        if (organizationId) {
-            queryClient.invalidateQueries({
-                queryKey: mobileConfigKey(organizationId),
-            });
-        }
-    };
+    // Helper to get the query key
+    const getQueryKey = useCallback(() => {
+        return organizationId ? mobileConfigKey(organizationId) : null;
+    }, [organizationId]);
 
+    // Create mutation with optimistic update
     const createMutation = useMutation({
         mutationFn: async (section: {
             title: string;
             description: string | null;
             order_position: number;
             collapsed_by_default: boolean;
+            _tempId: string;
         }) => {
             if (!organizationId) {
                 throw new Error("Organization ID is required");
@@ -48,17 +58,67 @@ export function useSectionMutations({
                 {
                     body: {
                         organization_id: organizationId,
-                        ...section,
+                        title: section.title,
+                        description: section.description,
+                        order_position: section.order_position,
+                        collapsed_by_default: section.collapsed_by_default,
                     },
                 },
             );
             if (error) throw error;
+            return { tempId: section._tempId };
+        },
+        onMutate: async (newSection) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
+
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            const optimisticSection: FormSectionWithFields = {
+                id: newSection._tempId,
+                organization_id: organizationId!,
+                title: newSection.title,
+                description: newSection.description,
+                order_position: newSection.order_position,
+                collapsed_by_default: newSection.collapsed_by_default,
+                field_ids: [],
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            };
+
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    sections: [...old.sections, optimisticSection],
+                };
+            });
+
+            return { previousData };
+        },
+        onError: (err, _newSection, context) => {
+            log.error("MobileConfig: Failed to create section", {
+                error: err instanceof Error ? err.message : "Unknown error",
+            });
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
         },
         onSuccess: () => {
-            invalidateCache();
+            log.info("MobileConfig: Section created successfully");
         },
     });
 
+    // Update mutation with optimistic update
     const updateMutation = useMutation({
         mutationFn: async ({
             sectionId,
@@ -77,12 +137,51 @@ export function useSectionMutations({
                 },
             );
             if (error) throw error;
+            return { sectionId };
+        },
+        onMutate: async ({ sectionId, updates }) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
+
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
+                if (!old) return old;
+                return {
+                    ...old,
+                    sections: old.sections.map((s) =>
+                        s.id === sectionId
+                            ? { ...s, ...updates, updated_at: new Date().toISOString() }
+                            : s,
+                    ),
+                };
+            });
+
+            return { previousData };
+        },
+        onError: (err, _variables, context) => {
+            log.error("MobileConfig: Failed to update section", {
+                error: err instanceof Error ? err.message : "Unknown error",
+            });
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
         },
         onSuccess: () => {
-            invalidateCache();
+            log.info("MobileConfig: Section updated successfully");
         },
     });
 
+    // Delete mutation with optimistic update
     const deleteMutation = useMutation({
         mutationFn: async (sectionId: string) => {
             const { error } = await supabase.functions.invoke(
@@ -92,167 +191,154 @@ export function useSectionMutations({
                 },
             );
             if (error) throw error;
+            return { sectionId };
         },
-        onSuccess: () => {
-            invalidateCache();
-        },
-    });
+        onMutate: async (sectionId) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
 
-    const handleAdd = async (
-        section: Omit<
-            FormSectionWithFields,
-            "id" | "organization_id" | "created_at" | "updated_at"
-        >,
-    ) => {
-        if (!organizationId) return;
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
 
-        // Optimistically add section
-        const optimisticSection: FormSectionWithFields = {
-            ...section,
-            id: `temp-section-${Date.now()}`,
-            organization_id: organizationId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
-
-        queryClient.setQueryData<MobileConfigData>(
-            mobileConfigKey(organizationId),
-            (old) => {
-                if (!old) return old;
-                return {
-                    ...old,
-                    sections: [...old.sections, optimisticSection],
-                };
-            },
-        );
-
-        try {
-            await createMutation.mutateAsync({
-                title: section.title,
-                description: section.description ?? null,
-                order_position: section.order_position,
-                collapsed_by_default: section.collapsed_by_default,
-            });
-            await onRefetch?.();
-            log.info("MobileConfig: Section created successfully");
-        } catch (err) {
-            log.error("MobileConfig: Failed to create section", {
-                error: err instanceof Error ? err.message : "Unknown error",
-            });
-            await onRefetch?.();
-            throw err;
-        }
-    };
-
-    const handleUpdate = async (
-        sectionId: string,
-        updates: Partial<FormSectionWithFields>,
-    ) => {
-        // Optimistically update section
-        queryClient.setQueryData<MobileConfigData>(
-            mobileConfigKey(organizationId),
-            (old) => {
-                if (!old) return old;
-                return {
-                    ...old,
-                    sections: old.sections.map((s) =>
-                        s.id === sectionId
-                            ? {
-                                ...s,
-                                ...updates,
-                                updated_at: new Date().toISOString(),
-                            }
-                            : s
-                    ),
-                };
-            },
-        );
-
-        try {
-            await updateMutation.mutateAsync({ sectionId, updates });
-            await onRefetch?.();
-            log.info("MobileConfig: Section updated successfully");
-        } catch (err) {
-            log.error("MobileConfig: Failed to update section", {
-                error: err instanceof Error ? err.message : "Unknown error",
-            });
-            await onRefetch?.();
-            throw err;
-        }
-    };
-
-    const handleDelete = async (sectionId: string) => {
-        // Optimistically delete section
-        queryClient.setQueryData<MobileConfigData>(
-            mobileConfigKey(organizationId),
-            (old) => {
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
                 if (!old) return old;
                 return {
                     ...old,
                     sections: old.sections.filter((s) => s.id !== sectionId),
                 };
-            },
-        );
+            });
 
-        try {
-            await deleteMutation.mutateAsync(sectionId);
-            await onRefetch?.();
-            log.info("MobileConfig: Section deleted successfully");
-        } catch (err) {
+            return { previousData };
+        },
+        onError: (err, _sectionId, context) => {
             log.error("MobileConfig: Failed to delete section", {
                 error: err instanceof Error ? err.message : "Unknown error",
             });
-            await onRefetch?.();
-            throw err;
-        }
-    };
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
+        },
+        onSuccess: () => {
+            log.info("MobileConfig: Section deleted successfully");
+        },
+    });
 
-    const handleReorder = async (sectionIds: string[]) => {
-        // Optimistically reorder
-        const reordered = sectionIds
-            .map((id: string) =>
-                sections.find((s: FormSectionWithFields) => s.id === id)
-            )
-            .filter((s): s is FormSectionWithFields => s !== undefined)
-            .map((s: FormSectionWithFields, index: number) => ({
-                ...s,
-                order_position: index,
-            }));
+    // Reorder mutation with optimistic update
+    const reorderMutation = useMutation({
+        mutationFn: async (sectionIds: string[]) => {
+            // Update each section's order position
+            await Promise.all(
+                sectionIds.map((id, index) =>
+                    supabase.functions.invoke("update-form-section", {
+                        body: {
+                            id,
+                            order_position: index,
+                        },
+                    }),
+                ),
+            );
+            return { sectionIds };
+        },
+        onMutate: async (sectionIds) => {
+            const queryKey = getQueryKey();
+            if (!queryKey) return;
 
-        queryClient.setQueryData<MobileConfigData>(
-            mobileConfigKey(organizationId),
-            (old) => {
+            await queryClient.cancelQueries({ queryKey });
+            const previousData = queryClient.getQueryData<MobileConfigData>(queryKey);
+
+            queryClient.setQueryData<MobileConfigData>(queryKey, (old) => {
                 if (!old) return old;
+                const idToSection = new Map(old.sections.map((s) => [s.id, s]));
+                const reordered = sectionIds
+                    .map((id, index) => {
+                        const section = idToSection.get(id);
+                        return section ? { ...section, order_position: index } : undefined;
+                    })
+                    .filter((s): s is FormSectionWithFields => s !== undefined);
                 return {
                     ...old,
                     sections: reordered,
                 };
-            },
-        );
+            });
 
-        // Update each section's order_position in the database
-        try {
-            await Promise.all(
-                reordered.map((section, index) =>
-                    supabase.functions.invoke("update-form-section", {
-                        body: {
-                            id: section.id,
-                            order_position: index,
-                        },
-                    })
-                ),
-            );
-            await onRefetch?.();
-            log.info("MobileConfig: Sections reordered successfully");
-        } catch (err) {
+            return { previousData };
+        },
+        onError: (err, _sectionIds, context) => {
             log.error("MobileConfig: Failed to reorder sections", {
                 error: err instanceof Error ? err.message : "Unknown error",
             });
-            await onRefetch?.();
-        }
-    };
+            const queryKey = getQueryKey();
+            if (queryKey && context?.previousData) {
+                queryClient.setQueryData(queryKey, context.previousData);
+            }
+            onRefetch?.();
+        },
+        onSettled: () => {
+            const queryKey = getQueryKey();
+            if (queryKey) {
+                queryClient.invalidateQueries({ queryKey });
+            }
+        },
+        onSuccess: () => {
+            log.info("MobileConfig: Sections reordered successfully");
+        },
+    });
+
+    // Handler functions
+    const handleAdd = useCallback(
+        (
+            section: Omit<
+                FormSectionWithFields,
+                "id" | "organization_id" | "created_at" | "updated_at"
+            >,
+        ) => {
+            if (!organizationId) return;
+            createMutation.mutate({
+                title: section.title,
+                description: section.description ?? null,
+                order_position: section.order_position,
+                collapsed_by_default: section.collapsed_by_default,
+                _tempId: `temp-section-${Date.now()}`,
+            });
+        },
+        [organizationId, createMutation],
+    );
+
+    const handleUpdate = useCallback(
+        (sectionId: string, updates: Partial<FormSectionWithFields>) => {
+            updateMutation.mutate({ sectionId, updates });
+        },
+        [updateMutation],
+    );
+
+    const handleDelete = useCallback(
+        (sectionId: string) => {
+            deleteMutation.mutate(sectionId);
+        },
+        [deleteMutation],
+    );
+
+    const handleReorder = useCallback(
+        (sectionIds: string[]) => {
+            reorderMutation.mutate(sectionIds);
+        },
+        [reorderMutation],
+    );
+
+    // Use sections directly from props (which comes from React Query cache)
+    // The optimistic updates are applied directly to the cache via onMutate
+    const optimisticSections = useMemo(() => sections, [sections]);
 
     return {
+        optimisticSections,
         handleAdd,
         handleUpdate,
         handleDelete,

@@ -84,7 +84,6 @@ export function FieldConfigDialog({
   const [required, setRequired] = useState(false);
   const [sectionId, setSectionId] = useState<string>("none");
   const [options, setOptions] = useState<string>("");
-  const [saving, setSaving] = useState(false);
   const [restrictToLocations, setRestrictToLocations] = useState(false);
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [allowMultiple, setAllowMultiple] = useState(false);
@@ -145,11 +144,18 @@ export function FieldConfigDialog({
   const handleSave = async () => {
     if (!label.trim() || !name.trim()) return;
 
-    setSaving(true);
+    // Capture values before closing (for location restrictions)
+    const savedName = name.trim();
+    const savedRestrictToLocations = restrictToLocations;
+    const savedLocationIds = [...selectedLocationIds];
+
+    // Close dialog immediately for optimistic UX
+    onOpenChange(false);
+
     try {
-      // Save the field first
+      // Save the field (optimistic update happens in the hook)
       await onSave({
-        name: name.trim(),
+        name: savedName,
         label: label.trim(),
         field_type: fieldType,
         description: description.trim() || null,
@@ -173,62 +179,63 @@ export function FieldConfigDialog({
         conditional_logic: null,
       });
 
-      // Save location restrictions after field is created
-      // We need to find the newly created field config by name
+      // Save location restrictions after field is created (in background)
       if (
-        restrictToLocations &&
-        selectedLocationIds.length > 0 &&
+        savedRestrictToLocations &&
+        savedLocationIds.length > 0 &&
         organizationId
       ) {
-        try {
-          // Wait a bit for the field config to be created
-          await new Promise((resolve) => setTimeout(resolve, 500));
-
-          // Fetch field configs to find the newly created one
-          const { data, error: fetchError } = await supabase.functions.invoke(
-            "list-field-configs",
-            {
-              body: {
-                organization_id: organizationId,
-              },
-            }
-          );
-
-          if (!fetchError && data?.field_configs) {
-            const newFieldConfig = data.field_configs.find(
-              (fc: FieldConfig) => fc.name === name.trim()
+        // Wait a bit for the field config to be created, then save restrictions
+        setTimeout(async () => {
+          try {
+            const { data, error: fetchError } = await supabase.functions.invoke(
+              "list-field-configs",
+              {
+                body: {
+                  organization_id: organizationId,
+                },
+              }
             );
 
-            if (newFieldConfig?.id) {
-              const { error: locationError } = await supabase.functions.invoke(
-                "update-field-config-locations",
-                {
-                  body: {
-                    field_config_id: newFieldConfig.id,
-                    location_ids: selectedLocationIds,
-                  },
-                }
+            if (!fetchError && data?.field_configs) {
+              const newFieldConfig = data.field_configs.find(
+                (fc: FieldConfig) => fc.name === savedName
               );
 
-              if (locationError) {
-                log.error("Failed to save location restrictions", {
-                  error: locationError.message || "Unknown error",
-                  fieldId: newFieldConfig?.id,
-                });
+              if (newFieldConfig?.id) {
+                const { error: locationError } = await supabase.functions.invoke(
+                  "update-field-config-locations",
+                  {
+                    body: {
+                      field_config_id: newFieldConfig.id,
+                      location_ids: savedLocationIds,
+                    },
+                  }
+                );
+
+                if (locationError) {
+                  log.error("Failed to save location restrictions", {
+                    error: locationError.message || "Unknown error",
+                    fieldId: newFieldConfig?.id,
+                  });
+                }
               }
             }
+          } catch (err) {
+            log.error("Failed to save location restrictions", {
+              error: err instanceof Error ? err.message : "Unknown error",
+              fieldName: savedName,
+            });
           }
-        } catch (err) {
-          log.error("Failed to save location restrictions", {
-            error: err instanceof Error ? err.message : "Unknown error",
-            fieldName: name,
-          });
-        }
+        }, 500);
       }
-
-      onOpenChange(false);
-    } finally {
-      setSaving(false);
+    } catch (err) {
+      // Error is logged in the mutation hook
+      // The optimistic update will roll back automatically via invalidateQueries
+      log.error("Failed to create field", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldName: savedName,
+      });
     }
   };
 
@@ -473,9 +480,9 @@ export function FieldConfigDialog({
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving || !label.trim() || !name.trim()}
+            disabled={!label.trim() || !name.trim()}
           >
-            {saving ? "Adding..." : "Add Field"}
+            Add Field
           </Button>
         </DialogFooter>
       </DialogContent>

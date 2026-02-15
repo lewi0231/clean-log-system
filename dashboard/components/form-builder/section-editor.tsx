@@ -169,6 +169,36 @@ export function SectionEditor({
   const [sectionFieldOrders, setSectionFieldOrders] = useState<
     Map<string, string[]>
   >(() => new Map(sections.map((s) => [s.id, s.field_ids || []])));
+
+  // Sync sectionFieldOrders when sections.field_ids change (e.g., from optimistic updates)
+  useEffect(() => {
+    setSectionFieldOrders((prev) => {
+      const next = new Map(prev);
+      let hasChanges = false;
+      for (const section of sections) {
+        const currentOrder = prev.get(section.id);
+        const newFieldIds = section.field_ids || [];
+        // Only update if the field_ids have actually changed
+        if (
+          !currentOrder ||
+          currentOrder.length !== newFieldIds.length ||
+          !currentOrder.every((id, i) => newFieldIds[i] === id)
+        ) {
+          next.set(section.id, newFieldIds);
+          hasChanges = true;
+        }
+      }
+      // Remove sections that no longer exist
+      for (const sectionId of prev.keys()) {
+        if (!sections.some((s) => s.id === sectionId)) {
+          next.delete(sectionId);
+          hasChanges = true;
+        }
+      }
+      return hasChanges ? next : prev;
+    });
+  }, [sections]);
+
   const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
     Map<string, boolean>
   >(new Map());
@@ -811,11 +841,18 @@ export function SectionEditor({
                   <div className="p-3 text-xs text-muted-foreground bg-background space-y-3">
                     <p>{section.description || "No description"}</p>
                     {(() => {
-                      // Get ordered field IDs for this section
-                      const orderedFieldIds =
-                        sectionFieldOrders.get(section.id) ||
-                        section.field_ids ||
-                        [];
+                      // Get ordered field IDs for this section from local state
+                      const localOrder = sectionFieldOrders.get(section.id) || [];
+                      // Use section.field_ids as the source of truth for which fields belong
+                      const sectionFieldIds = section.field_ids || [];
+                      
+                      // Merge: keep local order for existing fields, append any new fields not in local order
+                      const localOrderSet = new Set(localOrder);
+                      const orderedFieldIds = [
+                        ...localOrder.filter((id) => sectionFieldIds.includes(id)),
+                        ...sectionFieldIds.filter((id) => !localOrderSet.has(id)),
+                      ];
+                      
                       // Map to ordered fields
                       const orderedSectionFields = orderedFieldIds
                         .map((fieldId) => fieldMap.get(fieldId))

@@ -168,13 +168,44 @@ export function VisualFormBuilder({
   const { settings } = useOrganizationSettings();
 
   // Keep local order in sync when fields change externally
+  // Include any new fields that aren't in fieldOrder yet (e.g., optimistic adds)
   React.useEffect(() => {
-    setFieldOrder(fields.map((f) => f.id));
+    setFieldOrder((prev) => {
+      const currentIds = new Set(prev);
+      const newIds = fields.map((f) => f.id);
+      const addedIds = newIds.filter((id) => !currentIds.has(id));
+      const removedIds = new Set(
+        prev.filter((id) => !newIds.includes(id))
+      );
+      
+      // If nothing changed, return previous to avoid re-render
+      if (addedIds.length === 0 && removedIds.size === 0) {
+        return prev;
+      }
+      
+      // Keep existing order for fields that still exist, append new ones
+      const filtered = prev.filter((id) => !removedIds.has(id));
+      return [...filtered, ...addedIds];
+    });
   }, [fields]);
 
-  // Load location restrictions for all fields on mount
+  // Track field IDs that we've loaded location restrictions for
+  const loadedRestrictionsRef = React.useRef<Set<string>>(new Set());
+
+  // Load location restrictions for fields - only fetch for IDs we haven't loaded yet
   React.useEffect(() => {
-    if (!organizationId || fields.length === 0) return;
+    if (!organizationId) return;
+    
+    // Find field IDs that have real IDs (not temp-*) and haven't been loaded yet
+    const realFieldIds = fields
+      .filter((f) => !f.id.startsWith("temp-"))
+      .map((f) => f.id);
+    const unloadedIds = realFieldIds.filter(
+      (id) => !loadedRestrictionsRef.current.has(id)
+    );
+    
+    // If all fields are loaded or there are no real fields, skip
+    if (unloadedIds.length === 0) return;
 
     async function fetchAllLocationRestrictions() {
       try {
@@ -195,6 +226,7 @@ export function VisualFormBuilder({
 
         (data?.field_configs || []).forEach(
           (fc: FieldConfig & { location_restrictions?: string[] }) => {
+            loadedRestrictionsRef.current.add(fc.id);
             if (
               fc.location_restrictions &&
               fc.location_restrictions.length > 0
@@ -207,8 +239,16 @@ export function VisualFormBuilder({
           }
         );
 
-        setLocationRestrictionsMap(restrictionsMap);
-        setRestrictToLocationsMap(restrictMap);
+        setLocationRestrictionsMap((prev) => {
+          const next = new Map(prev);
+          restrictionsMap.forEach((v, k) => next.set(k, v));
+          return next;
+        });
+        setRestrictToLocationsMap((prev) => {
+          const next = new Map(prev);
+          restrictMap.forEach((v, k) => next.set(k, v));
+          return next;
+        });
       } catch (err) {
         log.error("Failed to fetch location restrictions", {
           error: err instanceof Error ? err.message : "Unknown error",
@@ -219,13 +259,19 @@ export function VisualFormBuilder({
     fetchAllLocationRestrictions();
   }, [organizationId, fields]);
 
-  const orderedFields = React.useMemo(
-    () =>
-      fieldOrder
-        .map((id) => fields.find((f) => f.id === id))
-        .filter((f): f is FieldConfig => f !== undefined),
-    [fieldOrder, fields]
-  );
+  // Compute ordered fields - use fieldOrder but include any new fields not yet in the order
+  const orderedFields = React.useMemo(() => {
+    const fieldMap = new Map(fields.map((f) => [f.id, f]));
+    const inOrder = fieldOrder
+      .map((id) => fieldMap.get(id))
+      .filter((f): f is FieldConfig => f !== undefined);
+    
+    // Add any fields that aren't in fieldOrder yet (optimistic adds)
+    const inOrderIds = new Set(fieldOrder);
+    const notInOrder = fields.filter((f) => !inOrderIds.has(f.id));
+    
+    return [...inOrder, ...notInOrder];
+  }, [fieldOrder, fields]);
 
   // Helper to generate unique field name
   const generateFieldName = (

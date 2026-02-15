@@ -2,7 +2,7 @@ import { useSectionMutations } from "@/hooks/use-section-mutations";
 import { supabase } from "@/lib/supabase";
 import type { FormSectionWithFields } from "@clean-log/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -77,8 +77,9 @@ describe("useSectionMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleAdd({
+    // Handlers now use startTransition internally and don't return a promise
+    act(() => {
+      result.current.handleAdd({
         title: "New Section",
         description: "Description",
         order_position: 0,
@@ -87,15 +88,18 @@ describe("useSectionMutations", () => {
       });
     });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "create-form-section",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          title: "New Section",
-          organization_id: "org-1",
-        }),
-      })
-    );
+    // Wait for the mutation to be called
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "create-form-section",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            title: "New Section",
+            organization_id: "org-1",
+          }),
+        })
+      );
+    });
   });
 
   it("should optimistically update section", async () => {
@@ -119,21 +123,25 @@ describe("useSectionMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleUpdate("section-1", {
+    // Handlers now use startTransition internally and don't return a promise
+    act(() => {
+      result.current.handleUpdate("section-1", {
         title: "Updated Title",
       });
     });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "update-form-section",
-      expect.objectContaining({
-        body: expect.objectContaining({
-          id: "section-1",
-          title: "Updated Title",
-        }),
-      })
-    );
+    // Wait for the mutation to be called
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "update-form-section",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            id: "section-1",
+            title: "Updated Title",
+          }),
+        })
+      );
+    });
   });
 
   it("should optimistically delete section", async () => {
@@ -154,16 +162,20 @@ describe("useSectionMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleDelete("section-1");
+    // Handlers now use startTransition internally and don't return a promise
+    act(() => {
+      result.current.handleDelete("section-1");
     });
 
-    expect(supabase.functions.invoke).toHaveBeenCalledWith(
-      "delete-form-section",
-      expect.objectContaining({
-        body: { id: "section-1" },
-      })
-    );
+    // Wait for the mutation to be called
+    await waitFor(() => {
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "delete-form-section",
+        expect.objectContaining({
+          body: { id: "section-1" },
+        })
+      );
+    });
   });
 
   it("should reorder sections", async () => {
@@ -187,12 +199,17 @@ describe("useSectionMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await result.current.handleReorder(["section-2", "section-1"]);
+    // Handlers now use startTransition internally and don't return a promise
+    act(() => {
+      result.current.handleReorder(["section-2", "section-1"]);
     });
 
-    // Should call update-form-section for each section with new order
-    expect(supabase.functions.invoke).toHaveBeenCalledTimes(2);
+    // Wait for the mutations to be called
+    await waitFor(() => {
+      // Should call update-form-section for each section with new order
+      expect(supabase.functions.invoke).toHaveBeenCalledTimes(2);
+    });
+
     expect(supabase.functions.invoke).toHaveBeenCalledWith(
       "update-form-section",
       expect.objectContaining({
@@ -223,14 +240,17 @@ describe("useSectionMutations", () => {
       { wrapper: createWrapper() }
     );
 
-    await act(async () => {
-      await expect(
-        result.current.handleUpdate("section-1", {
-          title: "Updated",
-        })
-      ).rejects.toBeDefined();
+    // Handlers now use startTransition internally and don't return a promise
+    // Errors are caught internally and onRefetch is called
+    act(() => {
+      result.current.handleUpdate("section-1", {
+        title: "Updated",
+      });
     });
 
-    expect(onRefetch).toHaveBeenCalled();
+    // Wait for onRefetch to be called after the error
+    await waitFor(() => {
+      expect(onRefetch).toHaveBeenCalled();
+    });
   });
 });
