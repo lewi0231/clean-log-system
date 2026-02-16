@@ -1,7 +1,7 @@
 import { useCurrentWorker } from "@/hooks/use-current-worker";
 import { useAuth } from "@/hooks/useAuth";
-import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -35,9 +35,8 @@ interface PendingConfirmation {
 }
 
 export default function PendingConfirmationsScreen() {
-  const { user, session } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { worker } = useCurrentWorker();
-  const { organizationId } = useOrganization();
 
   const [confirmations, setConfirmations] = useState<PendingConfirmation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +51,7 @@ export default function PendingConfirmationsScreen() {
 
   const fetchConfirmations = useCallback(async () => {
     if (!user || !session?.access_token) {
-      setLoading(false);
+      if (!authLoading) setLoading(false); // Auth resolved but no session
       return;
     }
 
@@ -86,7 +85,7 @@ export default function PendingConfirmationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user, session?.access_token]);
+  }, [user, session?.access_token, authLoading]);
 
   useEffect(() => {
     fetchConfirmations();
@@ -220,12 +219,40 @@ export default function PendingConfirmationsScreen() {
     });
   };
 
-  if (loading) {
+  // Show skeleton until we've completed the initial fetch (never show empty state before load)
+  const isInitialLoad = loading || authLoading;
+  if (isInitialLoad) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="rgb(37 99 235)" />
-          <Text className="text-muted-foreground mt-4">Loading...</Text>
+        <View className="flex-1">
+          {/* Header skeleton */}
+          <View className="px-4 pt-4 pb-3 border-b border-border/50">
+            <Skeleton width="60%" height={28} className="mb-2" />
+            <Skeleton width="80%" height={16} />
+          </View>
+          {/* Content skeleton - card placeholders */}
+          <View className="p-4 gap-4">
+            {[1, 2, 3].map((i) => (
+              <View
+                key={i}
+                className="bg-card rounded-xl p-4 border border-border/50"
+              >
+                <View className="flex-row justify-between mb-3">
+                  <Skeleton width="50%" height={18} />
+                  <Skeleton width={60} height={24} rounded />
+                </View>
+                <Skeleton width="70%" height={14} className="mb-3" />
+                <View className="flex-row gap-2 mb-4">
+                  <Skeleton width={80} height={24} rounded />
+                  <Skeleton width={80} height={24} rounded />
+                </View>
+                <View className="flex-row gap-3">
+                  <Skeleton width="48%" height={44} rounded={false} />
+                  <Skeleton width="48%" height={44} rounded={false} />
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
       </SafeAreaView>
     );

@@ -267,8 +267,7 @@ export function useFieldConfigs(
 
   useEffect(() => {
     if (!organizationId) {
-      setLoading(false);
-      return;
+      return; // Keep loading true until we have org and can fetch
     }
 
     async function fetchFieldConfigs() {

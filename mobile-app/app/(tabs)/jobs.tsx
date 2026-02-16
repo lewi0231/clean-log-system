@@ -3,6 +3,7 @@ import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -42,7 +43,7 @@ interface Job {
 export default function JobsScreen() {
   const { user, session } = useAuth();
   const { worker } = useCurrentWorker();
-  const { organizationId } = useOrganization();
+  const { organizationId, loading: orgLoading } = useOrganization();
   const { isAdmin } = useUserRole();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +53,7 @@ export default function JobsScreen() {
 
   const fetchJobs = useCallback(async () => {
     if (!user || !organizationId) {
-      setLoading(false);
+      if (!orgLoading) setLoading(false); // Org resolved but unavailable
       return;
     }
 
@@ -110,7 +111,7 @@ export default function JobsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user, organizationId, worker, isAdmin]);
+  }, [user, organizationId, worker, isAdmin, orgLoading]);
 
   useEffect(() => {
     setLoading(true);
@@ -249,12 +250,35 @@ export default function JobsScreen() {
     }
   };
 
-  if (loading) {
+  // Show skeleton until we've completed the initial fetch (never show empty state before load)
+  const isInitialLoad = loading || orgLoading;
+  if (isInitialLoad) {
     return (
       <SafeAreaView className="flex-1 bg-background" edges={["top"]}>
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="rgb(37 99 235)" />
-          <Text className="text-muted-foreground mt-4">Loading jobs...</Text>
+        <View className="flex-1">
+          {/* Header skeleton */}
+          <View className="px-4 pt-4 pb-3 border-b border-border/50">
+            <Skeleton width="40%" height={28} className="mb-2" />
+            <Skeleton width="50%" height={16} />
+          </View>
+          {/* Content skeleton - job card placeholders */}
+          <View className="p-4 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <View
+                key={i}
+                className="bg-card rounded-xl p-4 border border-border/50"
+              >
+                <View className="flex-row justify-between mb-2">
+                  <Skeleton width="45%" height={18} />
+                  <Skeleton width={50} height={14} />
+                </View>
+                <View className="flex-row gap-1.5 mt-2">
+                  <Skeleton width={70} height={22} rounded />
+                  <Skeleton width={60} height={22} rounded />
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
       </SafeAreaView>
     );

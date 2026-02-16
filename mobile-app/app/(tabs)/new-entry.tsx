@@ -101,24 +101,9 @@ function evaluateCondition(
 }
 
 export default function NewEntryScreen() {
-  // #region agent log
-  fetch("http://127.0.0.1:7242/ingest/0d1ba94f-1dd7-415c-b280-fce28d1bc840", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "new-entry.tsx:102",
-      message: "Component rendering/mounting",
-      data: {},
-      timestamp: Date.now(),
-      sessionId: "debug-session",
-      runId: "run1",
-      hypothesisId: "A",
-    }),
-  }).catch(() => {});
-  // #endregion
   const scrollViewRef = useRef<any>(null);
   const fieldPositions = useRef<Record<string, number>>({});
-  const { organizationId } = useOrganization();
+  const { organizationId, loading: orgLoading } = useOrganization();
   const { settings } = useOrganizationSettings(organizationId);
   const { user } = useAuth();
   const { worker } = useCurrentWorker();
@@ -674,6 +659,32 @@ export default function NewEntryScreen() {
   const isLastStep = currentStep === totalSteps - 1;
   const isSummaryStep = currentStep === totalSteps - 1;
   const currentSection = getCurrentSection();
+
+  // Show full-screen skeleton until org is ready (prevents flash of empty/minimal form)
+  if (orgLoading || !organizationId) {
+    return (
+      <View className="flex-1 bg-background">
+        <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+          <View className="px-4 pt-4 pb-3">
+            <Skeleton width="30%" height={20} className="mb-2" />
+            <Skeleton width="100%" height={8} rounded={false} />
+          </View>
+          <View className="px-4 pt-6">
+            <View className="bg-card rounded-2xl p-6">
+              <View className="flex-col gap-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <View key={i} className="flex-col gap-2">
+                    <Skeleton height={16} width="60%" />
+                    <Skeleton height={48} fullWidth rounded={false} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   // Check if first step data is ready
   const isFirstStepReady =
