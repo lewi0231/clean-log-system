@@ -1,7 +1,9 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -61,7 +63,7 @@ serve(async (req) => {
     // Get the job and verify it's in pending status
     const { data: job, error: jobError } = await supabase
       .from("job")
-      .select("id, organization_id, approval_status")
+      .select("id, organization_id, approval_status, location_id, location:location_id (name)")
       .eq("id", job_id)
       .single();
 
@@ -175,6 +177,51 @@ serve(async (req) => {
       logger.info("Job auto-approved after all workers confirmed", {
         jobId: job_id,
       });
+
+      // Notify admins that the job was approved (all colleagues confirmed)
+      const location = Array.isArray(job.location) ? job.location[0] : job.location;
+      const locationName = (location as { name?: string } | null)?.name ?? "Unknown location";
+      const notificationResult = await createNotification(supabase, {
+        organization_id: job.organization_id,
+        type: "job_colleagues_confirmed",
+        title: "Job Approved",
+        message: `All colleagues have confirmed. Job at ${locationName} is now approved.`,
+        related_entity_type: "job",
+        related_entity_id: job_id,
+      });
+      if (!notificationResult.success) {
+        logger.warn("Failed to create job_colleagues_confirmed notification", {
+          jobId: job_id,
+          error: notificationResult.error,
+        });
+      }
+
+      // Auto-generate invoice if org has the setting enabled (job is now approved and completed)
+      try {
+        const autoInvoiceResult = await autoGenerateInvoiceForJob({
+          jobId: job_id,
+          organizationId: job.organization_id,
+          locationId: job.location_id,
+          supabaseAdmin: supabase,
+          logger,
+        });
+        if (autoInvoiceResult.skipped) {
+          logger.debug("Auto-invoice skipped after colleague confirmation", {
+            jobId: job_id,
+            reason: autoInvoiceResult.skipReason,
+          });
+        } else if (!autoInvoiceResult.success) {
+          logger.warn("Auto-invoice failed after colleague confirmation", {
+            jobId: job_id,
+            error: autoInvoiceResult.error,
+          });
+        }
+      } catch (invoiceErr) {
+        logger.warn("Auto-invoice error after colleague confirmation", {
+          jobId: job_id,
+          error: invoiceErr,
+        });
+      }
 
       return jsonResponse({
         success: true,

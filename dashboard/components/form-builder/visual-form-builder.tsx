@@ -991,14 +991,6 @@ export function VisualFormBuilder({
                                       No section
                                     </Badge>
                                   )}
-                                  {groupId && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] px-1.5 text-primary border-primary/40"
-                                    >
-                                      Exclusive: {groupId}
-                                    </Badge>
-                                  )}
                                   {clusterId && (
                                     <TooltipProvider>
                                       <Tooltip>

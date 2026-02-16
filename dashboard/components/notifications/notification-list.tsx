@@ -40,6 +40,7 @@ const notificationIcons: Record<Notification["type"], React.ReactNode> = {
   job_resolved_approved: <CheckCircle2 className="h-4 w-4 text-green-500" />,
   job_resolved_cancelled: <XCircle className="h-4 w-4 text-red-500" />,
   job_auto_approved: <CheckCircle2 className="h-4 w-4 text-blue-400" />,
+  job_colleagues_confirmed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
 };
 
 export default function NotificationList({

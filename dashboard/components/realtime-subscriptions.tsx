@@ -1,21 +1,23 @@
 "use client";
 
+import { useRealtimeJobs } from "@/hooks/use-realtime-jobs";
 import { useRealtimeWorkers } from "@/hooks/use-realtime-workers";
 import useOrganization from "@/hooks/useOrganization";
 
 /**
- * Mounts realtime worker subscription at the dashboard layout level.
- * This ensures the workers subscription is active on every dashboard page, so:
- * - Worker list updates immediately when a worker activates (e.g. via invitation link)
+ * Mounts realtime subscriptions at the dashboard layout level.
+ * This ensures subscriptions are active on every dashboard page, so:
+ * - Worker list updates when a worker activates (e.g. via invitation link)
+ * - Completed jobs list updates when a job is submitted (mobile app) or updated
  *
- * Without this, the subscription would only run when a page that uses useWorkers is mounted.
- * Pages like Settings, Help, or Mobile Config don't use useWorkers, so workers would not
- * update in realtime. Notifications are already covered by NotificationBell (in Nav).
+ * Without this, subscriptions would only run when the relevant page is mounted.
+ * Notifications are already covered by NotificationBell (in Nav).
  */
 export function RealtimeSubscriptions() {
   const { organizationId } = useOrganization();
 
   useRealtimeWorkers(organizationId);
+  useRealtimeJobs(organizationId);
 
   return null;
 }

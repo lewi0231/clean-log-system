@@ -25,7 +25,8 @@ export interface Notification {
     | "job_withdrawn"
     | "job_resolved_approved"
     | "job_resolved_cancelled"
-    | "job_auto_approved";
+    | "job_auto_approved"
+    | "job_colleagues_confirmed";
   title: string;
   message: string;
   related_entity_type?: string;

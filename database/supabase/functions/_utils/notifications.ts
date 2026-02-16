@@ -21,7 +21,8 @@ export type NotificationType =
   | "job_withdrawn"
   | "job_resolved_approved"
   | "job_resolved_cancelled"
-  | "job_auto_approved";
+  | "job_auto_approved"
+  | "job_colleagues_confirmed";
 
 export interface CreateNotificationParams {
   organization_id: string;

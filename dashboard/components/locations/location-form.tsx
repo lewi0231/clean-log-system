@@ -163,26 +163,25 @@ export default function LocationForm({
       locationId: location?.id,
     });
 
-    // Always use field_based pricing mode
-    await onSuccess(
-      {
-        name: values.name,
-        email: values.email,
-        address: values.address,
-        contact_person: values.contact_person,
-        phone: values.phone || undefined,
-        hierarchy_parent_id: values.hierarchy_parent_id ?? null,
-        active: values.active ?? true,
-        pricing_mode: "field_based",
-        fixed_customer_price: null,
-        fixed_worker_payment: null,
-        fixed_price_currency: null,
-      },
-      location?.id,
-    );
+    const locationData = {
+      name: values.name,
+      email: values.email,
+      address: values.address,
+      contact_person: values.contact_person,
+      phone: values.phone || undefined,
+      hierarchy_parent_id: values.hierarchy_parent_id ?? null,
+      active: values.active ?? true,
+      pricing_mode: "field_based" as const,
+      fixed_customer_price: null,
+      fixed_worker_payment: null,
+      fixed_price_currency: null,
+    };
 
+    // Close popup immediately (like mobile config) - optimistic UX
     reset(defaultValues);
     onOpenChange(false);
+
+    await onSuccess(locationData, location?.id);
   };
 
   // Reset form when dialog opens/closes or location changes

@@ -240,9 +240,7 @@ describe("VisualFormBuilder", () => {
     expect(
       screen.getByText("Choose one: Yard Tracking Method")
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByText("Exclusive: yard_tracking_method")[0]
-    ).toBeInTheDocument();
+    // Only Cluster badge is shown on relevant fields (not Exclusive badge)
     expect(screen.getByText("Cluster: simple_servicing")).toBeInTheDocument();
   });
 

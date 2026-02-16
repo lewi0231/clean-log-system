@@ -1,4 +1,5 @@
 import { serve } from "server";
+import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLoggerWithoutRequest } from "../_utils/logger.ts";
 import { createNotification } from "../_utils/notifications.ts";
@@ -48,6 +49,7 @@ serve(async (req) => {
       .select(`
         id,
         organization_id,
+        location_id,
         submitted_by_worker_id,
         location:location_id (name)
       `)
@@ -104,11 +106,11 @@ serve(async (req) => {
       // Don't fail - jobs were approved
     }
 
-    // Send notifications for each auto-approved job
+    // Send notifications and auto-generate invoices for each auto-approved job
     for (const job of jobsToApprove) {
       try {
         const locationName = job.location?.name || "Unknown location";
-        
+
         // Notify admins
         await createNotification(supabase, {
           organization_id: job.organization_id,
@@ -125,7 +127,33 @@ serve(async (req) => {
             ? notificationError.message
             : "Unknown error",
         });
-        // Continue with other jobs
+      }
+
+      // Auto-generate invoice if org has the setting enabled
+      try {
+        const autoInvoiceResult = await autoGenerateInvoiceForJob({
+          jobId: job.id,
+          organizationId: job.organization_id,
+          locationId: job.location_id,
+          supabaseAdmin: supabase,
+          logger,
+        });
+        if (autoInvoiceResult.skipped) {
+          logger.debug("Auto-invoice skipped for auto-approved job", {
+            jobId: job.id,
+            reason: autoInvoiceResult.skipReason,
+          });
+        } else if (!autoInvoiceResult.success) {
+          logger.warn("Auto-invoice failed for auto-approved job", {
+            jobId: job.id,
+            error: autoInvoiceResult.error,
+          });
+        }
+      } catch (invoiceErr) {
+        logger.warn("Auto-invoice error for auto-approved job", {
+          jobId: job.id,
+          error: invoiceErr,
+        });
       }
     }
 

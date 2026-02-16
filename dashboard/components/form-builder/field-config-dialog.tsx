@@ -144,16 +144,14 @@ export function FieldConfigDialog({
   const handleSave = async () => {
     if (!label.trim() || !name.trim()) return;
 
-    // Capture values before closing (for location restrictions)
+    // Capture values before any async work (for location restrictions)
     const savedName = name.trim();
     const savedRestrictToLocations = restrictToLocations;
     const savedLocationIds = [...selectedLocationIds];
 
-    // Close dialog immediately for optimistic UX
-    onOpenChange(false);
-
     try {
-      // Save the field (optimistic update happens in the hook)
+      // Save the field first - await to ensure correct field_type/options are persisted
+      // before closing (closing before save can cause races with rapid type switching)
       await onSave({
         name: savedName,
         label: label.trim(),
@@ -178,6 +176,8 @@ export function FieldConfigDialog({
         section_id: sectionId === "none" ? null : sectionId,
         conditional_logic: null,
       });
+
+      onOpenChange(false);
 
       // Save location restrictions after field is created (in background)
       if (

@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createNotification } from "../_utils/notifications.ts";
@@ -87,6 +88,7 @@ serve(async (req) => {
         id,
         organization_id,
         approval_status,
+        location_id,
         location:location_id (name)
       `)
       .eq("id", job_id)
@@ -138,6 +140,33 @@ serve(async (req) => {
       if (confirmError) {
         logger.warn("Failed to confirm workers", { error: confirmError.message });
         // Don't fail - the resolution was successful
+      }
+
+      // Auto-generate invoice if org has the setting enabled
+      try {
+        const autoInvoiceResult = await autoGenerateInvoiceForJob({
+          jobId: job_id,
+          organizationId: job.organization_id,
+          locationId: job.location_id,
+          supabaseAdmin: supabase,
+          logger,
+        });
+        if (autoInvoiceResult.skipped) {
+          logger.debug("Auto-invoice skipped after resolving flagged job", {
+            jobId: job_id,
+            reason: autoInvoiceResult.skipReason,
+          });
+        } else if (!autoInvoiceResult.success) {
+          logger.warn("Auto-invoice failed after resolving flagged job", {
+            jobId: job_id,
+            error: autoInvoiceResult.error,
+          });
+        }
+      } catch (invoiceErr) {
+        logger.warn("Auto-invoice error after resolving flagged job", {
+          jobId: job_id,
+          error: invoiceErr,
+        });
       }
     }
 

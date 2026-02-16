@@ -105,14 +105,16 @@ describe("useLocations", () => {
     expect(result.current.locations).toEqual([]);
   });
 
-  it("should create location and refetch", async () => {
+  it("should create location with optimistic update", async () => {
     const mockLocation = createMockLocation();
     vi.mocked(WorkersService.listWorkersAndLocations).mockResolvedValue({
       success: true,
       workers: [],
       locations: [],
     });
-    vi.mocked(LocationsService.create).mockResolvedValue(mockLocation);
+    vi.mocked(LocationsService.create).mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(mockLocation), 50))
+    );
 
     const { result } = renderHook(() => useLocations(), {
       wrapper: createWrapper(),
@@ -122,7 +124,7 @@ describe("useLocations", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    await result.current.createLocation({
+    const createPromise = result.current.createLocation({
       organization_id: "org-1",
       name: "Main Office",
       email: "office@example.com",
@@ -130,9 +132,17 @@ describe("useLocations", () => {
       contact_person: "John Doe",
     });
 
+    // Optimistic update: new location appears immediately (before server responds)
+    await waitFor(() => {
+      expect(result.current.locations).toHaveLength(1);
+      expect(result.current.locations[0]?.name).toBe("Main Office");
+      expect(result.current.locations[0]?.email).toBe("office@example.com");
+    });
+
+    await createPromise;
+
     expect(LocationsService.create).toHaveBeenCalled();
-    // Initial mount + invalidateCache (triggers refetch) + explicit refetch = 3 calls
-    // Or: initial mount + invalidateCache + refetch = 3 calls
-    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(3);
+    // Initial mount + onSettled invalidate (triggers refetch) = 2 calls
+    expect(WorkersService.listWorkersAndLocations).toHaveBeenCalledTimes(2);
   });
 });

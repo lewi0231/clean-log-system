@@ -939,14 +939,6 @@ export function SectionEditor({
                                       <span className="font-mono truncate">
                                         {field.name}
                                       </span>
-                                      {groupId && (
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[10px] px-1.5 text-primary border-primary/40"
-                                        >
-                                          Exclusive: {groupId}
-                                        </Badge>
-                                      )}
                                       {clusterId && (
                                         <TooltipProvider>
                                           <Tooltip>

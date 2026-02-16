@@ -202,10 +202,13 @@ export function MutuallyExclusiveGroupManager({
     requestAnimationFrame(() => {
       // Optimistic update happens immediately in the hook
       // Don't await to prevent UI jitter
-      onUpdateField(fieldId, {
-        mutually_exclusive_group: DEFAULT_EXCLUSIVE_GROUP,
-        group_cluster: clusterId,
-      }).catch((err) => {
+      // Wrap in Promise.resolve - onUpdateField may return void (e.g. mutate vs mutateAsync)
+      Promise.resolve(
+        onUpdateField(fieldId, {
+          mutually_exclusive_group: DEFAULT_EXCLUSIVE_GROUP,
+          group_cluster: clusterId,
+        }),
+      ).catch((err) => {
         console.error("Failed to add field to option:", err);
       });
     });
@@ -509,10 +512,13 @@ export function MutuallyExclusiveGroupManager({
                                       requestAnimationFrame(() => {
                                         // Optimistic update happens immediately in the hook
                                         // Don't await to prevent UI jitter
-                                        onUpdateField(field.id, {
-                                          mutually_exclusive_group: null,
-                                          group_cluster: null,
-                                        }).catch((err) => {
+                                        // Wrap in Promise.resolve - onUpdateField may return void
+                                        Promise.resolve(
+                                          onUpdateField(field.id, {
+                                            mutually_exclusive_group: null,
+                                            group_cluster: null,
+                                          }),
+                                        ).catch((err) => {
                                           console.error(
                                             "Failed to remove field from option:",
                                             err,

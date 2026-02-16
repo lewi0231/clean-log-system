@@ -251,9 +251,7 @@ describe("SectionEditor", () => {
       { wrapper: createWrapper() }
     );
 
-    expect(
-      screen.getByText("Exclusive: yard_tracking_method")
-    ).toBeInTheDocument();
+    // Only Cluster badge is shown on relevant fields (not Exclusive badge)
     expect(screen.getByText("Cluster: detailed_tracking")).toBeInTheDocument();
   });
 });
