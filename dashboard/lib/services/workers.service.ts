@@ -51,17 +51,26 @@ export class WorkersService {
         name: `${request.first_name} ${request.last_name}`,
       });
 
-      const data = await invokeEdgeFunction<{ worker?: Worker }>(
-        "create-worker",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeEdgeFunction<{
+        worker?: Worker;
+        email_sent?: boolean;
+        email_error?: string;
+      }>("create-worker", request as unknown as Record<string, unknown>);
 
       if (!data || !data.worker) {
         throw new Error("Failed to create worker");
       }
 
+      if (!data.email_sent && data.email_error) {
+        log.warn("WorkersService: Worker created but invitation email failed", {
+          workerId: data.worker.id,
+          error: data.email_error,
+        });
+      }
+
       log.info("WorkersService: Worker created successfully", {
         workerId: data.worker.id,
+        emailSent: data.email_sent,
       });
       return data.worker as Worker;
     } catch (err) {

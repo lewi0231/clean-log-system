@@ -1,0 +1,195 @@
+# MDC (Markdown with Components/Metadata) Schema
+# Agent Excellence Framework v4.0.0
+#
+# This schema defines the structure for .mdc files used across SCAINET projects.
+# MDC files are standard Markdown with YAML frontmatter optimized for AI agent consumption.
+
+---
+schema_version: "1.0.0"
+framework_version: "4.0.0"
+
+description: |
+  MDC files extend standard Markdown with structured metadata that AI agents can parse
+  to understand document context, relationships, and purpose without reading full content.
+
+file_extension: ".mdc"
+encoding: "UTF-8"
+
+frontmatter:
+  format: "YAML"
+  delimiters:
+    start: "---"
+    end: "---"
+
+  required_fields:
+    document:
+      title: "string - Human-readable document title"
+      type: "enum - Document type classification"
+      version: "semver - Document version"
+
+    agent_context:
+      purpose: "string - What this document is for"
+      priority: "enum - critical|high|medium|low"
+
+  optional_fields:
+    document:
+      last_updated: "date - ISO 8601 format"
+      author: "string - Document author"
+      status: "enum - draft|review|approved|archived"
+
+    agent_context:
+      read_first: "boolean - Should agent read this first?"
+      estimated_read_time: "string - e.g., '5 minutes'"
+      skip_if: "string[] - Conditions when to skip"
+
+    dependencies:
+      must_read_before: "array - Documents to read first"
+      related_documents: "array - Related but not required"
+      blocks: "array - Documents this blocks"
+
+    project:
+      name: "string - Project name"
+      repos: "array - Related repositories"
+
+    framework:
+      version: "string - Framework version"
+      key_sections: "array - Important framework sections"
+
+    current_state:
+      dashboard_version: "string - Current dashboard version"
+      live_url: "string - Production URL"
+      recent_changes: "array - Recent changes"
+
+    tags: "string[] - Searchable tags"
+
+    automation:
+      triggers: "array - Events that trigger actions"
+      actions: "array - Actions to take"
+
+document_types:
+  start_prompt:
+    description: "Entry point for new agent sessions"
+    required_sections:
+      - "Before Starting"
+      - "Previous Session"
+      - "Outstanding Work"
+
+  handover:
+    description: "Session handover between agents"
+    required_sections:
+      - "Session Summary"
+      - "Completed Work"
+      - "Files Modified"
+      - "Outstanding Work"
+
+  framework:
+    description: "Framework rules and guidelines"
+    required_sections:
+      - "Critical Rules"
+      - "Standards"
+
+  specification:
+    description: "Technical specifications"
+    required_sections:
+      - "Overview"
+      - "Requirements"
+
+  process:
+    description: "Process documentation"
+    required_sections:
+      - "Steps"
+      - "Success Criteria"
+
+  reference:
+    description: "Reference documentation"
+    required_sections:
+      - "Content"
+
+priority_levels:
+  critical:
+    color: "#ef4444"
+    description: "Must read before any work"
+    auto_surface: true
+
+  high:
+    color: "#f59e0b"
+    description: "Important context for most tasks"
+    auto_surface: true
+
+  medium:
+    color: "#3b82f6"
+    description: "Useful reference material"
+    auto_surface: false
+
+  low:
+    color: "#71717a"
+    description: "Background information"
+    auto_surface: false
+
+agent_behaviors:
+  on_session_start:
+    - "Parse all .mdc files in repo root"
+    - "Build dependency graph from must_read_before"
+    - "Present critical priority documents first"
+    - "Note recent_changes from last 7 days"
+
+  on_document_access:
+    - "Check dependencies.must_read_before"
+    - "Warn if prerequisites not read"
+    - "Log document access for session tracking"
+
+  on_session_end:
+    - "Generate handover.mdc from session"
+    - "Update current_state in start_prompt.mdc"
+    - "Tag any universal learnings"
+
+examples:
+  minimal:
+    file: |
+      ---
+      document:
+        title: "Example Document"
+        type: "reference"
+        version: "1.0.0"
+      agent_context:
+        purpose: "Example of minimal MDC"
+        priority: "low"
+      ---
+
+      # Example Document
+
+      Content here...
+
+  full:
+    file: |
+      ---
+      document:
+        title: "Full Example"
+        type: "specification"
+        version: "2.1.0"
+        last_updated: "2026-01-22"
+        author: "Simon Case"
+        status: "approved"
+
+      agent_context:
+        purpose: "Demonstrates all MDC fields"
+        priority: "high"
+        read_first: false
+        estimated_read_time: "10 minutes"
+
+      dependencies:
+        must_read_before:
+          - path: "PREREQ.md"
+            reason: "Required background"
+        related_documents:
+          - path: "RELATED.md"
+            relevance: "Additional context"
+
+      tags:
+        - "example"
+        - "full-spec"
+      ---
+
+      # Full Example
+
+      Content with all features...

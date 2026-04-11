@@ -1,8 +1,8 @@
 {
-  "version": "4.8.1",
+  "version": "4.8.5",
   "projectName": "clean-log-system",
   "initialized": "2026-01-22T22:13:22.191Z",
-  "lastSync": "2026-01-28T05:58:24.467Z",
+  "lastSync": "2026-04-06T00:40:54.646Z",
   "coreFiles": [
     "AGENT_EXCELLENCE_CORE.md",
     "CONTEXT_MANAGEMENT.md",
@@ -16,5 +16,19 @@
     "AGENT_START_PROMPT.mdc",
     "AGENT_HANDOVER.mdc"
   ],
-  "useMdc": true
+  "useMdc": true,
+  "fileHashes": {
+    "AGENT_EXCELLENCE_CORE.md": "sha256:c743c4c9b59895f8caf6d0815e62a8774fd4acadb1349393aac75425765f0366",
+    "HUMAN_COMMANDS.md": "sha256:01256ee084b8759df33efbf18a08677d6707dacb160e195b1941b85a223bbe37",
+    "CONTEXT_MANAGEMENT.md": "sha256:471942f270299d97732f90ebfe0d5a25b86806b3a0f34d55d04c11c491949015",
+    "DEBUGGING_METHODOLOGY.md": "sha256:87c0a6aac833c5aab2f3ef510424e1a8858d2161d529167068bd47eb411cc858",
+    "MDC_SPECIFICATION.md": "sha256:2fbbd52d71c0da36b6fdf5f9dacc1a8c7d8aa2f66870e8580f2d28f7542b1c0b",
+    "HUMAN_PROTOCOL.md": "sha256:1058790b19aed6190c60156cfda521695569e5ab955323fa0b093c4373b9d8a8",
+    "EGO_REGISTRY.md": "sha256:85db0d999b79c0e8008fc1afd0fdb6f1e5cf82db607a76667991933165764d81",
+    ".cursorrules": "sha256:67171f95f3fa26af70b871e239973404d825f74189694ae3bb6745c5f58005e7",
+    ".cursor/rules/agent-excellence.mdc": "sha256:c87c10d2d450508b9c9c97296186d84ee063417109fab35c4c79bbfa3ae44ac5",
+    ".cursor/rules/process-excellence.mdc": "sha256:b6ceeea95296c64e26939bf2dcf04e5b4c8defdeeb62869c2bba493da55fd825",
+    ".human-commands.yaml": "sha256:dd55dadf90128f79afda069d3459acc0cadbe8271c5ffaf16963b36200454745",
+    ".mdc-schema.yaml": "sha256:ea06fe7996d6dfb24c8eca5adaccd48e88e3cbe90ca71e6e66590330db7733b8"
+  }
 }

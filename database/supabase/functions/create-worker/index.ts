@@ -107,7 +107,7 @@ serve(async (req) => {
     const orgName = await getOrganizationName(supabase, organization_id);
 
     // Send invitation email (don't throw on error - worker and invitation are already created)
-    await sendWorkerInvitationEmail(
+    const emailResult = await sendWorkerInvitationEmail(
       {
         workerName: name, // Use computed name for email
         workerEmail: email,
@@ -116,6 +116,14 @@ serve(async (req) => {
       },
       false,
     ); // false = don't throw on error
+
+    if (!emailResult.success) {
+      logger.warn("Worker invitation email failed to send", {
+        worker_id: worker?.id,
+        email,
+        error: emailResult.error,
+      });
+    }
 
     logger.info("Worker created successfully", {
       worker_id: worker?.id,
@@ -130,6 +138,9 @@ serve(async (req) => {
         token: invitationToken,
         expires_at: expiresAt.toISOString(),
       },
+      // Surface email delivery status for debugging (e.g. missing WORKER_INVITATION_BASE_URL)
+      email_sent: emailResult.success,
+      ...(emailResult.error && { email_error: emailResult.error }),
     });
   } catch (error) {
     logger.error("Create worker error", error);

@@ -1,3 +1,9 @@
+---
+description: "Agent Excellence Framework v{{CORE_VERSION}} — Constitution, Protocols, Session Start, and HUMAN Commands for {{PROJECT_NAME}}"
+globs: ["**/*"]
+alwaysApply: true
+---
+
 # ╔═══════════════════════════════════════════════════════════════════════════╗
 
 # ║ AGENT CONSTITUTION ║
@@ -270,7 +276,7 @@ REGISTRY_RULE: You MUST read and parse the existing registry table before choosi
 
 When user says "start", "I'm ready", "ready", "start session", "begin", or "let's go":
 
-**RULES: READ each file listed below. Do NOT edit any files. Do NOT search or explore the codebase. Do NOT run any commands except `agent-excellence validate`. After step 8, STOP and present your session report.**
+**RULES: READ each file listed below. Do NOT edit any files. Do NOT search or explore the codebase. Do NOT run any commands except `agent-excellence validate`. After step 9, STOP and present your session report.**
 
 1. **DECLARE IDENTITY** - State Agent ID in header
 2. **Read `EGO_REGISTRY.md`** — Parse the agent table, confirm next available ID, verify your chosen name is unique. If the file cannot be read, STOP and report.

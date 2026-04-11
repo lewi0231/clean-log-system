@@ -1,0 +1,432 @@
+# HUMAN Command Dictionary
+# Heuristics for User Machine Alignment Navigation
+# Version: 1.0.0
+# Framework: Agent Excellence v4.1.0
+
+metadata:
+  name: "HUMAN Command Dictionary"
+  version: "1.0.0"
+  description: "Natural language commands for AI agent interaction"
+  framework_version: "4.1.0"
+  updated: "2026-01-22"
+  author: "SCAINET Enterprise"
+
+# =============================================================================
+# SESSION MANAGEMENT
+# =============================================================================
+session:
+  catch_me_up:
+    casual:
+      - "catch me up"
+      - "brief me"
+      - "what did I miss"
+      - "status update"
+      - "what's happening"
+      - "fill me in"
+    formal: "Parse .mdc files, show critical items, recent changes since last session, outstanding work from previous handover"
+    role_context:
+      ceo: "Include financial metrics, hiring status, board matters"
+      cto: "Include tech metrics, PR status, deployment state, infrastructure"
+      cgo: "Include game dev progress, player metrics, platform status"
+      cco: "Include marketing campaigns, content pipeline, community metrics"
+    category: "session"
+
+  lets_get_started:
+    casual:
+      - "let's get started"
+      - "begin session"
+      - "I'm ready"
+      - "let's go"
+      - "start"
+      - "begin"
+    formal: "Confirm framework documents read, show today's priorities, check for blockers, display role-specific dashboard summary"
+    category: "session"
+    first_command: true
+
+  wrap_it_up:
+    casual:
+      - "wrap it up"
+      - "I'm done"
+      - "hand it off"
+      - "end session"
+      - "pack it up"
+      - "that's it for now"
+      - "call it a day"
+    formal: "Create handover.mdc with full metadata, update AGENT_START_PROMPT.mdc current_state, commit all changes with descriptive message"
+    category: "session"
+    creates_handover: true
+
+  hand_off_to:
+    casual:
+      - "hand off to {name}"
+      - "pass to {name}"
+      - "{name} is taking over"
+      - "transfer to {name}"
+    formal: "Create targeted handover document with context specific to {name}'s role and responsibilities"
+    category: "session"
+    creates_handover: true
+    requires_parameter: "name"
+
+  quick_save:
+    casual:
+      - "quick save"
+      - "checkpoint"
+      - "save progress"
+      - "backup"
+      - "commit this"
+    formal: "Commit current work with auto-generated descriptive message, do NOT end session"
+    category: "session"
+    ends_session: false
+
+# =============================================================================
+# STATUS & PRIORITIES
+# =============================================================================
+status:
+  what_needs_me:
+    casual:
+      - "what needs me"
+      - "my priorities"
+      - "what's mine"
+      - "what should I focus on"
+      - "my tasks"
+      - "what am I working on"
+    formal: "Query action items where owner matches current user role, sort by priority descending, group by project if multiple"
+    category: "status"
+
+  whats_urgent:
+    casual:
+      - "what's urgent"
+      - "what's hot"
+      - "fires"
+      - "critical items"
+      - "emergencies"
+      - "priority one"
+      - "p1s"
+    formal: "Query action items with priority = 1 across all projects, regardless of owner"
+    category: "status"
+
+  any_blockers:
+    casual:
+      - "any blockers"
+      - "what's stuck"
+      - "bottlenecks"
+      - "what's holding us up"
+      - "obstacles"
+      - "blocked items"
+    formal: "Query action items with status = 'blocked', show dependencies and risks"
+    role_context:
+      ceo: "Focus on cross-team dependencies, legal issues, funding gaps"
+      cto: "Focus on technical blockers, infrastructure issues, tech debt"
+      cgo: "Focus on asset delivery, platform approvals, critical bugs"
+      cco: "Focus on content approvals, brand issues, vendor delays"
+    category: "status"
+
+  how_are_we_tracking:
+    casual:
+      - "how are we tracking"
+      - "project health"
+      - "are we on track"
+      - "progress check"
+      - "velocity"
+      - "how's the project"
+    formal: "Show roadmap progress vs timeline, milestone completion status, sprint velocity if applicable"
+    category: "status"
+
+  whats_changed:
+    casual:
+      - "what's changed"
+      - "recent updates"
+      - "what's new"
+      - "changelog"
+      - "recent activity"
+    formal: "Show git commits, file changes, action item status updates in last 24-48 hours"
+    category: "status"
+    time_range: "48h"
+
+# =============================================================================
+# WORK ACTIONS
+# =============================================================================
+actions:
+  ship_it:
+    casual:
+      - "ship it"
+      - "deploy"
+      - "push it live"
+      - "release"
+      - "go live"
+      - "launch"
+    formal: "Run test suite, execute build, deploy to production environment, create release notes, update version"
+    category: "action"
+    requires_confirmation: true
+    confirmation_reason: "Production deployment"
+    high_impact: true
+
+  test_it:
+    casual:
+      - "test it"
+      - "run tests"
+      - "check it works"
+      - "validate"
+      - "verify"
+    formal: "Execute full test suite, report pass/fail results with details on failures"
+    category: "action"
+    requires_confirmation: false
+
+  fix_that:
+    casual:
+      - "fix that"
+      - "sort it out"
+      - "handle that"
+      - "resolve it"
+      - "fix the error"
+      - "debug that"
+    formal: "Apply Investigation-First Protocol: add diagnostics, identify root cause, then implement fix"
+    category: "action"
+    follows_protocol: "investigation_first"
+
+  clean_it_up:
+    casual:
+      - "clean it up"
+      - "tidy up"
+      - "polish"
+      - "refactor"
+    formal: "Run linter, apply formatting, remove dead code, organize imports"
+    category: "action"
+    ambiguous: true
+    clarification_options:
+      - "Clean up code (lint, format, remove dead code)"
+      - "Clean up files (archive old docs, organize)"
+      - "Clean up session (commit, handover)"
+
+  document_this:
+    casual:
+      - "document this"
+      - "write it up"
+      - "explain this"
+      - "add docs"
+      - "update docs"
+    formal: "Create or update documentation for recent changes, following MDC format where applicable"
+    category: "action"
+
+# =============================================================================
+# INFORMATION & DISCOVERY
+# =============================================================================
+discovery:
+  show_me:
+    casual:
+      - "show me {target}"
+      - "find {target}"
+      - "where's {target}"
+      - "pull up {target}"
+      - "display {target}"
+    formal: "Search codebase and documentation for {target}, display most relevant results"
+    category: "discovery"
+    requires_parameter: "target"
+
+  explain:
+    casual:
+      - "explain {target}"
+      - "what is {target}"
+      - "how does {target} work"
+      - "walk me through {target}"
+      - "tell me about {target}"
+    formal: "Provide explanation of {target} appropriate to user's role and technical level"
+    category: "discovery"
+    requires_parameter: "target"
+    role_aware_depth: true
+
+  what_can_you_do:
+    casual:
+      - "what can you do"
+      - "help"
+      - "commands"
+      - "options"
+      - "what are my options"
+    formal: "Display categorized list of available HUMAN commands with examples"
+    category: "discovery"
+
+  who_owns:
+    casual:
+      - "who owns {target}"
+      - "who's responsible for {target}"
+      - "who handles {target}"
+      - "owner of {target}"
+    formal: "Look up owner from action items, CODEOWNERS, or team directory for {target}"
+    category: "discovery"
+    requires_parameter: "target"
+
+# =============================================================================
+# PLANNING & STRATEGY
+# =============================================================================
+planning:
+  lets_plan:
+    casual:
+      - "let's plan {target}"
+      - "think through {target}"
+      - "strategy for {target}"
+      - "plan out {target}"
+    formal: "Create structured implementation plan with tasks, dependencies, estimates; optionally create action items"
+    category: "planning"
+    requires_parameter: "target"
+    creates_action_items: true
+
+  add_to_roadmap:
+    casual:
+      - "add to roadmap"
+      - "roadmap this"
+      - "schedule this"
+      - "put on roadmap"
+    formal: "Link current work or plan to appropriate roadmap phase, update tracking"
+    category: "planning"
+
+  board_review:
+    casual:
+      - "board review"
+      - "escalate this"
+      - "needs approval"
+      - "get board input"
+      - "strategic decision"
+    formal: "Create AI Board of Directors matter for review and decision"
+    category: "planning"
+    creates_board_matter: true
+
+  estimate_this:
+    casual:
+      - "estimate this"
+      - "how long will {target} take"
+      - "scope {target}"
+      - "effort for {target}"
+      - "t-shirt size {target}"
+    formal: "Provide time and effort estimate with assumptions and risks"
+    category: "planning"
+    requires_parameter: "target"
+
+# =============================================================================
+# TEAM & COMMUNICATION
+# =============================================================================
+communication:
+  update_the_team:
+    casual:
+      - "update the team"
+      - "notify everyone"
+      - "share this"
+      - "team update"
+    formal: "Draft update message suitable for relevant stakeholders based on recent work"
+    category: "communication"
+
+  client_update:
+    casual:
+      - "client update"
+      - "update {client}"
+      - "client status"
+    formal: "Prepare client-appropriate status update, filtering internal details"
+    category: "communication"
+    filters_internal: true
+
+  flag_for_role:
+    casual:
+      - "flag for {role}"
+      - "{role} needs to see this"
+      - "{role} attention"
+      - "escalate to {role}"
+    formal: "Create high-priority action item assigned to {role}"
+    category: "communication"
+    requires_parameter: "role"
+    creates_action_item: true
+
+# =============================================================================
+# FRAMEWORK & GOVERNANCE
+# =============================================================================
+framework:
+  framework_check:
+    casual:
+      - "framework check"
+      - "compliance check"
+      - "are we following the rules"
+      - "validate framework"
+    formal: "Execute 'agent-excellence validate' command, report compliance status"
+    category: "framework"
+
+  share_this_learning:
+    casual:
+      - "share this learning"
+      - "this should be universal"
+      - "add to framework"
+      - "everyone should know this"
+    formal: "Tag item as [UNIVERSAL] in PROJECT_LEARNINGS.mdc for framework review"
+    category: "framework"
+    tags_universal: true
+
+  sync_framework:
+    casual:
+      - "sync framework"
+      - "update framework"
+      - "pull latest rules"
+      - "get framework updates"
+    formal: "Execute 'agent-excellence sync' command, pull latest from Chazwazza"
+    category: "framework"
+
+# =============================================================================
+# DESTRUCTIVE / HIGH-IMPACT COMMANDS
+# =============================================================================
+high_impact:
+  delete:
+    casual:
+      - "delete {target}"
+      - "remove {target}"
+      - "get rid of {target}"
+    formal: "Delete {target} after confirmation"
+    category: "destructive"
+    requires_confirmation: true
+    confirmation_reason: "Destructive action"
+    high_impact: true
+    requires_parameter: "target"
+
+  start_over:
+    casual:
+      - "start over"
+      - "reset"
+      - "from scratch"
+      - "clean slate"
+    formal: "Discard current work and restart - requires explicit confirmation"
+    category: "destructive"
+    requires_confirmation: true
+    confirmation_reason: "Could lose work"
+    high_impact: true
+
+  archive:
+    casual:
+      - "archive {target}"
+      - "put away {target}"
+      - "shelve {target}"
+    formal: "Archive {target}, removing from active view but preserving"
+    category: "destructive"
+    requires_confirmation: true
+    confirmation_reason: "Removes from active view"
+    requires_parameter: "target"
+
+# =============================================================================
+# CUSTOM COMMANDS (Team-Added)
+# =============================================================================
+custom:
+  # Example of a team-added command
+  # moonshot_mode:
+  #   casual:
+  #     - "moonshot mode"
+  #     - "let's go big"
+  #     - "swing for the fences"
+  #   formal: "Relax constraints, prioritize innovation over incremental safety"
+  #   added_by: "simon@scainet.io"
+  #   added_date: "2026-01-22"
+  #   category: "custom"
+
+# =============================================================================
+# CONFIGURATION
+# =============================================================================
+config:
+  ambiguity_handling: "ask_user" # ask_user | best_guess | fail
+  confirmation_style: "inline" # inline | modal | skip
+  role_detection: "auto" # auto | explicit | default_ceo
+  default_time_range: "48h"
+  enable_learning: true # Allow agent to suggest new commands
+  strict_mode: false # If true, only recognize defined commands

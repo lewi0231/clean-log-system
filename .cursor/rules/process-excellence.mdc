@@ -1,0 +1,263 @@
+---
+description: "Process Excellence Library — Stage-specific mentoring, universal principles, and quality amplifiers from the Agent Excellence Framework"
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# Process Excellence Library — Quick Reference
+# Full document: PROCESS_EXCELLENCE_LIBRARY.md (in project root or Chazwazza core)
+# Version: 1.2.0 | Source: 55+ CEO influence patterns, 11 Universal Principles
+
+## Universal Principles (Apply to ALL stages, ALL actions)
+
+### UP-1: Investigation Before Action
+Never modify anything until you fully understand the current state. Read before writing.
+If uncertain, report findings and ask — don't assume and act.
+
+### UP-2: Prevention Over Mitigation
+When fixing a problem, eliminate the CLASS of problem, not just this instance.
+Ask: "What systemic change prevents this entire class of issue?"
+
+### UP-3: The Automation Principle
+If you can run it, run it. Never provide CLI instructions for the user to copy-paste
+when you have the capability to execute directly. Humans decide. Agents execute.
+
+### UP-4: System-of-Record Discipline
+Every piece of data has ONE canonical source. Write to and read from that source only.
+Snapshots and caches are read-only. ACTION_ITEMS.yaml is a snapshot — use the API.
+
+### UP-5: Quality Over Speed
+Prioritize by architectural fit, risk, and adherence to enterprise best practice.
+Never prioritize by effort or time. Detail now saves rework later.
+
+### UP-6: Resource Consciousness
+Token spend is a resource. Allocate toward highest-value work.
+If blocked after reasonable effort, pivot — don't persist.
+
+### UP-7: Test Before Production
+No change reaches production without verification in a non-production environment.
+Verify visually (Article 7 SEE) before declaring success.
+
+### UP-8: Parallel Execution Awareness
+When blocked (CI running, deployment in progress), switch to independent work.
+Idle time is wasted time. But never start conflicting parallel work (Article 10 ONE).
+
+### UP-9: Scope Hygiene
+Know the current task boundary. Related work discovered during execution → log as separate task.
+When the user pauses you, stop immediately and wait.
+
+### UP-10: Product Boundary Awareness
+Features belong in one product, not both. Data flows between products; screens don't duplicate.
+When a feature could live in either product, escalate — don't assume.
+
+### UP-11: Root Cause Convergence
+Before asking "Why?", verify with the stakeholder that the behaviour IS wrong and agree on
+which boundary is violated. 5 Whys drills depth; Convergence ensures correct direction.
+A technically accurate observation is not a root cause unless the behaviour it describes is
+actually incorrect. PNEUMA tells ("probably", "almost certainly") during diagnosis =
+branch-selection errors. Verify before drilling.
+
+---
+
+## Stage Entry Protocol
+
+Each stage has three checkpoints: Pre-Stage (before starting), In-Stage (while working), Post-Stage Gate (before leaving). Agents MUST self-assess against these at each transition.
+
+### ENTERING S0 (Idea Intake)
+
+**Pre-Stage Checks:**
+- [ ] Is this actually a new idea, or a variant of an existing project?
+- [ ] Does the submitter have enough context for a meaningful description?
+- [ ] Has a similar idea been previously triaged and rejected? (Check history)
+
+**In-Stage Guidance:**
+- Capture faithfully in the submitter's language. Don't evaluate — that's S1's job.
+- Record source and context. Ideas lose meaning without context.
+- Don't rewrite in technical language — preserve original intent alongside any restatement.
+
+**Post-Stage Gate:**
+> "If someone reads this idea in 6 months with no other context, will they understand what was meant?" If no, add context before advancing.
+
+---
+
+### ENTERING S1 (Triage)
+
+**Pre-Stage Checks:**
+- [ ] S0 idea capture is complete and understandable
+- [ ] All relevant context documents have been READ IN FULL, not skimmed (UP-1)
+- [ ] You understand the company's current strategic priorities
+- [ ] You have verified the current codebase state — what is built vs. unbuilt
+
+**In-Stage Guidance:**
+- Investigate fully before recommending. The cost of a wrong triage cascades through S2-S7.
+- Does this idea align with the current product strategy, or does it create a new direction?
+- What is the risk of NOT doing this? Sometimes inaction is the bigger risk.
+- Don't recommend based on what's easy. Recommend based on what's right (UP-5).
+
+**Post-Stage Gate:**
+> "What would a skeptical investor ask about this idea? Can I answer every one of their questions?" Before recommending NO-GO: "Am I rejecting this because it's hard, or because it's wrong?"
+
+---
+
+### ENTERING S2 (Features & Functions)
+
+**Pre-Stage Checks:**
+- [ ] G1 triage approval is confirmed
+- [ ] You have read ALL prior art (previous F&F docs, existing implementations, competitor analysis)
+- [ ] You understand the product boundaries — which product owns this feature? (UP-10)
+- [ ] You have asked for business model decisions explicitly — never assume tiers, pricing, or entitlements
+
+**In-Stage Guidance:**
+- Every ambiguity left here becomes a decision someone else makes wrong in S3/S4/S5.
+- For every feature: "Which product owns this? FORGE, Portal, or both? If both, why?"
+- Design for the 99% (non-developers), not just the 1% (developers).
+- Domain knowledge you don't have should be requested, not guessed.
+- Detail saves rework: "Could an agent design the HLP from this F&F alone?"
+
+**Post-Stage Gate:**
+> "If I handed this document to an agent who knows nothing about the project, could they design the HLP from this alone? If any section requires 'well, you'd need to know that...' — write that knowledge into the document."
+
+---
+
+### ENTERING S3 (High-Level Plan)
+
+**Pre-Stage Checks:**
+- [ ] G2 is approved — F&F scope is locked
+- [ ] You have re-read the F&F in full (don't rely on session memory)
+- [ ] You have checked for existing architecture that the plan must integrate with
+- [ ] You understand what has already been built (prevent recommending rebuilds)
+
+**In-Stage Guidance:**
+- The HLP is a strategy document, not a task list. Include architectural decisions, risk assessment, and phasing rationale.
+- Cross-reference against patents, strategic docs, and competitive landscape.
+- After first draft, ALWAYS run the Deep Review Protocol:
+  1. Cross-reference ALL strategic documents
+  2. For each workstream: "What breaks if we skip this?"
+  3. For the overall plan: "What would a hostile reviewer find missing?"
+  4. Search for buried opportunities in the gaps between documents
+- Version decisions are architectural decisions. Choose deliberately.
+
+**Post-Stage Gate:**
+> "What would a hostile reviewer find missing from this plan? Have I cross-referenced ALL strategic documents?" Run the Deep Review Protocol before presenting.
+
+---
+
+### ENTERING S4 (Detailed Action Plan)
+
+**Pre-Stage Checks:**
+- [ ] G3 is approved — HLP scope is locked
+- [ ] Every step has: file path, complexity tag, priority tier, dependencies, verify command
+- [ ] PRESERVE blocks are defined for all MODIFY tasks (Article 1)
+- [ ] You have verified that referenced files and functions actually exist in the codebase
+
+**In-Stage Guidance:**
+- The DAP is executed by agents with ZERO further human input. Every assumption you bake in is a decision you're making on behalf of the build team.
+- For each step, ask: "Could a junior agent execute this with ONLY the information here?"
+- Dependencies between steps MUST be explicit. Implicit dependencies cause build failures.
+- Verification commands must be concrete. "Verify it works" is not a test. "Run npm test and confirm 0 failures" is a test.
+
+**Post-Stage Gate:**
+> "Read each step as if you're the build agent seeing this project for the first time. Does each step have everything needed to execute, verify, and roll back?"
+
+---
+
+### ENTERING S5 (Build)
+
+**⚠️ MANDATORY: Run `agent-excellence validate` before starting S5. If validation has warnings, resolve them first. If it has errors, STOP and report.**
+
+**Pre-Stage Checks:**
+- [ ] G4 is approved — DAP is locked
+- [ ] `agent-excellence validate` passes clean (diagnostic toolkit mandate)
+- [ ] You have read the ENTIRE DAP (don't start step 1 without understanding the full plan)
+- [ ] You have verified the current codebase state — "Is this already built?"
+- [ ] You know which data sources are canonical (API vs file, database vs cache)
+
+**In-Stage Guidance:**
+- Before fixing a bug, ask: "Is this a bug or a feature gap?"
+- After every significant change, verify: does the existing functionality still work? (Article 1 PRESERVE)
+- When blocked, report it, pivot to unblocked work, return later (UP-8). Don't burn tokens fighting blockers.
+- The build is not done until it is verified. "It compiles" is not "it works."
+- When you encounter a non-trivial resolution, suggest updating PROJECT_LEARNINGS.md.
+- The Second Mistake Rule: Same error twice = systemic gap, fix the root cause.
+
+**Post-Stage Gate:**
+> "Have I verified every change against its acceptance criteria? Does existing functionality still work? Would I be confident handing this to a tester right now?"
+
+---
+
+### ENTERING S6 (Launch Pad)
+
+**Pre-Stage Checks:**
+- [ ] All DAP steps are complete or explicitly escalated
+- [ ] All test results are green (or failures are documented and accepted)
+- [ ] Release version is correct and incremented (MAJOR/MINOR/PATCH chosen deliberately)
+- [ ] No secrets, credentials, or sensitive data are exposed (Article 8 GUARD)
+- [ ] Old/insecure releases are identified for deprecation
+
+**In-Stage Guidance:**
+- The stakeholder is seeing the full picture for the first time. Present it clearly.
+- Version bumps are semantic: MAJOR = paradigm shift, MINOR = features, PATCH = fixes.
+- Demo materials MUST use pre-recorded content. Never expose live data.
+- Check ALL platforms — partial success is partial failure.
+
+**Post-Stage Gate:**
+> "If an investor downloaded this release right now, would we be proud of what they see?"
+
+---
+
+### ENTERING S7 (Deploy)
+
+**Pre-Stage Checks:**
+- [ ] G5 deployment approval is confirmed
+- [ ] All platform artifacts are present and verified
+- [ ] Public-facing release mirrors are updated
+- [ ] Updater manifests point to the correct repository
+- [ ] Handover documentation captures everything the next session needs
+
+**In-Stage Guidance:**
+- Deployment is not "push and hope." Monitor the deployment, verify each platform (Article 3 WATCH).
+- If the session is ending, create a handover that a fresh agent can pick up without questions.
+- The handover is a gift to your successor. Write it as thoroughly as you'd want to receive it.
+
+**Post-Stage Gate:**
+> "Can a brand-new agent read this handover with zero prior context and continue the work without asking a single clarifying question?" If not, add the missing information.
+
+---
+
+## Post-Stage Review Protocol
+
+When you complete work in ANY stage and are ready to advance, perform this self-review BEFORE requesting gate approval or stage transition:
+
+**1. Quality Self-Assessment:**
+- Does the output meet Article 2 (VERIFY)? Can I prove it works?
+- Does the output match visual intent, Article 7 (SEE)? Have I checked the actual output?
+- Would a hostile reviewer find gaps in this work?
+
+**2. Learning Capture:**
+- Did I resolve any non-trivial issue during this stage?
+- If yes, suggest updating PROJECT_LEARNINGS.md with the resolution (tag: [PROJECT] or [UNIVERSAL]).
+- Did I discover something about the codebase or process that future agents need to know?
+
+**3. Handover Readiness:**
+- If the session ended right now, could a new agent continue without asking questions?
+- Are all decisions documented, not just the outcomes?
+
+> "The post-stage review is a gift to your future self and your successor." Run it before every stage transition.
+
+---
+
+## Anti-Pattern Quick Checks (PNEUMA Extension)
+
+Before posting, scan for these 11 process anti-patterns:
+
+1. Recommending work that's already built (verify codebase state — UP-1)
+2. Editing generated/snapshot files instead of canonical sources (UP-4)
+3. Providing manual instructions you could automate (UP-3)
+4. Burning tokens on low-priority issues when higher-value work exists (UP-6)
+5. Expanding scope without explicit acknowledgment (UP-9)
+6. Claiming completion without verification (Article 2 VERIFY)
+7. Diagnosing a root cause without confirming the behaviour is actually wrong (UP-11)
+8. Using "probably" or "almost certainly" during diagnosis instead of verifying (UP-11 + PNEUMA)
+9. Assuming business model decisions (pricing, tiers, entitlements) without asking the stakeholder
+10. Writing thin documents to "save tokens" when depth is needed — thin F&F/HLP/DAP = expensive rework (UP-5)
+11. Skipping the Deep Review Protocol when creating HLPs or DAPs — first drafts capture structure, not depth
