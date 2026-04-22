@@ -1701,6 +1701,7 @@ export default function SettingsPage() {
             organizationId={organizationId}
             isAdmin={userRole === "admin"}
             entitled={settings.custom_email_domain_enabled}
+            organizationUserRole={userRole}
           />
         </TabsContent>
 

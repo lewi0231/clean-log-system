@@ -49,11 +49,14 @@ export function OrgSendingDomainCard({
   organizationId,
   isAdmin,
   entitled,
+  /** Dashboard role from get-organization-id (null for many worker-only accounts). */
+  organizationUserRole = null,
 }: {
   organizationId: string;
   isAdmin: boolean;
   /** From get-organization-settings; client cannot read public.organization (RLS). */
   entitled: boolean;
+  organizationUserRole?: string | null;
 }) {
   const [loading, setLoading] = useState(isAdmin);
   const [row, setRow] = useState<SendingDomainRow | null>(null);
@@ -96,7 +99,28 @@ export function OrgSendingDomainCard({
   }, [load]);
 
   if (!isAdmin) {
-    return null;
+    const roleLabel =
+      organizationUserRole === null || organizationUserRole === undefined
+        ? "not set (common for field-worker accounts that are not in organization users)"
+        : `"${organizationUserRole}"`;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Email &amp; domain</CardTitle>
+          <CardDescription>Custom sending domain (Resend)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            Only <strong>organization administrators</strong> can register a domain, view DNS
+            records, and remove a domain. Your current dashboard role is {roleLabel}.
+          </p>
+          <p>
+            If you should be an admin, ask an owner to check <strong>Users</strong> and your
+            invitation, or that your sign-in email matches the one on your organization user record.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (loading) {
