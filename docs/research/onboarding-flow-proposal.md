@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the proposed onboarding flow for new users signing up to the Clean Log System dashboard. The goal is to collect essential information during signup to preconfigure their account and guide them through initial setup.
+This document outlines the proposed onboarding flow for new users signing up to the Tally Runner (monorepo) dashboard. The goal is to collect essential information during signup to preconfigure their account and guide them through initial setup.
 
 ## Research Insights
 
@@ -21,7 +21,6 @@ Based on SaaS onboarding best practices:
 **Questions:**
 
 1. **Industry Type** (Select one)
-
    - Car Detailing / Vehicle Services
    - Cleaning Services
    - Maintenance Services
@@ -44,7 +43,6 @@ Based on SaaS onboarding best practices:
 **Questions:**
 
 1. **ABN Number** (Optional, Australian only)
-
    - Text input with validation
 
 2. **Do you service specific customer locations?** (Yes/No)
@@ -90,7 +88,6 @@ Based on SaaS onboarding best practices:
 **Questions:**
 
 1. **How often do you invoice customers?**
-
    - Immediately after each job
    - Daily (at end of day)
    - Weekly (select day)
@@ -120,19 +117,16 @@ After onboarding questions, guide users through setup steps based on their answe
 ### Priority Order:
 
 1. **Add Workers** (if employee count > 0)
-
    - "Let's add your first worker"
    - Direct to `/dashboard/users` with onboarding context
    - Show tooltip/guide on how to add workers
 
 2. **Add Locations** (if "service specific locations" = Yes)
-
    - "Now let's add your first customer location"
    - Direct to `/dashboard/locations` with onboarding context
    - Show tooltip/guide on how to add locations
 
 3. **Configure Mobile App Forms** (Always)
-
    - "Customize your mobile app forms"
    - Direct to `/dashboard/mobile-config` with onboarding context
    - Suggest applying template based on industry/business mode

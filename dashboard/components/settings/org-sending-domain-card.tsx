@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { APP_DISPLAY_NAME } from "@/lib/brand";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
@@ -195,7 +196,7 @@ export function OrgSendingDomainCard({
   };
 
   const handleRemove = async () => {
-    if (!confirm("Remove this domain from Clean Log and Resend?")) return;
+    if (!confirm(`Remove this domain from ${APP_DISPLAY_NAME} and Resend?`)) return;
     setActionError(null);
     setBusy("remove");
     try {

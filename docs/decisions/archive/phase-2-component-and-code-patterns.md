@@ -1,6 +1,6 @@
 # Phase 2: Component and Code Patterns Analysis
 
-**Project:** Clean Log System Monorepo  
+**Project:** Tally Runner (monorepo) Monorepo  
 **Date:** January 20, 2026  
 **Scope:** React component architecture, custom hooks, state management, error handling, and code organization patterns
 
@@ -24,6 +24,7 @@
 ### 1.1 Component Organization Structure
 
 **Dashboard (Next.js) Components:**
+
 ```
 dashboard/components/
 ├── ui/                      # Primitives (18 components)
@@ -60,6 +61,7 @@ dashboard/components/
 ```
 
 **Mobile (React Native) Components:**
+
 ```
 mobile-app/components/
 ├── ui/                     # Primitives (19 components)
@@ -77,28 +79,32 @@ mobile-app/components/
 
 Components fall into clear categories:
 
-| Category | Count | Purpose | Examples |
-|----------|-------|---------|----------|
-| **UI Primitives** | 37 | Reusable building blocks | Button, Input, Dialog, Select |
-| **State Components** | 3 | Loading/error/empty states | LoadingState, ErrorState, EmptyState |
-| **Feature Components** | 80+ | Business logic components | VisualFormBuilder, InvoiceList |
-| **Layout Components** | 5 | Page structure | DashboardLayout, DashboardSidebar |
-| **Context Providers** | 4 | State management | PricingScopeContext, OnboardingContext |
+| Category               | Count | Purpose                    | Examples                               |
+| ---------------------- | ----- | -------------------------- | -------------------------------------- |
+| **UI Primitives**      | 37    | Reusable building blocks   | Button, Input, Dialog, Select          |
+| **State Components**   | 3     | Loading/error/empty states | LoadingState, ErrorState, EmptyState   |
+| **Feature Components** | 80+   | Business logic components  | VisualFormBuilder, InvoiceList         |
+| **Layout Components**  | 5     | Page structure             | DashboardLayout, DashboardSidebar      |
+| **Context Providers**  | 4     | State management           | PricingScopeContext, OnboardingContext |
 
 ### 1.3 Export Patterns
 
 **Current patterns observed:**
 
 1. **Named Function Exports** (most common):
+
    ```typescript
    export function ComponentName() { ... }
    ```
+
    **Usage:** 101 components use this pattern
 
 2. **Const Arrow Function Exports** (rare):
+
    ```typescript
    export const ComponentName = () => { ... };
    ```
+
    **Usage:** Only 7 instances (utility functions, not components)
 
 3. **Barrel Exports** (selective):
@@ -148,6 +154,7 @@ export function EmptyState({
 ```
 
 **Why it works:**
+
 - **Scalability:** Named exports enable better tree-shaking and code splitting
 - **Efficiency:** Easier to refactor (search for exact component name)
 - **Debugging:** Stack traces show actual component names, not anonymous functions
@@ -206,6 +213,7 @@ export class ErrorBoundary extends Component<
 ```
 
 **Why it works:**
+
 - **Scalability:** Type safety prevents props misuse across large codebase
 - **Efficiency:** IDE autocomplete and inline documentation
 - **Maintainability:** Props interface serves as component API documentation
@@ -263,6 +271,7 @@ export function ErrorState({
 ```
 
 **Why it works:**
+
 - **Scalability:** Consistent UX across all features
 - **Efficiency:** Reduces code duplication (DRY principle)
 - **UX Consistency:** Users see familiar patterns everywhere
@@ -274,7 +283,7 @@ export function ErrorState({
 export function useFieldConfigs(): UseFieldConfigsResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // In component:
   // if (loading) return <LoadingState message="Loading configurations..." />;
   // if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -307,6 +316,7 @@ dashboard/components/
 ```
 
 **Why it works:**
+
 - **Scalability:** Easy to locate related components as features grow
 - **Efficiency:** Reduces cognitive load when working on a feature
 - **Maintainability:** Changes to a feature are localized
@@ -382,12 +392,14 @@ export function useFieldConfigs(): UseFieldConfigsResult {
 ```
 
 **Why it works:**
+
 - **Scalability:** Typed return values prevent incorrect usage
 - **Efficiency:** Object destructuring allows selective usage
 - **Type Safety:** Return interface acts as contract
 - **Industry Standard:** React hooks best practices (2026)
 
 **Pattern elements:**
+
 1. Explicit return type interface
 2. Loading/error/data states
 3. Refetch functionality exposed
@@ -448,6 +460,7 @@ export class FieldConfigsService {
 ```
 
 **Why it works:**
+
 - **Scalability:** Centralized API logic, easy to add methods
 - **Efficiency:** Single source of truth for API calls
 - **Testability:** Easy to mock entire service class
@@ -455,6 +468,7 @@ export class FieldConfigsService {
 - **Error Handling:** Uniform error handling and transformation
 
 **Pattern benefits:**
+
 - Static methods avoid unnecessary instantiation
 - TSDoc comments provide inline documentation
 - Logging at entry and exit points for debugging
@@ -491,7 +505,7 @@ function fieldConfigsReducer(
         case "add":
             return [...state, action.item];
         case "update":
-            return state.map((fc) => 
+            return state.map((fc) =>
                 fc.id === action.item.id ? action.item : fc
             );
         case "delete":
@@ -542,6 +556,7 @@ export function useFieldConfigMutations({
 ```
 
 **Why it works:**
+
 - **Scalability:** Handles complex state transitions cleanly
 - **UX Excellence:** Immediate feedback, rolls back on error
 - **Performance:** Non-blocking updates via `startTransition`
@@ -587,7 +602,7 @@ export class FieldConfigsService {
       log.info("FieldConfigsService: Field configs fetched successfully", {
         fieldConfigsCount: data.field_configs.length,
       });
-      
+
       return data.field_configs;
     } catch (err) {
       log.error("FieldConfigsService: Failed to fetch field configs", {
@@ -600,6 +615,7 @@ export class FieldConfigsService {
 ```
 
 **Why it works:**
+
 - **Scalability:** Easy to add structured logging across entire codebase
 - **Efficiency:** Production logs only warnings/errors, dev logs everything
 - **Debugging:** Consistent format aids troubleshooting
@@ -691,6 +707,7 @@ export const buttonVariants = cva(
 ```
 
 **Why it works:**
+
 - **Scalability:** Easy to add new variants without prop explosion
 - **Type Safety:** VariantProps ensures only valid combinations
 - **Efficiency:** Runtime class name computation is fast
@@ -759,6 +776,7 @@ export class ErrorBoundary extends Component<
 ```
 
 **Why it works:**
+
 - **Scalability:** Prevents single component errors from crashing entire app
 - **UX:** Graceful degradation with user-friendly error messages
 - **Debugging:** Logs errors to console for development
@@ -778,7 +796,7 @@ export class ErrorBoundary extends Component<
 ```
 dashboard/hooks/
 ├── useAuth.ts              # ❌ camelCase
-├── useOrganization.ts      # ❌ camelCase  
+├── useOrganization.ts      # ❌ camelCase
 ├── use-field-configs.ts    # ✅ kebab-case
 ├── use-mobile-config.ts    # ✅ kebab-case
 ├── use-notifications.ts    # ✅ kebab-case
@@ -786,6 +804,7 @@ dashboard/hooks/
 ```
 
 **Impact:**
+
 - **Scalability:** File naming inconsistency creates confusion
 - **Efficiency:** Developers must remember exceptions to naming rule
 - **Maintainability:** Harder to establish consistent patterns
@@ -805,6 +824,7 @@ import useOrganization from "@/hooks/useOrganization";  // Exception to rule
 **✅ Recommended approach:**
 
 Rename files to follow established convention:
+
 - `useOrganization.ts` → `use-organization.ts`
 - `useAuth.ts` → `use-auth.ts`
 
@@ -845,6 +865,7 @@ export function useFieldConfigs(): UseFieldConfigsResult {
 ```
 
 **Impact:**
+
 - **Scalability:** Inconsistent import patterns across codebase
 - **Efficiency:** Harder to use IDE auto-imports
 - **Maintainability:** Team must remember which hooks use default exports
@@ -853,8 +874,8 @@ export function useFieldConfigs(): UseFieldConfigsResult {
 
 ```typescript
 // Two different import styles in same file
-import useOrganization from "@/hooks/useOrganization";  // default
-import { useFieldConfigs } from "@/hooks/use-field-configs";  // named
+import useOrganization from "@/hooks/useOrganization"; // default
+import { useFieldConfigs } from "@/hooks/use-field-configs"; // named
 ```
 
 **✅ Recommended approach:**
@@ -900,11 +921,11 @@ export function useFieldConfigs(): UseFieldConfigsResult {
     try {
       setLoading(true);
       setError(null);  // ✅ Reset error state
-      
+
       const configs = await FieldConfigsService.list({
         organization_id: organizationId,
       });
-      
+
       setFieldConfigs(configs);
     } catch (err) {
       setError(
@@ -927,7 +948,7 @@ export default function useOrganization() {
   // ❌ No try-catch
   // ❌ No error state returned
   // ❌ Errors silently fail
-  
+
   useEffect(() => {
     const fetchOrganization = async () => {
       const result = await supabase.auth.getUser();
@@ -942,6 +963,7 @@ export default function useOrganization() {
 ```
 
 **Impact:**
+
 - **Scalability:** Inconsistent error handling makes debugging harder
 - **UX:** Users don't get feedback when operations fail
 - **Reliability:** Silent failures lead to confusing app states
@@ -971,16 +993,14 @@ export function useData<T>(): UseDataResult<T> {
     try {
       setLoading(true);
       setError(null);
-      
+
       const result = await api.fetch();
       setData(result);
     } catch (err) {
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : "An unexpected error occurred";
+      const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred";
       setError(errorMessage);
       setData(null);
-      
+
       // Optional: Log for debugging
       log.error("useData: Fetch failed", { error: err });
     } finally {
@@ -993,6 +1013,7 @@ export function useData<T>(): UseDataResult<T> {
 ```
 
 **Pattern requirements:**
+
 1. Always return `loading`, `error`, `data`
 2. Reset error state at start of operation
 3. Provide user-friendly error messages
@@ -1049,22 +1070,27 @@ export function useAsyncState<T>(initialData: T | null = null): AsyncState<T> {
 ```
 
 **Usage:**
+
 ```typescript
 export function useWorkers() {
   const state = useAsyncState<Worker[]>([]);
   const { organizationId } = useOrganization();
 
-  const fetch = () => state.execute(async () => {
-    return await WorkersService.list({ organization_id: organizationId });
-  });
+  const fetch = () =>
+    state.execute(async () => {
+      return await WorkersService.list({ organization_id: organizationId });
+    });
 
-  useEffect(() => { fetch(); }, [organizationId]);
+  useEffect(() => {
+    fetch();
+  }, [organizationId]);
 
   return { ...state, refetch: fetch };
 }
 ```
 
 **Migration Checklist:**
+
 - [ ] Create `useAsyncState` utility
 - [ ] Identify hooks with inconsistent error handling
 - [ ] Refactor hooks to use the utility or follow the pattern
@@ -1149,11 +1175,11 @@ export function VisualFormBuilder({ ... }: VisualFormBuilderProps) {
   const [fieldOrder, setFieldOrder] = useState<string[]>(() =>
     fields.map((f) => f.id)
   );
-  
+
   // Event handlers scattered throughout
   // Effects mixed with handlers
   // No clear separation
-  
+
   return (
     // 1500+ lines of JSX
   );
@@ -1161,6 +1187,7 @@ export function VisualFormBuilder({ ... }: VisualFormBuilderProps) {
 ```
 
 **Impact:**
+
 - **Scalability:** Large components become hard to navigate
 - **Efficiency:** Finding specific logic takes longer
 - **Maintainability:** Harder to refactor or extract logic
@@ -1186,7 +1213,7 @@ No enforcement of internal organization pattern.
 export function VisualFormBuilder() {
   const dragState = useDragState();
   const fieldOperations = useFieldOperations();
-  
+
   return (
     <FormBuilderLayout>
       <FieldTypesPalette types={FIELD_TYPES} />
@@ -1211,10 +1238,10 @@ Consider adding `max-lines-per-function` rule to enforce component size limits:
 // eslint.config.mjs
 {
   rules: {
-    "max-lines-per-function": ["warn", { 
-      max: 300, 
-      skipBlankLines: true, 
-      skipComments: true 
+    "max-lines-per-function": ["warn", {
+      max: 300,
+      skipBlankLines: true,
+      skipComments: true
     }],
   }
 }
@@ -1242,6 +1269,7 @@ export const PricingScopeProvider = ({ children, ...props }) => {
 ```
 
 **Impact:**
+
 - **Scalability:** Prop drilling becomes unwieldy as features grow
 - **Efficiency:** Harder to compose complex UIs
 - **DX:** More boilerplate code for consumers
@@ -1268,7 +1296,7 @@ interface PricingEditorProps {
 
 export function PricingEditor({ scope, mode }: PricingEditorProps) {
   const [state, setState] = useState(/* ... */);
-  
+
   return (
     <PricingEditorContext.Provider value={{ scope, mode, state, setState }}>
       {/* Compound components can access context implicitly */}
@@ -1306,6 +1334,7 @@ PricingEditor.Actions = function PricingEditorActions() {
 ```
 
 **Benefits:**
+
 - Cleaner API (no prop drilling)
 - Better composition
 - Type-safe through context
@@ -1322,6 +1351,7 @@ PricingEditor.Actions = function PricingEditorActions() {
 **Where it occurs:**
 
 **With barrel exports:**
+
 ```
 components/form-builder/
 ├── visual-form-builder.tsx
@@ -1330,6 +1360,7 @@ components/form-builder/
 ```
 
 **Without barrel exports:**
+
 ```
 components/pricing/         # 18 components, no barrel export
 components/invoicing/       # 10 components, no barrel export
@@ -1337,6 +1368,7 @@ components/worker-payments/ # 7 components, no barrel export
 ```
 
 **Impact:**
+
 - **Scalability:** Inconsistent import patterns
 - **Efficiency:** Must know exact file names vs directory imports
 - **Refactoring:** Moving components harder without barrel exports
@@ -1345,9 +1377,9 @@ components/worker-payments/ # 7 components, no barrel export
 
 ```typescript
 // Inconsistent imports across codebase
-import { VisualFormBuilder } from "@/components/form-builder";  // Uses barrel
-import { InvoiceList } from "@/components/invoicing/invoice-list";  // Direct
-import { PaymentHistory } from "@/components/invoicing/payment-history";  // Direct
+import { VisualFormBuilder } from "@/components/form-builder"; // Uses barrel
+import { InvoiceList } from "@/components/invoicing/invoice-list"; // Direct
+import { PaymentHistory } from "@/components/invoicing/payment-history"; // Direct
 ```
 
 **✅ Recommended approach:**
@@ -1365,11 +1397,7 @@ export { ConditionalRuleBuilder } from "./conditional-rule-builder";
 **Usage:**
 
 ```typescript
-import {
-  BasePricingEditor,
-  FieldPricingList,
-  ConditionalRuleBuilder,
-} from "@/components/pricing";
+import { BasePricingEditor, FieldPricingList, ConditionalRuleBuilder } from "@/components/pricing";
 ```
 
 **Option B: Remove all barrel exports (simpler)**
@@ -1382,6 +1410,7 @@ import { FieldConfigDialog } from "@/components/form-builder/field-config-dialog
 ```
 
 **Recommendation:** Choose **Option A** (add barrel exports) because:
+
 - Better for large codebases
 - Enables easier refactoring
 - Common in modern React projects
@@ -1399,13 +1428,13 @@ import { FieldConfigDialog } from "@/components/form-builder/field-config-dialog
 
 **Categories identified:**
 
-| Category | Count | Purpose | Examples |
-|----------|-------|---------|----------|
-| **Data Fetching** | 18 | Fetch and cache data | `useFieldConfigs`, `useInvoices` |
-| **Mutations** | 6 | Create/update/delete operations | `useFieldConfigMutations` |
-| **Local State** | 4 | UI state management | `useToggle`, `useAlertDialog` |
-| **Side Effects** | 3 | Subscriptions, events | `useNotifications` |
-| **Context Access** | 2 | Wrap context usage | `useOrganization`, `useAuth` |
+| Category           | Count | Purpose                         | Examples                         |
+| ------------------ | ----- | ------------------------------- | -------------------------------- |
+| **Data Fetching**  | 18    | Fetch and cache data            | `useFieldConfigs`, `useInvoices` |
+| **Mutations**      | 6     | Create/update/delete operations | `useFieldConfigMutations`        |
+| **Local State**    | 4     | UI state management             | `useToggle`, `useAlertDialog`    |
+| **Side Effects**   | 3     | Subscriptions, events           | `useNotifications`               |
+| **Context Access** | 2     | Wrap context usage              | `useOrganization`, `useAuth`     |
 
 ### 4.2 Common Hook Structure
 
@@ -1438,7 +1467,7 @@ export function useData(): UseDataResult<DataType> {
     try {
       setLoading(true);
       setError(null);
-      
+
       const result = await Service.fetch({ organization_id: organizationId });
       setData(result);
     } catch (err) {
@@ -1469,18 +1498,11 @@ export function useData(): UseDataResult<DataType> {
 **Pattern with optimistic updates:**
 
 ```typescript
-export function useMutations({
-  organizationId,
-  data,
-  onRefetch,
-}: UseMutationsOptions) {
+export function useMutations({ organizationId, data, onRefetch }: UseMutationsOptions) {
   const queryClient = useQueryClient();
 
   // Optimistic state
-  const [optimisticData, updateOptimisticData] = useOptimistic(
-    data,
-    reducer
-  );
+  const [optimisticData, updateOptimisticData] = useOptimistic(data, reducer);
 
   // TanStack Query mutation
   const mutation = useMutation({
@@ -1516,13 +1538,13 @@ export function useMutations({
 
 The codebase follows a **layered state management approach**:
 
-| Layer | Tools Used | Purpose | Examples |
-|-------|-----------|---------|----------|
-| **Server State** | TanStack Query | API data caching and sync | Field configs, invoices, jobs |
-| **Optimistic State** | `useOptimistic` | Immediate UI updates | Form builder, pricing editor |
-| **Global Client State** | Context API | Auth, organization, theme | `OrganizationContext`, `OnboardingContext` |
-| **Local UI State** | `useState` | Component-local state | Form inputs, modals, toggles |
-| **Derived State** | `useMemo` | Computed values | Filtered lists, calculations |
+| Layer                   | Tools Used      | Purpose                   | Examples                                   |
+| ----------------------- | --------------- | ------------------------- | ------------------------------------------ |
+| **Server State**        | TanStack Query  | API data caching and sync | Field configs, invoices, jobs              |
+| **Optimistic State**    | `useOptimistic` | Immediate UI updates      | Form builder, pricing editor               |
+| **Global Client State** | Context API     | Auth, organization, theme | `OrganizationContext`, `OnboardingContext` |
+| **Local UI State**      | `useState`      | Component-local state     | Form inputs, modals, toggles               |
+| **Derived State**       | `useMemo`       | Computed values           | Filtered lists, calculations               |
 
 ### 5.2 Context Usage Patterns
 
@@ -1598,6 +1620,7 @@ export function useFieldConfigMutations() {
 ```
 
 **Benefits:**
+
 - Automatic request deduplication
 - Background refetching
 - Cache invalidation strategies
@@ -1655,10 +1678,10 @@ static async list(request): Promise<FieldConfig[]> {
   try {
     log.debug("Fetching field configs");
     const { data, error } = await supabase.functions.invoke("...");
-    
+
     if (error) throw error;
     if (!data) throw new Error("No data returned");
-    
+
     log.info("Field configs fetched successfully");
     return data;
   } catch (err) {
@@ -1677,7 +1700,7 @@ static async list(request): Promise<FieldConfig[]> {
 setError("Failed to load configurations. Please try again.");
 
 // ❌ Bad: Technical error exposed
-setError(err.message);  // Could be "Network request failed with status 500"
+setError(err.message); // Could be "Network request failed with status 500"
 ```
 
 **Pattern for user-friendly errors:**
@@ -1726,6 +1749,7 @@ function getUserFriendlyError(err: unknown, operation: string): string {
    - Lazy load non-critical components
 
 **Research Sources:**
+
 - [React Server Components 2025 Guide](https://jordanpatel.dev/en/blog/react-server-components-2025)
 - [React Design Patterns Best Practices](https://www.telerik.com/blogs/react-design-patterns-best-practices)
 - [Modern React Architecture 2026](https://react-news.com/react-news-navigating-the-2024-ecosystem)
@@ -1761,14 +1785,15 @@ function getUserFriendlyError(err: unknown, operation: string): string {
 
 **Common Patterns in 2026:**
 
-| Pattern | Use Case | Benefits |
-|---------|----------|----------|
-| Generic `useFetch<T>` | Reusable data fetching | Type-safe, flexible |
-| Discriminated union actions | `useReducer` with typed actions | Predictable state transitions |
-| Configurable options objects | Hooks with many parameters | Scalable API |
-| State machine enums | `loading \| idle \| error \| success` | Explicit states, fewer bugs |
+| Pattern                      | Use Case                              | Benefits                      |
+| ---------------------------- | ------------------------------------- | ----------------------------- |
+| Generic `useFetch<T>`        | Reusable data fetching                | Type-safe, flexible           |
+| Discriminated union actions  | `useReducer` with typed actions       | Predictable state transitions |
+| Configurable options objects | Hooks with many parameters            | Scalable API                  |
+| State machine enums          | `loading \| idle \| error \| success` | Explicit states, fewer bugs   |
 
 **Research Sources:**
+
 - [React Hooks Best Practices 2026](https://www.expertia.ai/career-tips/common-mistakes-to-avoid-when-using-react-hooks)
 - [TypeScript React Hooks](https://stevekinney.com/courses/react-typescript/typescript-react-hooks)
 - [Custom Hooks Patterns](https://dev.to/syakirurahman/react-custom-hooks-best-practices-with-example-usecases)
@@ -1805,6 +1830,7 @@ function getUserFriendlyError(err: unknown, operation: string): string {
    - Integrates with optimistic updates
 
 **Research Sources:**
+
 - [State Management in React 2026](https://www.c-sharpcorner.com/article/state-management-in-react-2026-best-practices-tools)
 - [Redux vs Context API 2026](https://www.nucamp.co/blog/state-management-in-2026)
 - [React 19 useOptimistic](https://medium.com/@youmna.yazji/react-19s-useoptimistic-enhancing-responsiveness)
@@ -1816,14 +1842,14 @@ function getUserFriendlyError(err: unknown, operation: string): string {
 **Key Findings:**
 
 1. **Render Props vs Compound Components:**
-   
-   | Aspect | Render Props | Compound Components |
-   |--------|--------------|---------------------|
-   | Flexibility | High - full render control | Medium - predefined parts |
-   | API Complexity | Can get verbose | Clean, declarative |
-   | State Sharing | Explicit via props | Implicit via Context |
-   | Type Safety | Can be complex | Usually easier |
-   | Best For | Highly customizable UIs | Widget-like components |
+
+   | Aspect         | Render Props               | Compound Components       |
+   | -------------- | -------------------------- | ------------------------- |
+   | Flexibility    | High - full render control | Medium - predefined parts |
+   | API Complexity | Can get verbose            | Clean, declarative        |
+   | State Sharing  | Explicit via props         | Implicit via Context      |
+   | Type Safety    | Can be complex             | Usually easier            |
+   | Best For       | Highly customizable UIs    | Widget-like components    |
 
 2. **When to Use Each:**
    - **Compound Components:** Tabs, Dropdowns, Accordions, Modals (fixed structure)
@@ -1837,6 +1863,7 @@ function getUserFriendlyError(err: unknown, operation: string): string {
    - Component-as-props pattern gaining popularity
 
 **Research Sources:**
+
 - [Frontend Composition Patterns](https://planobit.com/blog/frontend-composition-patterns)
 - [React Design Patterns 2026](https://www.kellton.com/kellton-tech-blog/react-design-patterns)
 - [Compound Components Pattern](https://www.freecodecamp.org/news/compound-components-pattern-in-react)
@@ -1848,6 +1875,7 @@ function getUserFriendlyError(err: unknown, operation: string): string {
 ### 8.1 Component Structure Rules
 
 #### RULE-COMP-001: Component Export Pattern
+
 **Requirement:** All components MUST use named function exports.
 
 ```typescript
@@ -1871,6 +1899,7 @@ export default ComponentName;
 ---
 
 #### RULE-COMP-002: Props Interface Naming
+
 **Requirement:** Component props interfaces MUST follow the pattern `[ComponentName]Props`.
 
 ```typescript
@@ -1888,6 +1917,7 @@ export function Button({ variant, size, children }: ButtonProps) {
 ---
 
 #### RULE-COMP-003: Component Internal Organization
+
 **Requirement:** Components over 100 lines SHOULD follow this structure:
 
 ```typescript
@@ -1932,9 +1962,11 @@ export function Component({ ...props }: ComponentProps) {
 ---
 
 #### RULE-COMP-004: Component Size Limits
+
 **Recommendation:** Components over 300 lines SHOULD be split into smaller components or extract logic into hooks.
 
 **Refactoring strategies:**
+
 1. Extract custom hooks for complex logic
 2. Split into sub-components
 3. Use composition patterns (compound components)
@@ -1945,6 +1977,7 @@ export function Component({ ...props }: ComponentProps) {
 ### 8.2 Custom Hooks Rules
 
 #### RULE-HOOK-001: Hook File Naming
+
 **Requirement:** Hook files MUST use kebab-case with `use-` prefix.
 
 ```
@@ -1962,6 +1995,7 @@ hooks/useAuth.ts
 ---
 
 #### RULE-HOOK-002: Hook Export Pattern
+
 **Requirement:** All hooks MUST use named exports (not default exports).
 
 ```typescript
@@ -1979,6 +2013,7 @@ export default function useData(): UseDataResult {
 ---
 
 #### RULE-HOOK-003: Hook Return Type
+
 **Requirement:** All hooks MUST define and return an explicit result interface.
 
 ```typescript
@@ -1998,6 +2033,7 @@ export function useData<T>(): UseDataResult<T> {
 ---
 
 #### RULE-HOOK-004: Hook Error Handling
+
 **Requirement:** All async hooks MUST implement try-catch-finally error handling.
 
 ```typescript
@@ -2008,18 +2044,16 @@ export function useData(): UseDataResult {
   const fetch = async () => {
     try {
       setLoading(true);
-      setError(null);  // Reset error state
-      
+      setError(null); // Reset error state
+
       const result = await api.call();
       setData(result);
     } catch (err) {
-      const message = err instanceof Error 
-        ? err.message 
-        : "An unexpected error occurred";
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
       setError(message);
-      setData(null);  // Reset data on error
+      setData(null); // Reset data on error
     } finally {
-      setLoading(false);  // Always reset loading
+      setLoading(false); // Always reset loading
     }
   };
 
@@ -2030,6 +2064,7 @@ export function useData(): UseDataResult {
 ---
 
 #### RULE-HOOK-005: Hook Dependencies
+
 **Requirement:** All hooks MUST include exhaustive dependencies in `useEffect`, `useCallback`, and `useMemo`.
 
 Enable ESLint rule: `react-hooks/exhaustive-deps`
@@ -2038,12 +2073,12 @@ Enable ESLint rule: `react-hooks/exhaustive-deps`
 // ✅ Correct
 useEffect(() => {
   fetchData(organizationId, userId);
-}, [organizationId, userId]);  // All dependencies listed
+}, [organizationId, userId]); // All dependencies listed
 
 // ❌ Incorrect
 useEffect(() => {
   fetchData(organizationId, userId);
-}, []);  // Missing dependencies - stale closure bug
+}, []); // Missing dependencies - stale closure bug
 ```
 
 ---
@@ -2051,26 +2086,28 @@ useEffect(() => {
 ### 8.3 State Management Rules
 
 #### RULE-STATE-001: State Layer Selection
+
 **Requirement:** Choose state management tool based on state type:
 
-| State Type | Tool | Use Case |
-|------------|------|----------|
-| Server data | TanStack Query | API responses, caching |
-| Optimistic updates | `useOptimistic` | Immediate UI feedback |
-| Global client state | Context API | Auth, theme, slow-changing values |
-| Local UI state | `useState` | Form inputs, modals, toggles |
-| Derived state | `useMemo` | Filtered lists, calculations |
+| State Type          | Tool            | Use Case                          |
+| ------------------- | --------------- | --------------------------------- |
+| Server data         | TanStack Query  | API responses, caching            |
+| Optimistic updates  | `useOptimistic` | Immediate UI feedback             |
+| Global client state | Context API     | Auth, theme, slow-changing values |
+| Local UI state      | `useState`      | Form inputs, modals, toggles      |
+| Derived state       | `useMemo`       | Filtered lists, calculations      |
 
 ---
 
 #### RULE-STATE-002: Context Value Memoization
+
 **Requirement:** Context provider values MUST be memoized to prevent unnecessary re-renders.
 
 ```typescript
 // ✅ Correct
 export function Provider({ children }) {
   const [state, setState] = useState();
-  
+
   const value = useMemo(
     () => ({ state, setState }),
     [state]
@@ -2086,7 +2123,7 @@ export function Provider({ children }) {
 // ❌ Incorrect
 export function Provider({ children }) {
   const [state, setState] = useState();
-  
+
   return (
     <Context.Provider value={{ state, setState }}>
       {children}
@@ -2098,6 +2135,7 @@ export function Provider({ children }) {
 ---
 
 #### RULE-STATE-003: Optimistic Updates Pattern
+
 **Requirement:** Optimistic updates MUST use React 19's `useOptimistic` hook with discriminated union actions.
 
 ```typescript
@@ -2108,11 +2146,12 @@ type OptimisticAction<T> =
 
 function reducer<T>(state: T[], action: OptimisticAction<T>): T[] {
   switch (action.type) {
-    case "add": return [...state, action.item];
-    case "update": return state.map(item => 
-      item.id === action.item.id ? action.item : item
-    );
-    case "delete": return state.filter(item => item.id !== action.id);
+    case "add":
+      return [...state, action.item];
+    case "update":
+      return state.map((item) => (item.id === action.item.id ? action.item : item));
+    case "delete":
+      return state.filter((item) => item.id !== action.id);
   }
 }
 
@@ -2135,6 +2174,7 @@ export function useMutations(data: T[]) {
 ### 8.4 Error Handling Rules
 
 #### RULE-ERROR-001: Error Boundary Usage
+
 **Requirement:** All major feature routes MUST be wrapped in error boundaries.
 
 ```typescript
@@ -2152,6 +2192,7 @@ export default function DashboardLayout({ children }) {
 ---
 
 #### RULE-ERROR-002: User-Friendly Error Messages
+
 **Requirement:** User-facing error messages MUST be friendly and actionable.
 
 ```typescript
@@ -2159,10 +2200,11 @@ export default function DashboardLayout({ children }) {
 setError("Failed to save changes. Please check your connection and try again.");
 
 // ❌ Incorrect - Technical error exposed
-setError(error.message);  // "NetworkError: fetch failed at line 42"
+setError(error.message); // "NetworkError: fetch failed at line 42"
 ```
 
 **Error message guidelines:**
+
 1. Explain what went wrong (briefly)
 2. Suggest what user can do
 3. Avoid technical jargon
@@ -2171,6 +2213,7 @@ setError(error.message);  // "NetworkError: fetch failed at line 42"
 ---
 
 #### RULE-ERROR-003: Error Logging
+
 **Requirement:** All caught errors SHOULD be logged using the centralized logger.
 
 ```typescript
@@ -2179,10 +2222,10 @@ import { log } from "@/lib/logger";
 try {
   await api.call();
 } catch (err) {
-  log.error("Operation failed", { 
+  log.error("Operation failed", {
     operation: "fetchData",
     error: err instanceof Error ? err.message : "Unknown error",
-    context: { userId, organizationId }
+    context: { userId, organizationId },
   });
   throw err;
 }
@@ -2193,6 +2236,7 @@ try {
 ### 8.5 Component Composition Rules
 
 #### RULE-COMP-005: Barrel Export Usage
+
 **Requirement:** All feature directories with 3+ components SHOULD have a barrel export (`index.ts`).
 
 ```typescript:components/pricing/index.ts
@@ -2206,21 +2250,19 @@ export { ConditionalRuleBuilder } from "./conditional-rule-builder";
 **Usage:**
 
 ```typescript
-import {
-  BasePricingEditor,
-  FieldPricingList,
-} from "@/components/pricing";
+import { BasePricingEditor, FieldPricingList } from "@/components/pricing";
 ```
 
 ---
 
 #### RULE-COMP-006: Compound Components for Complex UIs
+
 **Recommendation:** Use compound component pattern for UI with fixed structural parts (tabs, dropdowns, editors with multiple sections).
 
 ```typescript
 export function Editor({ scope }: EditorProps) {
   const [state, setState] = useState();
-  
+
   return (
     <EditorContext.Provider value={{ scope, state, setState }}>
       {/* Context available to all children */}
@@ -2250,6 +2292,7 @@ Editor.Content = function EditorContent() {
 ### 8.6 UI State Component Rules
 
 #### RULE-UI-001: Consistent State Components
+
 **Requirement:** Use dedicated state components for loading, error, and empty states.
 
 ```typescript
@@ -2267,19 +2310,23 @@ if (data.length === 0) return <div>No items</div>;
 ---
 
 #### RULE-UI-002: State Component Props
+
 **Requirement:** State components MUST accept these standard props:
 
 **LoadingState:**
+
 - `message?: string` - Custom loading message
 - `fullScreen?: boolean` - Full screen or inline
 
 **ErrorState:**
+
 - `title?: string` - Error title
 - `message: string` - Error description (required)
 - `onRetry?: () => void` - Retry action
 - `fullScreen?: boolean` - Full screen or inline
 
 **EmptyState:**
+
 - `title: string` - Empty state title (required)
 - `description: string` - Empty state description (required)
 - `icon?: LucideIcon` - Optional icon
@@ -2290,9 +2337,11 @@ if (data.length === 0) return <div>No items</div>;
 ### 8.7 Code Quality Rules
 
 #### RULE-QUALITY-001: TypeScript Strict Mode
+
 **Requirement:** All TypeScript files MUST be compatible with strict mode.
 
 `tsconfig.json`:
+
 ```json
 {
   "compilerOptions": {
@@ -2307,6 +2356,7 @@ if (data.length === 0) return <div>No items</div>;
 ---
 
 #### RULE-QUALITY-002: Avoid Any Type
+
 **Requirement:** The `any` type SHOULD NOT be used. Use `unknown` for truly unknown types.
 
 ```typescript
@@ -2320,13 +2370,14 @@ function handleError(error: unknown) {
 
 // ❌ Incorrect
 function handleError(error: any) {
-  return error.message;  // Unsafe
+  return error.message; // Unsafe
 }
 ```
 
 ---
 
 #### RULE-QUALITY-003: Explicit Return Types
+
 **Requirement:** All public functions and hooks MUST declare explicit return types.
 
 ```typescript
@@ -2364,7 +2415,9 @@ export function useData() {
 Since the project uses Next.js App Router, understanding when to use Server Components vs Client Components is critical.
 
 #### Server Components (Default)
+
 Use Server Components when:
+
 - Fetching data directly from database/API
 - Accessing backend resources (filesystem, env vars)
 - Keeping sensitive information on server (API keys, tokens)
@@ -2375,7 +2428,7 @@ Use Server Components when:
 export default async function WorkersPage() {
   // Can fetch data directly - no useEffect needed
   const workers = await WorkersService.list({ organization_id: orgId });
-  
+
   return (
     <div>
       <h1>Workers</h1>
@@ -2387,7 +2440,9 @@ export default async function WorkersPage() {
 ```
 
 #### Client Components
+
 Use `"use client"` when:
+
 - Using React hooks (useState, useEffect, useContext)
 - Using browser APIs (localStorage, window)
 - Adding event listeners (onClick, onChange)
@@ -2399,7 +2454,7 @@ Use `"use client"` when:
 // components/workers/worker-list.tsx (Client Component)
 export function WorkerList({ workers }: { workers: Worker[] }) {
   const [selected, setSelected] = useState<string | null>(null);
-  
+
   return (
     <ul>
       {workers.map((worker) => (
@@ -2421,7 +2476,7 @@ Keep Client Components at the "leaves" of the component tree:
 // app/dashboard/page.tsx (Server)
 export default async function DashboardPage() {
   const stats = await fetchStats();
-  
+
   return (
     <div>
       <h1>Dashboard</h1>
@@ -2443,11 +2498,13 @@ export default function DashboardPage() {
 ### 9.3 Server Actions vs Edge Functions
 
 **Use Server Actions for:**
+
 - Form submissions
 - Simple mutations that don't need to be called from mobile app
 - Operations that benefit from being co-located with UI
 
 **Use Edge Functions for:**
+
 - Operations called by both dashboard AND mobile app
 - Complex business logic that should be centralized
 - Operations requiring organization-level authorization
@@ -2485,29 +2542,33 @@ Is the data needed for initial render?
 ### 9.5 Rules for Server/Client Boundary
 
 #### RULE-RSC-001: Default to Server Components
+
 **Requirement:** Components SHOULD be Server Components by default. Only add `"use client"` when required.
 
 #### RULE-RSC-002: Client Components at Leaves
+
 **Requirement:** Client Components SHOULD be at the "leaves" of the component tree, not at the root.
 
 #### RULE-RSC-003: Props Serialization
+
 **Requirement:** Data passed from Server to Client Components MUST be serializable (no functions, Dates as strings, etc.).
 
 ```typescript
 // ✅ Good: Serializable props
-<ClientComponent 
-  date={date.toISOString()} 
+<ClientComponent
+  date={date.toISOString()}
   onAction={undefined}  // Will use server action
 />
 
 // ❌ Bad: Non-serializable props
-<ClientComponent 
+<ClientComponent
   date={new Date()}  // Date object
   onAction={() => {}}  // Function
 />
 ```
 
 #### RULE-RSC-004: Shared Code via Edge Functions
+
 **Requirement:** Business logic needed by both dashboard and mobile MUST use Edge Functions, not Server Actions.
 
 ---
@@ -2517,6 +2578,7 @@ Is the data needed for initial render?
 ### 10.1 Overview
 
 Constants management prevents "magic strings" and "magic numbers" from being scattered throughout the codebase. Centralizing these values improves:
+
 - **Maintainability:** Change values in one place
 - **Type Safety:** TypeScript infers literal types from `as const`
 - **Discoverability:** Developers can find all valid values in one location
@@ -2561,6 +2623,7 @@ function updateStatus(status: InvoiceStatus) {
 ```
 
 **Why it works:**
+
 - **Autocomplete:** IDE suggests `INVOICE_STATUS.DRAFT`, `INVOICE_STATUS.SENT`, etc.
 - **Type Safety:** `InvoiceStatus` type only allows defined values
 - **Single Source of Truth:** Value AND type defined together
@@ -2601,6 +2664,7 @@ export function getDefaultInvoiceTemplateConfig(
 ```
 
 **Why it works:**
+
 - **Composable:** Individual defaults can be used separately or together
 - **Type Safe:** Factory function return type is explicit
 - **Testable:** Defaults are importable for test assertions
@@ -2640,6 +2704,7 @@ export function getRatingDimensionDescription(dimension: string): string {
 ```
 
 **Why it works:**
+
 - **Separation of Concerns:** Business logic separate from display text
 - **i18n Ready:** Easy to swap for translation functions later
 - **Safe Fallbacks:** Helper functions handle missing keys gracefully
@@ -2647,39 +2712,44 @@ export function getRatingDimensionDescription(dimension: string): string {
 
 ### 10.5 When to Use Constants Files
 
-| Scenario | Use Constants File? | Example |
-|----------|---------------------|---------|
-| Status values, types, categories | ✅ Yes | `INVOICE_STATUS.DRAFT` |
-| Default configuration values | ✅ Yes | `DEFAULT_CURRENCY` |
-| UI labels and descriptions | ✅ Yes | `RATING_DIMENSION_LABELS` |
-| Validation limits (max length, etc.) | ✅ Yes | `MAX_FILE_SIZE` |
-| API endpoint paths | ✅ Yes | `API_ENDPOINTS.WORKERS` |
-| Environment-specific values | ❌ No - use `.env` | Database URLs, API keys |
-| Component-specific magic values | ⚠️ Maybe | Consider if reused elsewhere |
-| One-off numeric values | ⚠️ Maybe | Use descriptive variable name at minimum |
+| Scenario                             | Use Constants File? | Example                                  |
+| ------------------------------------ | ------------------- | ---------------------------------------- |
+| Status values, types, categories     | ✅ Yes              | `INVOICE_STATUS.DRAFT`                   |
+| Default configuration values         | ✅ Yes              | `DEFAULT_CURRENCY`                       |
+| UI labels and descriptions           | ✅ Yes              | `RATING_DIMENSION_LABELS`                |
+| Validation limits (max length, etc.) | ✅ Yes              | `MAX_FILE_SIZE`                          |
+| API endpoint paths                   | ✅ Yes              | `API_ENDPOINTS.WORKERS`                  |
+| Environment-specific values          | ❌ No - use `.env`  | Database URLs, API keys                  |
+| Component-specific magic values      | ⚠️ Maybe            | Consider if reused elsewhere             |
+| One-off numeric values               | ⚠️ Maybe            | Use descriptive variable name at minimum |
 
 ### 10.6 Rules for Constants Management
 
 #### RULE-CONST-001: No Magic Strings in Business Logic
+
 **Requirement:** String literals used for comparison or status checks MUST be defined as constants.
 
 ```typescript
 // ❌ Bad: Magic string
-if (invoice.status === "paid") { }
+if (invoice.status === "paid") {
+}
 
 // ✅ Good: Named constant
 import { INVOICE_STATUS } from "@/lib/constants/invoice-constants";
-if (invoice.status === INVOICE_STATUS.PAID) { }
+if (invoice.status === INVOICE_STATUS.PAID) {
+}
 ```
 
 ---
 
 #### RULE-CONST-002: No Magic Numbers
+
 **Requirement:** Numeric values with business meaning MUST be named constants.
 
 ```typescript
 // ❌ Bad: Magic numbers
-if (retryCount > 3) { }
+if (retryCount > 3) {
+}
 const timeout = 5000;
 const maxSize = 10485760;
 
@@ -2688,31 +2758,34 @@ const MAX_RETRY_ATTEMPTS = 3;
 const REQUEST_TIMEOUT_MS = 5000;
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
-if (retryCount > MAX_RETRY_ATTEMPTS) { }
+if (retryCount > MAX_RETRY_ATTEMPTS) {
+}
 ```
 
 ---
 
 #### RULE-CONST-003: Use `as const` for Literal Types
+
 **Requirement:** Constant objects MUST use `as const` assertion for type inference.
 
 ```typescript
 // ❌ Bad: Types inferred as string
 export const STATUS = {
-    ACTIVE: "active",    // type: string
-    INACTIVE: "inactive" // type: string
+  ACTIVE: "active", // type: string
+  INACTIVE: "inactive", // type: string
 };
 
 // ✅ Good: Types inferred as literals
 export const STATUS = {
-    ACTIVE: "active",    // type: "active"
-    INACTIVE: "inactive" // type: "inactive"
+  ACTIVE: "active", // type: "active"
+  INACTIVE: "inactive", // type: "inactive"
 } as const;
 ```
 
 ---
 
 #### RULE-CONST-004: Derive Types from Constants
+
 **Requirement:** Types representing constant values SHOULD be derived from the const object, not defined separately.
 
 ```typescript
@@ -2728,6 +2801,7 @@ export type Status = (typeof STATUS)[keyof typeof STATUS]; // Auto-derived
 ---
 
 #### RULE-CONST-005: Constants File Naming
+
 **Requirement:** Constants files MUST use kebab-case and end with `-constants.ts` or describe their domain.
 
 ```
@@ -2745,6 +2819,7 @@ lib/constants/misc.ts
 ---
 
 #### RULE-CONST-006: Co-locate Related Constants
+
 **Requirement:** Related constants SHOULD be in the same file for discoverability.
 
 ```typescript
@@ -2762,6 +2837,7 @@ export const MAX_LINE_ITEMS = 100;
 ---
 
 #### RULE-CONST-007: Mirror Constants in Backend When Needed
+
 **Requirement:** Constants used in both frontend and backend MUST be kept in sync or shared via the `shared` package.
 
 ```
@@ -2810,6 +2886,7 @@ import { INVOICE_STATUS, PAYMENT_STATUS, MAX_FILE_SIZE } from "@/lib/constants";
 ## Summary
 
 **Phase 2 analyzed:**
+
 - 100+ React components across dashboard and mobile
 - 44 custom hooks
 - State management patterns (4 layers)
@@ -2817,12 +2894,14 @@ import { INVOICE_STATUS, PAYMENT_STATUS, MAX_FILE_SIZE } from "@/lib/constants";
 - Component composition strategies
 
 **Key findings:**
+
 - Strong foundation with TypeScript interfaces and named exports
 - Excellent use of React 19 `useOptimistic` for UX
 - Comprehensive logging strategy
 - Good separation of concerns (services, hooks, components)
 
 **Areas for improvement:**
+
 - Standardize hook file naming (2 outliers)
 - Consistent error handling across all hooks
 - Barrel exports for feature directories

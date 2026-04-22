@@ -1,6 +1,6 @@
 # E2E Testing
 
-This directory contains end-to-end tests for the Clean Log System dashboard using Playwright.
+This directory contains end-to-end tests for the Tally Runner (monorepo) dashboard using Playwright.
 
 ## Directory Structure
 
@@ -35,6 +35,7 @@ e2e/
 ### Scenario 1: Car Yard Detailer
 
 Comprehensive E2E tests with seeded test data. Tests the full workflow:
+
 - Organization setup with hierarchy
 - 6 workers (including 1 supervisor with rate card)
 - 3 locations (2 under hierarchy, 1 independent)
@@ -74,11 +75,13 @@ pnpm test:e2e:codegen
 Before running Scenario 1 tests:
 
 1. **Start local Supabase**:
+
    ```bash
    cd database && supabase start
    ```
 
 2. **Start dashboard dev server** (automatic via playwright config):
+
    ```bash
    pnpm dev:dashboard
    ```
@@ -159,6 +162,7 @@ This avoids the need for email verification during tests.
 ## CI/CD Integration
 
 Tests run automatically in CI with:
+
 - Global setup/teardown for database seeding
 - Retries on failure (2 attempts)
 - JUnit XML reports for integration

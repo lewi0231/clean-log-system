@@ -1,6 +1,6 @@
 # Phase 1: Organizational Structure Analysis
 
-**Project:** Clean Log System Monorepo  
+**Project:** Tally Runner (monorepo) Monorepo  
 **Date:** January 20, 2026  
 **Scope:** Top-level monorepo structure, cross-cutting concerns, dependency management, and organizational patterns
 
@@ -128,11 +128,11 @@ packages:
 
 ### 1.3 Package Naming Conventions
 
-| Package | Name in package.json | Rationale |
-|---------|---------------------|-----------|
-| dashboard | `@clean-log/dashboard` | Scoped package name |
+| Package    | Name in package.json    | Rationale           |
+| ---------- | ----------------------- | ------------------- |
+| dashboard  | `@clean-log/dashboard`  | Scoped package name |
 | mobile-app | `@clean-log/mobile-app` | Scoped package name |
-| shared | `@clean-log/shared` | Scoped package name |
+| shared     | `@clean-log/shared`     | Scoped package name |
 
 All packages use the `@clean-log/` scope, providing namespace isolation and consistent naming.
 
@@ -160,11 +160,13 @@ The `workspace:*` protocol ensures pnpm resolves these as local workspace packag
 **What it is:** All workspace packages use the `@clean-log/` scope prefix.
 
 **Where it's used:**
+
 - `/dashboard/package.json` - `"name": "@clean-log/dashboard"`
 - `/mobile-app/package.json` - `"name": "@clean-log/mobile-app"`
 - `/shared/package.json` - `"name": "@clean-log/shared"`
 
 **Why it works:**
+
 - **Scalability:** Prevents naming collisions with npm packages or future additions
 - **Efficiency:** Clear package ownership and discoverability in IDE autocomplete
 - **Industry Standard:** Aligns with npm scoped packages best practice ([npmjs.com](https://docs.npmjs.com/about-scopes))
@@ -189,11 +191,13 @@ The `workspace:*` protocol ensures pnpm resolves these as local workspace packag
 **What it is:** Using `workspace:*` protocol for internal package dependencies.
 
 **Where it's used:**
+
 ```typescript:dashboard/package.json
 "@clean-log/shared": "workspace:*"
 ```
 
 **Why it works:**
+
 - **Scalability:** Ensures dependencies resolve to local workspace packages, not published versions
 - **Efficiency:** Eliminates version mismatch issues during development
 - **Industry Standard:** Recommended by pnpm for monorepo management ([pnpm.io](https://pnpm.io/workspaces))
@@ -205,11 +209,13 @@ The `workspace:*` protocol ensures pnpm resolves these as local workspace packag
 **What it is:** Each Supabase edge function has its own `deno.json` file declaring dependencies.
 
 **Where it's used:**
+
 - `/database/supabase/functions/create-field-config/deno.json`
 - `/database/supabase/functions/manage-worker-rate-card/deno.json`
 - All 70+ edge functions have individual `deno.json` files
 
 **Why it works:**
+
 - **Scalability:** Isolates dependency changes to individual functions, preventing cascading breakage
 - **Efficiency:** Reduces deployment bundle size (only includes necessary dependencies)
 - **Industry Standard:** Supabase v1.215.0+ requires this for proper function isolation
@@ -238,12 +244,14 @@ The `workspace:*` protocol ensures pnpm resolves these as local workspace packag
 **What it is:** Centralized utility functions in `_utils/` directory for edge functions.
 
 **Where it's used:**
+
 - `/database/supabase/functions/_utils/auth.ts` - Authentication helpers
 - `/database/supabase/functions/_utils/http.ts` - HTTP response utilities
 - `/database/supabase/functions/_utils/logger.ts` - Logging utilities
 - `/database/supabase/functions/_utils/validation.ts` - Validation helpers
 
 **Why it works:**
+
 - **Scalability:** Single source of truth for common patterns across 70+ functions
 - **Efficiency:** Reduces code duplication and maintenance burden
 - **Industry Standard:** Recommended pattern for Supabase monorepos
@@ -296,6 +304,7 @@ import { validateRequiredFields } from "../_utils/validation.ts";
 ```
 
 **Why it works:**
+
 - **Scalability:** Eliminates brittle relative imports (`../../../component`)
 - **Efficiency:** Improves refactoring capabilities and IDE navigation
 - **Industry Standard:** TypeScript path mapping best practice
@@ -332,6 +341,7 @@ export { JobsService } from "./jobs.service";
 ```
 
 **Why it works:**
+
 - **Scalability:** Single import point simplifies dependency management
 - **Efficiency:** Reduces import statement clutter in consuming files
 - **Industry Standard:** Common pattern in TypeScript/JavaScript projects
@@ -355,6 +365,7 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 **What it is:** Each major package has its own README and coding practices documentation.
 
 **Where it's used:**
+
 - `/database/README.md` - Database setup, testing, and Deno commands
 - `/dashboard/CONTRIBUTING.md` - Comprehensive dashboard development guidelines
 - `/dashboard/CODING_PRACTICES.md` - Dashboard-specific patterns
@@ -362,6 +373,7 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 - `/mobile-app/CODING_PRACTICES.md` - Mobile development standards
 
 **Why it works:**
+
 - **Scalability:** Context-specific documentation reduces cognitive load
 - **Efficiency:** Developers can quickly find relevant information without searching root docs
 - **Industry Standard:** Recommended monorepo documentation strategy (2026 best practices)
@@ -401,6 +413,7 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 ```
 
 **Why it works:**
+
 - **Scalability:** Catches type errors early, preventing runtime bugs in production
 - **Efficiency:** Improves IDE autocomplete and refactoring confidence
 - **Industry Standard:** TypeScript team strongly recommends strict mode for all projects
@@ -412,11 +425,13 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 **What it is:** Both dashboard and mobile-app use Vitest with similar configuration patterns.
 
 **Where it's used:**
+
 - `/dashboard/vitest.config.mts`
 - `/mobile-app/vitest.config.mts`
 - Test files in `__tests__/` directories mirroring source structure
 
 **Why it works:**
+
 - **Scalability:** Shared testing knowledge across teams
 - **Efficiency:** Single test runner to learn, consistent CLI commands
 - **Industry Standard:** Vitest is recommended for modern TypeScript projects
@@ -428,11 +443,13 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 **What it is:** Each workspace package has its own `.vscode/settings.json` for package-specific tooling.
 
 **Where it's used:**
+
 - `/dashboard/.vscode/settings.json`
 - `/mobile-app/.vscode/settings.json`
 - `/database/.vscode/settings.json`
 
 **Why it works:**
+
 - **Scalability:** Isolates Deno LSP (database) from Node/TypeScript LSP (dashboard/mobile)
 - **Efficiency:** Prevents IDE conflicts and improves autocomplete accuracy
 - **Industry Standard:** Recommended for monorepos with multiple runtimes
@@ -466,6 +483,7 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 ```
 
 **Impact:**
+
 - **Scalability:** Developers switching between packages must remember different import patterns
 - **Efficiency:** Creates confusion and potential merge conflicts when copying code between packages
 - **Maintenance Burden:** Inconsistent patterns are harder to enforce via linting
@@ -512,7 +530,8 @@ Based on research, the industry standard is to **align path aliases with package
 import { FieldConfig, FieldType, ValidationRules } from "@clean-log/shared";
 ```
 
-**Research basis:** 
+**Research basis:**
+
 - TypeScript documentation recommends aligning path aliases with package names ([typescriptlang.org](https://www.typescriptlang.org/tsconfig#paths))
 - Monorepo best practices (2026) emphasize consistency over brevity for long-term maintainability
 - Aligning aliases with package names enables proper `package.json` exports field usage
@@ -524,10 +543,12 @@ import { FieldConfig, FieldType, ValidationRules } from "@clean-log/shared";
 **What's inconsistent:** The `database` directory is not a Node.js package but sits alongside Node packages without clear separation.
 
 **Where it occurs:**
+
 - `/database/` is at the same level as `/dashboard/`, `/mobile-app/`, and `/shared/`
 - `pnpm-workspace.yaml` doesn't explicitly exclude database (implicit exclusion)
 
 **Impact:**
+
 - **Scalability:** May cause confusion about whether database should be included in monorepo tooling
 - **Efficiency:** Package managers may scan database unnecessarily
 
@@ -546,6 +567,7 @@ packages:
 Explicitly document the exclusion and consider restructuring:
 
 **Option A: Explicit exclusion in workspace file**
+
 ```yaml:pnpm-workspace.yaml
 packages:
   - "dashboard"
@@ -555,6 +577,7 @@ packages:
 ```
 
 **Option B: Separate top-level structure**
+
 ```
 clean-log-system/
 ├── apps/
@@ -567,6 +590,7 @@ clean-log-system/
 ```
 
 **Research basis:**
+
 - Modern monorepo conventions (2026) recommend clear separation between different runtime environments
 - Turborepo, Nx, and other monorepo tools expect `/apps` and `/packages` structure for clarity
 
@@ -613,6 +637,7 @@ export interface Location {
 ```
 
 **Impact:**
+
 - **Scalability:** Type drift between edge functions and frontend leads to runtime errors
 - **Efficiency:** Maintaining duplicate definitions wastes developer time
 - **Risk:** Edge functions cannot use `@clean-log/shared` due to Deno runtime differences
@@ -620,6 +645,7 @@ export interface Location {
 **❌ Current approach:**
 
 Three separate type definitions for the same domain entities:
+
 1. Shared types (Node.js compatible)
 2. Dashboard types (extends shared)
 3. Edge function types (Deno-specific, duplicated)
@@ -661,6 +687,7 @@ import type { Worker } from "../../../../shared/types/worker.ts";
 ```
 
 **Research basis:**
+
 - Supabase edge functions support importing local TypeScript files
 - Deno can consume TypeScript directly without compilation
 - Industry pattern: platform-agnostic types in `.ts` files, runtime-specific code in separate modules
@@ -694,6 +721,7 @@ import type { Worker } from "../../../../shared/types/worker.ts";
 ```
 
 **Impact:**
+
 - **Scalability:** Version drift across functions creates maintenance nightmare
 - **Efficiency:** Difficult to upgrade dependencies (must update 70+ files)
 - **Risk:** Functions may break in production due to missing transitive dependencies
@@ -745,6 +773,7 @@ Create a script that generates `deno.json` files from templates:
 ```
 
 **Research basis:**
+
 - Supabase v1.215.0+ requires per-function `deno.json` for isolation
 - Industry practice: centralize version management, distribute via tooling
 - Netflix, Google, and other large-scale monorepos use code generation for config consistency
@@ -752,6 +781,7 @@ Create a script that generates `deno.json` files from templates:
 **Supabase Note:** The Supabase CLI bundles each function and its dependencies into an ESZip file—a compact format created by Deno that includes a complete module graph. While per-function `deno.json` is required for deployment, you can still maintain a centralized version manifest (`deps.ts`) for development consistency. Use a pre-commit hook or CI check to validate version alignment across all function configs.
 
 **Migration Checklist:**
+
 - [ ] Create centralized `deps.ts` with version constants
 - [ ] Audit all existing `deno.json` files for version inconsistencies
 - [ ] Update inconsistent versions to match centralized manifest
@@ -765,10 +795,12 @@ Create a script that generates `deno.json` files from templates:
 **What's inconsistent:** The repository lacks a comprehensive root README explaining monorepo structure, setup, and contribution workflow.
 
 **Where it occurs:**
+
 - `/README.md` is absent
 - New developers must discover structure through exploration
 
 **Impact:**
+
 - **Scalability:** Onboarding friction increases with team size
 - **Efficiency:** Repeated questions about setup waste senior developer time
 - **Discoverability:** GitHub landing page shows no project description
@@ -776,6 +808,7 @@ Create a script that generates `deno.json` files from templates:
 **❌ Current approach:**
 
 Documentation exists but is scattered:
+
 - `/database/README.md` - Database-specific
 - `/dashboard/CONTRIBUTING.md` - Dashboard-specific
 - `/docs/` - Various feature documentation
@@ -785,8 +818,8 @@ Documentation exists but is scattered:
 
 Create comprehensive root README following modern monorepo best practices:
 
-```markdown:/README.md
-# Clean Log System
+````markdown:/README.md
+# Tally Runner (monorepo)
 
 > SaaS platform for service-based businesses to manage field workers, jobs, and customer invoicing
 
@@ -820,7 +853,7 @@ pnpm dev:mobile
 
 # Start local Supabase
 cd database && supabase start
-```
+````
 
 ## 📚 Documentation
 
@@ -842,13 +875,14 @@ See individual package CONTRIBUTING.md files for specific guidelines.
 
 ## 📦 Packages
 
-| Package | Description | Tech Stack |
-|---------|-------------|------------|
-| dashboard | Admin web interface | Next.js 16, React 19, Tailwind |
-| mobile-app | Field worker app | Expo, React Native, NativeWind |
-| shared | Type definitions | TypeScript |
-| database | Backend functions | Deno, Supabase |
-```
+| Package    | Description         | Tech Stack                     |
+| ---------- | ------------------- | ------------------------------ |
+| dashboard  | Admin web interface | Next.js 16, React 19, Tailwind |
+| mobile-app | Field worker app    | Expo, React Native, NativeWind |
+| shared     | Type definitions    | TypeScript                     |
+| database   | Backend functions   | Deno, Supabase                 |
+
+````
 
 **Research basis:**
 - GitHub repositories with comprehensive READMEs receive 2-3x more contributions (GitHub Research 2025)
@@ -875,7 +909,7 @@ const eslintConfig = defineConfig([
 ]);
 
 export default eslintConfig;
-```
+````
 
 ```javascript:mobile-app/eslint.config.js
 const { defineConfig } = require("eslint/config");
@@ -888,12 +922,14 @@ module.exports = defineConfig([
 ```
 
 **Impact:**
+
 - **Scalability:** Different module systems create confusion
 - **Efficiency:** Cannot share ESLint utilities/rules between packages easily
 
 **❌ Current approach:**
 
 Platform-specific requirements dictate format:
+
 - Dashboard: ESM (Next.js prefers)
 - Mobile: CJS (React Native/Metro expects)
 
@@ -928,6 +964,7 @@ Update `package.json`:
 ```
 
 **Research basis:**
+
 - ESLint 9+ recommends flat config (ESM) for all new projects
 - Expo SDK 54+ supports ESM modules
 - Consistency enables shared ESLint utilities in future
@@ -960,6 +997,7 @@ Update `package.json`:
 ```
 
 **Impact:**
+
 - **Scalability:** Root directory becomes cluttered and hard to navigate
 - **Efficiency:** Developers cannot quickly find relevant documentation
 - **Maintenance:** Outdated files remain because they're not in structured location
@@ -995,6 +1033,7 @@ Organize by category and archive completed work:
 ```
 
 **Research basis:**
+
 - Diátaxis documentation framework (2024): separate tutorials, how-tos, references, explanations
 - Architecture Decision Records (ADRs) are industry standard for tracking design choices
 - Archive folder prevents document deletion while keeping root clean
@@ -1008,16 +1047,19 @@ Organize by category and archive completed work:
 #### 4.1.1 TypeScript Types Sharing
 
 **Current Pattern:**
+
 - Single `@clean-log/shared` package contains domain types
 - Both dashboard and mobile-app import via `@clean-log/shared`
 - Edge functions duplicate types (runtime incompatibility)
 
 **Strengths:**
+
 - ✅ Single source of truth for Node.js applications
 - ✅ Type safety across frontend packages
 - ✅ Workspace protocol ensures version consistency
 
 **Weaknesses:**
+
 - ❌ Edge functions cannot consume shared package (Deno vs Node.js)
 - ❌ Type drift between frontend and backend
 - ❌ Limited exports configuration (no conditional exports for Deno)
@@ -1043,11 +1085,13 @@ Implement dual-runtime type exports:
 #### 4.1.2 Utility Functions
 
 **Current Pattern:**
+
 - Dashboard: `/dashboard/lib/utils.ts` + `/dashboard/lib/utils/`
 - Mobile: `/mobile-app/lib/utils.ts`
 - Edge Functions: `/database/supabase/functions/_utils/`
 
 **Assessment:**
+
 - ✅ Clear separation by runtime environment
 - ❌ Some utilities could be shared (date formatting, validation logic)
 
@@ -1070,6 +1114,7 @@ shared/
 #### 4.2.1 TypeScript Configuration
 
 **Current Pattern:**
+
 - Each package has independent `tsconfig.json`
 - No shared base configuration
 - Duplicated compiler options
@@ -1140,6 +1185,7 @@ Create shared base configuration:
 #### 4.2.2 ESLint Configuration
 
 **Current Pattern:**
+
 - Dashboard: Flat config (ESM) using Next.js presets
 - Mobile: Flat config (CJS) using Expo presets
 - No shared rules or utilities
@@ -1174,6 +1220,7 @@ export default {
 #### 4.3.1 Test Organization
 
 **Current Pattern:**
+
 - Dashboard: `__tests__/` directory mirrors source structure
 - Mobile: `__tests__/` subdirectories within feature directories
 - Edge Functions: `__tests__/` at functions root
@@ -1196,6 +1243,7 @@ mobile-app/
 ```
 
 **Assessment:**
+
 - ✅ Both patterns are valid (collocated vs centralized)
 - ❌ Inconsistency creates confusion
 
@@ -1217,6 +1265,7 @@ dashboard/
 **Research Basis:** Kent C. Dodds and Testing Library documentation recommend collocating tests with source for better maintainability.
 
 **Migration Checklist:**
+
 - [ ] Create `__tests__/` directories adjacent to source
 - [ ] Move existing tests to colocated structure
 - [ ] Update test import paths
@@ -1228,6 +1277,7 @@ dashboard/
 #### 4.3.2 Test Utilities
 
 **Current Pattern:**
+
 - Dashboard: `/dashboard/__tests__/lib/fixtures.ts` for test data
 - Mobile: Inline test data in test files
 - Edge Functions: `/database/supabase/functions/__tests__/test-utils.ts`
@@ -1265,6 +1315,7 @@ it("renders field config form", () => {
 #### 4.4.1 Code Documentation
 
 **Current Pattern:**
+
 - TSDoc comments used inconsistently
 - Some services well-documented, others minimal
 - Edge function utilities have good inline documentation
@@ -1309,6 +1360,7 @@ export default {
 #### 4.4.2 Architecture Documentation
 
 **Current Pattern:**
+
 - Multiple progress tracking documents at root
 - No formal Architecture Decision Records (ADRs)
 - No system architecture diagrams
@@ -1375,6 +1427,7 @@ What other options were evaluated?
 ```
 
 **Assessment:**
+
 - ✅ Good: Provides monorepo-wide commands
 - ✅ Uses pnpm filtering effectively
 - ❌ Missing: Clean, install-deps, build-all, test-all with options
@@ -1389,23 +1442,23 @@ Expand root scripts for better DX:
     "dev:dashboard": "pnpm --filter dashboard dev",
     "dev:mobile": "pnpm --filter @clean-log/mobile-app start",
     "dev:db": "cd database && supabase start",
-    
+
     "build": "pnpm -r build",
     "build:dashboard": "pnpm --filter dashboard build",
     "build:mobile": "pnpm --filter @clean-log/mobile-app build",
-    
+
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint -- --fix",
-    
+
     "test": "pnpm -r test",
     "test:watch": "pnpm -r test -- --watch",
     "test:coverage": "pnpm -r test:coverage",
-    
+
     "typecheck": "pnpm -r typecheck",
-    
+
     "clean": "pnpm -r exec rm -rf node_modules .next .expo dist",
     "clean:install": "pnpm clean && pnpm install",
-    
+
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
   }
@@ -1417,6 +1470,7 @@ Expand root scripts for better DX:
 #### 4.5.2 CI/CD Implications
 
 **Current Pattern:**
+
 - No CI/CD configuration files in repository
 - Manual deployment process implied
 
@@ -1520,6 +1574,7 @@ jobs:
    - Netflix and Google use code generation for config consistency
 
 **Research Sources:**
+
 - [Supabase Edge Functions Documentation](https://supabase.com/docs/guides/functions/development-environment)
 - [Supabase GitHub Discussions #30291](https://github.com/orgs/supabase/discussions/30291)
 - [Deno Import Maps Documentation](https://deno.land/manual/linking_to_external_code/import_maps)
@@ -1548,6 +1603,7 @@ jobs:
    - Supports proper `package.json` exports field usage
 
 **Research Sources:**
+
 - [TypeScript Handbook - Path Mapping](https://www.typescriptlang.org/docs/handbook/module-resolution.html#path-mapping)
 - [Next.js Documentation - Absolute Imports and Module Path Aliases](https://nextjs.org/docs/app/building-your-application/configuring/absolute-imports-and-module-aliases)
 
@@ -1575,6 +1631,7 @@ jobs:
    - Separate docs/ directory from code
 
 **Research Sources:**
+
 - [Monorepo Fundamentals - Documentation](https://www.mindfulchase.com/deep-dives/monorepo-fundamentals-deep-dives-into-unified-codebases/getting-started-with-monorepo-architecture-best-practices-and-principles.html)
 - [README Standardization Guide](https://dev-docs.kyan.blue/standards/readme-standardization-guide.html)
 - [Diátaxis Documentation Framework](https://diataxis.fr/)
@@ -1603,6 +1660,7 @@ jobs:
    - Recommended for TypeScript monorepos in 2026
 
 **Research Sources:**
+
 - [Testing Library Best Practices](https://testing-library.com/docs/guiding-principles/)
 - [Kent C. Dodds - Testing Implementation Details](https://kentcdodds.com/blog/testing-implementation-details)
 - [Vitest Documentation - Workspace](https://vitest.dev/guide/workspace.html)
@@ -1616,11 +1674,13 @@ Based on Phase 1 analysis, the following rules should be established:
 ### 6.1 Monorepo Structure Rules
 
 #### RULE-ORG-001: Package Naming
+
 **Requirement:** All workspace packages SHALL use the `@clean-log/` scope prefix.
 
 **Rationale:** Prevents naming collisions, enables clear package ownership, aligns with npm standards.
 
 **Example:**
+
 ```json
 {
   "name": "@clean-log/package-name"
@@ -1630,11 +1690,13 @@ Based on Phase 1 analysis, the following rules should be established:
 ---
 
 #### RULE-ORG-002: Workspace Dependencies
+
 **Requirement:** Internal package dependencies MUST use the `workspace:*` protocol.
 
 **Rationale:** Ensures local resolution, prevents version mismatches.
 
 **Example:**
+
 ```json
 {
   "dependencies": {
@@ -1646,9 +1708,11 @@ Based on Phase 1 analysis, the following rules should be established:
 ---
 
 #### RULE-ORG-003: Directory Structure
+
 **Recommendation:** Consider restructuring to `/apps` and `/packages` pattern for clarity.
 
 **Current:**
+
 ```
 /
 ├── dashboard/
@@ -1658,6 +1722,7 @@ Based on Phase 1 analysis, the following rules should be established:
 ```
 
 **Recommended:**
+
 ```
 /
 ├── apps/
@@ -1673,6 +1738,7 @@ Based on Phase 1 analysis, the following rules should be established:
 **Migration Note:** This restructuring should be done during a low-activity period and requires updating all import paths, CI/CD configurations, and deployment scripts. Consider the ROI before implementing—the current flat structure works and this is a "nice to have" improvement.
 
 **Migration Checklist (if proceeding):**
+
 - [ ] Create new directory structure
 - [ ] Update `pnpm-workspace.yaml` paths
 - [ ] Update all `tsconfig.json` path aliases
@@ -1687,14 +1753,17 @@ Based on Phase 1 analysis, the following rules should be established:
 ### 6.2 Path Alias Rules
 
 #### RULE-ALIAS-001: Shared Package Imports
+
 **Requirement:** All imports from shared package MUST use the package name, not a path alias.
 
 **Correct:**
+
 ```typescript
 import { FieldConfig } from "@clean-log/shared";
 ```
 
 **Incorrect:**
+
 ```typescript
 import { FieldConfig } from "@shared";
 import { FieldConfig } from "@/shared";
@@ -1705,9 +1774,11 @@ import { FieldConfig } from "@/shared";
 ---
 
 #### RULE-ALIAS-002: Local Path Aliases
+
 **Requirement:** All packages SHALL use `@/` prefix for local imports within the same package.
 
 **Example:**
+
 ```typescript
 import { Button } from "@/components/ui/button";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
@@ -1718,6 +1789,7 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 ---
 
 #### RULE-ALIAS-003: Path Alias Configuration
+
 **Requirement:** Path aliases MUST be defined consistently in `tsconfig.json`:
 
 ```json
@@ -1737,6 +1809,7 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 ### 6.3 TypeScript Configuration Rules
 
 #### RULE-TS-001: Strict Mode
+
 **Requirement:** All `tsconfig.json` files MUST enable `"strict": true`.
 
 **Rationale:** Catches type errors early, prevents runtime bugs.
@@ -1744,9 +1817,11 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 ---
 
 #### RULE-TS-002: Shared Base Configuration
+
 **Recommendation:** Create shared `tsconfig.base.json` for common compiler options.
 
 **Example:**
+
 ```json:tsconfig.base.json
 {
   "compilerOptions": {
@@ -1761,6 +1836,7 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 ```
 
 Individual packages extend:
+
 ```json:dashboard/tsconfig.json
 {
   "extends": "../tsconfig.base.json",
@@ -1775,9 +1851,11 @@ Individual packages extend:
 ### 6.4 Edge Function Rules
 
 #### RULE-EDGE-001: Per-Function Configuration
+
 **Requirement:** Every edge function MUST have its own `deno.json` file declaring all dependencies.
 
 **Example:**
+
 ```json:database/supabase/functions/my-function/deno.json
 {
   "imports": {
@@ -1796,9 +1874,11 @@ Individual packages extend:
 ---
 
 #### RULE-EDGE-002: Shared Utilities Import Pattern
+
 **Requirement:** Edge functions MUST import shared utilities from `_utils/` directory using relative paths.
 
 **Example:**
+
 ```typescript:database/supabase/functions/my-function/index.ts
 import { verifyAuth } from "../_utils/auth.ts";
 import { createLogger } from "../_utils/logger.ts";
@@ -1810,6 +1890,7 @@ import { jsonResponse } from "../_utils/http.ts";
 ---
 
 #### RULE-EDGE-003: Dependency Version Management
+
 **Requirement:** All edge functions using the same dependency SHOULD declare the same version.
 
 **Recommendation:** Create centralized version manifest:
@@ -1828,7 +1909,9 @@ export const DEPS = {
 ### 6.5 Documentation Rules
 
 #### RULE-DOC-001: Root README Required
+
 **Requirement:** Repository MUST have comprehensive root `README.md` covering:
+
 - Project overview and purpose
 - Monorepo structure explanation
 - Quick start guide
@@ -1838,7 +1921,9 @@ export const DEPS = {
 ---
 
 #### RULE-DOC-002: Package-Level Documentation
+
 **Requirement:** Each package MUST have its own `README.md` covering:
+
 - Package purpose and scope
 - Local setup and development
 - Testing instructions
@@ -1847,33 +1932,41 @@ export const DEPS = {
 ---
 
 #### RULE-DOC-003: Architecture Decision Records
+
 **Recommendation:** Significant architectural decisions SHOULD be documented using ADR format in `/docs/decisions/`.
 
 **Template:**
+
 ```markdown
 # [Number]. [Title]
 
 Date: YYYY-MM-DD
 
 ## Status
+
 [Proposed | Accepted | Deprecated]
 
 ## Context
+
 [Problem/situation]
 
 ## Decision
+
 [Solution chosen]
 
 ## Consequences
+
 [Positive and negative outcomes]
 
 ## Alternatives Considered
+
 [Other options evaluated]
 ```
 
 ---
 
 #### RULE-DOC-004: Documentation Organization
+
 **Requirement:** Root-level documentation MUST be organized in `/docs/` directory:
 
 ```
@@ -1892,9 +1985,11 @@ docs/
 ### 6.6 Testing Rules
 
 #### RULE-TEST-001: Test Colocation
+
 **Recommendation:** Tests SHOULD be colocated with source files using `.test.ts` or `.test.tsx` extension.
 
 **Example:**
+
 ```
 hooks/
 ├── use-field-configs.ts
@@ -1906,6 +2001,7 @@ hooks/
 ---
 
 #### RULE-TEST-002: Consistent Test Runner
+
 **Requirement:** All packages MUST use Vitest for testing.
 
 **Rationale:** Consistency across packages, modern ESM support, fast execution.
@@ -1913,9 +2009,11 @@ hooks/
 ---
 
 #### RULE-TEST-003: Test Utilities
+
 **Recommendation:** Shared test utilities SHOULD be created in `@clean-log/shared/test-utils`.
 
 **Example:**
+
 ```typescript:shared/test-utils/factories.ts
 export function createMockFieldConfig(overrides?: Partial<FieldConfig>): FieldConfig {
   return {
@@ -1933,13 +2031,16 @@ export function createMockFieldConfig(overrides?: Partial<FieldConfig>): FieldCo
 ### 6.7 Code Organization Rules
 
 #### RULE-ORG-004: Service Classes
+
 **Requirement:** API service classes MUST:
+
 - Use PascalCase naming with `Service` suffix
 - Be exported from `/lib/services/index.ts` barrel export
 - Define static methods for operations
 - Return typed data or throw typed errors
 
 **Example:**
+
 ```typescript:lib/services/example.service.ts
 export class ExampleService {
   static async list(): Promise<Example[]> {
@@ -1955,7 +2056,9 @@ export class ExampleService {
 ---
 
 #### RULE-ORG-005: File Naming Conventions
+
 **Requirement:** Files MUST follow these naming patterns:
+
 - Components: `kebab-case.tsx` (e.g., `field-config-form.tsx`)
 - Hooks: `use-kebab-case.ts` (e.g., `use-field-configs.ts`)
 - Services: `kebab-case.service.ts` (e.g., `field-configs.service.ts`)
@@ -1967,7 +2070,9 @@ export class ExampleService {
 ---
 
 #### RULE-ORG-006: Import Order
+
 **Requirement:** Imports MUST be organized in this order:
+
 1. React and framework imports
 2. Third-party libraries
 3. Internal components (`@/components`)
@@ -1977,6 +2082,7 @@ export class ExampleService {
 7. Types from same file or local
 
 **Example:**
+
 ```typescript
 // 1. React
 import { useState, useEffect } from "react";
@@ -2002,9 +2108,11 @@ import { FieldConfig } from "@clean-log/shared";
 ### 6.8 Configuration Standardization Rules
 
 #### RULE-CONFIG-001: ESLint Configuration Format
+
 **Requirement:** All packages SHOULD use ESM-based flat config (`.mjs` extension).
 
 **Example:**
+
 ```javascript:eslint.config.mjs
 import { defineConfig } from "eslint/config";
 
@@ -2018,6 +2126,7 @@ export default defineConfig([
 ---
 
 #### RULE-CONFIG-002: Root Scripts
+
 **Requirement:** Root `package.json` MUST provide monorepo-wide scripts:
 
 ```json

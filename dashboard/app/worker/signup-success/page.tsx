@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, Mail, Smartphone } from "lucide-react";
 
 export default function WorkerSignupSuccessPage() {
@@ -18,7 +12,7 @@ export default function WorkerSignupSuccessPage() {
           <div className="flex justify-center mb-4">
             <CheckCircle2 className="h-12 w-12 text-primary" />
           </div>
-          <CardTitle className="text-center">Welcome to Fieldly!</CardTitle>
+          <CardTitle className="text-center">Welcome to Tally Runner!</CardTitle>
           <CardDescription className="text-center">
             Your account has been created successfully.
           </CardDescription>
@@ -31,8 +25,8 @@ export default function WorkerSignupSuccessPage() {
                 Next Steps
               </h3>
               <p className="text-sm text-muted-foreground">
-                To get started, you&apos;ll need to download and log in to our
-                mobile application. You can download it here:
+                To get started, you&apos;ll need to download and log in to our mobile application.
+                You can download it here:
               </p>
               <Button className="w-full" variant="default" disabled>
                 Download Mobile App (Coming Soon)
@@ -45,17 +39,16 @@ export default function WorkerSignupSuccessPage() {
                 Check Your Email
               </h3>
               <p className="text-sm text-muted-foreground">
-                An email has been sent to your registered email address with a
-                link to download the mobile application. Please check your inbox
-                (and spam folder) for further instructions.
+                An email has been sent to your registered email address with a link to download the
+                mobile application. Please check your inbox (and spam folder) for further
+                instructions.
               </p>
             </div>
           </div>
 
           <div className="pt-4 border-t">
             <p className="text-xs text-muted-foreground text-center">
-              If you have any questions, please contact your organization
-              administrator.
+              If you have any questions, please contact your organization administrator.
             </p>
           </div>
         </CardContent>

@@ -1,4 +1,4 @@
-# Payment Processing Best Practices for Clean Log System
+# Payment Processing Best Practices for Tally Runner (monorepo)
 
 **Research Date:** January 2025  
 **Focus:** Stripe integration for all payment methods and comprehensive payment tracking
@@ -361,14 +361,12 @@ type StripeWebhookEvent =
 **For Manual Bank Transfers (BSB/Account):**
 
 1. **Manual Entry:**
-
    - Admin enters payment details in dashboard
    - System matches to invoice by reference number
    - Updates invoice status
    - Creates payment record
 
 2. **Stripe Dashboard Reconciliation:**
-
    - Use Stripe's reconciliation tools
    - Match Stripe transactions to invoices
    - Export data for accounting integration
@@ -385,14 +383,12 @@ type StripeWebhookEvent =
 ### **A. Security**
 
 1. **Webhook Security:**
-
    - Verify webhook signatures
    - Use HTTPS only
    - Implement idempotency keys
    - Rate limiting
 
 2. **Payment Data:**
-
    - Never store full card numbers
    - Tokenize sensitive data
    - Encrypt BSB/account numbers at rest
@@ -406,14 +402,12 @@ type StripeWebhookEvent =
 ### **B. Error Handling**
 
 1. **Failed Payments:**
-
    - Track failure reasons
    - Automatic retry logic (with backoff)
    - Customer notifications
    - Admin alerts for repeated failures
 
 2. **Partial Payments:**
-
    - Support multiple payments per invoice
    - Track remaining balance
    - Automatic status updates
@@ -426,14 +420,12 @@ type StripeWebhookEvent =
 ### **C. User Experience**
 
 1. **Payment Links:**
-
    - Mobile-optimized
    - Clear payment amount
    - Multiple payment method options
    - Receipt generation
 
 2. **BSB/Account Payments:**
-
    - Clear instructions on invoice
    - Prominent reference number
    - Confirmation email when payment received
@@ -536,25 +528,21 @@ type StripeWebhookEvent =
 ## 9. Next Steps
 
 1. **Evaluate Providers:**
-
    - Request API documentation from Azupay and Zai
    - Compare with Stripe Australia pricing
    - Consider Monoova for PayTo if needed
 
 2. **Design Database Schema:**
-
    - Review recommended tables above
    - Adapt to your specific needs
    - Plan migration strategy
 
 3. **Prototype Integration:**
-
    - Start with Stripe (easiest integration)
    - Test payment link flow
    - Implement webhook handling
 
 4. **Build Payment Tracking:**
-
    - Create payment table
    - Implement status workflow
    - Build admin UI for payment management

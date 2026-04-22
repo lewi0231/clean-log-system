@@ -6,25 +6,28 @@ The final CTA section appears at the bottom of the landing page, providing one l
 
 ## User Story
 
-**As a** visitor who has read through the RivetUp landing page  
+**As a** visitor who has read through the Tally Runner landing page  
 **I want to** see a clear, compelling call-to-action that addresses any final concerns  
-**So that** I can take the next step to try RivetUp with confidence
+**So that** I can take the next step to try Tally Runner with confidence
 
 ## Acceptance Criteria
 
 ### 1. Final CTA Content
+
 - **Headline**: Reinforce value proposition or address final objection
 - **Subheadline**: Remove last barrier (free trial, no credit card, etc.)
 - **Primary CTA**: "Start Free Trial" or "Get Started Free"
 - **Secondary CTA**: "Schedule Demo" or "Contact Sales" (optional)
 
 ### 2. Headline Options
+
 - "Ready to Transform Your Service Business?"
 - "Start Managing Your Business Better Today"
-- "Join 100+ Service Businesses Using RivetUp"
+- "Join 100+ Service Businesses Using Tally Runner"
 - "Get Started in Minutes, No Credit Card Required"
 
 ### 3. Objection Removal
+
 - Address common final objections:
   - "14-day free trial, no credit card required"
   - "Set up in 15 minutes"
@@ -33,6 +36,7 @@ The final CTA section appears at the bottom of the landing page, providing one l
   - "See it in action with a demo"
 
 ### 4. Value Reinforcement
+
 - Remind visitors of key benefits:
   - "Stop chasing paperwork"
   - "Get paid faster"
@@ -40,24 +44,28 @@ The final CTA section appears at the bottom of the landing page, providing one l
   - "Works on mobile and desktop"
 
 ### 5. Trust Indicators
+
 - Social proof: "Join 500+ businesses"
 - Security: "Your data is secure"
 - Support: "We're here to help"
 - Guarantee: "14-day free trial"
 
 ### 6. Visual Design
+
 - Prominent, high-contrast CTA button
 - Clean, uncluttered design
 - Mobile-responsive
 - Consistent with brand style
 
 ### 7. CTA Button Specifications
+
 - **Text**: "Start Free Trial" (primary), "Watch Demo" (secondary)
 - **Size**: Large, easily clickable (minimum 44x44px on mobile)
 - **Color**: High contrast, stands out
 - **Position**: Centered or left-aligned (depending on layout)
 
 ### 8. Additional Elements (Optional)
+
 - Email signup for newsletter (if not ready to trial)
 - Link to pricing page
 - Link to FAQ section
@@ -92,10 +100,12 @@ The final CTA section appears at the bottom of the landing page, providing one l
 **[Start Free Trial Button - Large, Prominent]**
 
 Trust indicators:
+
 - "Join 500+ service businesses"
 - "14-day free trial • No credit card • Cancel anytime"
 
 Optional secondary:
+
 - "Schedule a demo" (link)
 - "See pricing" (link)
 

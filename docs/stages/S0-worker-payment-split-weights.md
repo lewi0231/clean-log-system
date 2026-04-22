@@ -5,7 +5,7 @@
 | **Stage**    | S0 — Idea capture (not triage; no build commitment)                                                   |
 | **Captured** | 2026-04-22                                                                                            |
 | **Updated**  | 2026-04-22 (section 4.4 patterns; section 5.2 decisions, edge-case example, AU compliance, audit/ops) |
-| **Product**  | Clean Log (organization / worker job logging, pricing, worker payments)                               |
+| **Product**  | Tally Runner (organization / worker job logging, pricing, worker payments)                            |
 | **Source**   | Product owner — operational pay fairness (trainee vs experienced on same job)                         |
 
 ---
@@ -80,7 +80,7 @@ _(Exact KPIs, acceptance tests, and migration rules belong in S1/S2.)_
 
 The following summarizes **frequently used** approaches in operations, team incentives, and pooled pay (e.g. hospitality), informed by general HR/industry summaries and tip-pooling guides. It is **not** legal advice; jurisdictions differ (especially tips, minimum wage, and who may participate in a pool).
 
-| Pattern                                  | What businesses often do                                                                                                           | Clean Log today (approx.)                                                                                       | Gap / product note                                                                                                        |
+| Pattern                                  | What businesses often do                                                                                                           | Tally Runner today (approx.)                                                                                    | Gap / product note                                                                                                        |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Equal split**                          | Everyone gets **1/N** of the crew pool                                                                                             | **Yes** when there are **no** usable time ranges on `job_worker` (equal fallback)                               | Org-level default is reasonable; document when it applies.                                                                |
 | **Hours-only proportional**              | Pool split **∝ hours worked** (common in tip pools)                                                                                | **Yes** — primary path when `start_time` / `end_time` exist                                                     | Matches “$ per hour in pool” mental models.                                                                               |
@@ -193,7 +193,7 @@ So: **less time** and **lower weight** compound in a predictable, standard “we
 
 > If someone reads this idea in 6 months with no other context, will they understand what was meant?
 
-**Reader should take away:** Clean Log should support **relative split weights** so multi-worker jobs can divide a **fixed worker pool** with **implicit 1.0** for everyone by default and **lower weights** (e.g. trainees) without inventing a new total; **implementation** should integrate cleanly with (or replace the misuse of) **multiplier**, **wire or drop unused allocations**, and **refactor** split math into **tested, explicit strategies** for long-term robustness.
+**Reader should take away:** Tally Runner should support **relative split weights** so multi-worker jobs can divide a **fixed worker pool** with **implicit 1.0** for everyone by default and **lower weights** (e.g. trainees) without inventing a new total; **implementation** should integrate cleanly with (or replace the misuse of) **multiplier**, **wire or drop unused allocations**, and **refactor** split math into **tested, explicit strategies** for long-term robustness.
 
 ---
 

@@ -22,10 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { log } from "@/lib/logger";
-import {
-  EdgeFunctionError,
-  invokeEdgeFunction,
-} from "@/lib/supabase/invoke-edge-function";
+import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -87,10 +84,7 @@ export function OnboardingWizard() {
       case 3:
         if (data.employee_count === "none") return true;
         // If they have employees, payment method and frequency are required
-        return (
-          data.worker_payment_method !== null &&
-          data.worker_payment_frequency !== null
-        );
+        return data.worker_payment_method !== null && data.worker_payment_frequency !== null;
       case 4:
         if (data.invoice_frequency === "weekly") {
           return data.invoice_weekly_day !== null;
@@ -142,7 +136,7 @@ export function OnboardingWizard() {
 
       await invokeEdgeFunction<{ success: boolean; organizationId: string }>(
         "complete-onboarding",
-        data as unknown as Record<string, unknown>,
+        data as unknown as Record<string, unknown>
       );
 
       log.info("Onboarding: Completed successfully");
@@ -184,10 +178,9 @@ export function OnboardingWizard() {
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <div className="space-y-2">
-            <CardTitle className="text-2xl">Welcome to Fieldly</CardTitle>
+            <CardTitle className="text-2xl">Welcome to Tally Runner</CardTitle>
             <CardDescription>
-              Let&apos;s get your account set up. This will only take a few
-              minutes.
+              Let&apos;s get your account set up. This will only take a few minutes.
             </CardDescription>
           </div>
           <div className="mt-4 space-y-2">
@@ -259,9 +252,7 @@ function Step1BusinessBasics({
             <SelectValue placeholder="Select your industry" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="car_detailing">
-              Car Detailing / Vehicle Services
-            </SelectItem>
+            <SelectItem value="car_detailing">Car Detailing / Vehicle Services</SelectItem>
             <SelectItem value="cleaning">Cleaning Services</SelectItem>
             <SelectItem value="maintenance">Maintenance Services</SelectItem>
             <SelectItem value="other">Other</SelectItem>
@@ -288,46 +279,31 @@ function Step1BusinessBasics({
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="none" id="employees-none" />
-            <Label
-              htmlFor="employees-none"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="employees-none" className="font-normal cursor-pointer">
               None (I&apos;m a solo operator)
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="1-5" id="employees-1-5" />
-            <Label
-              htmlFor="employees-1-5"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="employees-1-5" className="font-normal cursor-pointer">
               1-5 employees
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="6-20" id="employees-6-20" />
-            <Label
-              htmlFor="employees-6-20"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="employees-6-20" className="font-normal cursor-pointer">
               6-20 employees
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="21-50" id="employees-21-50" />
-            <Label
-              htmlFor="employees-21-50"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="employees-21-50" className="font-normal cursor-pointer">
               21-50 employees
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="50+" id="employees-50" />
-            <Label
-              htmlFor="employees-50"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="employees-50" className="font-normal cursor-pointer">
               50+ employees
             </Label>
           </div>
@@ -376,9 +352,7 @@ function Step2BusinessDetails({
           </div>
           <Switch
             checked={data.has_locations}
-            onCheckedChange={(checked) =>
-              updateData({ has_locations: checked })
-            }
+            onCheckedChange={(checked) => updateData({ has_locations: checked })}
             className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
           />
         </div>
@@ -407,8 +381,8 @@ function Step3WorkerPayment({
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">
-          Since you don&apos;t have employees, you can skip worker payment
-          setup. You can configure this later if needed.
+          Since you don&apos;t have employees, you can skip worker payment setup. You can configure
+          this later if needed.
         </p>
       </div>
     );
@@ -417,46 +391,32 @@ function Step3WorkerPayment({
   return (
     <div className="space-y-6">
       <div>
-        <Label className="text-base font-semibold">
-          How do you pay workers? *
-        </Label>
-        <p className="text-sm text-muted-foreground mt-1 mb-4">
-          Select the payment method you use
-        </p>
+        <Label className="text-base font-semibold">How do you pay workers? *</Label>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">Select the payment method you use</p>
         <RadioGroup
           value={data.worker_payment_method || ""}
           onValueChange={(value) =>
             updateData({
-              worker_payment_method:
-                value as OnboardingData["worker_payment_method"],
+              worker_payment_method: value as OnboardingData["worker_payment_method"],
             })
           }
           className="space-y-3"
         >
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="hourly" id="payment-hourly" />
-            <Label
-              htmlFor="payment-hourly"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="payment-hourly" className="font-normal cursor-pointer">
               By the hour
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="per_job" id="payment-per-job" />
-            <Label
-              htmlFor="payment-per-job"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="payment-per-job" className="font-normal cursor-pointer">
               Per job completed
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="fixed_salary" id="payment-fixed" />
-            <Label
-              htmlFor="payment-fixed"
-              className="font-normal cursor-pointer"
-            >
+            <Label htmlFor="payment-fixed" className="font-normal cursor-pointer">
               Fixed salary
             </Label>
           </div>
@@ -474,8 +434,7 @@ function Step3WorkerPayment({
           value={data.worker_payment_frequency || ""}
           onValueChange={(value) =>
             updateData({
-              worker_payment_frequency:
-                value as OnboardingData["worker_payment_frequency"],
+              worker_payment_frequency: value as OnboardingData["worker_payment_frequency"],
             })
           }
         >
@@ -508,8 +467,7 @@ function Step4Invoicing({
           How often do you invoice customers? *
         </Label>
         <p className="text-sm text-muted-foreground mt-1 mb-4">
-          We&apos;ll configure automatic invoice sending based on your
-          preference
+          We&apos;ll configure automatic invoice sending based on your preference
         </p>
         <Select
           value={data.invoice_frequency}
@@ -525,9 +483,7 @@ function Step4Invoicing({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="immediately">
-              Immediately after each job
-            </SelectItem>
+            <SelectItem value="immediately">Immediately after each job</SelectItem>
             <SelectItem value="daily">Daily (at end of day)</SelectItem>
             <SelectItem value="weekly">Weekly</SelectItem>
             <SelectItem value="monthly">Monthly</SelectItem>
@@ -537,17 +493,12 @@ function Step4Invoicing({
 
       {data.invoice_frequency === "weekly" && (
         <div>
-          <Label
-            htmlFor="invoice-weekly-day"
-            className="text-base font-semibold"
-          >
+          <Label htmlFor="invoice-weekly-day" className="text-base font-semibold">
             Which day of the week? *
           </Label>
           <Select
             value={data.invoice_weekly_day?.toString() || ""}
-            onValueChange={(value) =>
-              updateData({ invoice_weekly_day: parseInt(value) })
-            }
+            onValueChange={(value) => updateData({ invoice_weekly_day: parseInt(value) })}
           >
             <SelectTrigger id="invoice-weekly-day">
               <SelectValue placeholder="Select day" />
@@ -567,17 +518,12 @@ function Step4Invoicing({
 
       {data.invoice_frequency === "monthly" && (
         <div>
-          <Label
-            htmlFor="invoice-monthly-day"
-            className="text-base font-semibold"
-          >
+          <Label htmlFor="invoice-monthly-day" className="text-base font-semibold">
             Which day of the month? *
           </Label>
           <Select
             value={data.invoice_monthly_day?.toString() || ""}
-            onValueChange={(value) =>
-              updateData({ invoice_monthly_day: parseInt(value) })
-            }
+            onValueChange={(value) => updateData({ invoice_monthly_day: parseInt(value) })}
           >
             <SelectTrigger id="invoice-monthly-day">
               <SelectValue placeholder="Select day" />
@@ -604,18 +550,15 @@ function Step4Invoicing({
               Automatically generate invoices from completed jobs?
             </Label>
             <p className="text-sm text-muted-foreground">
-              If enabled, invoices will be automatically created immediately
-              when jobs are completed. For organizations with location
-              hierarchies, configure this per location. For others, invoices are
-              created in pending review for you to review and send.
+              If enabled, invoices will be automatically created immediately when jobs are
+              completed. For organizations with location hierarchies, configure this per location.
+              For others, invoices are created in pending review for you to review and send.
               Location-specific auto-generate takes precedence.
             </p>
           </div>
           <Switch
             checked={data.auto_generate_invoices}
-            onCheckedChange={(checked) =>
-              updateData({ auto_generate_invoices: checked })
-            }
+            onCheckedChange={(checked) => updateData({ auto_generate_invoices: checked })}
             className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
           />
         </div>

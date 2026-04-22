@@ -6,7 +6,7 @@
 | **From S0**     | 2026-04-12                                             |
 | **Triaged**     | 2026-04-12                                             |
 | **Gold review** | 2026-04-12 — findings integrated below (§3.7, §4, §11) |
-| **Product**     | Clean Log (organization / worker job logging)          |
+| **Product**     | Tally Runner (organization / worker job logging)       |
 
 ---
 
@@ -157,7 +157,7 @@ All use **`RESEND_API_KEY`** server-side only (existing pattern).
   - Else → `localPart@${Deno.env.get("RESEND_FROM_DOMAIN")}` (current behavior).
 - **Centralize** in one helper, e.g. **`resolveOrgMailFrom({ organizationId, mailKind, organizationName, localPart })`**, returning the full **`From`** string (display name + address).
 - **Feedback / rating email (critical):** Today **`sendFeedbackRequestEmail`** uses **`FeedbackEmailData`** without **`organization_id`** and builds `from: noreply@…` **without** org display name. **Must** add **`organization_id`** (or resolve from **`job_id`** before send) so **AC6** holds and branding matches other mail — see **§3.7**.
-- **Display name policy:** Prefer **`{OrganizationName} <local@domain>`** for org-scoped product mail. **Exception (intentional):** **Org signup verification** (`Clean Log <noreply@…>`) may remain **platform-branded** — confirm in S2 **from-address matrix**.
+- **Display name policy:** Prefer **`{OrganizationName} <local@domain>`** for org-scoped product mail. **Exception (intentional):** **Org signup verification** (`Tally Runner <noreply@…>`) may remain **platform-branded** — confirm in S2 **from-address matrix**.
 
 ### 3.5 Dashboard
 
@@ -181,21 +181,21 @@ All use **`RESEND_API_KEY`** server-side only (existing pattern).
 | **429 / rate limit (5 req/s team-wide)**   | Retry with backoff on **`429`** in send helpers; document **batch** for bursts; optional **queue** = backlog.                                                                           |
 | **Resend outage / API failure**            | **Fail open:** use **platform domain** fallback for `from` resolution when **read** of org domain state fails (log error); do not block sends if policy is “never block transactional.” |
 | **DMARC**                                  | Optional **admin doc** recommending DMARC after SPF/DKIM; not a code gate for v1.                                                                                                       |
-| **`from` inventory**                       | Full matrix in **S2** — includes **`Clean Log`** vs **`OrganizationName`** decisions per mail kind.                                                                                     |
+| **`from` inventory**                       | Full matrix in **S2** — includes **`Tally Runner`** vs **`OrganizationName`** decisions per mail kind.                                                                                  |
 
 ---
 
 ## 4. Risk Assessment
 
-| Risk                                                   | Likelihood        | Impact | Mitigation                                                                                                             |
-| ------------------------------------------------------ | ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- |
-| **Resend domain quota** exceeded vs plan               | Medium            | High   | Paid gating + monitor domain count; upgrade to Scale/Enterprise as customer base grows                                 |
-| **DNS misconfiguration**                               | High (user error) | Low    | Clear UI, copy-paste records, **Check DNS** button, link to docs                                                       |
-| **Reputation** — one bad org hurts team                | Low–Medium        | High   | Monitor bounces/spam; terms of use; optional suspend custom domain for abuse                                           |
-| **Auth confusion** (“why isn’t reset from my domain?”) | Medium            | Low    | In-product copy: “Custom domain applies to job and invoice email; account emails use Clean Log until a future update.” |
-| **HTTP 429** (team rate limit)                         | Medium            | Medium | Backoff/retry; batch API where applicable; monitor spikes                                                              |
-| **Resend API unavailable**                             | Low               | Medium | Fallback **`from`** to platform domain; log; optional alert                                                            |
-| **Migration / enum mismatch** with Resend              | Medium            | Low    | Raw **`resend_status`** + mapped **`display_status`** (§3.2)                                                           |
+| Risk                                                   | Likelihood        | Impact | Mitigation                                                                                                                |
+| ------------------------------------------------------ | ----------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **Resend domain quota** exceeded vs plan               | Medium            | High   | Paid gating + monitor domain count; upgrade to Scale/Enterprise as customer base grows                                    |
+| **DNS misconfiguration**                               | High (user error) | Low    | Clear UI, copy-paste records, **Check DNS** button, link to docs                                                          |
+| **Reputation** — one bad org hurts team                | Low–Medium        | High   | Monitor bounces/spam; terms of use; optional suspend custom domain for abuse                                              |
+| **Auth confusion** (“why isn’t reset from my domain?”) | Medium            | Low    | In-product copy: “Custom domain applies to job and invoice email; account emails use Tally Runner until a future update.” |
+| **HTTP 429** (team rate limit)                         | Medium            | Medium | Backoff/retry; batch API where applicable; monitor spikes                                                                 |
+| **Resend API unavailable**                             | Low               | Medium | Fallback **`from`** to platform domain; log; optional alert                                                               |
+| **Migration / enum mismatch** with Resend              | Medium            | Low    | Raw **`resend_status`** + mapped **`display_status`** (§3.2)                                                              |
 
 ---
 

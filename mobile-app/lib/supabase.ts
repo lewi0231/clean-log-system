@@ -30,7 +30,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
   global: {
     headers: {
-      "x-client-info": `clean-log-mobile/${Platform.OS}`,
+      "x-client-info": `tally-runner-mobile/${Platform.OS}`,
     },
   },
   // Add retry logic for network failures

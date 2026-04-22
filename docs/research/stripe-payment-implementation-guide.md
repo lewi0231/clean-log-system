@@ -7,7 +7,7 @@
 
 ## Overview
 
-This guide outlines the implementation of Stripe payment processing for the Clean Log System. We're using Stripe for all payment methods:
+This guide outlines the implementation of Stripe payment processing for the Tally Runner (monorepo). We're using Stripe for all payment methods:
 
 - Payment links via Stripe Checkout
 - Bank transfers via Stripe Direct Debit
@@ -20,14 +20,12 @@ This guide outlines the implementation of Stripe payment processing for the Clea
 ### 1.1 Stripe Account Setup
 
 1. **Create Stripe Account**
-
    - Sign up at https://stripe.com/au
    - Complete business verification
    - Add Australian bank account for payouts
    - **Note:** If using a Stripe Sandbox for testing, all the same steps apply - just make sure you're in the Sandbox when getting keys and setting up webhooks
 
 2. **Get API Keys**
-
    - Test keys: Dashboard → Developers → API keys
    - Live keys: (after account activation)
    - Store in environment variables:
@@ -39,30 +37,26 @@ This guide outlines the implementation of Stripe payment processing for the Clea
    **Important:** The webhook signing secret (`whsec_...`) is different from your API secret key (`sk_test_...`). You'll get the webhook secret after creating the endpoint.
 
    **Step-by-Step Instructions:**
-
    1. **Go to Stripe Dashboard:**
-
       - Log into your Stripe account (make sure you're in your Sandbox if using one)
       - Navigate to: **Developers** → **Webhooks** (in the left sidebar)
 
    2. **Add Destination:**
-
       - Click the **"+ Add destination"** button (purple button, top right)
       - You'll see options for destination types
       - **Choose "Webhook endpoint"** as the destination type
 
    3. **Configure Webhook Endpoint:**
-
       - **Endpoint URL:** Enter your Supabase function URL:
         ```
         https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
         ```
+
         - Replace `YOUR_PROJECT_REF` with your actual Supabase project reference
         - You can find this in your Supabase dashboard under Project Settings → API
         - Example: `https://abcdefghijklmnop.supabase.co/functions/v1/stripe-webhook`
 
    4. **Select Events to Listen To:**
-
       - You'll see an option to select which events to listen to
       - Choose these specific events (don't select "Send all events"):
         - ✅ `checkout.session.completed`
@@ -73,7 +67,6 @@ This guide outlines the implementation of Stripe payment processing for the Clea
       - Click **"Add events"**
 
    5. **Save the Destination:**
-
       - Click **"Add destination"** or **"Save"** at the bottom
       - Stripe will test the endpoint (it will fail initially since we haven't created the function yet - that's OK and expected)
 
@@ -85,7 +78,6 @@ This guide outlines the implementation of Stripe payment processing for the Clea
       - **Note:** This is different from your API secret key (`sk_test_...`)
 
    **For Testing with Stripe CLI (Local Development):**
-
    - You can use Stripe CLI to forward webhooks locally
    - The CLI will give you a different signing secret (also starts with `whsec_...`)
    - Use that secret when testing locally
@@ -339,20 +331,17 @@ Use Stripe test cards:
 ### 5.3 Test Scenarios
 
 1. **Payment Link Flow:**
-
    - Generate link for invoice
    - Click link, complete payment
    - Verify webhook updates database
    - Check invoice status updated
 
 2. **Failed Payment:**
-
    - Use declined card
    - Verify failure logged
    - Check invoice remains unpaid
 
 3. **Manual Payment:**
-
    - Enter manual payment
    - Verify payment record created
    - Check invoice status updated

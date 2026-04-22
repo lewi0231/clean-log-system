@@ -5,7 +5,7 @@
 | **Stage**    | S0 — Idea capture (not triage; no build commitment)     |
 | **Captured** | 2026-04-12                                              |
 | **Updated**  | 2026-04-12 (scope + stakeholder resolutions + research) |
-| **Product**  | Clean Log (organization / worker job logging)           |
+| **Product**  | Tally Runner (organization / worker job logging)        |
 | **Source**   | Product owner — conversational requirement              |
 
 ---
@@ -65,7 +65,7 @@ _(Exact KPIs, acceptance tests, and Settings placement belong in S1/S2.)_
 
 - Optional **`custom_return_path`**, **region**, **capabilities** (sending vs receiving) — see Resend domain API. **Receiving** is separate from transactional **sending**; v1 likely **sending only**.
 
-### 4.4 Relationship to current Clean Log implementation
+### 4.4 Relationship to current Tally Runner implementation
 
 - **`RESEND_FROM_DOMAIN`** drives `from` addresses across `email.ts` (invitations, invoices, payments, feedback, etc.).
 - **Feedback / rating links to clients:** Implemented via feedback email utilities and related Edge Functions (e.g. `database/supabase/functions/_utils/feedback-email.ts`); these should **use the same org sending domain** once verified, so **client-facing** review mail matches **worker-facing** mail branding.
@@ -176,7 +176,7 @@ To avoid vendor lock-in and keep testing simple:
 
 > If someone reads this idea in 6 months with no other context, will they understand what was meant?
 
-**Reader should take away:** Clean Log should let **each org** verify a **subdomain** so **Resend-sent** mail — **worker invitations, invoices, client rating/feedback links**, and related transactional email — can use **that org’s domain**, with **platform default fallback** when not verified, **optional paid gating**, **provider-shaped boundaries** for maintainability, and **S1** handling **Auth** branding feasibility and **Resend plan** fit for **many domains**.
+**Reader should take away:** Tally Runner should let **each org** verify a **subdomain** so **Resend-sent** mail — **worker invitations, invoices, client rating/feedback links**, and related transactional email — can use **that org’s domain**, with **platform default fallback** when not verified, **optional paid gating**, **provider-shaped boundaries** for maintainability, and **S1** handling **Auth** branding feasibility and **Resend plan** fit for **many domains**.
 
 ---
 

@@ -1,6 +1,6 @@
 # Phase 5: Testing Patterns Analysis
 
-**Project:** Clean Log System Monorepo  
+**Project:** Tally Runner (monorepo) Monorepo  
 **Date:** January 20, 2026  
 **Scope:** Testing strategies, patterns, coverage metrics, mock strategies, and quality assurance
 
@@ -26,11 +26,11 @@
 
 **Test Framework:** Vitest (Fast unit test framework with Vite integration)
 
-| Application | Framework | Environment | Test Files |
-|-------------|-----------|-------------|------------|
-| **Dashboard** | Vitest + React Testing Library | jsdom | 107 test files |
-| **Mobile App** | Vitest + React Testing Library | jsdom | 5 test files |
-| **Edge Functions** | Deno test | Deno runtime | 25 test files |
+| Application        | Framework                      | Environment  | Test Files     |
+| ------------------ | ------------------------------ | ------------ | -------------- |
+| **Dashboard**      | Vitest + React Testing Library | jsdom        | 107 test files |
+| **Mobile App**     | Vitest + React Testing Library | jsdom        | 5 test files   |
+| **Edge Functions** | Deno test                      | Deno runtime | 25 test files  |
 
 **Total test files:** 137 across the monorepo
 
@@ -84,6 +84,7 @@ coverage: {
 ```
 
 **Coverage targets:**
+
 - Lines: 80%
 - Functions: 80%
 - Branches: 75%
@@ -148,6 +149,7 @@ export const createMockFieldConfig = (overrides?: Partial<FieldConfig>): FieldCo
 ```
 
 **Why it works:**
+
 - **Consistency:** All tests use same base data structure
 - **Maintainability:** Schema changes only need fixture updates
 - **Readability:** Tests show only relevant overrides
@@ -219,6 +221,7 @@ export const resetMocks = () => {
 ```
 
 **Why it works:**
+
 - **DRY Principle:** Mock configuration in one place
 - **Consistency:** All tests use same mock structure
 - **Easy Updates:** Change mock once, applies to all tests
@@ -269,7 +272,7 @@ import { vi } from "vitest";
 try {
   const envPath = resolve(process.cwd(), ".env.development");
   const envFile = readFileSync(envPath, "utf-8");
-  
+
   envFile.split("\n").forEach((line) => {
     const trimmedLine = line.trim();
     if (trimmedLine && !trimmedLine.startsWith("#")) {
@@ -310,6 +313,7 @@ vi.mock("@/lib/supabase", () => ({
 ```
 
 **Why it works:**
+
 - **Automatic:** Runs before all tests
 - **Environment Parity:** Tests use same env vars as development
 - **Global Mocks:** Common dependencies mocked once
@@ -390,6 +394,7 @@ describe("WorkersService", () => {
 ```
 
 **Test coverage:**
+
 - ✅ Happy path (success response)
 - ✅ Error from API
 - ✅ Missing success flag
@@ -397,6 +402,7 @@ describe("WorkersService", () => {
 - ✅ Correct function invocation parameters
 
 **Why it works:**
+
 - **Comprehensive:** Tests all code paths
 - **Edge Cases:** Handles unexpected responses
 - **Verification:** Confirms correct API calls
@@ -517,6 +523,7 @@ describe("useWorkers", () => {
 ```
 
 **Why it works:**
+
 - **Isolation:** Service layer mocked, hook logic tested in isolation
 - **React Context:** QueryClient wrapper provides required context
 - **Async Handling:** `waitFor` handles async state updates
@@ -587,6 +594,7 @@ export function createCheckoutSessionCompletedEvent(
 ```
 
 **Why it works:**
+
 - **Reusability:** Complex test data created once
 - **Type Safety:** Matches Stripe types exactly
 - **Realistic:** Mirrors actual webhook payloads
@@ -640,6 +648,7 @@ Deno.test("create-worker: should validate email format", () => {
 ```
 
 **Why it works:**
+
 - **Validation Focus:** Tests input validation without full HTTP layer
 - **Fast:** Unit tests run quickly
 - **Deno Runtime:** Tests run in actual edge function environment
@@ -663,6 +672,7 @@ thresholds: {
 ```
 
 **Why it works:**
+
 - **Quality Gate:** Tests fail if coverage drops below threshold
 - **Progressive:** Sets minimum bar for code quality
 - **CI/CD Integration:** Prevents untested code from merging
@@ -692,6 +702,7 @@ __tests__/
 ```
 
 **Why it works:**
+
 - **Discoverability:** Easy to find tests for any module
 - **Maintainability:** Tests colocated with related code
 - **Separation of Concerns:** Different test types clearly distinguished
@@ -739,6 +750,7 @@ it("should handle error response", async () => {
 ```
 
 **Why it works:**
+
 - **Consistency:** All mocks use same response structure
 - **Readability:** Test intent clear without boilerplate
 - **Type Safety:** Response structure matches Supabase types
@@ -753,13 +765,14 @@ it("should handle error response", async () => {
 
 **Where it occurs:**
 
-| Application | Test Files | Coverage |
-|-------------|------------|----------|
-| Dashboard | 107 files | ~60-70% (estimated) |
-| Mobile App | 5 files | ~10-20% (estimated) |
-| Edge Functions | 25 files | ~30-40% (estimated) |
+| Application    | Test Files | Coverage            |
+| -------------- | ---------- | ------------------- |
+| Dashboard      | 107 files  | ~60-70% (estimated) |
+| Mobile App     | 5 files    | ~10-20% (estimated) |
+| Edge Functions | 25 files   | ~30-40% (estimated) |
 
 **Impact:**
+
 - **Risk:** Mobile app and edge functions under-tested
 - **Quality:** Bugs more likely in less-tested areas
 - **Confidence:** Can't confidently refactor poorly tested code
@@ -786,6 +799,7 @@ thresholds: {
 **2. Prioritize testing by risk:**
 
 **High Priority (must have 80%+ coverage):**
+
 - Payment processing (Stripe webhooks, payment links)
 - Pricing calculations
 - Invoice generation
@@ -793,12 +807,14 @@ thresholds: {
 - Data mutations (create, update, delete)
 
 **Medium Priority (target 60%+ coverage):**
+
 - Data fetching hooks
 - UI components with business logic
 - Form validation
 - Edge function utilities
 
 **Low Priority (target 40%+ coverage):**
+
 - Simple presentational components
 - Static utilities
 - Type definitions
@@ -809,17 +825,20 @@ thresholds: {
 ## Testing Roadmap
 
 ### Q1 2026
+
 - [ ] Mobile app: Add tests for critical hooks (use-entry-form, use-job-submission)
 - [ ] Mobile app: Add tests for field-renderer component
 - [ ] Edge functions: Add integration tests for payment flows
 - [ ] Edge functions: Add integration tests for invoice generation
 
 ### Q2 2026
+
 - [ ] Mobile app: Achieve 60% overall coverage
 - [ ] Edge functions: Achieve 70% overall coverage
 - [ ] Dashboard: Maintain 80%+ coverage
 
 ### Q3 2026
+
 - [ ] Mobile app: Achieve 80% coverage
 - [ ] Edge functions: Achieve 80% coverage
 - [ ] All: Implement E2E test suite
@@ -836,6 +855,7 @@ thresholds: {
 **Where it's missing:**
 
 Currently no E2E tests for:
+
 - User registration and login flow
 - Worker invitation and acceptance
 - Job creation and completion (mobile → dashboard sync)
@@ -843,6 +863,7 @@ Currently no E2E tests for:
 - Pricing configuration and application
 
 **Impact:**
+
 - **Integration Issues:** Can't catch bugs spanning multiple systems
 - **Regression:** No safety net for full-stack changes
 - **Confidence:** Can't verify complete user workflows
@@ -868,34 +889,34 @@ npm install -D cypress
 
 ```typescript
 // e2e/auth-flow.spec.ts
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('user can register and login', async ({ page }) => {
+test("user can register and login", async ({ page }) => {
   // Registration
-  await page.goto('/signup');
-  await page.fill('[name="email"]', 'test@example.com');
-  await page.fill('[name="password"]', 'SecurePass123!');
+  await page.goto("/signup");
+  await page.fill('[name="email"]', "test@example.com");
+  await page.fill('[name="password"]', "SecurePass123!");
   await page.click('button[type="submit"]');
-  
+
   // Verify dashboard loads
-  await expect(page).toHaveURL('/dashboard');
-  await expect(page.locator('h1')).toContainText('Dashboard');
+  await expect(page).toHaveURL("/dashboard");
+  await expect(page.locator("h1")).toContainText("Dashboard");
 });
 
-test('worker can complete job', async ({ page, context }) => {
+test("worker can complete job", async ({ page, context }) => {
   // Login as worker
-  await page.goto('/login');
-  await page.fill('[name="email"]', 'worker@example.com');
-  await page.fill('[name="password"]', 'WorkerPass123!');
+  await page.goto("/login");
+  await page.fill('[name="email"]', "worker@example.com");
+  await page.fill('[name="password"]', "WorkerPass123!");
   await page.click('button[type="submit"]');
-  
+
   // Select job
   await page.click('[data-testid="job-card"]:first-child');
-  
+
   // Fill form
-  await page.fill('[name="field1"]', 'Test value');
+  await page.fill('[name="field1"]', "Test value");
   await page.click('button[type="submit"]');
-  
+
   // Verify completion
   await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
 });
@@ -941,38 +962,38 @@ jobs:
 
 **Research Basis:** E2E tests provide highest confidence for critical flows; recommended 5-10% of test suite.
 
-**E2E Test Priority List for Clean Log System:**
+**E2E Test Priority List for Tally Runner (monorepo):**
 
 ```markdown
 ## E2E Test Priority List
 
 ### P0 - Revenue Impact (Must Have)
+
 1. **Invoice Payment Flow**
    - Create invoice → Generate Stripe link → Complete payment → Invoice marked paid
    - Test: Payment webhook correctly updates invoice status
-   
 2. **Worker Payment Calculation**
    - Complete job → Calculate worker payment → Verify accuracy against rate card
-   
+
 ### P1 - Core Workflow (Should Have)
+
 3. **Job Completion Flow**
    - Admin creates job template → Worker accesses job → Fills form → Submits → Data syncs to dashboard
-   
 4. **Organization Onboarding**
    - Register organization → Configure settings → Add first worker → Verify access
 
 ### P2 - Security (Should Have)
+
 5. **Cross-Organization Isolation**
    - User A cannot access Organization B's data
    - Workers can only see assigned jobs
-   
 6. **Authentication Flow**
    - Login → Session management → Logout → Token expiry
 
 ### P3 - Configuration (Nice to Have)
+
 7. **Pricing Rule Configuration**
    - Create pricing rule → Verify calculation in invoice
-   
 8. **Field Configuration**
    - Create field config → Verify appears in mobile form
 ```
@@ -1012,6 +1033,7 @@ export default defineConfig({
 ```
 
 **Migration Checklist:**
+
 - [ ] Install Playwright: `npm install -D @playwright/test`
 - [ ] Run setup: `npx playwright install`
 - [ ] Create `e2e/` directory
@@ -1028,23 +1050,27 @@ export default defineConfig({
 **Where it occurs:**
 
 **Pattern 1: Colocated tests**
+
 ```
 hooks/use-workers.ts
 hooks/__tests__/use-workers.test.tsx
 ```
 
 **Pattern 2: Test directory with structure**
+
 ```
 __tests__/hooks/use-workers.test.tsx
 ```
 
 **Pattern 3: Edge functions separate tests**
+
 ```
 functions/create-worker/index.ts
 functions/__tests__/create-worker.test.ts
 ```
 
 **Impact:**
+
 - **Discoverability:** Harder to find tests for specific modules
 - **Tooling:** Test runners may need different glob patterns
 - **Consistency:** New developers unsure where to put tests
@@ -1085,12 +1111,14 @@ dashboard/
 ```
 
 **Naming convention:**
+
 - Test files: `{module-name}.test.{ts|tsx}`
 - Test directories: `__tests__/`
 - Integration tests: Top-level `__tests__/integration/`
 - E2E tests: Top-level `e2e/`
 
 **Benefits:**
+
 - Clear test location for any module
 - Tests excluded from production builds automatically
 - IDE support (tests discoverable by file tree)
@@ -1106,6 +1134,7 @@ dashboard/
 No `TESTING.md` or testing guide in repository.
 
 **Impact:**
+
 - **Onboarding:** New developers don't know testing expectations
 - **Inconsistency:** Each developer creates different test patterns
 - **Quality:** No shared understanding of good test practices
@@ -1128,14 +1157,16 @@ This project uses Vitest for unit/integration tests and Playwright for E2E tests
 ## Test Structure
 
 ```
+
 ├── dashboard/
-│   ├── __tests__/
-│   │   ├── lib/              # Service & utility tests
-│   │   ├── hooks/            # Custom hooks tests
-│   │   ├── components/       # Component tests
-│   │   └── integration/      # Integration tests
-│   └── e2e/                  # End-to-end tests
-```
+│ ├── **tests**/
+│ │ ├── lib/ # Service & utility tests
+│ │ ├── hooks/ # Custom hooks tests
+│ │ ├── components/ # Component tests
+│ │ └── integration/ # Integration tests
+│ └── e2e/ # End-to-end tests
+
+````
 
 ## Running Tests
 
@@ -1151,7 +1182,7 @@ npm test -- --coverage
 
 # Run E2E tests
 npm run test:e2e
-```
+````
 
 ## Writing Tests
 
@@ -1187,9 +1218,7 @@ describe("WorkersService", () => {
     });
 
     // Act & Assert
-    await expect(
-      WorkersService.list("org-1")
-    ).rejects.toThrow("Network error");
+    await expect(WorkersService.list("org-1")).rejects.toThrow("Network error");
   });
 });
 ```
@@ -1269,7 +1298,8 @@ describe("WorkerList", () => {
 - [Vitest Documentation](https://vitest.dev/)
 - [React Testing Library](https://testing-library.com/react)
 - [Playwright Documentation](https://playwright.dev/)
-```
+
+````
 
 ---
 
@@ -1321,9 +1351,10 @@ await new Promise(resolve => setTimeout(resolve, 1000));
 
 // ✅ Good: Wait for condition
 await waitFor(() => expect(result).toBeDefined());
-```
+````
 
 **Shared State:**
+
 ```typescript
 // ❌ Bad: Shared variable
 let userId = "user-1";
@@ -1335,24 +1366,27 @@ beforeEach(() => {
 ```
 
 **Date/Time:**
+
 ```typescript
 // ❌ Bad: Real dates
 const now = new Date();
 
 // ✅ Good: Mock dates
 vi.useFakeTimers();
-vi.setSystemTime(new Date('2024-01-01'));
+vi.setSystemTime(new Date("2024-01-01"));
 ```
 
 **Network:**
+
 ```typescript
 // ❌ Bad: Real API calls
-const data = await fetch('https://api.example.com');
+const data = await fetch("https://api.example.com");
 
 // ✅ Good: Mocked responses
 vi.mocked(fetch).mockResolvedValue({ data: mockData });
 ```
-```
+
+````
 
 **2. Monitor flaky test rate:**
 
@@ -1362,7 +1396,7 @@ npm test -- --reporter=json > test-results.json
 
 # Calculate flaky rate
 # Target: < 2% flaky rate
-```
+````
 
 **3. Use retry only for known-flaky tests:**
 
@@ -1386,12 +1420,14 @@ describe.concurrent("Network-dependent tests", () => {
 **Where it's missing:**
 
 No performance benchmarks for:
+
 - Pricing rule evaluation (complex conditional logic)
 - Invoice calculation (multiple jobs, many line items)
 - Form rendering (many field configs)
 - Data transformation (large datasets)
 
 **Impact:**
+
 - **Regression:** Performance degrades without detection
 - **Scalability:** No data on how code scales
 - **User Experience:** Slow operations not caught until production
@@ -1431,7 +1467,7 @@ describe('Pricing calculation performance', () => {
 **2. Set performance budgets:**
 
 ```typescript
-it('should calculate invoice in under 100ms', async () => {
+it("should calculate invoice in under 100ms", async () => {
   const start = performance.now();
   await calculateInvoice(jobs, rules);
   const duration = performance.now() - start;
@@ -1496,12 +1532,12 @@ describe('Pricing Calculation Performance', () => {
 
 **Performance Budgets:**
 
-| Operation | Target | Warning | Critical |
-|-----------|--------|---------|----------|
-| Invoice calculation (10 jobs) | < 50ms | 50-100ms | > 100ms |
-| Invoice calculation (100 jobs) | < 200ms | 200-500ms | > 500ms |
-| Form render (20 fields) | < 100ms | 100-200ms | > 200ms |
-| Worker list render (50 workers) | < 150ms | 150-300ms | > 300ms |
+| Operation                       | Target  | Warning   | Critical |
+| ------------------------------- | ------- | --------- | -------- |
+| Invoice calculation (10 jobs)   | < 50ms  | 50-100ms  | > 100ms  |
+| Invoice calculation (100 jobs)  | < 200ms | 200-500ms | > 500ms  |
+| Form render (20 fields)         | < 100ms | 100-200ms | > 200ms  |
+| Worker list render (50 workers) | < 150ms | 150-300ms | > 300ms  |
 
 **CI Integration:**
 
@@ -1537,6 +1573,7 @@ jobs:
 **What's missing:** No guidance on when to use or avoid snapshot testing.
 
 **Impact:**
+
 - **Over-snapshotting:** Tests become brittle and meaningless
 - **Under-snapshotting:** Missing useful regression detection
 - **Noise:** Snapshot updates become routine without thought
@@ -1545,27 +1582,31 @@ jobs:
 
 **Snapshot Testing Guidelines:**
 
-```markdown
+````markdown
 ## Snapshot Testing
 
 ### When to Use Snapshots
+
 - **Complex UI output:** After component is stable and mature
 - **API response structure:** Verify response shape hasn't changed
 - **Error messages:** Ensure user-facing messages don't regress
 - **Generated content:** HTML emails, PDF content structure
 
 ### When to Avoid Snapshots
+
 - **Frequently changing components:** Creates update fatigue
 - **Dynamic content:** Timestamps, random IDs, etc.
 - **Simple components:** Explicit assertions are clearer
 - **Behavior testing:** Snapshots test output, not behavior
 
 ### The "Two Updates" Rule
+
 If you update a snapshot more than twice for the same test,
 convert it to explicit assertions. Frequent updates indicate
 the test is either too broad or testing implementation details.
 
 ### Snapshot Configuration
+
 ```typescript
 // vitest.config.mts
 {
@@ -1577,8 +1618,10 @@ the test is either too broad or testing implementation details.
   },
 }
 ```
+````
 
 ### Good Snapshot Example
+
 ```typescript
 it("should render invoice email template", () => {
   const html = renderInvoiceEmail(mockInvoice);
@@ -1587,6 +1630,7 @@ it("should render invoice email template", () => {
 ```
 
 ### Bad Snapshot Example
+
 ```typescript
 // ❌ Too dynamic - will change frequently
 it("should render dashboard", () => {
@@ -1594,7 +1638,8 @@ it("should render dashboard", () => {
   expect(screen.getByRole("main")).toMatchSnapshot();
 });
 ```
-```
+
+````
 
 ---
 
@@ -1633,16 +1678,16 @@ let testSupabase: SupabaseClient;
 export async function setupTestDatabase() {
   // Start PostgreSQL container
   container = await new PostgreSqlContainer('postgres:15').start();
-  
+
   // Run migrations
   await runMigrations(container.getConnectionString());
-  
+
   // Create Supabase client
   testSupabase = createClient(
     container.getConnectionString(),
     'test-anon-key'
   );
-  
+
   return testSupabase;
 }
 
@@ -1656,7 +1701,7 @@ export async function seedTestData() {
     id: 'test-org-1',
     name: 'Test Organization',
   });
-  
+
   await testSupabase.from('worker').insert({
     id: 'test-worker-1',
     organization_id: 'test-org-1',
@@ -1670,12 +1715,12 @@ export async function cleanupTestData() {
   await testSupabase.from('worker').delete();
   await testSupabase.from('organization').delete();
 }
-```
+````
 
 **2. Use database transactions for test isolation:**
 
 ```typescript
-describe('Integration tests', () => {
+describe("Integration tests", () => {
   let supabase: SupabaseClient;
   let transaction: Transaction;
 
@@ -1696,7 +1741,7 @@ describe('Integration tests', () => {
     await teardownTestDatabase();
   });
 
-  it('should create worker', async () => {
+  it("should create worker", async () => {
     // Test uses transaction, rolls back after
   });
 });
@@ -1710,7 +1755,7 @@ INSERT INTO organization (id, name, created_at)
 VALUES ('test-org-1', 'Test Organization', NOW());
 
 INSERT INTO worker (id, organization_id, name, email, created_at)
-VALUES 
+VALUES
   ('test-worker-1', 'test-org-1', 'Worker One', 'worker1@test.com', NOW()),
   ('test-worker-2', 'test-org-1', 'Worker Two', 'worker2@test.com', NOW());
 ```
@@ -1727,7 +1772,7 @@ on: [pull_request, push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: supabase/postgres:15.1.0.147
@@ -1744,24 +1789,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: pnpm/action-setup@v4
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-      
+
       - name: Install dependencies
         run: pnpm install
-      
+
       - name: Setup test database
         run: |
           cd database
           supabase db push --db-url postgresql://postgres:postgres@localhost:5432/test_db
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      
+
       - name: Run tests
         run: pnpm test
         env:
@@ -1771,6 +1816,7 @@ jobs:
 ```
 
 **Migration Checklist:**
+
 - [ ] Create test database setup script
 - [ ] Add seed data for integration tests
 - [ ] Implement transaction rollback for test isolation
@@ -1842,12 +1888,12 @@ export default defineConfig({
 
 **Key Configuration Notes:**
 
-| Setting | Value | Reason |
-|---------|-------|--------|
-| `pool` | `"threads"` | Avoids EPERM errors on macOS when terminating test workers |
-| `exclude` | `**/__tests__/integration/**` | Integration tests excluded by default (require Supabase) |
-| `environment` | `"jsdom"` | Browser-like environment for React component testing |
-| `globals` | `true` | Enables global test functions (`describe`, `it`, `expect`) |
+| Setting       | Value                         | Reason                                                     |
+| ------------- | ----------------------------- | ---------------------------------------------------------- |
+| `pool`        | `"threads"`                   | Avoids EPERM errors on macOS when terminating test workers |
+| `exclude`     | `**/__tests__/integration/**` | Integration tests excluded by default (require Supabase)   |
+| `environment` | `"jsdom"`                     | Browser-like environment for React component testing       |
+| `globals`     | `true`                        | Enables global test functions (`describe`, `it`, `expect`) |
 
 **Mobile:**
 
@@ -1955,6 +2001,7 @@ pnpm test:e2e:headed
 ### 4.4 Test Environment Prerequisites
 
 **Integration tests require:**
+
 1. Local Supabase running (`cd database && supabase start`)
 2. Environment variables in `.env.development`:
    - `NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321`
@@ -1965,6 +2012,7 @@ pnpm test:e2e:headed
    - `RESEND_FROM_DOMAIN=<your domain>`
 
 **The test setup automatically:**
+
 - Checks if Supabase is available before running integration tests
 - Shows helpful error messages if prerequisites are missing
 - Loads `.env.development` variables for test environment
@@ -2142,8 +2190,8 @@ describe("ComponentName", () => {
 Deno.test("function-name: should validate required fields", () => {
   const body = { field1: "value", field2: "value" };
   const requiredFields = ["field1", "field2", "field3"];
-  
-  const missingFields = requiredFields.filter(field => !body[field]);
+
+  const missingFields = requiredFields.filter((field) => !body[field]);
   assertEquals(missingFields, ["field3"]);
 });
 
@@ -2153,12 +2201,7 @@ Deno.test("function-name: should validate email format", () => {
 });
 
 Deno.test("function-name: should require organization access", async () => {
-  const hasAccess = await verifyOrganizationMembership(
-    supabase,
-    "org-1",
-    "user@example.com",
-    null
-  );
+  const hasAccess = await verifyOrganizationMembership(supabase, "org-1", "user@example.com", null);
   assertEquals(hasAccess, true);
 });
 ```
@@ -2184,6 +2227,7 @@ export const createMockEntity = (overrides?: Partial<Entity>): Entity => ({
 ```
 
 **Benefits:**
+
 - Defaults provide valid data
 - Overrides customize for specific tests
 - Type-safe with TypeScript
@@ -2236,22 +2280,24 @@ export function createCheckoutSessionCompletedEvent(
 
 ### 7.1 Current Coverage Targets
 
-| Metric | Target | Status |
-|--------|--------|--------|
-| Lines | 80% | ✅ Dashboard |
-| Functions | 80% | ✅ Dashboard |
-| Branches | 75% | ✅ Dashboard |
-| Statements | 80% | ✅ Dashboard |
-| Overall | 70%+ | ⚠️ Mobile/Edge need work |
+| Metric     | Target | Status                   |
+| ---------- | ------ | ------------------------ |
+| Lines      | 80%    | ✅ Dashboard             |
+| Functions  | 80%    | ✅ Dashboard             |
+| Branches   | 75%    | ✅ Dashboard             |
+| Statements | 80%    | ✅ Dashboard             |
+| Overall    | 70%+   | ⚠️ Mobile/Edge need work |
 
 ### 7.2 Test Pyramid Distribution
 
 **Recommended (industry standard):**
+
 - 70% Unit Tests
 - 20% Integration Tests
 - 10% E2E Tests
 
 **Current (estimated):**
+
 - 85% Unit Tests
 - 15% Integration Tests
 - 0% E2E Tests
@@ -2261,24 +2307,20 @@ export function createCheckoutSessionCompletedEvent(
 ### 7.3 Quality Metrics to Track
 
 **Test Suite Metrics:**
+
 1. **Test Count:** Total number of tests
 2. **Test Duration:** Time to run full suite
 3. **Flaky Rate:** Percentage of non-deterministic tests
 4. **Coverage Percentage:** Code covered by tests
 
-**Development Metrics:**
-5. **Tests per PR:** New tests added with new code
-6. **Bug Escape Rate:** Bugs found in production vs tests
-7. **Test Maintenance Time:** Time spent fixing broken tests
+**Development Metrics:** 5. **Tests per PR:** New tests added with new code 6. **Bug Escape Rate:** Bugs found in production vs tests 7. **Test Maintenance Time:** Time spent fixing broken tests
 
-**CI/CD Metrics:**
-8. **Pipeline Success Rate:** Percentage of passing builds
-9. **Feedback Time:** Time from commit to test results
-10. **Blocked PRs:** PRs blocked by test failures
+**CI/CD Metrics:** 8. **Pipeline Success Rate:** Percentage of passing builds 9. **Feedback Time:** Time from commit to test results 10. **Blocked PRs:** PRs blocked by test failures
 
 ### 7.4 Coverage Exclusions
 
 **Appropriate exclusions:**
+
 - Test files themselves
 - Configuration files
 - Type definitions
@@ -2335,6 +2377,7 @@ exclude: [
    - Share fixtures and test utilities
 
 **Sources:**
+
 - [Next.js Testing with Vitest](https://nextjs.org/docs/app/guides/testing/vitest)
 - [React Testing Best Practices](https://blog.incubyte.co/blog/vitest-react-testing-library-guide/)
 - [Vitest with Next.js 15](https://www.wisp.blog/blog/setting-up-vitest-for-nextjs-15)
@@ -2377,6 +2420,7 @@ exclude: [
    - Test maintenance burden
 
 **Sources:**
+
 - [Software Testing Best Practices 2026](https://www.zemith.com/blogs/software-testing-best-practices)
 - [E2E Testing Guide 2025](https://opsmatters.com/posts/end-end-testing-microservices-2025-guide)
 - [Quality Assurance Framework](https://fullscale.io/blog/software-quality-assurance-framework/)
@@ -2412,6 +2456,7 @@ exclude: [
 ### 9.1 Test Organization Rules
 
 #### RULE-TEST-001: Colocated Test Files
+
 **Requirement:** Test files MUST be placed in `__tests__/` directories adjacent to source code.
 
 ```
@@ -2423,12 +2468,14 @@ lib/
 ```
 
 **Exceptions:**
+
 - Integration tests: Top-level `__tests__/integration/`
 - E2E tests: Top-level `e2e/`
 
 ---
 
 #### RULE-TEST-002: Test File Naming
+
 **Requirement:** Test files MUST use `.test.{ts|tsx}` extension.
 
 ```
@@ -2446,6 +2493,7 @@ test-workers.ts
 ---
 
 #### RULE-TEST-003: Test Suite Organization
+
 **Requirement:** Tests MUST be organized by method/feature using nested `describe` blocks.
 
 ```typescript
@@ -2466,6 +2514,7 @@ describe("ServiceName", () => {
 ### 9.2 Test Structure Rules
 
 #### RULE-TEST-004: AAA Pattern
+
 **Requirement:** Tests MUST follow Arrange-Act-Assert pattern.
 
 ```typescript
@@ -2485,6 +2534,7 @@ it("should return data on success", async () => {
 ---
 
 #### RULE-TEST-005: Test Description
+
 **Requirement:** Test descriptions MUST be clear and describe expected behavior.
 
 ```typescript
@@ -2501,6 +2551,7 @@ it("returns data", () => {});
 ---
 
 #### RULE-TEST-006: One Assertion Per Test
+
 **Requirement:** Tests SHOULD focus on single behavior (multiple assertions OK if testing same behavior).
 
 ```typescript
@@ -2515,10 +2566,10 @@ it("should render worker details", () => {
 it("should do everything", () => {
   render(<WorkerCard worker={mockWorker} />);
   expect(screen.getByText("John Doe")).toBeInTheDocument();
-  
+
   userEvent.click(screen.getByRole("button"));
   expect(onEdit).toHaveBeenCalled();
-  
+
   expect(screen.getByText("Edit mode")).toBeInTheDocument();
 });
 ```
@@ -2528,6 +2579,7 @@ it("should do everything", () => {
 ### 9.3 Mock Strategy Rules
 
 #### RULE-TEST-007: Use Fixtures
+
 **Requirement:** Tests MUST use fixture functions for test data, not inline objects.
 
 ```typescript
@@ -2547,6 +2599,7 @@ const worker = {
 ---
 
 #### RULE-TEST-008: Mock at Boundaries
+
 **Requirement:** Tests SHOULD mock external dependencies, not internal functions.
 
 ```typescript
@@ -2565,6 +2618,7 @@ vi.mock("@/lib/services/workers.service", () => ({
 ---
 
 #### RULE-TEST-009: Clean Up Mocks
+
 **Requirement:** Tests MUST clean up mocks in `beforeEach` or `afterEach`.
 
 ```typescript
@@ -2583,6 +2637,7 @@ describe("Test suite", () => {
 ### 9.4 Coverage Rules
 
 #### RULE-TEST-010: Minimum Coverage
+
 **Requirement:** All applications MUST maintain minimum coverage thresholds:
 
 - Lines: 80%
@@ -2602,6 +2657,7 @@ thresholds: {
 ---
 
 #### RULE-TEST-011: Coverage for Critical Code
+
 **Requirement:** High-risk code MUST have 90%+ coverage:
 
 - Payment processing
@@ -2613,6 +2669,7 @@ thresholds: {
 ---
 
 #### RULE-TEST-012: Test All Code Paths
+
 **Requirement:** Tests MUST cover success, error, and edge cases.
 
 ```typescript
@@ -2630,6 +2687,7 @@ describe("method", () => {
 ### 9.5 Integration Test Rules
 
 #### RULE-TEST-013: Integration Test Isolation
+
 **Requirement:** Integration tests MUST be isolated (no shared state).
 
 ```typescript
@@ -2655,6 +2713,7 @@ describe("Integration tests", () => {
 ---
 
 #### RULE-TEST-014: No Real External Services
+
 **Requirement:** Integration tests MUST NOT call real external services (Stripe, email, etc.).
 
 ```typescript
@@ -2670,9 +2729,11 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 ### 9.6 E2E Test Rules
 
 #### RULE-TEST-015: E2E for Critical Flows Only
+
 **Requirement:** E2E tests MUST cover only critical user journeys (5-10 tests max).
 
 **Critical flows:**
+
 1. User registration and login
 2. Worker invitation and acceptance
 3. Job creation and completion
@@ -2682,6 +2743,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 ---
 
 #### RULE-TEST-016: Stable Selectors
+
 **Requirement:** E2E tests MUST use stable selectors (role, label, test-id).
 
 ```typescript
@@ -2700,6 +2762,7 @@ await page.locator("div > button:nth-child(3)");
 ### 9.7 Test Quality Rules
 
 #### RULE-TEST-017: No Flaky Tests
+
 **Requirement:** Flaky tests MUST be fixed immediately or marked as skip/failing.
 
 ```typescript
@@ -2715,18 +2778,19 @@ it.failing("known issue - see issue #456", () => {});
 ---
 
 #### RULE-TEST-018: Deterministic Tests
+
 **Requirement:** Tests MUST be deterministic (same input → same output).
 
 ```typescript
 // ✅ Correct: Mock time
 vi.useFakeTimers();
-vi.setSystemTime(new Date('2024-01-01'));
+vi.setSystemTime(new Date("2024-01-01"));
 
 // ❌ Incorrect: Real time
 const now = new Date();
 
 // ✅ Correct: Fixed random
-Math.seedrandom('test-seed');
+Math.seedrandom("test-seed");
 
 // ❌ Incorrect: Real random
 Math.random();
@@ -2735,13 +2799,18 @@ Math.random();
 ---
 
 #### RULE-TEST-019: Fast Tests
+
 **Requirement:** Unit tests MUST run in < 100ms, integration tests in < 1s.
 
 ```typescript
 // Set timeout for slow tests
-it("slow test", async () => {
-  // Test...
-}, { timeout: 5000 }); // 5 second timeout
+it(
+  "slow test",
+  async () => {
+    // Test...
+  },
+  { timeout: 5000 }
+); // 5 second timeout
 ```
 
 **Target:** Full test suite under 5 minutes.
@@ -2751,6 +2820,7 @@ it("slow test", async () => {
 ### 9.8 Documentation Rules
 
 #### RULE-TEST-020: Document Complex Tests
+
 **Requirement:** Complex test setup MUST include comments explaining why.
 
 ```typescript
@@ -2762,7 +2832,7 @@ describe("Complex pricing calculation", () => {
     // - Location B inherits from parent: $11/unit
     // - Job uses Location A
     // Expected: $12/unit applied
-    
+
     const result = calculatePrice(job, rules);
     expect(result.unit_price).toBe(12);
   });
@@ -2784,6 +2854,7 @@ describe("Complex pricing calculation", () => {
 ## Summary
 
 **Phase 5 analyzed:**
+
 - 137 test files across monorepo
 - 107 dashboard tests, 5 mobile tests, 25 edge function tests
 - Vitest + React Testing Library for unit/integration
@@ -2792,6 +2863,7 @@ describe("Complex pricing calculation", () => {
 **Key findings:**
 
 **Strengths:**
+
 - Excellent fixture and mock infrastructure
 - Comprehensive service layer testing
 - Coverage thresholds enforced (80%)
@@ -2800,6 +2872,7 @@ describe("Complex pricing calculation", () => {
 - React hooks tested with proper wrappers
 
 **Areas for improvement:**
+
 - Inconsistent coverage (dashboard 80%, mobile 20%, edge 40%)
 - No E2E tests for critical flows
 - Mixed test naming conventions (test/spec)
@@ -2821,6 +2894,7 @@ All 5 phases have been completed:
 5. ✅ **Phase 5:** Testing patterns (coverage, mocks, quality metrics)
 
 **Total Analysis:**
+
 - 26 best practices identified and documented
 - 24 inconsistencies/anti-patterns found with solutions
 - 120+ style guide rules established across all phases

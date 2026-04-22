@@ -7,7 +7,7 @@
 | **Created**            | 2026-04-22                                                                   |
 | **Gold review (S2)**   | 2026-04-22 — **section 10** (codebase cross-check vs S1 inheritance)         |
 | **Adversarial review** | 2026-04-22 — **section 11**                                                  |
-| **Product**            | Clean Log                                                                    |
+| **Product**            | Tally Runner                                                                 |
 
 ---
 

@@ -6,13 +6,14 @@ The footer provides important links, legal information, and additional resources
 
 ## User Story
 
-**As a** visitor to the RivetUp website  
+**As a** visitor to the Tally Runner website  
 **I want to** find important links, legal information, and contact details  
 **So that** I can access resources, understand policies, and contact support when needed
 
 ## Acceptance Criteria
 
 ### 1. Footer Structure
+
 - Organized into columns (3-4 columns on desktop)
 - Stacked on mobile
 - Clean, scannable layout
@@ -21,6 +22,7 @@ The footer provides important links, legal information, and additional resources
 ### 2. Footer Sections
 
 #### A. Product Links
+
 - Features
 - Pricing
 - Mobile App
@@ -28,6 +30,7 @@ The footer provides important links, legal information, and additional resources
 - Roadmap (optional)
 
 #### B. Resources
+
 - Help Center / Documentation
 - Blog (if applicable)
 - Case Studies
@@ -35,6 +38,7 @@ The footer provides important links, legal information, and additional resources
 - Video Tutorials
 
 #### C. Company
+
 - About Us
 - Careers (if applicable)
 - Contact
@@ -42,6 +46,7 @@ The footer provides important links, legal information, and additional resources
 - Partners (optional)
 
 #### D. Legal & Policies
+
 - Privacy Policy
 - Terms of Service
 - Cookie Policy
@@ -49,12 +54,14 @@ The footer provides important links, legal information, and additional resources
 - Compliance (if applicable)
 
 ### 3. Contact Information
-- Email: support@rivetup.com (or relevant email)
+
+- Email: support@tallyrunner.com (or relevant email)
 - Phone: (if applicable)
 - Address: (if applicable)
 - Social Media Links: (if applicable)
 
 ### 4. Social Media Links (Optional)
+
 - LinkedIn
 - Twitter/X
 - Facebook
@@ -63,23 +70,27 @@ The footer provides important links, legal information, and additional resources
 - Icons with links, opens in new tab
 
 ### 5. Newsletter Signup (Optional)
+
 - Email input field
 - "Subscribe" button
 - Brief description: "Get tips and updates"
 - Privacy note: "We respect your privacy"
 
 ### 6. Trust Badges
+
 - Security certifications
 - Industry memberships
 - Awards (if applicable)
 - "Australian-owned" or location-specific badges
 
 ### 7. Copyright and Legal
-- Copyright notice: "© 2026 RivetUp. All rights reserved."
+
+- Copyright notice: "© 2026 Tally Runner. All rights reserved."
 - Legal links (Privacy, Terms)
 - Last updated date (optional)
 
 ### 8. Mobile Responsiveness
+
 - Footer stacks vertically on mobile
 - All links easily tappable
 - Readable text size
@@ -96,17 +107,20 @@ The footer provides important links, legal information, and additional resources
 ## Content Guidelines
 
 ### Link Labels
+
 - Clear, descriptive labels
 - Use common terms
 - Group related links together
 - Don't use abbreviations unless widely understood
 
 ### Contact Information
+
 - Use real contact information
 - Include response time expectations (if applicable)
 - Multiple contact methods (email, phone, chat)
 
 ### Legal Links
+
 - Must include: Privacy Policy, Terms of Service
 - Should include: Cookie Policy (if using cookies)
 - Optional: Refund Policy, Acceptable Use Policy
@@ -132,7 +146,7 @@ Integrations      API Docs           Press              Security
 
 [Trust Badges]
 
-© 2026 RivetUp. All rights reserved.
+© 2026 Tally Runner. All rights reserved.
 ```
 
 ## Success Metrics

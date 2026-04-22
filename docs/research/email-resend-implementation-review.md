@@ -28,7 +28,7 @@ port = 465
 user = "resend"
 pass = "env(RESEND_API_KEY)"
 admin_email = "noreply@feedback.flowerhead.dev"
-sender_name = "Clean Log"
+sender_name = "Tally Runner"
 ```
 
 ### Hosted Supabase (Manual Configuration Required)
@@ -36,7 +36,7 @@ sender_name = "Clean Log"
 Go to **Supabase Dashboard → Authentication → Email → SMTP Settings**:
 
 - **Sender email:** `noreply@feedback.flowerhead.dev`
-- **Sender name:** `Clean Log`
+- **Sender name:** `Tally Runner`
 - **Host:** `smtp.resend.com`
 - **Port:** `465`
 - **Username:** `resend`
@@ -46,13 +46,13 @@ Go to **Supabase Dashboard → Authentication → Email → SMTP Settings**:
 
 ## Email Flows in This Project
 
-| Flow | Trigger | Sender | Where it shows |
-|------|---------|--------|----------------|
-| Supabase Auth (password reset, magic links) | Auth events | Resend SMTP | ✅ Resend dashboard |
-| Worker invitation | `create-worker` Edge Function | Resend API | ✅ Resend dashboard |
-| Org signup verification | `register-organization` | Resend API | ✅ Resend dashboard |
-| Resend activation link | `resend-activation-link` | Resend API | ✅ Resend dashboard |
-| Invoices, feedback, payments | Various Edge Functions | Resend API | ✅ Resend dashboard |
+| Flow                                        | Trigger                       | Sender      | Where it shows      |
+| ------------------------------------------- | ----------------------------- | ----------- | ------------------- |
+| Supabase Auth (password reset, magic links) | Auth events                   | Resend SMTP | ✅ Resend dashboard |
+| Worker invitation                           | `create-worker` Edge Function | Resend API  | ✅ Resend dashboard |
+| Org signup verification                     | `register-organization`       | Resend API  | ✅ Resend dashboard |
+| Resend activation link                      | `resend-activation-link`      | Resend API  | ✅ Resend dashboard |
+| Invoices, feedback, payments                | Various Edge Functions        | Resend API  | ✅ Resend dashboard |
 
 ---
 
@@ -114,7 +114,7 @@ Verify the recipient's spam folder if the sending path is correct. Unverified do
 2. **Subdomains** – Prefer subdomains (e.g. `feedback.flowerhead.dev`) over root for reputation isolation.
 3. **Test addresses** – Use `delivered@resend.dev` or `delivered+label@resend.dev` for safe testing.
 4. **Unified SMTP** – Configure Supabase Auth SMTP with Resend so Auth emails go through Resend and appear in the same dashboard. ✅ Done.
-5. **From address** – `from` must use a verified domain (e.g. `Clean Log <noreply@feedback.flowerhead.dev>`).
+5. **From address** – `from` must use a verified domain (e.g. `Tally Runner <noreply@feedback.flowerhead.dev>`).
 
 ---
 

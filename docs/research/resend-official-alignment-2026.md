@@ -7,7 +7,7 @@ This file exists so search and “research” discoverability point at the same 
 
 ## Summary
 
-Cross-reviewed Clean Log’s per-organization sending domain plan (S0–S2) against Resend’s published guidance:
+Cross-reviewed Tally Runner’s per-organization sending domain plan (S0–S2) against Resend’s published guidance:
 
 - **[Setting up Resend for Multi-Tenant Applications](https://resend.com/docs/knowledge-base/setting-up-resend-for-multi-tenants)** — Option A (single team, many domains) matches our direction; Option B (BYOK / separate accounts) is deferred.
 - **Webhooks** — `domain.verified` can reduce polling; `email.bounced` / `email.complained` + **tags** (`organization_id`, etc.) support tenant-scoped operations with one Resend team.

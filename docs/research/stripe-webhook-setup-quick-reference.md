@@ -12,7 +12,6 @@
 **They are DIFFERENT:**
 
 - **API Secret Key** (`sk_test_...` or `sk_live_...`)
-
   - Used to make API calls TO Stripe
   - Found in: Dashboard → Developers → API keys
   - Used in: Your backend code to create checkout sessions, etc.
@@ -39,22 +38,19 @@
 ### Step 2: Create Webhook Endpoint in Stripe
 
 1. **Go to Stripe Dashboard:**
-
    - Make sure you're in the correct account/Sandbox
    - Click **Developers** in the left sidebar
    - Click **Webhooks**
 
 2. **Add New Endpoint:**
-
    - Click **"+ Add endpoint"** button (top right)
    - **Endpoint URL:** Paste your Supabase function URL:
      ```
      https://YOUR_PROJECT_REF.supabase.co/functions/v1/stripe-webhook
      ```
-   - **Description:** (Optional) "Clean Log System - Invoice Payments"
+   - **Description:** (Optional) "Tally Runner (monorepo) - Invoice Payments"
 
 3. **Select Events:**
-
    - Click **"Select events"** button
    - **DO NOT** select "Send all events" (we only want specific ones)
    - Search and select these events one by one:
@@ -118,7 +114,6 @@ Stripe will show webhook delivery failures - that's expected! Once you create th
 ### After Your Function Exists:
 
 1. **Check Webhook Logs:**
-
    - Go to: Developers → Webhooks → [Your Endpoint]
    - Click **"Events"** tab
    - You'll see all webhook attempts and their status

@@ -559,7 +559,7 @@ serve(async (req: Request) => {
               );
               // Get base URL from environment or use default
               const baseUrl = Deno.env.get("DASHBOARD_BASE_URL") ||
-                "https://app.fieldly.com";
+                "https://app.tallyrunner.com";
               const reviewUrl =
                 `${baseUrl}/dashboard/invoicing?status=pending_review`;
 

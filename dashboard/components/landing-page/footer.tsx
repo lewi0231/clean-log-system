@@ -41,12 +41,13 @@ export function Footer() {
               <Logo />
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              RivetUp helps you manage field workers, jobs, and invoicing—with forms, pricing, and locations
-              you configure yourself. Automatic review links to clients; static and one-off locations supported.
-              Built for tradespeople, car detailers, and cleaning services.
+              Tally Runner helps you manage field workers, jobs, and invoicing—with forms, pricing,
+              and locations you configure yourself. Automatic review links to clients; static and
+              one-off locations supported. Built for tradespeople, car detailers, and cleaning
+              services.
             </p>
             <p className="text-xs text-muted-foreground">
-              © 2026 RivetUp. All rights reserved.
+              © 2026 Tally Runner. All rights reserved.
             </p>
           </div>
 

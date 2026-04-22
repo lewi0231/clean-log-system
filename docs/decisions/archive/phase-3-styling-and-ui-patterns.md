@@ -1,6 +1,6 @@
 # Phase 3: Styling and UI Patterns Analysis
 
-**Project:** Clean Log System Monorepo  
+**Project:** Tally Runner (monorepo) Monorepo  
 **Date:** January 20, 2026  
 **Scope:** Tailwind CSS usage, design system patterns, color tokens, responsive design, and UI consistency
 
@@ -23,14 +23,15 @@
 
 ### 1.1 Styling Technology Stack
 
-| Application | CSS Framework | Config | Theme System |
-|-------------|--------------|--------|--------------|
-| **Dashboard** | Tailwind CSS v4 | CSS-first (no `.ts` config) | CSS variables (oklch) |
-| **Mobile App** | Tailwind CSS v3 + NativeWind | `tailwind.config.js` | CSS variables (rgb) |
+| Application    | CSS Framework                | Config                      | Theme System          |
+| -------------- | ---------------------------- | --------------------------- | --------------------- |
+| **Dashboard**  | Tailwind CSS v4              | CSS-first (no `.ts` config) | CSS variables (oklch) |
+| **Mobile App** | Tailwind CSS v3 + NativeWind | `tailwind.config.js`        | CSS variables (rgb)   |
 
 ### 1.2 Design System Foundation
 
 **Dashboard:**
+
 - **Style variant:** shadcn/ui "new-york" style
 - **Base color:** Gray
 - **CSS Variables:** Yes (semantic color tokens)
@@ -39,7 +40,8 @@
 - **Icon library:** Lucide React
 
 **Mobile:**
-- **Style variant:** shadcn/ui "new-york" style  
+
+- **Style variant:** shadcn/ui "new-york" style
 - **Base color:** Neutral
 - **CSS Variables:** Yes (semantic color tokens)
 - **Color format:** RGB with CSS variables
@@ -49,6 +51,7 @@
 ### 1.3 Documentation Structure
 
 The project has a comprehensive `STYLING_PRACTICES.md` (635 lines) documenting:
+
 - Tooltips styling
 - Advanced settings sections
 - Drag and drop visual feedback
@@ -64,6 +67,7 @@ The project has a comprehensive `STYLING_PRACTICES.md` (635 lines) documenting:
 ### 1.4 Usage Statistics
 
 **Dashboard component styling:**
+
 - 2,972 `className=` usages across 122 files
 - 112 color token uses (`bg-primary`, `text-primary`, `border-primary`)
 - 29 dark mode uses (`dark:` prefix) across 7 files
@@ -111,6 +115,7 @@ The project has a comprehensive `STYLING_PRACTICES.md` (635 lines) documenting:
 ```
 
 **Why it works:**
+
 - **Scalability:** Single source of truth for colors, easy global theme changes
 - **Efficiency:** OKLCH provides perceptually uniform color manipulation
 - **Maintainability:** Semantic names (`--background`, `--primary`) vs arbitrary values
@@ -126,7 +131,7 @@ The project has a comprehensive `STYLING_PRACTICES.md` (635 lines) documenting:
 
 **Where it's documented:**
 
-```markdown:dashboard/STYLING_PRACTICES.md
+````markdown:dashboard/STYLING_PRACTICES.md
 ## Tooltips
 
 ### Background and Colors
@@ -144,8 +149,9 @@ The project has a comprehensive `STYLING_PRACTICES.md` (635 lines) documenting:
     <p className="text-xs text-slate-200">Description text</p>
   </div>
 </TooltipContent>
-```
-```
+````
+
+````
 
 **Why it works:**
 - **Scalability:** New developers can quickly learn established patterns
@@ -174,7 +180,7 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-```
+````
 
 **Usage example:**
 
@@ -195,12 +201,14 @@ function Button({ className, variant, size, ...props }) {
 ```
 
 **Why it works:**
+
 - **Scalability:** Handles complex conditional class logic cleanly
 - **Efficiency:** Automatically deduplicates and resolves Tailwind conflicts
 - **Type Safety:** Accepts multiple input types (strings, objects, arrays)
 - **Industry Standard:** Recommended pattern by shadcn/ui and Tailwind community
 
 **Pattern benefits:**
+
 - Prevents className conflicts (e.g., `p-4 p-6` → `p-6`)
 - Supports conditional classes via objects
 - Handles null/undefined gracefully
@@ -214,7 +222,7 @@ function Button({ className, variant, size, ...props }) {
 
 **Where it's documented:**
 
-```markdown:dashboard/STYLING_PRACTICES.md
+````markdown:dashboard/STYLING_PRACTICES.md
 ## Settings Sections
 
 ### Visual Separation
@@ -236,8 +244,9 @@ Settings cards use a subtle primary-colored background with matching border:
     <CardContent>{/* Settings content */}</CardContent>
   </CollapsibleContent>
 </Card>
-```
-```
+````
+
+````
 
 **Why it works:**
 - **Scalability:** Clear visual hierarchy separates config from content
@@ -267,14 +276,16 @@ Settings cards use a subtle primary-colored background with matching border:
   onCheckedChange={setIsEnabled}
   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
 />
-```
+````
 
 ### Styling Breakdown
+
 - `data-[state=checked]:bg-primary` - Primary color when switch is ON
 - `data-[state=unchecked]:bg-muted-foreground/50` - Semi-transparent muted background when OFF
 - `data-[state=unchecked]:border-2` - 2px border when OFF
 - `data-[state=unchecked]:border-muted-foreground/30` - Muted border color when OFF
-```
+
+````
 
 **Why it works:**
 - **Accessibility:** High contrast between checked/unchecked states
@@ -322,8 +333,9 @@ Settings cards use a subtle primary-colored background with matching border:
     </div>
   </div>
 </div>
-```
-```
+````
+
+````
 
 **Why it works:**
 - **Scalability:** Easy to add new banner types following pattern
@@ -361,9 +373,10 @@ All clickable elements should use `cursor-pointer` to provide clear visual feedb
 - **Clickable Cards**: Add `cursor-pointer` to card headers that trigger actions
 - **Collapsible Sections**: Use `cursor-pointer` on collapsible triggers
 - **Interactive Lists**: Add `cursor-pointer` to list items that are clickable
-```
+````
 
 **Why it works:**
+
 - **UX Consistency:** Users get consistent interaction feedback
 - **Discoverability:** Clear indication of clickable elements
 - **Accessibility:** Helps users with motor impairments identify targets
@@ -378,6 +391,7 @@ All clickable elements should use `cursor-pointer` to provide clear visual feedb
 **Where it's used:**
 
 **Spacing utilities usage:**
+
 - 788 gap/space utilities (`space-y-4`, `gap-2`, etc.)
 - 609 padding utilities (`p-4`, `px-6`, `py-2`)
 - Consistent patterns: `space-y-2`, `space-y-4`, `space-y-6` for vertical spacing
@@ -406,6 +420,7 @@ All clickable elements should use `cursor-pointer` to provide clear visual feedb
 ```
 
 **Why it works:**
+
 - **Scalability:** Consistent spacing creates visual harmony
 - **Efficiency:** No custom spacing values to maintain
 - **Responsive:** Tailwind spacing scales predictably
@@ -419,13 +434,13 @@ All clickable elements should use `cursor-pointer` to provide clear visual feedb
 
 **Where it's aligned:**
 
-| Aspect | Dashboard | Mobile | Status |
-|--------|-----------|--------|--------|
-| Style variant | new-york | new-york | ✅ Aligned |
-| Icon library | Lucide | Lucide | ✅ Aligned |
-| CSS variables | Yes | Yes | ✅ Aligned |
+| Aspect            | Dashboard | Mobile             | Status     |
+| ----------------- | --------- | ------------------ | ---------- |
+| Style variant     | new-york  | new-york           | ✅ Aligned |
+| Icon library      | Lucide    | Lucide             | ✅ Aligned |
+| CSS variables     | Yes       | Yes                | ✅ Aligned |
 | Component library | shadcn/ui | shadcn/ui (native) | ✅ Aligned |
-| Utility fn name | `cn()` | `cn()` | ✅ Aligned |
+| Utility fn name   | `cn()`    | `cn()`             | ✅ Aligned |
 
 **Mobile app tokens:**
 
@@ -448,6 +463,7 @@ theme: {
 ```
 
 **Why it works:**
+
 - **Scalability:** Shared design language reduces cognitive load for users
 - **Efficiency:** Component patterns transfer between platforms
 - **Maintainability:** Single design system to maintain
@@ -485,6 +501,7 @@ theme: {
 ```
 
 **Why it works:**
+
 - **Scalability:** Encapsulates complex patterns into single classes
 - **Efficiency:** Reusable across codebase without duplication
 - **Purging:** Tailwind's JIT handles these custom classes correctly
@@ -529,6 +546,7 @@ module.exports = {
 ```
 
 **Impact:**
+
 - **Scalability:** Inconsistent user experience across platforms
 - **Efficiency:** Commented code creates maintenance debt
 - **UX:** Users expect dark mode in 2026 (accessibility feature)
@@ -591,7 +609,8 @@ This dashboard intentionally uses only a light theme for the following reasons:
 
 Remove commented dark mode code to eliminate confusion.
 
-**Research Basis:** 
+**Research Basis:**
+
 - 85% of users expect dark mode toggle in 2026 apps
 - WCAG 2.1 SC 1.4.12 (Text Spacing) easier to meet with dark mode option
 - Commented code is considered technical debt in modern codebases
@@ -605,6 +624,7 @@ Remove commented dark mode code to eliminate confusion.
 **Where it occurs:**
 
 Files with dark mode utilities:
+
 1. `components/invoicing/payment-history.tsx` (4 uses)
 2. `components/invoicing/invoice-list.tsx` (3 uses)
 3. `components/ui/checkbox.tsx` (1 use)
@@ -614,6 +634,7 @@ Files with dark mode utilities:
 7. `components/pricing/base-pricing-editor.tsx` (3 uses)
 
 **Impact:**
+
 - **Scalability:** If dark mode is ever enabled, significant work needed
 - **Inconsistency:** Some components consider dark mode, most don't
 - **Wasted Effort:** Existing dark mode code might not work as intended
@@ -649,8 +670,8 @@ rg "dark:" --files-with-matches | xargs sed -i '' 's/dark:[^ "]* //g'
 }
 
 .dark {
-  --info-bg: oklch(0.20 0.03 240); /* dark blue */
-  --info-border: oklch(0.30 0.04 240);
+  --info-bg: oklch(0.2 0.03 240); /* dark blue */
+  --info-border: oklch(0.3 0.04 240);
 }
 ```
 
@@ -670,6 +691,7 @@ rg "dark:" --files-with-matches | xargs sed -i '' 's/dark:[^ "]* //g'
 **Where it occurs:**
 
 **Dashboard:**
+
 ```css:dashboard/app/globals.css
 @import "tailwindcss";  /* v4 syntax */
 @custom-variant dark (&:is(.dark *));
@@ -679,9 +701,11 @@ rg "dark:" --files-with-matches | xargs sed -i '' 's/dark:[^ "]* //g'
   /* ... */
 }
 ```
+
 No `tailwind.config.ts` file exists.
 
 **Mobile:**
+
 ```javascript:mobile-app/tailwind.config.js
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -697,6 +721,7 @@ module.exports = {
 ```
 
 **Impact:**
+
 - **Scalability:** Different mental models for configuration
 - **Maintenance:** Must understand two different config systems
 - **Migration:** Mobile will need migration to v4 eventually
@@ -732,7 +757,7 @@ Migrate mobile app to Tailwind v4 when NativeWind supports it:
 
 - **Dashboard**: Tailwind v4 (CSS-first configuration)
   - Leverages latest features and performance improvements
-  
+
 - **Mobile**: Tailwind v3 with NativeWind preset
   - Waiting for NativeWind v4 compatibility
   - Will migrate when available
@@ -745,6 +770,7 @@ Migration tracked in issue #[number]
 **Migration Timeline:** NativeWind v4 support for Tailwind v4 is expected in 2026. Track the [NativeWind GitHub repository](https://github.com/marklawlor/nativewind) for updates and plan migration after stable release. Until then, document the configuration differences to reduce cognitive load when switching between projects.
 
 **Migration Checklist (when NativeWind v4 is available):**
+
 - [ ] Update NativeWind to v4
 - [ ] Convert `tailwind.config.js` to CSS-first config
 - [ ] Migrate color tokens to CSS variables
@@ -761,6 +787,7 @@ Migration tracked in issue #[number]
 **Where it occurs:**
 
 **Semantic approach (defined in CSS):**
+
 ```css:dashboard/app/globals.css
 :root {
   --radius: 0.625rem;  /* 10px */
@@ -775,6 +802,7 @@ Migration tracked in issue #[number]
 ```
 
 **Actual usage in components:**
+
 ```tsx
 // Some components use semantic tokens
 <Card className="rounded-lg">  // Uses --radius-lg
@@ -786,6 +814,7 @@ Migration tracked in issue #[number]
 ```
 
 **Impact:**
+
 - **Scalability:** Hard to change border radius globally
 - **Inconsistency:** Components don't adapt to theme changes
 - **Maintenance:** Must find/replace all explicit values to change theme
@@ -793,6 +822,7 @@ Migration tracked in issue #[number]
 **❌ Current approach:**
 
 Mixed usage with no clear preference:
+
 - 235+ border/radius utilities
 - Some use semantic (`rounded-lg`)
 - Some use explicit (`rounded-md`, `rounded-[12px]`)
@@ -812,6 +842,7 @@ Establish clear border radius hierarchy and enforce usage:
 ```
 
 **Component mapping:**
+
 ```tsx
 // Buttons, inputs, small UI
 <Button className="rounded-md">     // Uses --radius-md
@@ -827,6 +858,7 @@ Establish clear border radius hierarchy and enforce usage:
 ```
 
 **ESLint rule to enforce:**
+
 ```javascript
 // Warn on arbitrary border radius values
 "tailwindcss/no-arbitrary-value": ["warn", {
@@ -859,6 +891,7 @@ Establish clear border radius hierarchy and enforce usage:
 ```
 
 **Impact:**
+
 - **Scalability:** Arbitrary values hard to find and update
 - **Inconsistency:** Similar UI elements have different measurements
 - **Design System:** Breaks spacing/sizing scale consistency
@@ -866,6 +899,7 @@ Establish clear border radius hierarchy and enforce usage:
 **❌ Current approach:**
 
 No restrictions on arbitrary values, leading to:
+
 - `border-[1px]`, `border-[1.5px]`, `border-[2px]` all used
 - `gap-[6px]`, `gap-[8px]`, `gap-2` (8px) mixed
 - Inconsistent sizing across similar components
@@ -874,7 +908,7 @@ No restrictions on arbitrary values, leading to:
 
 **1. Establish when arbitrary values are acceptable:**
 
-```markdown:STYLING_PRACTICES.md
+````markdown:STYLING_PRACTICES.md
 ## Arbitrary Values
 
 ### When Allowed:
@@ -892,8 +926,9 @@ Before using arbitrary value, check if semantic option exists:
 ```bash
 # Check Tailwind spacing scale
 # 0.5 = 2px, 1 = 4px, 2 = 8px, 3 = 12px, 4 = 16px...
-```
-```
+````
+
+````
 
 **2. Refactor common arbitrary values:**
 
@@ -909,7 +944,7 @@ Before using arbitrary value, check if semantic option exists:
 
 // After (use semantic)
 <div className="border-2">  // 2px, standard thickness
-```
+````
 
 **3. Document exceptions:**
 
@@ -948,6 +983,7 @@ Components use responsive utilities but with no documented strategy:
 ```
 
 **Impact:**
+
 - **Scalability:** No consistent approach to responsive design
 - **Efficiency:** Developers reinvent patterns for each component
 - **Testing:** No clear breakpoints to test against
@@ -960,7 +996,7 @@ Responsive utilities used without documented patterns or breakpoint strategy.
 
 Document responsive design patterns in `STYLING_PRACTICES.md`:
 
-```markdown:dashboard/STYLING_PRACTICES.md
+````markdown:dashboard/STYLING_PRACTICES.md
 ## Responsive Design
 
 ### Mobile-First Approach
@@ -974,21 +1010,22 @@ Base styles apply to mobile, use breakpoint prefixes to enhance for larger scree
 
 // ❌ Bad: Desktop-first with lg:hidden
 <div className="block lg:hidden">
-```
+````
 
 ### Breakpoints
 
-| Prefix | Min Width | Use Case |
-|--------|-----------|----------|
-| `sm:` | 640px | Large phones, tablets portrait |
-| `md:` | 768px | Tablets landscape, small laptops |
-| `lg:` | 1024px | Desktops, large laptops |
-| `xl:` | 1280px | Large desktops |
-| `2xl:` | 1536px | Extra large desktops |
+| Prefix | Min Width | Use Case                         |
+| ------ | --------- | -------------------------------- |
+| `sm:`  | 640px     | Large phones, tablets portrait   |
+| `md:`  | 768px     | Tablets landscape, small laptops |
+| `lg:`  | 1024px    | Desktops, large laptops          |
+| `xl:`  | 1280px    | Large desktops                   |
+| `2xl:` | 1536px    | Extra large desktops             |
 
 ### Common Patterns
 
 #### Responsive Grid
+
 ```tsx
 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
   {/* 1 column mobile, 2 tablet, 3 desktop */}
@@ -996,6 +1033,7 @@ Base styles apply to mobile, use breakpoint prefixes to enhance for larger scree
 ```
 
 #### Responsive Spacing
+
 ```tsx
 <section className="py-8 px-4 md:py-12 md:px-6 lg:py-16 lg:px-8">
   {/* Spacing increases with viewport */}
@@ -1003,6 +1041,7 @@ Base styles apply to mobile, use breakpoint prefixes to enhance for larger scree
 ```
 
 #### Responsive Typography
+
 ```tsx
 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
   {/* Font size scales with viewport */}
@@ -1010,6 +1049,7 @@ Base styles apply to mobile, use breakpoint prefixes to enhance for larger scree
 ```
 
 #### Responsive Layout Shift
+
 ```tsx
 <div className="flex flex-col lg:flex-row gap-4">
   {/* Vertical on mobile, horizontal on desktop */}
@@ -1017,12 +1057,16 @@ Base styles apply to mobile, use breakpoint prefixes to enhance for larger scree
 ```
 
 ### Testing Breakpoints
+
 Always test components at these viewport widths:
+
 - 375px (iPhone SE, small phones)
 - 768px (iPad portrait, tablets)
 - 1024px (iPad landscape, laptops)
 - 1440px (Desktop)
+
 ```
+
 ```
 
 **Research Basis:** Mobile-first approach is industry standard for responsive design (Tailwind, Bootstrap, Foundation all recommend this).
@@ -1036,11 +1080,13 @@ Always test components at these viewport widths:
 **Where it occurs:**
 
 Color system exists but no guidance on:
+
 - Which color combinations meet WCAG AA/AAA
 - When to use which foreground/background pairs
 - How to verify contrast in development
 
 **Impact:**
+
 - **Accessibility:** Potential WCAG violations
 - **Efficiency:** Developers manually check contrast each time
 - **Legal Risk:** Accessibility lawsuits are common in 2026
@@ -1053,7 +1099,7 @@ Colors defined with no contrast verification or documentation.
 
 Add accessibility section to styling documentation:
 
-```markdown:dashboard/STYLING_PRACTICES.md
+````markdown:dashboard/STYLING_PRACTICES.md
 ## Accessibility: Color Contrast
 
 ### WCAG Requirements
@@ -1087,8 +1133,9 @@ npm install -D @double-great/contrast-checker
 
 # Check component contrast
 npx contrast-checker src/components/button.tsx
-```
-```
+````
+
+````
 
 **Research Basis:** WCAG 2.1 Level AA is minimum legal requirement in many jurisdictions; AAA is aspirational best practice.
 
@@ -1116,7 +1163,7 @@ Add CSS layers to `globals.css` for explicit specificity control:
   *, *::before, *::after {
     box-sizing: border-box;
   }
-  
+
   body {
     @apply bg-background text-foreground;
   }
@@ -1131,7 +1178,7 @@ Add CSS layers to `globals.css` for explicit specificity control:
   .card-shadow {
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
   }
-  
+
   .card-shadow-hover {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   }
@@ -1143,9 +1190,10 @@ Add CSS layers to `globals.css` for explicit specificity control:
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
 }
-```
+````
 
 **Benefits:**
+
 - Explicit control over style precedence
 - Easier debugging of specificity issues
 - Better organization of custom CSS
@@ -1158,6 +1206,7 @@ Add CSS layers to `globals.css` for explicit specificity control:
 **What's missing:** No documentation on container queries for component-level responsive design.
 
 **Impact:**
+
 - **Reusability:** Components depend on viewport width, not container width
 - **Flexibility:** Can't easily use same component in different layout contexts
 - **Modern CSS:** Missing out on powerful new CSS feature
@@ -1191,11 +1240,13 @@ export function ResponsiveCard({ children }) {
 ```
 
 **When to use container queries:**
+
 - Reusable components in different layout contexts (sidebars, modals, full-width)
 - Card components that should adapt to available space
 - Dashboard widgets that resize based on grid placement
 
 **When to use media queries (viewport):**
+
 - Page-level layouts
 - Navigation components
 - Full-page responsive breakpoints
@@ -1208,36 +1259,38 @@ export function ResponsiveCard({ children }) {
 
 **Dashboard color system (OKLCH-based):**
 
-| Token | Purpose | Value | Hex Equivalent |
-|-------|---------|-------|----------------|
-| `--background` | Page background | `oklch(0.98 0.002 264.542)` | #F9FAFB |
-| `--foreground` | Primary text | `oklch(0.25 0.015 264.542)` | #1F2937 |
-| `--card` | Card backgrounds | `oklch(1 0 0)` | #FFFFFF |
-| `--primary` | Brand color | `oklch(0.55 0.18 264.542)` | #2563EB |
-| `--muted` | Subtle backgrounds | `oklch(0.96 0.003 264.542)` | #F3F4F6 |
-| `--accent` | Accent color | `oklch(0.65 0.15 180)` | #14B8A6 |
-| `--destructive` | Error/delete | `oklch(0.55 0.22 27.325)` | #EF4444 |
-| `--success` | Success states | `oklch(0.65 0.15 150)` | #10B981 |
-| `--warning` | Warning states | `oklch(0.75 0.15 80)` | #F59E0B |
-| `--border` | Borders | `oklch(0.92 0.006 264.531)` | #E5E7EB |
+| Token           | Purpose            | Value                       | Hex Equivalent |
+| --------------- | ------------------ | --------------------------- | -------------- |
+| `--background`  | Page background    | `oklch(0.98 0.002 264.542)` | #F9FAFB        |
+| `--foreground`  | Primary text       | `oklch(0.25 0.015 264.542)` | #1F2937        |
+| `--card`        | Card backgrounds   | `oklch(1 0 0)`              | #FFFFFF        |
+| `--primary`     | Brand color        | `oklch(0.55 0.18 264.542)`  | #2563EB        |
+| `--muted`       | Subtle backgrounds | `oklch(0.96 0.003 264.542)` | #F3F4F6        |
+| `--accent`      | Accent color       | `oklch(0.65 0.15 180)`      | #14B8A6        |
+| `--destructive` | Error/delete       | `oklch(0.55 0.22 27.325)`   | #EF4444        |
+| `--success`     | Success states     | `oklch(0.65 0.15 150)`      | #10B981        |
+| `--warning`     | Warning states     | `oklch(0.75 0.15 80)`       | #F59E0B        |
+| `--border`      | Borders            | `oklch(0.92 0.006 264.531)` | #E5E7EB        |
 
 **Mobile color system (RGB-based):**
 
-| Token | Value |
-|-------|-------|
-| `--color-primary` | `37 99 235` (#2563eb) |
-| `--color-secondary` | `226 232 240` (#e2e8f0) |
+| Token                | Value                   |
+| -------------------- | ----------------------- |
+| `--color-primary`    | `37 99 235` (#2563eb)   |
+| `--color-secondary`  | `226 232 240` (#e2e8f0) |
 | `--color-background` | `248 249 250` (#f8f9fa) |
-| `--color-foreground` | `30 41 59` (#1e293b) |
+| `--color-foreground` | `30 41 59` (#1e293b)    |
 
 ### 4.2 Color Usage Patterns
 
 **Primary color usage:** 112 instances across 47 files
+
 - Brand elements (buttons, links, active states)
 - CTAs and important actions
 - Navigation active indicators
 
 **Destructive color usage:** Used for:
+
 - Delete buttons
 - Error messages
 - Warning dialogs
@@ -1247,6 +1300,7 @@ export function ResponsiveCard({ children }) {
 ### 4.3 OKLCH Benefits
 
 OKLCH provides:
+
 1. **Perceptual uniformity:** Equal lightness changes appear equal to human eye
 2. **Wider gamut:** Access to more vivid colors than sRGB
 3. **Predictable lightness:** `oklch(0.5 ...)` is always 50% lightness perceptually
@@ -1259,6 +1313,7 @@ OKLCH provides:
 ### 5.1 Spacing Scale Usage
 
 **Most common spacing values:**
+
 - `space-y-4`: Vertical spacing in forms (most common)
 - `gap-2`: Small button groups, chip lists
 - `gap-4`: Card grids, medium layouts
@@ -1267,6 +1322,7 @@ OKLCH provides:
 - `px-4 py-2`: Button padding
 
 **Spacing hierarchy:**
+
 - `space-y-2` (8px): Tight groups (form labels + inputs)
 - `space-y-4` (16px): Standard section spacing
 - `space-y-6` (24px): Major section breaks
@@ -1275,6 +1331,7 @@ OKLCH provides:
 ### 5.2 Layout Patterns
 
 **Container widths:**
+
 ```tsx
 // Full width
 <div className="w-full">
@@ -1288,6 +1345,7 @@ OKLCH provides:
 ```
 
 **Grid patterns:**
+
 ```tsx
 // Responsive grid
 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1297,6 +1355,7 @@ OKLCH provides:
 ```
 
 **Flexbox patterns:**
+
 ```tsx
 // Space between
 <div className="flex items-center justify-between">
@@ -1315,6 +1374,7 @@ OKLCH provides:
 ### 6.1 Button Styling
 
 From button component analysis:
+
 - Base classes apply to all variants
 - CVA handles variant logic
 - Size modifiers consistent across variants
@@ -1323,28 +1383,27 @@ From button component analysis:
 ### 6.2 Card Styling
 
 Common pattern:
+
 ```tsx
 <Card className="border border-border shadow-sm">
   <CardHeader className="pb-3">
     <CardTitle>Title</CardTitle>
     <CardDescription>Description</CardDescription>
   </CardHeader>
-  <CardContent>
-    {/* Content */}
-  </CardContent>
+  <CardContent>{/* Content */}</CardContent>
 </Card>
 ```
 
 Settings card variant:
+
 ```tsx
-<Card className="border-primary/20 bg-primary/5">
-  {/* Settings content */}
-</Card>
+<Card className="border-primary/20 bg-primary/5">{/* Settings content */}</Card>
 ```
 
 ### 6.3 Form Styling
 
 Consistent pattern:
+
 ```tsx
 <div className="space-y-4">
   <div className="space-y-2">
@@ -1358,18 +1417,15 @@ Consistent pattern:
 ### 6.4 Dialog/Modal Styling
 
 Standard pattern from documentation:
+
 ```tsx
 <Dialog>
   <DialogContent className="sm:max-w-[425px]">
     <DialogHeader>
       <DialogTitle>Dialog Title</DialogTitle>
-      <DialogDescription>
-        Dialog description text
-      </DialogDescription>
+      <DialogDescription>Dialog description text</DialogDescription>
     </DialogHeader>
-    <div className="space-y-4 py-4">
-      {/* Dialog content */}
-    </div>
+    <div className="space-y-4 py-4">{/* Dialog content */}</div>
     <DialogFooter>
       <Button variant="outline">Cancel</Button>
       <Button>Confirm</Button>
@@ -1406,6 +1462,7 @@ Standard pattern from documentation:
    - OKLCH colors render fast in modern browsers
 
 **Research Sources:**
+
 - [Tailwind Color Tokens](https://tailwindcss-color-tokens.epicweb.dev)
 - [Frontend Tools - Design System Patterns](https://www.frontendtools.tech/blog/tailwind-css-best-practices-design-system-patterns)
 - [Tailwind Tokens](https://www.tailwindtokens.com)
@@ -1438,6 +1495,7 @@ Standard pattern from documentation:
    - Consider touch targets (min 44x44px)
 
 **Research Sources:**
+
 - [How to Implement Responsive Design](https://howik.com/responsive-design-tailwind-css)
 - [Bootstrap Dash - Responsive Tips](https://www.bootstrapdash.com/blog/tailwind-responsive-design-tips)
 
@@ -1453,15 +1511,17 @@ Standard pattern from documentation:
    - Supports media query, class, or hybrid strategies
 
 2. **Token Override Pattern:**
+
    ```css
    :root {
      --background: light-color;
    }
-   
+
    @variant dark {
      --background: dark-color;
    }
    ```
+
    Components automatically adapt without `dark:` utilities
 
 3. **Performance & Accessibility:**
@@ -1477,6 +1537,7 @@ Standard pattern from documentation:
    - Smooth transitions between modes
 
 **Research Sources:**
+
 - [Tailwind v4 Dark Mode](https://sujalvanjare.com/blog/fix-dark-class-not-applying-tailwind-css-v4)
 - [Adding Dark Mode](https://windybase.com/blog/how-to-add-dark-mode-in-tailwind-css)
 - [Rich Infante - Dark Mode Tokens](https://www.richinfante.com/2024/10/21/tailwind-dark-mode-design-tokens-themes-css)
@@ -1508,6 +1569,7 @@ Standard pattern from documentation:
    - Minimal performance impact
 
 **Use Cases:**
+
 - Design systems requiring color scales
 - Dark/light theme generation
 - Accessible color contrast calculation
@@ -1520,6 +1582,7 @@ Standard pattern from documentation:
 ### 8.1 Color System Rules
 
 #### RULE-COLOR-001: Semantic Color Tokens
+
 **Requirement:** All colors MUST be used via semantic CSS variable tokens, not direct color values.
 
 ```tsx
@@ -1536,6 +1599,7 @@ Standard pattern from documentation:
 ---
 
 #### RULE-COLOR-002: Color Token Naming
+
 **Requirement:** Color token names MUST describe purpose, not appearance.
 
 ```css
@@ -1553,9 +1617,11 @@ Standard pattern from documentation:
 ---
 
 #### RULE-COLOR-003: Contrast Requirements
+
 **Requirement:** All text MUST meet WCAG 2.1 Level AA contrast requirements (4.5:1 for normal text, 3:1 for large text).
 
 **Verification:**
+
 ```bash
 # Use browser DevTools Accessibility pane
 # Or install contrast checker
@@ -1567,6 +1633,7 @@ npm install -D @double-great/contrast-checker
 ### 8.2 Spacing Rules
 
 #### RULE-SPACE-001: Spacing Scale
+
 **Requirement:** Use Tailwind's default spacing scale. Arbitrary spacing values require justification.
 
 ```tsx
@@ -1581,6 +1648,7 @@ npm install -D @double-great/contrast-checker
 ```
 
 **Standard scale:**
+
 - 0.5 = 2px
 - 1 = 4px
 - 2 = 8px
@@ -1592,6 +1660,7 @@ npm install -D @double-great/contrast-checker
 ---
 
 #### RULE-SPACE-002: Vertical Rhythm
+
 **Requirement:** Use `space-y-*` for vertical spacing within sections, not individual margins.
 
 ```tsx
@@ -1615,6 +1684,7 @@ npm install -D @double-great/contrast-checker
 ### 8.3 Responsive Design Rules
 
 #### RULE-RESPONSIVE-001: Mobile-First Approach
+
 **Requirement:** Base styles MUST apply to mobile, use breakpoint prefixes for larger screens.
 
 ```tsx
@@ -1628,9 +1698,11 @@ npm install -D @double-great/contrast-checker
 ---
 
 #### RULE-RESPONSIVE-002: Breakpoint Usage
+
 **Requirement:** Use standard Tailwind breakpoints. Custom breakpoints require documentation.
 
 **Standard breakpoints:**
+
 - `sm:` 640px - Large phones, tablets portrait
 - `md:` 768px - Tablets landscape, small laptops
 - `lg:` 1024px - Desktops, large laptops
@@ -1640,6 +1712,7 @@ npm install -D @double-great/contrast-checker
 ---
 
 #### RULE-RESPONSIVE-003: Testing Requirements
+
 **Requirement:** All components MUST be tested at these viewport widths:
 
 - 375px (iPhone SE, small phones)
@@ -1652,6 +1725,7 @@ npm install -D @double-great/contrast-checker
 ### 8.4 Component Styling Rules
 
 #### RULE-COMP-STYLE-001: `cn()` Utility Usage
+
 **Requirement:** Always use `cn()` utility for merging class names.
 
 ```tsx
@@ -1669,6 +1743,7 @@ import { cn } from "@/lib/utils";
 ---
 
 #### RULE-COMP-STYLE-002: Cursor Pointer
+
 **Requirement:** All clickable non-button elements MUST have `cursor-pointer` class.
 
 ```tsx
@@ -1680,12 +1755,14 @@ import { cn } from "@/lib/utils";
 ```
 
 **Exceptions:**
+
 - `<button>` and `<a>` elements (have cursor pointer by default)
 - Drag-and-drop elements (use `cursor-move` instead)
 
 ---
 
 #### RULE-COMP-STYLE-003: Settings Section Styling
+
 **Requirement:** Settings/configuration sections MUST use the documented primary-tinted pattern.
 
 ```tsx
@@ -1693,9 +1770,7 @@ import { cn } from "@/lib/utils";
   <CardHeader className="cursor-pointer hover:bg-primary/10 transition-colors">
     <CardTitle>Settings Section</CardTitle>
   </CardHeader>
-  <CardContent>
-    {/* Settings content */}
-  </CardContent>
+  <CardContent>{/* Settings content */}</CardContent>
 </Card>
 ```
 
@@ -1704,6 +1779,7 @@ import { cn } from "@/lib/utils";
 ### 8.5 Border and Shadow Rules
 
 #### RULE-BORDER-001: Border Radius Tokens
+
 **Requirement:** Use semantic border radius tokens, not arbitrary values.
 
 ```tsx
@@ -1718,6 +1794,7 @@ import { cn } from "@/lib/utils";
 ```
 
 **Token mapping:**
+
 - `rounded-sm` → Small elements (badges, tags)
 - `rounded-md` → Default (buttons, inputs)
 - `rounded-lg` → Cards, dialogs
@@ -1726,6 +1803,7 @@ import { cn } from "@/lib/utils";
 ---
 
 #### RULE-BORDER-002: Border Thickness
+
 **Requirement:** Use standard border widths (1px, 2px) via utilities, not arbitrary values.
 
 ```tsx
@@ -1743,6 +1821,7 @@ import { cn } from "@/lib/utils";
 ### 8.6 Documentation Rules
 
 #### RULE-DOC-001: Pattern Documentation
+
 **Requirement:** New UI patterns MUST be documented in `STYLING_PRACTICES.md` with:
 
 1. Pattern name and purpose
@@ -1753,35 +1832,42 @@ import { cn } from "@/lib/utils";
 
 **Template:**
 
-```markdown
+````markdown
 ## [Pattern Name]
 
 ### Purpose
+
 Brief description of what this pattern is for.
 
 ### Implementation
+
 ```tsx
-<Component className="documented-classes">
-  {/* Example */}
-</Component>
+<Component className="documented-classes">{/* Example */}</Component>
 ```
+````
 
 ### Usage Guidelines
+
 - When to use this pattern
 - When NOT to use this pattern
 - Important considerations
 
 ### Accessibility
+
 - Relevant WCAG guidelines
 - Contrast requirements
 - Keyboard navigation notes
+
 ```
+
 ```
 
 ---
 
 #### RULE-DOC-002: Color Token Documentation
+
 **Requirement:** All color tokens MUST be documented with:
+
 - Semantic name and purpose
 - OKLCH/RGB value
 - Hex equivalent (for tools)
@@ -1793,17 +1879,21 @@ Brief description of what this pattern is for.
 ### 8.7 Dark Mode Rules
 
 #### RULE-DARK-001: Dark Mode Decision
+
 **Requirement:** The project MUST either:
+
 1. Fully implement dark mode with complete coverage, OR
 2. Explicitly document why dark mode is excluded and remove commented code
 
 **If implementing dark mode:**
+
 - Use token override approach (not utility-based)
 - Cover all components
 - Test contrast ratios
 - Provide theme toggle UI
 
 **If excluding dark mode:**
+
 - Document reasoning in README
 - Remove all commented dark mode CSS
 - Remove sporadic `dark:` utilities
@@ -1811,6 +1901,7 @@ Brief description of what this pattern is for.
 ---
 
 #### RULE-DARK-002: Token-Based Dark Mode (If Implementing)
+
 **Requirement:** If implementing dark mode, MUST use CSS variable token overrides, not `dark:` utilities everywhere.
 
 ```css
@@ -1841,6 +1932,7 @@ Brief description of what this pattern is for.
 ### 8.8 Accessibility Rules
 
 #### RULE-A11Y-001: Interactive Element Size
+
 **Requirement:** All interactive elements MUST meet minimum touch target size of 44x44px (iOS guidelines) or 48x48px (Material Design).
 
 ```tsx
@@ -1855,6 +1947,7 @@ Brief description of what this pattern is for.
 ---
 
 #### RULE-A11Y-002: Focus States
+
 **Requirement:** All interactive elements MUST have visible focus states.
 
 ```tsx
@@ -1880,6 +1973,7 @@ Brief description of what this pattern is for.
 ## Summary
 
 **Phase 3 analyzed:**
+
 - Tailwind CSS configuration (v4 dashboard, v3 mobile)
 - 2,972 className usages across 122 files
 - Color token system (OKLCH-based for dashboard)
@@ -1889,6 +1983,7 @@ Brief description of what this pattern is for.
 **Key findings:**
 
 **Strengths:**
+
 - Excellent styling documentation with examples
 - Semantic color token system
 - OKLCH color space for perceptual uniformity
@@ -1897,6 +1992,7 @@ Brief description of what this pattern is for.
 - Good spacing scale adherence
 
 **Areas for improvement:**
+
 - Resolve dark mode inconsistency (enable or document exclusion)
 - Align Tailwind versions (v3 vs v4)
 - Reduce arbitrary value usage

@@ -3,6 +3,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { APP_DISPLAY_NAME } from "./brand.ts";
 import { createLoggerWithoutRequest } from "./logger.ts";
 
 export type MailKind =
@@ -62,7 +63,7 @@ function displayNameForKind(
 ): string {
   const safe = sanitizeForFromHeader(organizationName) || "Organization";
   if (kind === "org_signup_verification") {
-    return "Clean Log";
+    return APP_DISPLAY_NAME;
   }
   return safe;
 }
@@ -154,7 +155,7 @@ export async function resolveOrgMailFrom(
   const local = localPartForKind(mailKind);
   const display = displayNameForKind(mailKind, organizationName);
 
-  // 1) Org signup verification — always platform + Clean Log
+  // 1) Org signup verification — always platform + Tally Runner (see APP_DISPLAY_NAME)
   if (mailKind === "org_signup_verification") {
     return {
       from: `${display} <${local}@${platformDomain}>`,

@@ -22,7 +22,7 @@ export default function HomeScreen() {
             />
           </View>
           <Text className="text-3xl font-bold text-foreground mb-2 text-center">
-            Fieldly
+            Tally Runner
           </Text>
           <Text className="text-base text-muted-foreground text-center">
             Track your entries and stay organized

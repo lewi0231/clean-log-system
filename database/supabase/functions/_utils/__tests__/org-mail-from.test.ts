@@ -53,7 +53,7 @@ Deno.test("sanitizeForFromHeader strips CR/LF", () => {
   );
 });
 
-Deno.test("org_signup always platform Clean Log", async () => {
+Deno.test("org_signup always platform Tally Runner", async () => {
   const r = await resolveOrgMailFrom({
     supabase: orgMailMock(true, {
       domain_name: "mail.acme.com",
@@ -65,7 +65,7 @@ Deno.test("org_signup always platform Clean Log", async () => {
     mailKind: "org_signup_verification",
     platformDomain: "platform.example.com",
   });
-  assertEquals(r.from, "Clean Log <noreply@platform.example.com>");
+  assertEquals(r.from, "Tally Runner <noreply@platform.example.com>");
   assertEquals(r.fromDomainSource, "platform");
 });
 

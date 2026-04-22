@@ -1,16 +1,16 @@
-# Clean Log System - Style Guide Quick Reference
+# Tally Runner (monorepo) - Style Guide Quick Reference
 
 > Single-page summary of the most critical patterns and rules.  
 > For detailed explanations, see the modular guide docs.
 
 ## Guide Navigation
 
-| Section | What to Reference |
-|---------|-------------------|
-| [Universal](./universal/) | TypeScript, naming, imports, constants, errors, testing |
-| [Dashboard](./dashboard/) | Next.js components, hooks, services, styling, testing |
-| [Mobile App](./mobile-app/) | React Native components, hooks, NativeWind |
-| [Edge Functions](./edge-functions/) | Function structure, validation, auth, testing |
+| Section                             | What to Reference                                       |
+| ----------------------------------- | ------------------------------------------------------- |
+| [Universal](./universal/)           | TypeScript, naming, imports, constants, errors, testing |
+| [Dashboard](./dashboard/)           | Next.js components, hooks, services, styling, testing   |
+| [Mobile App](./mobile-app/)         | React Native components, hooks, NativeWind              |
+| [Edge Functions](./edge-functions/) | Function structure, validation, auth, testing           |
 
 ---
 
@@ -27,12 +27,12 @@ import { Worker } from "@clean-log/shared";
 import { Button } from "../../../components/ui/button";
 
 // ✅ Named exports only (no default exports)
-export function ComponentName() { }
-export function useHookName() { }
-export class ServiceName { }
+export function ComponentName() {}
+export function useHookName() {}
+export class ServiceName {}
 
 // ❌ No default exports
-export default function Component() { }
+export default function Component() {}
 ```
 
 ---
@@ -53,17 +53,17 @@ interface WorkerCardProps {
 export function WorkerCard({ worker, onEdit }: WorkerCardProps) {
   // 1. Hooks first
   const [state, setState] = useState();
-  
+
   // 2. Event handlers
   const handleClick = () => { };
-  
+
   // 3. Effects
   useEffect(() => { }, []);
-  
+
   // 4. Early returns for loading/error
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} />;
-  
+
   // 5. Render
   return <div>...</div>;
 }
@@ -98,18 +98,20 @@ export function useWorkers(): UseWorkersResult {
   const fetch = async () => {
     try {
       setLoading(true);
-      setError(null);  // Reset error
+      setError(null); // Reset error
       const data = await WorkersService.list(orgId);
       setWorkers(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
-      setWorkers([]);  // Reset data on error
+      setWorkers([]); // Reset data on error
     } finally {
-      setLoading(false);  // Always in finally
+      setLoading(false); // Always in finally
     }
   };
 
-  useEffect(() => { fetch(); }, [orgId]);
+  useEffect(() => {
+    fetch();
+  }, [orgId]);
 
   return { workers, loading, error, refetch: fetch };
 }
@@ -129,10 +131,9 @@ export class WorkersService {
     try {
       log.debug("WorkersService: Fetching workers", { orgId });
 
-      const { data, error } = await supabase.functions.invoke(
-        "list-workers",
-        { body: { organization_id: orgId } }
-      );
+      const { data, error } = await supabase.functions.invoke("list-workers", {
+        body: { organization_id: orgId },
+      });
 
       if (error) throw error;
       if (!data?.success) throw new Error("Failed to fetch");
@@ -141,7 +142,7 @@ export class WorkersService {
       return data.workers;
     } catch (err) {
       log.error("WorkersService: Failed", { error: err });
-      throw err;  // Always rethrow
+      throw err; // Always rethrow
     }
   }
 }
@@ -179,7 +180,10 @@ serve(async (req) => {
     // 4. Auth
     const supabase = createServiceRoleClient();
     const membership = await verifyOrganizationMembershipFromRequest(
-      req, body.organization_id, supabase, body
+      req,
+      body.organization_id,
+      supabase,
+      body
     );
     if (!membership) {
       return errorResponse("Unauthorized", 403);
@@ -190,7 +194,6 @@ serve(async (req) => {
 
     // 6. Response
     return jsonResponse({ success: true, data: result });
-
   } catch (error) {
     logger.error("Request failed", error);
     return errorResponse(error);
@@ -265,15 +268,15 @@ await waitFor(() => expect(result.current.loading).toBe(false));
 
 ## Quick Decisions
 
-| Situation | Decision |
-|-----------|----------|
-| Server or Client Component? | Default to Server, add `"use client"` only when needed |
-| Service or Server Action? | Service for mobile+dashboard shared, Server Action for dashboard-only |
-| useState or useReducer? | useState for simple, useReducer for related state + multiple actions |
+| Situation                              | Decision                                                               |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| Server or Client Component?            | Default to Server, add `"use client"` only when needed                 |
+| Service or Server Action?              | Service for mobile+dashboard shared, Server Action for dashboard-only  |
+| useState or useReducer?                | useState for simple, useReducer for related state + multiple actions   |
 | **Context hook or prop for org/auth?** | **Props in dialogs/modals/reusable forms; hooks at page/layout level** |
-| Zod or legacy validation? | Always Zod |
-| null or undefined? | null for database, undefined for JS optional |
-| Test colocated or centralized? | Colocated in `__tests__/` directories |
+| Zod or legacy validation?              | Always Zod                                                             |
+| null or undefined?                     | null for database, undefined for JS optional                           |
+| Test colocated or centralized?         | Colocated in `__tests__/` directories                                  |
 
 ---
 
@@ -301,12 +304,12 @@ pnpm test:e2e:ui            # Interactive UI mode
 
 ## Coverage Targets
 
-| Metric | Target |
-|--------|--------|
-| Lines | 80% |
-| Functions | 80% |
-| Branches | 75% |
-| Statements | 80% |
+| Metric     | Target |
+| ---------- | ------ |
+| Lines      | 80%    |
+| Functions  | 80%    |
+| Branches   | 75%    |
+| Statements | 80%    |
 
 **High-risk code (90%+):** payments, pricing, invoices, auth
 
@@ -317,16 +320,18 @@ pnpm test:e2e:ui            # Interactive UI mode
 ```typescript
 // ✅ Use const objects with derived types
 export const INVOICE_STATUS = {
-    DRAFT: "draft",
-    SENT: "sent",
-    PAID: "paid",
+  DRAFT: "draft",
+  SENT: "sent",
+  PAID: "paid",
 } as const;
 
 export type InvoiceStatus = (typeof INVOICE_STATUS)[keyof typeof INVOICE_STATUS];
 
 // ✅ Use named constants, not magic values
-if (invoice.status === INVOICE_STATUS.PAID) { }  // Good
-if (invoice.status === "paid") { }                // Bad
+if (invoice.status === INVOICE_STATUS.PAID) {
+} // Good
+if (invoice.status === "paid") {
+} // Bad
 
 // ✅ Name numeric constants
 const MAX_RETRY_ATTEMPTS = 3;
@@ -340,14 +345,14 @@ const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 ## File Naming Summary
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Component | `kebab-case.tsx` | `worker-card.tsx` |
-| Hook | `use-kebab-case.ts` | `use-workers.ts` |
-| Service | `kebab-case.service.ts` | `workers.service.ts` |
-| Constants | `kebab-case-constants.ts` | `invoice-constants.ts` |
-| Test | `*.test.{ts,tsx}` | `workers.service.test.ts` |
-| Edge Function | `kebab-case/index.ts` | `create-worker/index.ts` |
+| Type          | Pattern                   | Example                   |
+| ------------- | ------------------------- | ------------------------- |
+| Component     | `kebab-case.tsx`          | `worker-card.tsx`         |
+| Hook          | `use-kebab-case.ts`       | `use-workers.ts`          |
+| Service       | `kebab-case.service.ts`   | `workers.service.ts`      |
+| Constants     | `kebab-case-constants.ts` | `invoice-constants.ts`    |
+| Test          | `*.test.{ts,tsx}`         | `workers.service.test.ts` |
+| Edge Function | `kebab-case/index.ts`     | `create-worker/index.ts`  |
 
 ---
 
@@ -408,7 +413,7 @@ if (data.length === 0) return <EmptyState title="No workers" />;
 setError("Failed to save changes. Please try again.");
 
 // ❌ Technical
-setError(error.message);  // "NetworkError: fetch failed at line 42"
+setError(error.message); // "NetworkError: fetch failed at line 42"
 ```
 
 ---
@@ -441,7 +446,7 @@ database/supabase/migrations/20260120143000_add_team_percentage_modifier.sql
 -- Step 1: Description
 ALTER TABLE table_name ...;
 
--- Step 2: Description  
+-- Step 2: Description
 CREATE INDEX ...;
 
 -- Step 3: Update comments
@@ -452,15 +457,15 @@ COMMENT ON COLUMN table_name.column_name IS 'Description';
 
 ```sql
 -- Adding a new enum value to a CHECK constraint
-ALTER TABLE worker_rate_card 
+ALTER TABLE worker_rate_card
   DROP CONSTRAINT IF EXISTS worker_rate_card_modifier_type_check;
 
-ALTER TABLE worker_rate_card 
-  ADD CONSTRAINT worker_rate_card_modifier_type_check 
+ALTER TABLE worker_rate_card
+  ADD CONSTRAINT worker_rate_card_modifier_type_check
   CHECK (modifier_type IN ('existing', 'values', 'new_value'));
 
 -- Adding a new column
-ALTER TABLE table_name 
+ALTER TABLE table_name
   ADD COLUMN IF NOT EXISTS column_name TYPE DEFAULT value;
 
 -- Adding a new table with RLS
@@ -560,4 +565,4 @@ For comprehensive documentation, see the modular guides:
 
 ---
 
-*Last updated: January 20, 2026*
+_Last updated: January 20, 2026_

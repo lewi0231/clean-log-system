@@ -1,6 +1,6 @@
 # Manual Testing Scenarios
 
-This document outlines three user personas and scenarios for manual testing of the Clean Log System. Each scenario represents a different business model and use case to ensure the platform works effectively across various service-based businesses.
+This document outlines three user personas and scenarios for manual testing of the Tally Runner (monorepo). Each scenario represents a different business model and use case to ensure the platform works effectively across various service-based businesses.
 
 ## Scenario 1: Car Yard Detailer (Fixed Locations, Multiple Employees)
 
@@ -31,32 +31,32 @@ This scenario has automated E2E tests in `e2e/specs/scenario-1/`. The test data 
 
 ### Test Organization Setup
 
-| Setting | Value |
-|---------|-------|
-| Organization Name | Pro Detail Services |
-| Industry | Automotive/Detailing |
-| Currency | AUD |
-| Invoice Frequency | Monthly |
-| Worker Payment Cycle | Fortnightly |
-| Auto-send Invoices | No (requires review) |
+| Setting              | Value                |
+| -------------------- | -------------------- |
+| Organization Name    | Pro Detail Services  |
+| Industry             | Automotive/Detailing |
+| Currency             | AUD                  |
+| Invoice Frequency    | Monthly              |
+| Worker Payment Cycle | Fortnightly          |
+| Auto-send Invoices   | No (requires review) |
 
 ### Workers (6 Total)
 
-| Name | Email | Phone | Role | Rate Card |
-|------|-------|-------|------|-----------|
-| Sarah Mitchell | sarah.mitchell@prodetail.test | 0412345001 | Supervisor | Yes |
-| Michael Chen | michael.chen@prodetail.test | 0412345002 | Worker | No |
-| Emma Johnson | emma.johnson@prodetail.test | 0412345003 | Worker | No |
-| David Williams | david.williams@prodetail.test | 0412345004 | Worker | No |
-| Lisa Brown | lisa.brown@prodetail.test | 0412345005 | Worker | No |
-| James Taylor | james.taylor@prodetail.test | 0412345006 | Worker | No |
+| Name           | Email                         | Phone      | Role       | Rate Card |
+| -------------- | ----------------------------- | ---------- | ---------- | --------- |
+| Sarah Mitchell | sarah.mitchell@prodetail.test | 0412345001 | Supervisor | Yes       |
+| Michael Chen   | michael.chen@prodetail.test   | 0412345002 | Worker     | No        |
+| Emma Johnson   | emma.johnson@prodetail.test   | 0412345003 | Worker     | No        |
+| David Williams | david.williams@prodetail.test | 0412345004 | Worker     | No        |
+| Lisa Brown     | lisa.brown@prodetail.test     | 0412345005 | Worker     | No        |
+| James Taylor   | james.taylor@prodetail.test   | 0412345006 | Worker     | No        |
 
 ### Supervisor Rate Card (Sarah Mitchell)
 
-| Modifier | Type | Value | Description |
-|----------|------|-------|-------------|
-| Soap Bonus | Unit | $0.50/car | Bonus per car soaped (soaps_by_make field) |
-| Shift Percentage | Percentage | 2% | Percentage of total job earnings |
+| Modifier         | Type       | Value     | Description                                |
+| ---------------- | ---------- | --------- | ------------------------------------------ |
+| Soap Bonus       | Unit       | $0.50/car | Bonus per car soaped (soaps_by_make field) |
+| Shift Percentage | Percentage | 2%        | Percentage of total job earnings           |
 
 ### Location Hierarchy
 
@@ -68,22 +68,23 @@ Metro Auto Group (Parent Company)
 Budget Cars (Independent, no parent)
 ```
 
-| Location | Address | Contact | Phone | Hierarchy | Pricing Modifier |
-|----------|---------|---------|-------|-----------|------------------|
-| City Motors | 123 CBD Street, Sydney NSW 2000 | John Smith | 0291234567 | Metro Auto Group | +20% premium |
-| Suburban Auto | 456 Main Road, Parramatta NSW 2150 | Jane Doe | 0298765432 | Metro Auto Group | None |
-| Budget Cars | 789 Industrial Ave, Blacktown NSW 2148 | Bob Wilson | 0296543210 | None (independent) | None |
+| Location      | Address                                | Contact    | Phone      | Hierarchy          | Pricing Modifier |
+| ------------- | -------------------------------------- | ---------- | ---------- | ------------------ | ---------------- |
+| City Motors   | 123 CBD Street, Sydney NSW 2000        | John Smith | 0291234567 | Metro Auto Group   | +20% premium     |
+| Suburban Auto | 456 Main Road, Parramatta NSW 2150     | Jane Doe   | 0298765432 | Metro Auto Group   | None             |
+| Budget Cars   | 789 Industrial Ave, Blacktown NSW 2148 | Bob Wilson | 0296543210 | None (independent) | None             |
 
 ### Field Configurations
 
-| Field Name | Type | Label | Mutual Exclusive Group | Options |
-|------------|------|-------|------------------------|---------|
-| `soaps_by_make` | grouped_breakdown | Soaps by Car Make | detailing_work | Toyota, Honda, Ford, BMW, Other |
-| `wipes_by_make` | grouped_breakdown | Wipes by Car Make | detailing_work | Toyota, Honda, Ford, BMW, Other |
-| `tender` | number | Tender Amount | tender_work | Min: 0, Max: 10000 |
-| `warehouse` | boolean | Warehouse Duties | warehouse_work | N/A |
+| Field Name      | Type              | Label             | Mutual Exclusive Group | Options                         |
+| --------------- | ----------------- | ----------------- | ---------------------- | ------------------------------- |
+| `soaps_by_make` | grouped_breakdown | Soaps by Car Make | detailing_work         | Toyota, Honda, Ford, BMW, Other |
+| `wipes_by_make` | grouped_breakdown | Wipes by Car Make | detailing_work         | Toyota, Honda, Ford, BMW, Other |
+| `tender`        | number            | Tender Amount     | tender_work            | Min: 0, Max: 10000              |
+| `warehouse`     | boolean           | Warehouse Duties  | warehouse_work         | N/A                             |
 
 **Mutual Exclusivity Rules:**
+
 - `detailing_work` group: soaps_by_make and wipes_by_make can be used together
 - `tender_work` group: Only tender field
 - `warehouse_work` group: Only warehouse field
@@ -91,40 +92,43 @@ Budget Cars (Independent, no parent)
 
 ### Pricing Rules
 
-| Rule | Scope | Type | Value | Applies To |
-|------|-------|------|-------|------------|
-| Soap per car | Field | Unit | $5.00/car | soaps_by_make |
-| Wipe per car | Field | Unit | $3.00/car | wipes_by_make |
-| Tender handling | Field | Fixed | $10.00 | tender (when > 0) |
-| Warehouse flat | Field | Fixed | $25.00 | warehouse (when true) |
-| City Motors premium | Location | Percentage | +20% | City Motors only |
+| Rule                | Scope    | Type       | Value     | Applies To            |
+| ------------------- | -------- | ---------- | --------- | --------------------- |
+| Soap per car        | Field    | Unit       | $5.00/car | soaps_by_make         |
+| Wipe per car        | Field    | Unit       | $3.00/car | wipes_by_make         |
+| Tender handling     | Field    | Fixed      | $10.00    | tender (when > 0)     |
+| Warehouse flat      | Field    | Fixed      | $25.00    | warehouse (when true) |
+| City Motors premium | Location | Percentage | +20%      | City Motors only      |
 
 ### Test Jobs & Expected Calculations
 
 #### Job 1: Detailing at City Motors (Regular Worker)
 
-| Field | Location | Worker | Submission Data |
-|-------|----------|--------|-----------------|
+| Field         | Location    | Worker       | Submission Data     |
+| ------------- | ----------- | ------------ | ------------------- |
 | soaps_by_make | City Motors | Michael Chen | Toyota: 3, Honda: 2 |
 
 **Expected Invoice:**
+
 - Soap subtotal: 5 cars × $5.00 = **$25.00**
 - Location modifier (CBD +20%): **$5.00**
 - **Invoice Total: $30.00**
 
 #### Job 2: Detailing at Suburban Auto (Supervisor)
 
-| Field | Location | Worker | Submission Data |
-|-------|----------|--------|-----------------|
-| soaps_by_make | Suburban Auto | Sarah Mitchell | Ford: 4 |
-| wipes_by_make | Suburban Auto | Sarah Mitchell | BMW: 2 |
+| Field         | Location      | Worker         | Submission Data |
+| ------------- | ------------- | -------------- | --------------- |
+| soaps_by_make | Suburban Auto | Sarah Mitchell | Ford: 4         |
+| wipes_by_make | Suburban Auto | Sarah Mitchell | BMW: 2          |
 
 **Expected Invoice:**
+
 - Soap subtotal: 4 cars × $5.00 = **$20.00**
 - Wipe subtotal: 2 cars × $3.00 = **$6.00**
 - **Invoice Total: $26.00**
 
 **Expected Worker Payment (Supervisor):**
+
 - Base payment: $26.00
 - Soap bonus: 4 cars × $0.50 = **$2.00**
 - Shift percentage: 2% × $26.00 = **$0.52**
@@ -132,21 +136,23 @@ Budget Cars (Independent, no parent)
 
 #### Job 3: Tender at Budget Cars (Regular Worker)
 
-| Field | Location | Worker | Submission Data |
-|-------|----------|--------|-----------------|
-| tender | Budget Cars | Emma Johnson | 500 |
+| Field  | Location    | Worker       | Submission Data |
+| ------ | ----------- | ------------ | --------------- |
+| tender | Budget Cars | Emma Johnson | 500             |
 
 **Expected Invoice:**
+
 - Tender flat fee: **$10.00**
 - **Invoice Total: $10.00**
 
 #### Job 4: Warehouse at City Motors (Regular Worker)
 
-| Field | Location | Worker | Submission Data |
-|-------|----------|--------|-----------------|
-| warehouse | City Motors | David Williams | true |
+| Field     | Location    | Worker         | Submission Data |
+| --------- | ----------- | -------------- | --------------- |
+| warehouse | City Motors | David Williams | true            |
 
 **Expected Invoice:**
+
 - Warehouse subtotal: **$25.00**
 - Location modifier (CBD +20%): **$5.00**
 - **Invoice Total: $30.00**
@@ -156,7 +162,6 @@ Budget Cars (Independent, no parent)
 #### Onboarding Flow
 
 1. **Initial Signup & Onboarding**
-
    - Complete onboarding wizard
    - Set employee count (6)
    - Select industry type (automotive/detailing)
@@ -177,7 +182,6 @@ Budget Cars (Independent, no parent)
 #### Core Workflow Testing
 
 1. **Job Creation & Completion**
-
    - Create job via dashboard "Create Job" feature
    - Select location from dropdown
    - Select worker(s) from dropdown
@@ -186,7 +190,6 @@ Budget Cars (Independent, no parent)
    - Verify job appears in completed jobs list
 
 2. **Pricing & Invoicing**
-
    - Verify pricing calculations match expected values above
    - Verify location premium (+20%) applies to City Motors jobs
    - Test invoice generation
@@ -194,7 +197,6 @@ Budget Cars (Independent, no parent)
    - Verify currency is AUD
 
 3. **Worker Management & Payments**
-
    - Verify all 6 workers are listed as active
    - Verify supervisor has rate card configured
    - Verify worker payment calculations include bonuses for supervisor
@@ -241,7 +243,6 @@ Budget Cars (Independent, no parent)
 #### Onboarding Flow
 
 1. **Initial Signup & Onboarding**
-
    - Complete onboarding wizard
    - Set employee count: 0 or "none"
    - Select industry type (automotive/detailing)
@@ -262,7 +263,6 @@ Budget Cars (Independent, no parent)
 #### Core Workflow Testing
 
 1. **Owner as Mobile User**
-
    - Owner logs into mobile app
    - Creates job at customer location (address entry)
    - Fills in service details via mobile form
@@ -272,7 +272,6 @@ Budget Cars (Independent, no parent)
    - Track own job history and earnings
 
 2. **Dashboard Management**
-
    - View all jobs from dashboard
    - Edit job details if needed
    - Manage pricing rules
@@ -326,7 +325,6 @@ Budget Cars (Independent, no parent)
 #### Onboarding Flow
 
 1. **Initial Signup & Onboarding**
-
    - Complete onboarding wizard
    - Set employee count (10-30 range)
    - Select industry type (cleaning services)
@@ -353,7 +351,6 @@ Budget Cars (Independent, no parent)
 #### Core Workflow Testing
 
 1. **Job Creation & Completion**
-
    - Worker logs job at commercial location
    - Worker records time spent per area
    - Worker selects cleaning services performed
@@ -364,14 +361,12 @@ Budget Cars (Independent, no parent)
      - Location pricing
 
 2. **Time Tracking & Worker Payment**
-
    - Verify hourly time tracking
    - Calculate worker wages based on hours
    - Track hours per location
    - Generate worker payment reports
 
 3. **Recurring Jobs**
-
    - Set up recurring cleaning schedules
    - Track regular maintenance jobs
    - Invoice recurring customers

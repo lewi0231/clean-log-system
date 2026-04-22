@@ -1,6 +1,6 @@
 # Dark Mode Decision
 
-## Decision: Dark Mode Excluded from Clean Log System
+## Decision: Dark Mode Excluded from Tally Runner (monorepo)
 
 **Date:** 2026-01-20  
 **Status:** Accepted  
@@ -8,7 +8,7 @@
 
 ## Context
 
-The Clean Log System is designed as a professional SaaS platform for service-based businesses to manage field workers, jobs, and invoicing. During the design phase, the question of implementing dark mode was raised.
+The Tally Runner (monorepo) is designed as a professional SaaS platform for service-based businesses to manage field workers, jobs, and invoicing. During the design phase, the question of implementing dark mode was raised.
 
 ## Decision
 
@@ -79,7 +79,6 @@ The following changes were made to reflect this decision:
 1. **Removed commented dark mode code** from:
    - `dashboard/app/globals.css`
    - Chart components
-   
 2. **Updated documentation** to reflect light-mode-only design:
    - `dashboard/STYLING_PRACTICES.md`
    - This decision document
@@ -108,10 +107,12 @@ This decision will be reviewed in **Q3 2026** based on:
 ### Alternative 1: System Preference Based Dark Mode
 
 **Pros:**
+
 - Respects user OS preference
 - Modern web standard
 
 **Cons:**
+
 - Still requires full dark mode implementation
 - Adds complexity for minimal user value
 
@@ -120,10 +121,12 @@ This decision will be reviewed in **Q3 2026** based on:
 ### Alternative 2: Dashboard-Only Dark Mode
 
 **Pros:**
+
 - Focuses on primary interface
 - Mobile app remains light
 
 **Cons:**
+
 - Inconsistent experience across platforms
 - Still significant development effort
 
@@ -132,10 +135,12 @@ This decision will be reviewed in **Q3 2026** based on:
 ### Alternative 3: Premium Feature
 
 **Pros:**
+
 - Potential revenue stream
 - Limits support burden
 
 **Cons:**
+
 - Dark mode is expected to be free
 - Would create user frustration
 

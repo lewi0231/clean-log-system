@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   ArrowRight,
   Bell,
@@ -77,8 +74,8 @@ export function WorkflowSection() {
             From Job Site to Invoice in Minutes
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Our unique workflow automates everything between job completion and your approval,
-            so you focus on growing your business, not paperwork.
+            Our unique workflow automates everything between job completion and your approval, so
+            you focus on growing your business, not paperwork.
           </p>
         </div>
 
@@ -91,9 +88,13 @@ export function WorkflowSection() {
             <div className="grid grid-cols-7 gap-4 relative">
               {workflowSteps.map((step, index) => (
                 <div key={index} className="flex flex-col items-center">
-                  <Card className={`w-full max-w-48 transition-all hover:shadow-lg ${step.isConnector ? 'border-dashed' : ''}`}>
+                  <Card
+                    className={`w-full max-w-48 transition-all hover:shadow-lg ${step.isConnector ? "border-dashed" : ""}`}
+                  >
                     <CardContent className="p-6 text-center">
-                      <div className={`inline-flex size-12 items-center justify-center rounded-lg ${step.bgColor} mb-4`}>
+                      <div
+                        className={`inline-flex size-12 items-center justify-center rounded-lg ${step.bgColor} mb-4`}
+                      >
                         <step.icon className={`size-6 ${step.color}`} />
                       </div>
                       <h3 className="font-semibold mb-2">{step.title}</h3>
@@ -110,7 +111,9 @@ export function WorkflowSection() {
         <div className="lg:hidden space-y-6">
           {workflowSteps.map((step, index) => (
             <div key={index} className="flex items-start gap-4">
-              <div className={`shrink-0 inline-flex size-12 items-center justify-center rounded-lg ${step.bgColor}`}>
+              <div
+                className={`shrink-0 inline-flex size-12 items-center justify-center rounded-lg ${step.bgColor}`}
+              >
                 <step.icon className={`size-6 ${step.color}`} />
               </div>
               <div className="flex-1 min-w-0">
@@ -131,13 +134,13 @@ export function WorkflowSection() {
           <div className="rounded-lg border bg-primary/5 p-8">
             <div className="inline-flex items-center gap-2 mb-4">
               <User className="size-5 text-primary" />
-              <span className="font-semibold text-primary">What makes RivetUp unique</span>
+              <span className="font-semibold text-primary">What makes Tally Runner unique</span>
             </div>
             <p className="text-lg mb-4">
-              Most field service software just digitizes paperwork. RivetUp automates the entire
-              post-job workflow—review links to clients, emails, invoices, calculations—so you
-              focus on your customers, not admin. You configure everything yourself: forms, pricing,
-              static and one-off locations. No custom builds.
+              Most field service software just digitizes paperwork. Tally Runner automates the
+              entire post-job workflow—review links to clients, emails, invoices, calculations—so
+              you focus on your customers, not admin. You configure everything yourself: forms,
+              pricing, static and one-off locations. No custom builds.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div className="flex items-center gap-2">

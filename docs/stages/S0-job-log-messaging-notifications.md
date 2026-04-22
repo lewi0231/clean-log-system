@@ -4,7 +4,7 @@
 | ------------ | --------------------------------------------------- |
 | **Stage**    | S0 — Idea capture (not triage; no build commitment) |
 | **Captured** | 2026-04-11                                          |
-| **Product**  | Clean Log (organization / worker job logging)       |
+| **Product**  | Tally Runner (organization / worker job logging)    |
 | **Source**   | Product owner — conversational requirement          |
 
 ---

@@ -6,7 +6,7 @@
 | **From**      | S0, S1, [`S2-org-resend-email-domain.md`](./S2-org-resend-email-domain.md) (scope lock) |
 | **Execution** | [`S4`](./S4-org-resend-email-domain.md) (DAP) → **S5** build                            |
 | **Created**   | 2026-04-12                                                                              |
-| **Product**   | Clean Log                                                                               |
+| **Product**   | Tally Runner                                                                            |
 
 **Purpose:** S2 locks **what** to build. This document states **how** the system fits together across DB, Edge, and dashboard; **phasing**; **concurrency and risk** calls; and **where** to execute next (S4). Implementation detail belongs in S4, not here.
 
@@ -26,7 +26,7 @@ If S3 and S4 ever disagree, **S2** wins on product behavior; **S4** wins on file
 
 ## 2. System context
 
-Clean Log already sends transactional mail from Supabase **Edge Functions** using a **single platform** Resend API key. **Clients never** send email or choose `from` domains. This feature adds:
+Tally Runner already sends transactional mail from Supabase **Edge Functions** using a **single platform** Resend API key. **Clients never** send email or choose `from` domains. This feature adds:
 
 1. **Data:** per-org row describing the org’s Resend **domain** (metadata + snapshot of DNS), plus an **entitlement** flag.
 2. **Control plane:** org-admin-only Edge functions to create / refresh / remove domains via Resend’s Domains API.
@@ -71,7 +71,7 @@ flowchart LR
 | **Cross-tenant domain**     | **Global `UNIQUE(domain_name)`** + Resend conflict handling                               | One DNS owner per hostname; S2 §4.2.                                                                                        |
 | **Resend create region**    | Single env e.g. **`RESEND_SENDING_REGION`** on create-domain                              | S2 §5.2.                                                                                                                    |
 
-**Explicit precedence (summary — full matrix in S2 §4.4):** org signup verification → always platform + **Clean Log**; admin invite → optional **`RESEND_ADMIN_INVITES_FROM_DOMAIN`** override; all other kinds → org domain if verified, else platform.
+**Explicit precedence (summary — full matrix in S2 §4.4):** org signup verification → always platform + **Tally Runner**; admin invite → optional **`RESEND_ADMIN_INVITES_FROM_DOMAIN`** override; all other kinds → org domain if verified, else platform.
 
 ---
 

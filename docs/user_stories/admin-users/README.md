@@ -1,6 +1,6 @@
 # Admin Users User Stories
 
-This directory contains user stories for dashboard user management functionality, covering admin and viewer user accounts within the Clean Log system.
+This directory contains user stories for dashboard user management functionality, covering admin and viewer user accounts within the Tally Runner system.
 
 ## Overview
 
@@ -9,38 +9,50 @@ Dashboard users (admins and viewers) are team members who access the web dashboa
 ## User Stories
 
 ### 001 - Admin User Invitation Creation
+
 **Focus**: Inviting new dashboard users with email notifications
+
 - Adding admin/viewer users with complete contact information
 - Email invitation system with activation links
 - Form validation and success feedback
 
 ### 002 - Admin User Activation Process
+
 **Focus**: Secure account activation and status tracking
+
 - Email-based activation with secure tokens
 - Password setup and account activation
 - Status tracking (pending → active)
 - Error handling for expired/invalid links
 
 ### 003 - Admin User Contact Information
+
 **Focus**: Collecting and validating complete user details
+
 - First name, last name, phone number collection
 - Phone number validation and formatting
 - Consistency with worker data collection patterns
 
 ### 004 - Admin User Information Display
+
 **Focus**: Comprehensive user information display
+
 - Names, contact details, and status visualization
 - Status badges (Active/Pending/Inactive)
 - Enhanced table with sorting and responsive design
 
 ### 005 - Admin to Worker Conversion
+
 **Focus**: Flexible role conversion for workforce management
+
 - Dashboard users becoming mobile app workers
 - Maintaining dual access (dashboard + mobile)
 - Seamless conversion with data synchronization
 
 ### 006 - Admin In-App Notifications
+
 **Focus**: When and who gets notified for organization events
+
 - Worker creates job → all admins
 - Admin creates job / invoice → other admins
 - Payment received / client review → all admins
@@ -59,6 +71,7 @@ Dashboard users (admins and viewers) are team members who access the web dashboa
 ## Dependencies
 
 These user stories depend on:
+
 - Supabase authentication system
 - Email service integration (SendGrid/Mailgun)
 - Database schema updates for organization_users table

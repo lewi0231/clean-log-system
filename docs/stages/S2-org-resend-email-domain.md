@@ -7,7 +7,7 @@
 | **Created**            | 2026-04-12                                                      |
 | **Gold review**        | 2026-04-12 — §12                                                |
 | **Adversarial review** | 2026-04-12 — §13                                                |
-| **Product**            | Clean Log                                                       |
+| **Product**            | Tally Runner                                                    |
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 2. Product boundaries
 
-| In product (Clean Log)                                                              | Out of product                                     |
+| In product (Tally Runner)                                                           | Out of product                                     |
 | ----------------------------------------------------------------------------------- | -------------------------------------------------- |
 | Org admin configures **one** verified subdomain for **API/Edge** transactional mail | Per-org **Auth** `From` domain (GoTrue limitation) |
 | Dashboard UX + Edge APIs for DNS lifecycle                                          | **BYO SMTP**                                       |
@@ -46,16 +46,16 @@
 
 **Source:** `database/supabase/functions/_utils/email.ts`, `feedback-email.ts` (line refs approximate; verify during DAP).
 
-| Mail kind                        | Function / area     | Local part    | Display name (today)    | `organization_id` in context?                        | S2 policy for custom domain                                                                                                                   |
-| -------------------------------- | ------------------- | ------------- | ----------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Worker invitation                | `email.ts`          | `onboarding`  | `{organizationName}`    | Yes                                                  | **Org domain when verified**                                                                                                                  |
-| Invoice send                     | `email.ts`          | `invoices`    | `{organizationName}`    | Yes                                                  | **Org domain when verified**                                                                                                                  |
-| Payment confirmation             | `email.ts`          | `payments`    | `{organizationName}`    | Yes                                                  | **Org domain when verified**                                                                                                                  |
-| Admin invoice batch notification | `email.ts`          | `noreply`     | `{organizationName}`    | Yes                                                  | **Org domain when verified**                                                                                                                  |
-| Invoice reminder                 | `email.ts`          | `invoices`    | `{organizationName}`    | Yes                                                  | **Org domain when verified**                                                                                                                  |
-| Org signup email verification    | `email.ts`          | `noreply`     | **`Clean Log`** (fixed) | Org may be partial                                   | **Platform domain only** for v1 — signup is cross-tenant; keep **`Clean Log`** display name unless product reopens                            |
-| Admin user invitation            | `email.ts`          | `invitations` | `{organizationName}`    | Yes                                                  | **Org domain**; respect existing **`RESEND_ADMIN_INVITES_FROM_DOMAIN`** override as **platform** domain escape hatch (env-level), not per-org |
-| Feedback / rating to client      | `feedback-email.ts` | `noreply`     | **None** (address only) | **`jobId` present; add `organizationId`** (see §4.1) | **`{organizationName} <noreply@…>`** + org domain when verified — **align with other noreply mail**                                           |
+| Mail kind                        | Function / area     | Local part    | Display name (today)       | `organization_id` in context?                        | S2 policy for custom domain                                                                                                                   |
+| -------------------------------- | ------------------- | ------------- | -------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker invitation                | `email.ts`          | `onboarding`  | `{organizationName}`       | Yes                                                  | **Org domain when verified**                                                                                                                  |
+| Invoice send                     | `email.ts`          | `invoices`    | `{organizationName}`       | Yes                                                  | **Org domain when verified**                                                                                                                  |
+| Payment confirmation             | `email.ts`          | `payments`    | `{organizationName}`       | Yes                                                  | **Org domain when verified**                                                                                                                  |
+| Admin invoice batch notification | `email.ts`          | `noreply`     | `{organizationName}`       | Yes                                                  | **Org domain when verified**                                                                                                                  |
+| Invoice reminder                 | `email.ts`          | `invoices`    | `{organizationName}`       | Yes                                                  | **Org domain when verified**                                                                                                                  |
+| Org signup email verification    | `email.ts`          | `noreply`     | **`Tally Runner`** (fixed) | Org may be partial                                   | **Platform domain only** for v1 — signup is cross-tenant; keep **`Tally Runner`** display name unless product reopens                         |
+| Admin user invitation            | `email.ts`          | `invitations` | `{organizationName}`       | Yes                                                  | **Org domain**; respect existing **`RESEND_ADMIN_INVITES_FROM_DOMAIN`** override as **platform** domain escape hatch (env-level), not per-org |
+| Feedback / rating to client      | `feedback-email.ts` | `noreply`     | **None** (address only)    | **`jobId` present; add `organizationId`** (see §4.1) | **`{organizationName} <noreply@…>`** + org domain when verified — **align with other noreply mail**                                           |
 
 **Rules:**
 
@@ -75,7 +75,7 @@ Update **`_utils/__tests__/feedback-email.test.ts`** and integration tests accor
 
 ### 4.2 Cross-tenant domain collision
 
-**Global unique `domain_name`:** Only **one** DNS owner can control `mail.acme.com`. If **Org B** attempts to register a domain **already** attached to **Org A** (in Clean Log or already in the platform Resend team), **`register-org-sending-domain`** must **fail** with a clear error (“domain already in use”) after checking DB **and** handling Resend API conflicts.
+**Global unique `domain_name`:** Only **one** DNS owner can control `mail.acme.com`. If **Org B** attempts to register a domain **already** attached to **Org A** (in Tally Runner or already in the platform Resend team), **`register-org-sending-domain`** must **fail** with a clear error (“domain already in use”) after checking DB **and** handling Resend API conflicts.
 
 ### 4.3 `RESEND_TEST_MODE` and `from`
 
@@ -85,12 +85,12 @@ In **test mode**, recipients are redirected to **`@resend.dev`** addresses, but 
 
 Multiple rules can apply. **`resolveOrgMailFrom`** (or equivalent) **must** evaluate in **this order**:
 
-| Step  | Condition                                                                                                       | Effective mail domain (`@` host part)                | Display name                                           |
-| ----- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------ |
-| **1** | **`mailKind === org_signup_verification`** (or equivalent)                                                      | **Always** `RESEND_FROM_DOMAIN`                      | **`Clean Log`** (fixed) — **ignore** org custom domain |
-| **2** | **`mailKind === admin_user_invitation`** **and** `RESEND_ADMIN_INVITES_FROM_DOMAIN` is set                      | **Env domain** (platform operator control)           | `{organizationName}`                                   |
-| **3** | **`mailKind === admin_user_invitation`** **and** env **not** set                                                | Org custom if verified **else** `RESEND_FROM_DOMAIN` | `{organizationName}`                                   |
-| **4** | All other mail kinds (e.g. worker onboarding, invoice, payment, feedback, admin invoice notification, reminder) | Org custom if verified **else** `RESEND_FROM_DOMAIN` | `{organizationName}` (see §4 matrix for local-part)    |
+| Step  | Condition                                                                                                       | Effective mail domain (`@` host part)                | Display name                                              |
+| ----- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| **1** | **`mailKind === org_signup_verification`** (or equivalent)                                                      | **Always** `RESEND_FROM_DOMAIN`                      | **`Tally Runner`** (fixed) — **ignore** org custom domain |
+| **2** | **`mailKind === admin_user_invitation`** **and** `RESEND_ADMIN_INVITES_FROM_DOMAIN` is set                      | **Env domain** (platform operator control)           | `{organizationName}`                                      |
+| **3** | **`mailKind === admin_user_invitation`** **and** env **not** set                                                | Org custom if verified **else** `RESEND_FROM_DOMAIN` | `{organizationName}`                                      |
+| **4** | All other mail kinds (e.g. worker onboarding, invoice, payment, feedback, admin invoice notification, reminder) | Org custom if verified **else** `RESEND_FROM_DOMAIN` | `{organizationName}` (see §4 matrix for local-part)       |
 
 **Why:** Without this, **`RESEND_ADMIN_INVITES_FROM_DOMAIN`** (legal/compliance routing) could silently fight **org custom domain** and behavior would depend on refactor order. **DAP:** unit tests **must** lock precedence.
 
@@ -318,7 +318,7 @@ Cross-check of this feature set against Resend’s published **multi-tenant** gu
 
 Resend documents **per-domain API keys** so a key can only send from that domain. That pattern matters most when **tenants** or services hold keys.
 
-Clean Log v1: **all** HTTP calls use the **shared** key in Edge Functions; **clients never** set `from`. Hardening is **correct `resolveOrgMailFrom`** + **no** user-controlled envelope fields. Storing a **separate** Resend key per org (returned only once at creation) is **optional** and **high operational cost** — treat as a **future** enterprise hardening, not a G1 gap.
+Tally Runner v1: **all** HTTP calls use the **shared** key in Edge Functions; **clients never** set `from`. Hardening is **correct `resolveOrgMailFrom`** + **no** user-controlled envelope fields. Storing a **separate** Resend key per org (returned only once at creation) is **optional** and **high operational cost** — treat as a **future** enterprise hardening, not a G1 gap.
 
 ### 14.3 Recommended adds (improve on “good enough” v1)
 

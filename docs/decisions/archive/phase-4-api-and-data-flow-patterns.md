@@ -1,6 +1,6 @@
 # Phase 4: API and Data Flow Patterns Analysis
 
-**Project:** Clean Log System Monorepo  
+**Project:** Tally Runner (monorepo) Monorepo  
 **Date:** January 20, 2026  
 **Scope:** Edge function architecture, service layer patterns, API conventions, error handling, and data flow
 
@@ -64,17 +64,17 @@
 
 **Edge Functions:** 70+ functions across CRUD operations
 
-| Category | Count | Examples |
-|----------|-------|----------|
-| **Worker Management** | 8 | `create-worker`, `update-worker`, `list-workers`, `delete-worker` |
-| **Job Management** | 6 | `create-job`, `update-job`, `list-jobs`, `admin-create-job` |
-| **Invoice Management** | 13 | `create-invoice`, `calculate-invoice`, `list-invoices`, `generate-invoice-pdf` |
-| **Pricing** | 9 | `create-pricing-rule`, `update-pricing-rule`, `list-base-pricing`, `upsert-field-pricing` |
-| **Location Management** | 7 | `create-location`, `update-location`, `list-locations`, `create-location-hierarchy` |
-| **Field Configuration** | 8 | `create-field-config`, `update-field-config`, `list-field-configs`, `reorder-field-configs` |
-| **Organization** | 7 | `register-organization`, `update-organization-settings`, `get-organization-id` |
-| **Payment** | 8 | `create-payment-link`, `record-manual-payment`, `list-payments`, `calculate-worker-payment` |
-| **Misc** | 5+ | `send-feedback-email`, `submit-feedback`, `stripe-webhook` |
+| Category                | Count | Examples                                                                                    |
+| ----------------------- | ----- | ------------------------------------------------------------------------------------------- |
+| **Worker Management**   | 8     | `create-worker`, `update-worker`, `list-workers`, `delete-worker`                           |
+| **Job Management**      | 6     | `create-job`, `update-job`, `list-jobs`, `admin-create-job`                                 |
+| **Invoice Management**  | 13    | `create-invoice`, `calculate-invoice`, `list-invoices`, `generate-invoice-pdf`              |
+| **Pricing**             | 9     | `create-pricing-rule`, `update-pricing-rule`, `list-base-pricing`, `upsert-field-pricing`   |
+| **Location Management** | 7     | `create-location`, `update-location`, `list-locations`, `create-location-hierarchy`         |
+| **Field Configuration** | 8     | `create-field-config`, `update-field-config`, `list-field-configs`, `reorder-field-configs` |
+| **Organization**        | 7     | `register-organization`, `update-organization-settings`, `get-organization-id`              |
+| **Payment**             | 8     | `create-payment-link`, `record-manual-payment`, `list-payments`, `calculate-worker-payment` |
+| **Misc**                | 5+    | `send-feedback-email`, `submit-feedback`, `stripe-webhook`                                  |
 
 **Service Classes:** 20+ service classes in dashboard
 
@@ -139,12 +139,14 @@ import { createLogger } from "../_utils/logger.ts";
 ```
 
 **Why it works:**
+
 - **Scalability:** DRY principle, changes propagate to all functions
 - **Efficiency:** Consistent patterns reduce bundle size
 - **Maintainability:** Single source of truth for common operations
 - **Testing:** Utilities can be tested independently
 
 **Code quality:**
+
 - Clear separation of concerns
 - Well-documented interfaces
 - Type-safe with TypeScript
@@ -213,6 +215,7 @@ const body = validation.data; // Type-safe, validated data
 ```
 
 **Why it works:**
+
 - **Type Safety:** Runtime validation matches TypeScript types
 - **Error Messages:** Descriptive, field-level error reporting
 - **Scalability:** Composable schemas, reusable validation logic
@@ -220,6 +223,7 @@ const body = validation.data; // Type-safe, validated data
 - **Industry Standard:** Zod is the leading validation library in 2026
 
 **Benefits over legacy validation:**
+
 ```typescript
 // ❌ Old approach (validation.ts)
 const validation = validateRequiredFields(body, ["first_name", "last_name", "email"]);
@@ -301,6 +305,7 @@ logger.error("Failed to create worker", error);
 ```
 
 **Why it works:**
+
 - **Observability:** Trace requests across edge function invocations
 - **Security:** Automatic PII sanitization (emails masked, tokens removed)
 - **Debugging:** Structured format enables log aggregation tools
@@ -356,6 +361,7 @@ export class WorkersService {
 ```
 
 **Why it works:**
+
 - **Scalability:** Single responsibility per service class
 - **Type Safety:** TypeScript interfaces for requests/responses
 - **Testability:** Static methods easy to mock/stub
@@ -438,6 +444,7 @@ serve(async (req) => {
 ```
 
 **Why it works:**
+
 - **Scalability:** Single location for CORS configuration
 - **Consistency:** All edge functions have same CORS behavior
 - **Security:** Explicit allowed headers, no wildcards for auth
@@ -515,6 +522,7 @@ if (!membershipCheck) {
 ```
 
 **Why it works:**
+
 - **Security:** Multi-tenant isolation enforced at edge function level
 - **Dual Strategy:** Supports both admin users (by email) and workers (by auth_user_id)
 - **Reusability:** Single function handles all membership checks
@@ -557,6 +565,7 @@ export function getErrorStatusCode(error: unknown): number {
 ```
 
 **Why it works:**
+
 - **Developer Experience:** Throw descriptive errors, status codes assigned automatically
 - **Consistency:** Uniform error→status mapping across all functions
 - **Maintainability:** No hardcoded status codes scattered throughout
@@ -580,6 +589,7 @@ export function getErrorStatusCode(error: unknown): number {
 ```
 
 **Why it works:**
+
 - **Isolation:** Each function controls its own dependencies
 - **Performance:** Only load needed dependencies, smaller bundles
 - **Flexibility:** Functions can use different versions if needed
@@ -614,6 +624,7 @@ export interface UpdateWorkerRequest {
 ```
 
 **Why it works:**
+
 - **Type Safety:** Compile-time validation of API calls
 - **Documentation:** Interfaces serve as API documentation
 - **Autocomplete:** IDE support for API requests
@@ -655,6 +666,7 @@ static async create(request: CreateWorkerRequest): Promise<Worker> {
 ```
 
 **Why it works:**
+
 - **Debugging:** Track service calls from client side
 - **Performance:** Identify slow edge function calls
 - **Error Tracking:** Correlate client errors with server logs
@@ -721,6 +733,7 @@ if (!validation.success) {
 ```
 
 **Impact:**
+
 - **Scalability:** Two systems to maintain, confusing for developers
 - **Consistency:** Different error messages, validation quality varies
 - **Type Safety:** Legacy validation doesn't provide type inference
@@ -759,6 +772,7 @@ const { organization_id } = validation.data; // Type-safe
 ## Zod Migration Checklist
 
 Priority 1 (High-traffic functions):
+
 - [ ] list-workers
 - [ ] list-jobs
 - [ ] list-invoices
@@ -766,12 +780,14 @@ Priority 1 (High-traffic functions):
 - [ ] update-job
 
 Priority 2 (Write operations):
+
 - [ ] create-location
 - [ ] update-location
 - [ ] delete-worker
 - [ ] create-form-section
 
 Priority 3 (Admin/config):
+
 - [ ] update-organization-settings
 - [ ] create-organization-user
 ```
@@ -815,6 +831,7 @@ return jsonResponse({ success: false, error: "Worker not found" }, 404);
 ```
 
 **Impact:**
+
 - **Scalability:** Clients must handle multiple error formats
 - **Consistency:** No standard error parsing logic
 - **Debugging:** Hard to build error monitoring dashboards
@@ -915,6 +932,7 @@ try {
 ```
 
 **Benefits:**
+
 - **Standard:** RFC 7807 is industry-standard (Google, Microsoft, GitHub use it)
 - **Extensible:** Can add custom fields (invalidFields, retryAfter, etc.)
 - **Backward Compatible:** String errors still work
@@ -946,6 +964,7 @@ export function problemResponse(
 **Research Basis:** RFC 7807/9457 is the recommended standard for HTTP API error responses. Research confirms Google, Microsoft, and GitHub all use this format.
 
 **Migration Checklist:**
+
 - [ ] Update `errorResponse()` function to support ProblemDetails
 - [ ] Add `application/problem+json` content type for structured errors
 - [ ] Document standard error types in API documentation
@@ -976,6 +995,7 @@ return jsonResponse({ success: true, worker }, 201);
 ```
 
 **Impact:**
+
 - **Debugging:** Client can't reference specific request in support tickets
 - **Tracing:** Can't correlate client logs with server logs
 - **Observability:** Missing end-to-end request tracking
@@ -1070,6 +1090,7 @@ const { data: workers } = await supabase
 ```
 
 **Impact:**
+
 - **Security:** Bypasses Row Level Security (RLS) policies
 - **Risk:** Single function vulnerability exposes all data
 - **Audit:** Harder to track who accessed what
@@ -1151,6 +1172,7 @@ await supabase.functions.invoke("create-worker", { body: request });
 No version prefix like `/v1/create-worker` or header like `API-Version: 1`.
 
 **Impact:**
+
 - **Breaking Changes:** Can't evolve API without breaking clients
 - **Migration:** No way to run old and new versions simultaneously
 - **Deprecation:** Can't deprecate endpoints gracefully
@@ -1182,10 +1204,9 @@ class WorkersService {
   private static readonly API_VERSION = "v1";
 
   static async create(request: CreateWorkerRequest): Promise<Worker> {
-    const { data, error } = await supabase.functions.invoke(
-      `${this.API_VERSION}-workers-create`,
-      { body: request }
-    );
+    const { data, error } = await supabase.functions.invoke(`${this.API_VERSION}-workers-create`, {
+      body: request,
+    });
     // ...
   }
 }
@@ -1222,12 +1243,15 @@ Start with no breaking changes, introduce versioning when first breaking change 
 ## API Versioning Strategy
 
 ### Current State (v1 implicit)
+
 - All functions are v1 by default
 - Breaking changes NOT allowed
 - Use feature flags for new behavior
 
 ### When to Version
+
 Introduce v2 when:
+
 - Removing required field
 - Changing field type
 - Changing validation rules (more strict)
@@ -1235,6 +1259,7 @@ Introduce v2 when:
 - Removing endpoint
 
 ### Non-Breaking Changes (no version bump)
+
 - Adding optional field
 - Adding new endpoint
 - Relaxing validation
@@ -1244,7 +1269,7 @@ Introduce v2 when:
 
 **Research Basis:** Stripe API versioning (date-based headers), GitHub API (URL versioning), Supabase Edge Functions (function naming).
 
-**Recommended for Clean Log System:** Use **header-based versioning** with date stamps (like Stripe). This allows backward compatibility without URL changes:
+**Recommended for Tally Runner (monorepo):** Use **header-based versioning** with date stamps (like Stripe). This allows backward compatibility without URL changes:
 
 ```typescript
 // Service layer sends version header
@@ -1300,6 +1325,7 @@ serve(async (req) => {
 ```
 
 **Impact:**
+
 - **Security:** Vulnerable to DoS attacks
 - **Cost:** Abuse can cause high Supabase costs
 - **Fairness:** One org can monopolize resources
@@ -1459,6 +1485,7 @@ const { success, limit, remaining, reset } = await ratelimit.limit(organization_
 **What's missing:** Mutation operations don't support idempotency keys for safe retries.
 
 **Impact:**
+
 - **Duplicate Operations:** Network retries can create duplicate records
 - **Data Integrity:** Payment operations may charge twice
 - **Client Reliability:** Clients can't safely retry failed requests
@@ -1483,18 +1510,18 @@ export async function checkIdempotencyKey(
   functionName: string,
 ): Promise<IdempotencyResult> {
   const supabase = createServiceRoleClient();
-  
+
   const { data, error } = await supabase
     .from("idempotency_keys")
     .select("response")
     .eq("key", key)
     .eq("function_name", functionName)
     .single();
-  
+
   if (error || !data) {
     return { exists: false };
   }
-  
+
   return { exists: true, response: data.response };
 }
 
@@ -1507,7 +1534,7 @@ export async function storeIdempotencyKey(
   response: unknown,
 ): Promise<void> {
   const supabase = createServiceRoleClient();
-  
+
   await supabase
     .from("idempotency_keys")
     .insert({
@@ -1541,12 +1568,12 @@ serve(async (req) => {
 
     // Process request
     const result = await processPayment(body);
-    
+
     // Store response for future retries
     if (idempotencyKey) {
       await storeIdempotencyKey(idempotencyKey, "create-payment", result);
     }
-    
+
     return jsonResponse(result);
   } catch (error) {
     // Don't store failed responses
@@ -1563,14 +1590,14 @@ import { v4 as uuidv4 } from "uuid";
 export class PaymentService {
   static async create(request: CreatePaymentRequest): Promise<Payment> {
     const idempotencyKey = uuidv4();
-    
+
     const { data, error } = await supabase.functions.invoke("create-payment", {
       body: request,
       headers: {
         "X-Idempotency-Key": idempotencyKey,
       },
     });
-    
+
     if (error) throw error;
     return data;
   }
@@ -1578,12 +1605,14 @@ export class PaymentService {
 ```
 
 **When to use idempotency keys:**
+
 - Payment processing (critical)
 - Invoice creation
 - Worker creation
 - Any mutation that creates resources
 
 **Migration Checklist:**
+
 - [ ] Create `idempotency_keys` table
 - [ ] Add utility functions for idempotency
 - [ ] Update payment-related edge functions
@@ -1597,6 +1626,7 @@ export class PaymentService {
 **What's missing:** No guidance for handling long-running operations that may exceed edge function timeouts.
 
 **Impact:**
+
 - **Timeout Errors:** Operations exceeding 60s timeout fail silently
 - **Poor UX:** Users don't know operation status
 - **Data Loss:** Partially completed operations may leave inconsistent state
@@ -1620,7 +1650,7 @@ serve(async (req) => {
   if (job_ids.length > 50) {
     // Queue as background job
     const supabase = createServiceRoleClient();
-    
+
     const { data: job } = await supabase
       .from("background_jobs")
       .insert({
@@ -1631,9 +1661,9 @@ serve(async (req) => {
       })
       .select()
       .single();
-    
+
     logger.info("Queued bulk invoice generation", { jobId: job.id });
-    
+
     // Return 202 Accepted with job ID for polling
     return jsonResponse({
       success: true,
@@ -1655,13 +1685,13 @@ serve(async (req) => {
 serve(async (req) => {
   const { job_id } = await req.json();
   const supabase = createServiceRoleClient();
-  
+
   const { data: job } = await supabase
     .from("background_jobs")
     .select("*")
     .eq("id", job_id)
     .single();
-  
+
   return jsonResponse({
     status: job.status,
     progress: job.progress,
@@ -1679,16 +1709,16 @@ export function useJobStatus(jobId: string | null) {
 
   useEffect(() => {
     if (!jobId) return;
-    
+
     const poll = async () => {
       const result = await JobService.getStatus(jobId);
       setStatus(result);
-      
+
       if (result.status === "pending" || result.status === "processing") {
         setTimeout(poll, 2000); // Poll every 2 seconds
       }
     };
-    
+
     poll();
   }, [jobId]);
 
@@ -1697,6 +1727,7 @@ export function useJobStatus(jobId: string | null) {
 ```
 
 **When to use async jobs:**
+
 - Bulk operations (>50 items)
 - PDF generation for large invoices
 - Data exports
@@ -1732,14 +1763,12 @@ export interface UpdateWorkerRequest {
 **Database returns `null`:**
 
 ```typescript
-const { data: worker } = await supabase
-  .from("worker")
-  .select("*")
-  .single();
+const { data: worker } = await supabase.from("worker").select("*").single();
 // worker.notes is null, not undefined
 ```
 
 **Impact:**
+
 - **Type Confusion:** `if (value)` vs `if (value !== null)` vs `if (value !== undefined)`
 - **Bugs:** `obj?.field ?? defaultValue` behaves differently for null vs undefined
 - **Serialization:** JSON.stringify removes undefined, keeps null
@@ -1759,20 +1788,23 @@ if (value === null || value === undefined) {
 
 **Adopt "null for database, undefined for JavaScript" convention:**
 
-```markdown
+````markdown
 ## Null vs Undefined Convention
 
 ### Rule 1: Database Layer (Edge Functions)
+
 - Use `null` for missing/empty values
 - Database columns are nullable (SQL NULL)
 - Zod schemas use `.nullable()` only
 
 ### Rule 2: Client Layer (Service Layer, UI)
+
 - Convert `null` to `undefined` for optional fields
 - TypeScript interfaces use `field?: Type` (undefined)
 - UI components use `|| defaultValue` safely
 
 ### Rule 3: Transformation Layer
+
 Service layer transforms between conventions:
 
 ```typescript:dashboard/lib/services/workers.service.ts
@@ -1789,8 +1821,10 @@ static async get(workerId: string): Promise<Worker> {
   };
 }
 ```
+````
 
 ### Rule 4: Type Guards
+
 Use helper functions for checks:
 
 ```typescript:dashboard/lib/utils.ts
@@ -1803,7 +1837,8 @@ if (isPresent(worker.notes)) {
   displayNotes(worker.notes); // Type is string, not string | null | undefined
 }
 ```
-```
+
+````
 
 **Update Zod schemas:**
 
@@ -1818,7 +1853,7 @@ notes: z.string().nullable(),  // Database layer: null means absent
 interface Worker {
   notes?: string;  // undefined means absent
 }
-```
+````
 
 **Research Basis:** TypeScript recommendation: use undefined for optional, null for intentional absence.
 
@@ -1864,7 +1899,7 @@ serve(async (req) => {
       req,
       body.organization_id,
       supabase,
-      body,
+      body
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized access attempt", { organization_id: body.organization_id });
@@ -1878,7 +1913,6 @@ serve(async (req) => {
 
     // 7. Return success response
     return jsonResponse({ success: true, data: result }, 200);
-
   } catch (error) {
     // 8. Error handling
     logger.error("Request failed", error);
@@ -1892,6 +1926,7 @@ serve(async (req) => {
 ### 4.2 Function Categories
 
 **CRUD Operations:**
+
 - Create: `create-worker`, `create-job`, `create-invoice`
 - Read: `get-worker`, `get-job-by-token`, `get-invoice-details`
 - Update: `update-worker`, `update-job`, `update-invoice-status`
@@ -1899,22 +1934,25 @@ serve(async (req) => {
 - List: `list-workers`, `list-jobs`, `list-invoices`
 
 **Calculation/Processing:**
+
 - `calculate-invoice` - Complex pricing calculations
 - `calculate-worker-payment` - Worker compensation calculation
 
 **External Integrations:**
+
 - `stripe-webhook` - Stripe payment processing
 - `create-payment-link` - Stripe checkout session creation
 - `send-invoice-reminder` - Email notifications
 
 **Batch Operations:**
+
 - `auto-generate-invoices` - Automated invoice generation
 - `auto-send-invoices` - Bulk invoice sending
 - `mark-overdue-invoices` - Scheduled status updates
 
 ### 4.3 Dependency Management
 
-**Shared dependencies (_utils/deno.json):**
+**Shared dependencies (\_utils/deno.json):**
 
 ```json:database/supabase/functions/_utils/deno.json
 {
@@ -1984,15 +2022,15 @@ export class ExampleService {
 
 ### 5.2 Service Layer Responsibilities
 
-| Responsibility | Implementation |
-|----------------|----------------|
-| **Request Formatting** | Convert UI data to edge function format |
-| **Response Parsing** | Extract and type data from responses |
-| **Error Handling** | Catch, log, and rethrow errors |
-| **Logging** | Structured logging for observability |
-| **Type Safety** | Enforce TypeScript interfaces |
-| **Validation** | Client-side validation before API call |
-| **Caching** | (Future) Cache responses when appropriate |
+| Responsibility         | Implementation                            |
+| ---------------------- | ----------------------------------------- |
+| **Request Formatting** | Convert UI data to edge function format   |
+| **Response Parsing**   | Extract and type data from responses      |
+| **Error Handling**     | Catch, log, and rethrow errors            |
+| **Logging**            | Structured logging for observability      |
+| **Type Safety**        | Enforce TypeScript interfaces             |
+| **Validation**         | Client-side validation before API call    |
+| **Caching**            | (Future) Cache responses when appropriate |
 
 ### 5.3 Service Organization
 
@@ -2022,20 +2060,20 @@ dashboard/lib/services/
 
 ### 6.1 HTTP Status Code Usage
 
-| Code | Meaning | When to Use |
-|------|---------|-------------|
-| **200** | OK | Successful read operations |
-| **201** | Created | Successful resource creation |
-| **204** | No Content | Successful deletion |
-| **400** | Bad Request | Validation errors, missing required fields |
-| **401** | Unauthorized | Missing or invalid authentication token |
-| **403** | Forbidden | Valid auth but insufficient permissions |
-| **404** | Not Found | Resource doesn't exist |
-| **409** | Conflict | Duplicate resource, constraint violation |
-| **422** | Unprocessable Entity | Semantic validation errors |
-| **429** | Too Many Requests | Rate limit exceeded |
-| **500** | Internal Server Error | Unexpected server errors |
-| **503** | Service Unavailable | Maintenance, temporary outage |
+| Code    | Meaning               | When to Use                                |
+| ------- | --------------------- | ------------------------------------------ |
+| **200** | OK                    | Successful read operations                 |
+| **201** | Created               | Successful resource creation               |
+| **204** | No Content            | Successful deletion                        |
+| **400** | Bad Request           | Validation errors, missing required fields |
+| **401** | Unauthorized          | Missing or invalid authentication token    |
+| **403** | Forbidden             | Valid auth but insufficient permissions    |
+| **404** | Not Found             | Resource doesn't exist                     |
+| **409** | Conflict              | Duplicate resource, constraint violation   |
+| **422** | Unprocessable Entity  | Semantic validation errors                 |
+| **429** | Too Many Requests     | Rate limit exceeded                        |
+| **500** | Internal Server Error | Unexpected server errors                   |
+| **503** | Service Unavailable   | Maintenance, temporary outage              |
 
 ### 6.2 Success Response Format
 
@@ -2137,7 +2175,7 @@ dashboard/lib/services/
 const membershipCheck = await verifyOrganizationMembershipFromRequest(
   req,
   organization_id,
-  supabase,
+  supabase
 );
 if (!membershipCheck) {
   return errorResponse("You do not have permission to access this organization", 403);
@@ -2206,6 +2244,7 @@ if (!worker || worker.organization_id !== organization_id) {
    - Monitor cold vs warm latency
 
 **Sources:**
+
 - [Supabase Edge Functions Architecture](https://supabase.com/docs/guides/functions/architecture)
 - [Edge Functions Development](https://supabase.com/docs/guides/functions/development-environment)
 - [Supabase GitHub Discussions](https://github.com/orgs/supabase/discussions/29301)
@@ -2247,6 +2286,7 @@ if (!worker || worker.organization_id !== organization_id) {
    - Hide internal APIs from client
 
 **Sources:**
+
 - [Next.js Full-Stack Architecture](https://medium.com/@johnidouglasmarangon/next-js-as-a-full-stack-platform-architecture-patterns-and-trade-offs-c327dc394b7c)
 - [Next.js Architecture: API SDK UI Separation](https://lorenzogm.com/blog/nextjs-architecture-api-sdk-ui-separation)
 - [BFF Pattern in Next.js](https://dev.to/oliverke/simplifying-api-communication-with-the-bff-pattern-in-nextjs-1flb)
@@ -2296,6 +2336,7 @@ if (!worker || worker.organization_id !== organization_id) {
    - Document limits in API docs
 
 **Sources:**
+
 - [MuleSoft API Best Practices](https://blogs.mulesoft.com/dev-guides/api-design/api-best-practices-response-handling/)
 - [Microsoft API Guidelines - Error Handling](https://deepwiki.com/microsoft/api-guidelines/5.2-error-handling)
 - [RFC 7807 Problem Details](https://medium.com/@ayoubtaouam/error-handling-best-practices-in-spring-rest-apis-faa12dd1bb3a)
@@ -2307,6 +2348,7 @@ if (!worker || worker.organization_id !== organization_id) {
 ### 9.1 Edge Function Rules
 
 #### RULE-EDGE-001: Standard Function Structure
+
 **Requirement:** All edge functions MUST follow the standard structure template.
 
 **Template:**
@@ -2345,7 +2387,7 @@ serve(async (req) => {
       req,
       body.organization_id,
       supabase,
-      body,
+      body
     );
     if (!membershipCheck) {
       return errorResponse("You do not have permission to access this organization", 403);
@@ -2357,7 +2399,6 @@ serve(async (req) => {
 
     // 7. Return response
     return jsonResponse({ success: true, data: result });
-
   } catch (error) {
     logger.error("Request failed", error);
     return errorResponse(error, getErrorStatusCode(error));
@@ -2368,6 +2409,7 @@ serve(async (req) => {
 ---
 
 #### RULE-EDGE-002: Use Zod for Validation
+
 **Requirement:** All edge functions MUST use Zod schemas for request validation, not legacy `validateRequiredFields()`.
 
 ```typescript
@@ -2385,6 +2427,7 @@ const validation = validateRequiredFields(body, ["field1", "field2"]);
 ---
 
 #### RULE-EDGE-003: Structured Logging Required
+
 **Requirement:** All edge functions MUST use structured logger, not console.log().
 
 ```typescript
@@ -2401,6 +2444,7 @@ console.error("Error:", error);
 ---
 
 #### RULE-EDGE-004: Organization Membership Verification
+
 **Requirement:** All organization-scoped operations MUST verify membership before processing.
 
 ```typescript
@@ -2408,7 +2452,7 @@ const membershipCheck = await verifyOrganizationMembershipFromRequest(
   req,
   organization_id,
   supabase,
-  body,
+  body
 );
 if (!membershipCheck) {
   return errorResponse("You do not have permission to access this organization", 403);
@@ -2418,6 +2462,7 @@ if (!membershipCheck) {
 ---
 
 #### RULE-EDGE-005: CORS Headers
+
 **Requirement:** All edge functions MUST handle CORS preflight and include CORS headers in responses.
 
 ```typescript
@@ -2435,6 +2480,7 @@ return errorResponse("Error message", 400);
 ### 9.2 Service Layer Rules
 
 #### RULE-SERVICE-001: Static Method Pattern
+
 **Requirement:** Service classes MUST use static async methods, not instance methods.
 
 ```typescript
@@ -2463,6 +2509,7 @@ const worker = await service.create(request);
 ---
 
 #### RULE-SERVICE-002: Service Layer Logging
+
 **Requirement:** All service methods MUST log debug on entry, info on success, error on failure.
 
 ```typescript
@@ -2492,6 +2539,7 @@ static async create(request: CreateWorkerRequest): Promise<Worker> {
 ---
 
 #### RULE-SERVICE-003: Type-Safe Responses
+
 **Requirement:** Service methods MUST return strongly-typed data, not `any` or `unknown`.
 
 ```typescript
@@ -2515,6 +2563,7 @@ static async list(organizationId: string): Promise<any> {
 ---
 
 #### RULE-SERVICE-004: Error Propagation
+
 **Requirement:** Service methods MUST NOT swallow errors. Log and rethrow.
 
 ```typescript
@@ -2542,6 +2591,7 @@ try {
 ### 9.3 Validation Rules
 
 #### RULE-VALIDATION-001: Zod Schema Location
+
 **Requirement:** Shared Zod schemas MUST be defined in `_utils/zod-schemas.ts`.
 
 **For common schemas (reusable):**
@@ -2568,6 +2618,7 @@ const complexOperationSchema = z.object({
 ---
 
 #### RULE-VALIDATION-002: Validation Error Response
+
 **Requirement:** Validation errors MUST return 400 status with detailed error messages.
 
 ```typescript
@@ -2584,22 +2635,24 @@ if (!validation.success) {
 ### 9.4 Error Handling Rules
 
 #### RULE-ERROR-001: HTTP Status Codes
+
 **Requirement:** Edge functions MUST use appropriate HTTP status codes.
 
-| Situation | Status Code |
-|-----------|-------------|
-| Validation error | 400 |
-| Missing auth token | 401 |
-| Insufficient permissions | 403 |
-| Resource not found | 404 |
-| Duplicate resource | 409 |
-| Semantic validation error | 422 |
-| Rate limit exceeded | 429 |
-| Server error | 500 |
+| Situation                 | Status Code |
+| ------------------------- | ----------- |
+| Validation error          | 400         |
+| Missing auth token        | 401         |
+| Insufficient permissions  | 403         |
+| Resource not found        | 404         |
+| Duplicate resource        | 409         |
+| Semantic validation error | 422         |
+| Rate limit exceeded       | 429         |
+| Server error              | 500         |
 
 ---
 
 #### RULE-ERROR-002: Error Response Format
+
 **Requirement:** All error responses MUST use consistent format (moving toward RFC 7807).
 
 **Current (acceptable):**
@@ -2617,15 +2670,14 @@ return errorResponse({
   title: "Validation Failed",
   status: 400,
   detail: "One or more fields are invalid",
-  invalidFields: [
-    { field: "email", error: "Invalid email format" },
-  ],
+  invalidFields: [{ field: "email", error: "Invalid email format" }],
 });
 ```
 
 ---
 
 #### RULE-ERROR-003: No Stack Traces in Production
+
 **Requirement:** Error responses MUST NOT include stack traces or internal details in production.
 
 ```typescript
@@ -2642,6 +2694,7 @@ return errorResponse(error.stack, 500); // Exposes internals
 ### 9.5 Authentication & Authorization Rules
 
 #### RULE-AUTH-001: Bearer Token Required
+
 **Requirement:** All non-public edge functions MUST require Bearer token authentication.
 
 ```typescript
@@ -2659,13 +2712,14 @@ if (!authUser) {
 ---
 
 #### RULE-AUTH-002: Organization Isolation
+
 **Requirement:** All organization-scoped operations MUST verify organization membership.
 
 ```typescript
 const membershipCheck = await verifyOrganizationMembershipFromRequest(
   req,
   organization_id,
-  supabase,
+  supabase
 );
 if (!membershipCheck) {
   return errorResponse("You do not have permission to access this organization", 403);
@@ -2675,6 +2729,7 @@ if (!membershipCheck) {
 ---
 
 #### RULE-AUTH-003: Service Role Client Usage
+
 **Requirement:** Document why service role client is needed. Consider user-scoped client when possible.
 
 ```typescript
@@ -2695,6 +2750,7 @@ const supabase = createUserScopedClient(token); // Respects RLS
 ### 9.6 Response Rules
 
 #### RULE-RESPONSE-001: Success Response Format
+
 **Requirement:** Successful responses MUST include `success: true` and data.
 
 ```typescript
@@ -2720,6 +2776,7 @@ return jsonResponse({
 ---
 
 #### RULE-RESPONSE-002: Correlation ID in Headers
+
 **Requirement:** All responses SHOULD include `x-correlation-id` header for tracing.
 
 ```typescript
@@ -2732,6 +2789,7 @@ return jsonResponse({ success: true, data }, 200, {}, correlationId);
 ### 9.7 Performance Rules
 
 #### RULE-PERF-001: Minimize Bundle Size
+
 **Requirement:** Edge functions MUST minimize dependencies to reduce cold start time.
 
 - Prefer Deno standard library over npm packages
@@ -2741,6 +2799,7 @@ return jsonResponse({ success: true, data }, 200, {}, correlationId);
 ---
 
 #### RULE-PERF-002: Database Connection Management
+
 **Requirement:** Edge functions MUST NOT leak database connections.
 
 ```typescript
@@ -2759,6 +2818,7 @@ const conn = await Deno.connect({ hostname: "db.example.com", port: 5432 });
 ### 9.8 Logging Rules
 
 #### RULE-LOG-001: Structured JSON Logging
+
 **Requirement:** All logs MUST be structured JSON with correlation ID.
 
 ```typescript
@@ -2771,6 +2831,7 @@ logger.info("Processing request", { organizationId, workerEmail });
 ---
 
 #### RULE-LOG-002: PII Sanitization
+
 **Requirement:** Logs MUST sanitize PII (emails masked, tokens removed).
 
 ```typescript
@@ -2782,6 +2843,7 @@ logger.info("User details", { email: "user@example.com", token: "secret123" });
 ---
 
 #### RULE-LOG-003: Log Levels
+
 **Requirement:** Use appropriate log levels.
 
 - `debug`: Verbose info for development (not in production)
@@ -2804,6 +2866,7 @@ Database migrations in this project use Supabase migrations with raw SQL files. 
 ### 10.1 Migration File Naming
 
 #### RULE-MIG-001: Timestamp-Based Naming
+
 **Requirement:** Migration files MUST use timestamp prefix format `YYYYMMDDHHMMSS_descriptive_name.sql`.
 
 ```bash
@@ -2825,6 +2888,7 @@ add_team_percentage.sql               # Missing timestamp
 ### 10.2 Migration Immutability
 
 #### RULE-MIG-002: Never Modify Existing Migrations
+
 **Requirement:** Once a migration has been committed/deployed, it MUST NOT be modified.
 
 ```sql
@@ -2834,15 +2898,16 @@ add_team_percentage.sql               # Missing timestamp
 
 -- ✅ ALWAYS do this: Create a new migration
 -- File: 20260120143000_add_team_percentage_modifier.sql
-ALTER TABLE worker_rate_card 
+ALTER TABLE worker_rate_card
   DROP CONSTRAINT IF EXISTS worker_rate_card_modifier_type_check;
 
-ALTER TABLE worker_rate_card 
-  ADD CONSTRAINT worker_rate_card_modifier_type_check 
+ALTER TABLE worker_rate_card
+  ADD CONSTRAINT worker_rate_card_modifier_type_check
   CHECK (modifier_type IN ('per_unit', 'flat', 'multiplier', 'team_percentage'));
 ```
 
 **Rationale:** Migrations may have already been applied in production or other developer environments. Modifying them causes:
+
 - Migration hash mismatches
 - Failed deployments
 - Data inconsistencies across environments
@@ -2852,21 +2917,22 @@ ALTER TABLE worker_rate_card
 ### 10.3 Migration Structure
 
 #### RULE-MIG-003: Standard Migration Structure
+
 **Requirement:** Migrations SHOULD follow a consistent structure with comments.
 
 ```sql
 -- -*- mode: sql; sql-product: postgres -*-
 -- Brief description of what this migration does
--- 
+--
 -- Context: Why this change is needed
 -- Related: Link to user story or issue if applicable
 
 -- Step 1: Drop existing constraints (if modifying)
-ALTER TABLE table_name 
+ALTER TABLE table_name
   DROP CONSTRAINT IF EXISTS constraint_name;
 
 -- Step 2: Add/modify columns or constraints
-ALTER TABLE table_name 
+ALTER TABLE table_name
   ADD CONSTRAINT constraint_name CHECK (...);
 
 -- Step 3: Create indexes (if needed)
@@ -2890,12 +2956,12 @@ CREATE POLICY "policy_name" ON table_name FOR ALL
 
 ```sql
 -- Step 1: Drop existing constraint
-ALTER TABLE worker_rate_card 
+ALTER TABLE worker_rate_card
   DROP CONSTRAINT IF EXISTS worker_rate_card_modifier_type_check;
 
 -- Step 2: Re-create with new value
-ALTER TABLE worker_rate_card 
-  ADD CONSTRAINT worker_rate_card_modifier_type_check 
+ALTER TABLE worker_rate_card
+  ADD CONSTRAINT worker_rate_card_modifier_type_check
   CHECK (modifier_type IN ('per_unit', 'flat', 'multiplier', 'team_percentage'));
 ```
 
@@ -2903,7 +2969,7 @@ ALTER TABLE worker_rate_card
 
 ```sql
 -- Use IF NOT EXISTS for idempotency
-ALTER TABLE table_name 
+ALTER TABLE table_name
   ADD COLUMN IF NOT EXISTS new_column TEXT DEFAULT 'value';
 
 COMMENT ON COLUMN table_name.new_column IS 'Description of the column';
@@ -2997,6 +3063,7 @@ Before creating a migration, verify:
 ## Summary
 
 **Phase 4 analyzed:**
+
 - 70+ edge functions (Supabase Edge Functions / Deno runtime)
 - 20+ service layer classes (Next.js dashboard)
 - Authentication/authorization patterns
@@ -3006,6 +3073,7 @@ Before creating a migration, verify:
 **Key findings:**
 
 **Strengths:**
+
 - Excellent shared utilities (`_utils/` directory)
 - Structured logging with correlation IDs and PII sanitization
 - Zod schema validation (modern approach)
@@ -3015,6 +3083,7 @@ Before creating a migration, verify:
 - Per-function dependency configuration
 
 **Areas for improvement:**
+
 - Complete migration from legacy validation to Zod schemas
 - Standardize error response format (adopt RFC 7807/9457 with `application/problem+json`)
 - Implement request ID propagation (correlation IDs in response headers)

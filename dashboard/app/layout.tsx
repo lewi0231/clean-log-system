@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RivetUp - Field Service Management for Service Businesses",
+  title: "Tally Runner - Field Service Management for Service Businesses",
   description:
     "Manage your field workers, jobs, and invoicing in one place. Perfect for tradespeople, car detailers, and service contractors.",
 };
@@ -37,8 +37,7 @@ export default function RootLayout({
           <div
             className="fixed inset-0 -z-10"
             style={{
-              background:
-                "linear-gradient(135deg, #F9FAFB 0%, #FFFFFF 50%, #F9FAFB 100%)",
+              background: "linear-gradient(135deg, #F9FAFB 0%, #FFFFFF 50%, #F9FAFB 100%)",
             }}
           />
           <Nav />

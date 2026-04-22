@@ -5,7 +5,7 @@
 | **Stage**   | S3 — Detailed Action Plan (execute in order; checkboxes for tracking)        |
 | **From S2** | [`S2-worker-payment-split-weights.md`](./S2-worker-payment-split-weights.md) |
 | **Created** | 2026-04-22                                                                   |
-| **Product** | Clean Log                                                                    |
+| **Product** | Tally Runner                                                                 |
 
 ---
 

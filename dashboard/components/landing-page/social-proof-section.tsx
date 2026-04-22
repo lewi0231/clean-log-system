@@ -1,29 +1,26 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star } from "lucide-react";
 
 const testimonials = [
   {
-    quote: "RivetUp transformed how we manage our car yard detailing. The mobile app means our workers can log jobs on-site, and invoices go out automatically. We've cut our admin time in half.",
+    quote:
+      "Tally Runner transformed how we manage our car yard detailing. The mobile app means our workers can log jobs on-site, and invoices go out automatically. We've cut our admin time in half.",
     name: "Sarah Chen",
     business: "Auto Detail Pro, Melbourne",
     rating: 5,
   },
   {
-    quote: "As a solo operator, I needed something simple that didn't require a team to manage. RivetUp's mobile app lets me complete jobs and send invoices from my phone. Game changer.",
+    quote:
+      "As a solo operator, I needed something simple that didn't require a team to manage. Tally Runner's mobile app lets me complete jobs and send invoices from my phone. Game changer.",
     name: "Mike Thompson",
     business: "Thompson Electrical Services",
     rating: 5,
   },
   {
-    quote: "Managing 15 workers across 20 locations used to be chaos. Now with RivetUp, I can see all jobs in real-time, track worker performance, and invoice customers automatically. It's exactly what we needed.",
+    quote:
+      "Managing 15 workers across 20 locations used to be chaos. Now with Tally Runner, I can see all jobs in real-time, track worker performance, and invoice customers automatically. It's exactly what we needed.",
     name: "Lisa Rodriguez",
     business: "CleanSpace Commercial",
     rating: 5,
@@ -39,8 +36,8 @@ export function SocialProofSection() {
             Trusted by Service Businesses Nationwide
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            See how RivetUp is helping businesses like yours save time, get paid faster, and stop losing
-            revenue to incomplete or incorrect timesheets.
+            See how Tally Runner is helping businesses like yours save time, get paid faster, and
+            stop losing revenue to incomplete or incorrect timesheets.
           </p>
         </div>
 
@@ -77,9 +74,7 @@ export function SocialProofSection() {
                 </CardDescription>
                 <div>
                   <CardTitle className="text-sm">{testimonial.name}</CardTitle>
-                  <CardDescription className="text-sm">
-                    {testimonial.business}
-                  </CardDescription>
+                  <CardDescription className="text-sm">{testimonial.business}</CardDescription>
                 </div>
               </CardContent>
             </Card>

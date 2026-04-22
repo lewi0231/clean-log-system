@@ -6,7 +6,7 @@
 | **From S0**     | [`S0-worker-payment-split-weights.md`](./S0-worker-payment-split-weights.md) (2026-04-22) |
 | **Triaged**     | 2026-04-22                                                                                |
 | **Gold review** | 2026-04-22 — findings in **section 8**; mandates in **3.1**                               |
-| **Product**     | Clean Log (pricing, worker payments, rate cards)                                          |
+| **Product**     | Tally Runner (pricing, worker payments, rate cards)                                       |
 
 ---
 

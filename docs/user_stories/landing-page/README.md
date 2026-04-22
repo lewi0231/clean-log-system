@@ -1,10 +1,10 @@
 # Landing Page User Stories
 
-This directory contains user stories for the RivetUp landing page, based on UX/UI research and analysis of the codebase to understand product features and target audience.
+This directory contains user stories for the Tally Runner landing page, based on UX/UI research and analysis of the codebase to understand product features and target audience.
 
 ## Overview
 
-RivetUp is a SaaS platform for service-based businesses (tradespeople, car detailers, cleaning services) to manage field workers, jobs, and customer invoicing. The landing page must effectively communicate value, build trust, and convert visitors into trial users.
+Tally Runner is a SaaS platform for service-based businesses (tradespeople, car detailers, cleaning services) to manage field workers, jobs, and customer invoicing. The landing page must effectively communicate value, build trust, and convert visitors into trial users.
 
 ## Target Audience
 
@@ -15,9 +15,10 @@ RivetUp is a SaaS platform for service-based businesses (tradespeople, car detai
 ## Research Basis
 
 These user stories are informed by:
+
 - SaaS landing page UX/UI best practices (2026)
 - Field service management software landing page analysis
-- Codebase analysis of RivetUp features and capabilities
+- Codebase analysis of Tally Runner features and capabilities
 - Target audience understanding from testing scenarios
 
 ## User Stories
@@ -140,6 +141,7 @@ Track these metrics to measure landing page effectiveness:
 ## Technical Implementation Details
 
 ### Analytics Tracking
+
 - Implement Google Analytics 4 or similar for all user interactions
 - Track CTA clicks, form submissions, scroll depth, and time on page
 - Set up conversion tracking for signup events
@@ -147,6 +149,7 @@ Track these metrics to measure landing page effectiveness:
 - Track mobile vs desktop conversion rates
 
 ### A/B Testing Framework
+
 - Implement A/B testing capability for key elements:
   - Hero headlines and subheadlines
   - CTA button text and placement
@@ -158,6 +161,7 @@ Track these metrics to measure landing page effectiveness:
 - Set up statistical significance tracking
 
 ### Performance Optimization
+
 - Implement Core Web Vitals monitoring
 - Optimize images: WebP format with fallbacks, lazy loading, responsive images
 - Code splitting and dynamic imports for below-fold content
@@ -166,6 +170,7 @@ Track these metrics to measure landing page effectiveness:
 - Monitor and optimize Largest Contentful Paint (LCP), First Input Delay (FID), and Cumulative Layout Shift (CLS)
 
 ### SEO and Accessibility
+
 - Implement structured data (JSON-LD) for business information
 - Optimize meta tags, Open Graph, and Twitter Card tags
 - Ensure semantic HTML structure

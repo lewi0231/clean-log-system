@@ -6,52 +6,64 @@ import { cn } from "@/lib/utils";
 
 const faqs = [
   {
-    question: "How much does RivetUp cost?",
-    answer: "RivetUp offers three pricing plans: Starter at $39/month for solo operators, Professional at $79/month for small teams (most popular), and Business at $149/month for growing companies. All plans include a 14-day free trial with no credit card required.",
+    question: "How much does Tally Runner cost?",
+    answer:
+      "Tally Runner offers three pricing plans: Starter at $39/month for solo operators, Professional at $79/month for small teams (most popular), and Business at $149/month for growing companies. All plans include a 14-day free trial with no credit card required.",
   },
   {
-    question: "Can I configure RivetUp myself—or do I need custom development?",
-    answer: "You configure everything yourself. Set up job forms, pricing rules, and locations (static sites like car yards or one-off addresses) in your dashboard. No custom builds, no long waits—you're in control from day one.",
+    question: "Can I configure Tally Runner myself—or do I need custom development?",
+    answer:
+      "You configure everything yourself. Set up job forms, pricing rules, and locations (static sites like car yards or one-off addresses) in your dashboard. No custom builds, no long waits—you're in control from day one.",
   },
   {
     question: "Do my workers need to install an app?",
-    answer: "The RivetUp mobile app (coming soon) lets workers complete jobs on their phones with optional offline sync. You can also use the web on any device—phones, tablets, or PCs—with no install. Just sign in and go.",
+    answer:
+      "The Tally Runner mobile app (coming soon) lets workers complete jobs on their phones with optional offline sync. You can also use the web on any device—phones, tablets, or PCs—with no install. Just sign in and go.",
   },
   {
     question: "Is there a free trial?",
-    answer: "Yes! We offer a 14-day free trial with no credit card required. You can explore all features, set up your job forms, configure pricing rules, and invite workers to test the mobile app.",
+    answer:
+      "Yes! We offer a 14-day free trial with no credit card required. You can explore all features, set up your job forms, configure pricing rules, and invite workers to test the mobile app.",
   },
   {
     question: "Can I cancel anytime?",
-    answer: "Absolutely. You can cancel your subscription at any time with no long-term contracts. Your data remains accessible for 30 days after cancellation, and you can export all your information.",
+    answer:
+      "Absolutely. You can cancel your subscription at any time with no long-term contracts. Your data remains accessible for 30 days after cancellation, and you can export all your information.",
   },
   {
     question: "How does the mobile app work?",
-    answer: "The RivetUp mobile app (coming soon) allows your workers to complete jobs on-site with custom forms tailored to your business. Jobs sync instantly to your dashboard, and invoices are generated automatically. The app works offline and syncs when connection is available.",
+    answer:
+      "The Tally Runner mobile app (coming soon) allows your workers to complete jobs on-site with custom forms tailored to your business. Jobs sync instantly to your dashboard, and invoices are generated automatically. The app works offline and syncs when connection is available.",
   },
   {
     question: "Can I customize job forms for my business?",
-    answer: "Yes, that's one of RivetUp's key features. You can create custom job forms with fields like quantities, photos, checklists, time tracking, materials, and signatures. Forms are tailored to your specific industry and services.",
+    answer:
+      "Yes, that's one of Tally Runner's key features. You can create custom job forms with fields like quantities, photos, checklists, time tracking, materials, and signatures. Forms are tailored to your specific industry and services.",
   },
   {
     question: "How long does setup take?",
-    answer: "Most businesses are up and running in 15-30 minutes. Our onboarding wizard guides you through setting up workers, configuring job forms, and establishing pricing rules. Our support team is available if you need help.",
+    answer:
+      "Most businesses are up and running in 15-30 minutes. Our onboarding wizard guides you through setting up workers, configuring job forms, and establishing pricing rules. Our support team is available if you need help.",
   },
   {
     question: "Can I manage static locations and one-off jobs?",
-    answer: "Yes. RivetUp supports both fixed locations (car yards, recurring sites) and one-off job addresses—each with its own pricing and rules. Perfect for businesses that mix recurring customers with ad-hoc jobs.",
+    answer:
+      "Yes. Tally Runner supports both fixed locations (car yards, recurring sites) and one-off job addresses—each with its own pricing and rules. Perfect for businesses that mix recurring customers with ad-hoc jobs.",
   },
   {
-    question: "Is RivetUp good for solo operators?",
-    answer: "Definitely! Many of our customers are solo operators who love how RivetUp eliminates paperwork and automates invoicing. The Starter plan is specifically designed for solo businesses.",
+    question: "Is Tally Runner good for solo operators?",
+    answer:
+      "Definitely! Many of our customers are solo operators who love how Tally Runner eliminates paperwork and automates invoicing. The Starter plan is specifically designed for solo businesses.",
   },
   {
     question: "What payment methods do you accept?",
-    answer: "We accept all major credit cards (Visa, MasterCard, American Express) and use Stripe for secure payment processing. Customer payments are processed automatically when invoices are sent.",
+    answer:
+      "We accept all major credit cards (Visa, MasterCard, American Express) and use Stripe for secure payment processing. Customer payments are processed automatically when invoices are sent.",
   },
   {
     question: "Do you offer annual billing discounts?",
-    answer: "Yes, we offer a 10% discount for annual billing on all plans. Contact our sales team for annual pricing options.",
+    answer:
+      "Yes, we offer a 10% discount for annual billing on all plans. Contact our sales team for annual pricing options.",
   },
 ];
 
@@ -76,7 +88,7 @@ export function FAQSection() {
             Frequently Asked Questions
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Everything you need to know about getting started with RivetUp.
+            Everything you need to know about getting started with Tally Runner.
           </p>
         </div>
 
@@ -96,9 +108,7 @@ export function FAQSection() {
                 />
               </button>
               {openItems.has(index) && (
-                <div className="pb-4 text-muted-foreground">
-                  {faq.answer}
-                </div>
+                <div className="pb-4 text-muted-foreground">{faq.answer}</div>
               )}
             </div>
           ))}

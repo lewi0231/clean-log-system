@@ -1,11 +1,11 @@
 # S1 — Triage: Job log → team chat notifications (WhatsApp-first, channel-agnostic)
 
-| Field       | Value                                         |
-| ----------- | --------------------------------------------- |
-| **Stage**   | S1 — Triage (feasibility, risk, phased scope) |
-| **From S0** | 2026-04-11                                    |
-| **Triaged** | 2026-04-12                                    |
-| **Product** | Clean Log (organization / worker job logging) |
+| Field       | Value                                            |
+| ----------- | ------------------------------------------------ |
+| **Stage**   | S1 — Triage (feasibility, risk, phased scope)    |
+| **From S0** | 2026-04-11                                       |
+| **Triaged** | 2026-04-12                                       |
+| **Product** | Tally Runner (organization / worker job logging) |
 
 ---
 

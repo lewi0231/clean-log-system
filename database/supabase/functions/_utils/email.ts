@@ -2,6 +2,7 @@
 // Provides email sending functionality using Resend API
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { APP_DISPLAY_NAME } from "./brand.ts";
 import { createLoggerWithoutRequest } from "./logger.ts";
 import { resolveOrgMailFrom } from "./org-mail-from.ts";
 
@@ -339,7 +340,7 @@ export async function sendWorkerInvitationEmail(
     to: [testRecipient],
     subject: emailSubject,
     // template: {
-    //   id: "cleanlogworkerinvite",
+    //   id: "tallyrunnerworkerinvite",
     //   variables: emailData.templateVariables,
     // },
     html:
@@ -2161,7 +2162,7 @@ export async function sendAdminInvitationEmail(
         <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
           <h2 style="color: #2563eb;">You're Invited to Join ${data.organizationName}</h2>
           <p>Hi ${userName},</p>
-          <p>You've been invited to join <strong>${data.organizationName}</strong> as a <strong>${roleName}</strong> on the Clean Log dashboard.</p>
+          <p>You've been invited to join <strong>${data.organizationName}</strong> as a <strong>${roleName}</strong> on the ${APP_DISPLAY_NAME} dashboard.</p>
           <p>${
     data.role === "admin"
       ? "As an Administrator, you'll be able to manage workers, jobs, invoices, and organization settings."

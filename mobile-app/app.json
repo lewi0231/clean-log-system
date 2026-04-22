@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "clean-log-system",
-    "slug": "clean-log-system",
+    "name": "Tally Runner",
+    "slug": "tally-runner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "cleanlogsystem",
+    "scheme": "tallyrunner",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -20,7 +20,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.paullewis1308.cleanlogsystem"
+      "package": "com.paullewis1308.tallyrunner"
     },
     "web": {
       "output": "static",

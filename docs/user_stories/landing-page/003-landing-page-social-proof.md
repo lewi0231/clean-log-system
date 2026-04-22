@@ -6,13 +6,14 @@ Social proof builds trust and credibility, especially important for small busine
 
 ## User Story
 
-**As a** small business owner considering RivetUp  
-**I want to** see that other businesses like mine are using and benefiting from RivetUp  
-**So that** I feel confident that RivetUp is a trustworthy solution that works for businesses like mine
+**As a** small business owner considering Tally Runner  
+**I want to** see that other businesses like mine are using and benefiting from Tally Runner  
+**So that** I feel confident that Tally Runner is a trustworthy solution that works for businesses like mine
 
 ## Acceptance Criteria
 
 ### 1. Testimonials Section
+
 - Minimum 3 testimonials from real customers
 - Testimonials from target industries (car detailers, tradespeople, service businesses)
 - Each testimonial includes:
@@ -23,6 +24,7 @@ Social proof builds trust and credibility, especially important for small busine
   - Star rating (5 stars)
 
 ### 2. Testimonial Content Guidelines
+
 - Focus on specific outcomes, not vague praise
 - Include metrics when possible: "Saved 5 hours per week", "Get paid 3x faster"
 - Address common objections: "Easy to set up", "Works great for small teams"
@@ -31,45 +33,53 @@ Social proof builds trust and credibility, especially important for small busine
 ### 3. Testimonial Examples
 
 **Example 1: Car Detailer**
-> "RivetUp transformed how we manage our car yard detailing. The mobile app means our workers can log jobs on-site, and invoices go out automatically. We've cut our admin time in half."
-> 
+
+> "Tally Runner transformed how we manage our car yard detailing. The mobile app means our workers can log jobs on-site, and invoices go out automatically. We've cut our admin time in half."
+>
 > — Sarah Chen, Auto Detail Pro, Melbourne
 
 **Example 2: Tradesperson**
-> "As a solo operator, I needed something simple that didn't require a team to manage. RivetUp's mobile app lets me complete jobs and send invoices from my phone. Game changer."
-> 
+
+> "As a solo operator, I needed something simple that didn't require a team to manage. Tally Runner's mobile app lets me complete jobs and send invoices from my phone. Game changer."
+>
 > — Mike Thompson, Thompson Electrical Services
 
 **Example 3: Cleaning Service**
-> "Managing 15 workers across 20 locations used to be chaos. Now with RivetUp, I can see all jobs in real-time, track worker performance, and invoice customers automatically. It's exactly what we needed."
-> 
+
+> "Managing 15 workers across 20 locations used to be chaos. Now with Tally Runner, I can see all jobs in real-time, track worker performance, and invoice customers automatically. It's exactly what we needed."
+>
 > — Lisa Rodriguez, CleanSpace Commercial
 
 ### 4. Usage Statistics
+
 - Display key metrics prominently:
-  - "100+ service businesses trust RivetUp"
+  - "100+ service businesses trust Tally Runner"
   - "2,500+ jobs completed monthly"
   - "95% customer satisfaction"
   - "Average setup time: 15 minutes"
 
 ### 5. Customer Logos (If Available)
+
 - Display logos of recognizable customers (if any)
 - Or display industry badges: "Trusted by Car Detailers", "Used by Tradespeople"
 - Professional, high-quality logo display
 
 ### 6. Case Study Section (Optional)
+
 - Link to detailed case study
 - Highlights specific business transformation
 - Includes before/after metrics
 - Shows real screenshots of their setup
 
 ### 7. Trust Badges
+
 - Security certifications (if applicable)
 - Data protection statements
 - "Australian-owned" or location-specific trust signals
 - Payment security badges (Stripe, etc.)
 
 ### 8. Review Aggregation
+
 - If available, show aggregate review score
 - Link to review platform (Google Reviews, Trustpilot, etc.)
 - Display recent review snippets
@@ -85,18 +95,21 @@ Social proof builds trust and credibility, especially important for small busine
 ## Presentation Options
 
 ### Option A: Testimonial Carousel
+
 - Rotating testimonials
 - Navigation dots or arrows
 - Auto-rotate with pause on hover
 - Mobile-friendly swipe gestures
 
 ### Option B: Grid Layout
+
 - 3 testimonials in a row (desktop)
 - Stacked on mobile
 - Equal card heights
 - Visual consistency
 
 ### Option C: Alternating Layout
+
 - Large testimonial quote
 - Customer photo/logo prominent
 - Business details below
@@ -105,11 +118,13 @@ Social proof builds trust and credibility, especially important for small busine
 ## Content Guidelines
 
 ### Testimonial Structure
+
 1. **Hook**: Specific problem or pain point
-2. **Solution**: How RivetUp helped
+2. **Solution**: How Tally Runner helped
 3. **Result**: Concrete outcome or benefit
 
 ### Statistics to Highlight
+
 - Number of active customers
 - Jobs processed
 - Time saved

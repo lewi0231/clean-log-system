@@ -2,7 +2,7 @@ import DashboardLayout from "@/components/dashboard-layout";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard | Fieldly",
+  title: "Dashboard | Tally Runner",
   description: "Manage your organization's workers, locations, and jobs",
 };
 

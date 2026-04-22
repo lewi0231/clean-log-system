@@ -6,13 +6,14 @@ An FAQ section addresses common objections and questions, reducing friction in t
 
 ## User Story
 
-**As a** potential customer with questions about RivetUp  
+**As a** potential customer with questions about Tally Runner  
 **I want to** find answers to common questions quickly  
 **So that** I can make an informed decision without having to contact support
 
 ## Acceptance Criteria
 
 ### 1. FAQ Categories
+
 - **Pricing & Billing** (most common)
 - **Features & Functionality**
 - **Setup & Onboarding**
@@ -22,7 +23,8 @@ An FAQ section addresses common objections and questions, reducing friction in t
 ### 2. Essential FAQs
 
 #### Pricing & Billing
-- "How much does RivetUp cost?"
+
+- "How much does Tally Runner cost?"
 - "Is there a free trial?"
 - "Can I cancel anytime?"
 - "Do you offer annual billing discounts?"
@@ -30,6 +32,7 @@ An FAQ section addresses common objections and questions, reducing friction in t
 - "What payment methods do you accept?"
 
 #### Features & Functionality
+
 - "Can I customize job forms for my business?"
 - "How does the mobile app work?"
 - "Can I set up custom pricing rules?"
@@ -39,20 +42,23 @@ An FAQ section addresses common objections and questions, reducing friction in t
 - "How does automated invoicing work?"
 
 #### Setup & Onboarding
+
 - "How long does setup take?"
-- "Do I need technical knowledge to use RivetUp?"
+- "Do I need technical knowledge to use Tally Runner?"
 - "Can I import my existing data?"
 - "Is training provided?"
 - "What happens after I sign up?"
 
 #### Industry-Specific
-- "Is RivetUp good for car detailing businesses?"
+
+- "Is Tally Runner good for car detailing businesses?"
 - "Can I use it for trades like electrical or plumbing?"
 - "Does it work for solo operators?"
 - "Can I manage recurring jobs?"
 - "How does it handle location-based pricing?"
 
 #### Technical & Security
+
 - "Is my data secure?"
 - "Where is my data stored?"
 - "Can I export my data?"
@@ -63,24 +69,28 @@ An FAQ section addresses common objections and questions, reducing friction in t
 ### 3. FAQ Presentation Format
 
 #### Option A: Accordion Style (Recommended)
+
 - Expandable/collapsible questions
 - Clean, scannable list
 - Easy to find specific questions
 - Mobile-friendly
 
 #### Option B: Tabbed Interface
+
 - Questions grouped by category
 - Tabs for each category
 - Good for many FAQs
 - More organized
 
 #### Option C: Simple List
+
 - All questions visible
 - Expandable answers
 - Good for small FAQ sets
 - Less navigation needed
 
 ### 4. Answer Guidelines
+
 - **Concise**: 2-4 sentences per answer
 - **Clear**: Direct, jargon-free language
 - **Helpful**: Address the underlying concern
@@ -88,11 +98,13 @@ An FAQ section addresses common objections and questions, reducing friction in t
 - **Honest**: Don't oversell or make false promises
 
 ### 5. Search Functionality (If Many FAQs)
+
 - Search bar to find specific questions
 - Filters by category
 - Highlights search terms in results
 
 ### 6. Related Links
+
 - Link to relevant features from answers
 - Link to pricing page from pricing FAQs
 - Link to signup from relevant answers
@@ -109,11 +121,13 @@ An FAQ section addresses common objections and questions, reducing friction in t
 ## Content Guidelines
 
 ### Question Format
+
 - Start with question words: "How", "What", "Can", "Does", "Is"
 - Be specific: "How does automated invoicing work?" not "Invoicing?"
 - Use natural language: "Can I cancel anytime?" not "Cancellation policy?"
 
 ### Answer Format
+
 - Direct answer in first sentence
 - Additional context in following sentences
 - Include examples when helpful

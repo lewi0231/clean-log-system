@@ -7,7 +7,7 @@
 | **Created**            | 2026-04-22                                                                                                                                      |
 | **Gold review**        | 2026-04-12 — §14                                                                                                                                |
 | **Adversarial review** | 2026-04-12 — §15                                                                                                                                |
-| **Product**            | Clean Log                                                                                                                                       |
+| **Product**            | Tally Runner                                                                                                                                    |
 
 **Scope lock:** This DAP implements **v1** per S2 §2 / §5. **Out of scope:** per-org Supabase Auth `From`, BYO SMTP, multiple domains per org, optional **§14.3** webhooks/tags (listed as **Phase 1b** unless product pulls forward). _§8 is an optional **tangential** cleanup (`worker_payment_allocation` in `calculate-worker-payment`) only if that dead code exists — not part of core mail deliverables._
 
@@ -31,7 +31,7 @@
 - **PRESERVE-1:** When org has **no** verified custom domain, all sends behave as **today** (platform `RESEND_FROM_DOMAIN` + existing display names per mail kind), except where S2 **explicitly** changes copy (e.g. feedback `from` gains org display name).
 - **PRESERVE-2:** `validateEmailConfig()`, `RESEND_TEST_MODE`, `SKIP_EMAIL_SENDING` behavior for **invoice/payment/feedback** paths that already honor them — keep semantics; only change **`from` construction** and add **`resolveOrgMailFrom`** where needed.
 - **PRESERVE-3:** `RESEND_ADMIN_INVITES_FROM_DOMAIN` **precedence** over org domain for **admin invitation** mail only — see S2 **§4.4** steps **2–3**; lock with unit tests.
-- **PRESERVE-4:** **Org signup verification** mail stays **platform** domain + **Clean Log** display name (S2 **§4.4** step **1**).
+- **PRESERVE-4:** **Org signup verification** mail stays **platform** domain + **Tally Runner** display name (S2 **§4.4** step **1**).
 - **PRESERVE-5:** **Display name** and **`From`**-building inputs are safe for **RFC 5322** / Resend: no raw **CR/LF** or control characters from `organizationName` (or other user-influenced labels) in envelope fields (see **§3.2** / **§15**).
 
 ---
@@ -233,16 +233,16 @@ Red-team pass on this DAP: **trust boundaries**, **abuse**, and **edge cases** n
 
 ### 15.2 Abuse cases and DAP coverage
 
-| Attack / failure                                     | How it hurts                                                          | Mitigation in S4                                                                                                                 |
-| ---------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **IDOR** on refresh/remove                           | Read/update **another** tenant’s DNS / status                         | **§6.0** + tests §11.                                                                                                            |
-| **Domain swap** / **double** Resend create           | **Quota** + orphan domains; inconsistent DB                           | **§6.1b** + **Orphan** paragraph after **§6**.                                                                                   |
-| **CRLF in `organizationName`**                       | **Header split**, second **From**, log injection                      | **§3.2** note + **PRESERVE-5** + §11.                                                                                            |
-| **Resend** account **domain cap**                    | All **registers** fail; support storm                                 | **§6.3b**; ops **P2**; dashboard message.                                                                                        |
-| **“Domain in use”** error                            | **Intelligence** to attackers (“someone in Clean Log uses this name”) | _Residual:_ use **neutral** copy if product wants; S2 **§4.2** already requires clear failure — don’t list **other org’s** name. |
-| **Concurrent** two admins, **register** + **remove** | Last op wins; odd transient state                                     | S3 **§7**; **§6.1b**; _residual_ rare — document support “**refresh** and retry.”                                                |
-| **Service role in resolver**                         | If **`organizationId`** is **forged** by caller of `email.ts`         | Callers must pass **org from job/invoice** only — **S2 §4.5**; add **code review** gate on every `resolveOrgMailFrom` callsite.  |
-| **Stolen JWT** (short-lived)                         | Attacker is **legit** admin for that org — **cannot** other org       | **§6.0** still prevents **cross-tenant**; _accepted_ S2 **§13.1** compromised admin.                                             |
+| Attack / failure                                     | How it hurts                                                             | Mitigation in S4                                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| **IDOR** on refresh/remove                           | Read/update **another** tenant’s DNS / status                            | **§6.0** + tests §11.                                                                                                            |
+| **Domain swap** / **double** Resend create           | **Quota** + orphan domains; inconsistent DB                              | **§6.1b** + **Orphan** paragraph after **§6**.                                                                                   |
+| **CRLF in `organizationName`**                       | **Header split**, second **From**, log injection                         | **§3.2** note + **PRESERVE-5** + §11.                                                                                            |
+| **Resend** account **domain cap**                    | All **registers** fail; support storm                                    | **§6.3b**; ops **P2**; dashboard message.                                                                                        |
+| **“Domain in use”** error                            | **Intelligence** to attackers (“someone in Tally Runner uses this name”) | _Residual:_ use **neutral** copy if product wants; S2 **§4.2** already requires clear failure — don’t list **other org’s** name. |
+| **Concurrent** two admins, **register** + **remove** | Last op wins; odd transient state                                        | S3 **§7**; **§6.1b**; _residual_ rare — document support “**refresh** and retry.”                                                |
+| **Service role in resolver**                         | If **`organizationId`** is **forged** by caller of `email.ts`            | Callers must pass **org from job/invoice** only — **S2 §4.5**; add **code review** gate on every `resolveOrgMailFrom` callsite.  |
+| **Stolen JWT** (short-lived)                         | Attacker is **legit** admin for that org — **cannot** other org          | **§6.0** still prevents **cross-tenant**; _accepted_ S2 **§13.1** compromised admin.                                             |
 
 ### 15.3 Supply chain / config
 

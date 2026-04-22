@@ -1,6 +1,6 @@
 # User Stories
 
-This directory contains user stories for new features and feature updates for the Clean Log System platform.
+This directory contains user stories for new features and feature updates for the Tally Runner (monorepo) platform.
 
 ## Structure
 

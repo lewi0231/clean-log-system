@@ -32,10 +32,7 @@ const WorkerSignupSchema = z.object({
       (password) => /[a-z]/.test(password),
       "Password must contain at least one lowercase letter"
     )
-    .refine(
-      (password) => /[0-9]/.test(password),
-      "Password must contain at least one number"
-    ),
+    .refine((password) => /[0-9]/.test(password), "Password must contain at least one number"),
   address: z.string().min(1, "Address is required"),
   abn: z.string().min(1, "ABN is required"),
 });
@@ -87,7 +84,7 @@ function AcceptInvitePage() {
         log.debug("Accept Invite: Fetching invitation details", { hasToken: !!token });
         const data = await invokeEdgeFunction<{ invitation?: { worker_email?: string } }>(
           "get-worker",
-          token,
+          token
         );
 
         if (data?.invitation) {
@@ -97,9 +94,7 @@ function AcceptInvitePage() {
         }
       } catch (err) {
         const message =
-          err instanceof Error
-            ? err.message
-            : "Failed to load invitation. Please try again.";
+          err instanceof Error ? err.message : "Failed to load invitation. Please try again.";
         log.error("Accept Invite: Error fetching invitation", {
           error: message,
         });
@@ -130,7 +125,7 @@ function AcceptInvitePage() {
           password: validatedData.password,
           address: validatedData.address,
           abn: validatedData.abn,
-        },
+        }
       );
 
       if (data?.error) {
@@ -148,9 +143,7 @@ function AcceptInvitePage() {
         log.error("Accept Invite: Failed", { error: error.message });
         // Don't set error if it's a validation error (already set)
         if (!error.message.includes("Validation failed")) {
-          setError(
-            error.message || "An unexpected error occurred. Please try again."
-          );
+          setError(error.message || "An unexpected error occurred. Please try again.");
         }
       }
     } finally {
@@ -177,7 +170,7 @@ function AcceptInvitePage() {
     <div className="h-screen w-full flex justify-center items-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Set Up Your Fieldly Account</CardTitle>
+          <CardTitle>Set Up Your Tally Runner Account</CardTitle>
           <CardDescription>
             {workerEmail
               ? `Creating account for ${workerEmail}`
@@ -203,8 +196,8 @@ function AcceptInvitePage() {
                 required
               />
               <p className="text-xs text-muted-foreground">
-                You&apos;ll use this to log into the Fieldly mobile app that
-                you&apos;ll install later.
+                You&apos;ll use this to log into the Tally Runner mobile app that you&apos;ll
+                install later.
               </p>
             </div>
             <div className="space-y-2">
@@ -246,11 +239,7 @@ function AcceptInvitePage() {
             {error && <p className="text-sm text-destructive">{error}</p>}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4 mt-4">
-            <Button
-              className="w-full cursor-pointer"
-              type="submit"
-              disabled={loading}
-            >
+            <Button className="w-full cursor-pointer" type="submit" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOnboardingStatus } from "@/hooks/use-onboarding-status";
 import useOrganization from "@/hooks/useOrganization";
 import { CreditCard, MapPin, Smartphone, Users } from "lucide-react";
@@ -26,8 +20,7 @@ interface SetupStep {
 export default function GuidedSetupPage() {
   const router = useRouter();
   const { loading: orgLoading } = useOrganization();
-  const { onboardingStatus, loading: onboardingLoading } =
-    useOnboardingStatus();
+  const { onboardingStatus, loading: onboardingLoading } = useOnboardingStatus();
 
   const loading = orgLoading || onboardingLoading;
   const onboardingData = onboardingStatus?.data || null;
@@ -36,10 +29,7 @@ export default function GuidedSetupPage() {
     const steps: SetupStep[] = [];
 
     // Step 1: Add Workers (if they have employees)
-    if (
-      onboardingData?.employee_count &&
-      onboardingData.employee_count !== "none"
-    ) {
+    if (onboardingData?.employee_count && onboardingData.employee_count !== "none") {
       steps.push({
         id: "workers",
         title: "Add Your Workers",
@@ -66,8 +56,7 @@ export default function GuidedSetupPage() {
     steps.push({
       id: "mobile-config",
       title: "Customize Mobile App Forms",
-      description:
-        "Configure the forms your workers will use in the mobile app",
+      description: "Configure the forms your workers will use in the mobile app",
       href: "/dashboard/mobile-config",
       icon: Smartphone,
       required: true,
@@ -105,12 +94,10 @@ export default function GuidedSetupPage() {
   return (
     <div className="container max-w-4xl py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">
-          Let&apos;s Get You Set Up
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Let&apos;s Get You Set Up</h1>
         <p className="text-muted-foreground">
-          Complete these steps to start using Fieldly. You can always
-          come back to finish later.
+          Complete these steps to start using Tally Runner. You can always come back to finish
+          later.
         </p>
       </div>
 
@@ -133,9 +120,7 @@ export default function GuidedSetupPage() {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <CardTitle className="text-lg">
-                              {step.title}
-                            </CardTitle>
+                            <CardTitle className="text-lg">{step.title}</CardTitle>
                             <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                               Step {index + 1}
                             </span>
@@ -173,9 +158,7 @@ export default function GuidedSetupPage() {
                           </div>
                         </div>
                         <div className="flex-1">
-                          <CardTitle className="text-lg">
-                            {step.title}
-                          </CardTitle>
+                          <CardTitle className="text-lg">{step.title}</CardTitle>
                           <CardDescription>{step.description}</CardDescription>
                         </div>
                         <div className="shrink-0">
@@ -199,8 +182,7 @@ export default function GuidedSetupPage() {
               <div>
                 <p className="font-medium mb-1">Ready to continue?</p>
                 <p className="text-sm text-muted-foreground">
-                  You can always come back to complete these steps later from
-                  your dashboard.
+                  You can always come back to complete these steps later from your dashboard.
                 </p>
               </div>
               <Button onClick={handleCompleteSetup} size="lg">
