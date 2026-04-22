@@ -213,11 +213,13 @@ serve(async (req) => {
     // the required token/hash.
     const invitationLink = linkData.properties.action_link;
     const emailResult = await sendAdminInvitationEmail(
+      supabase,
       {
         email,
         firstName: first_name,
         lastName: last_name,
         organizationName: organizationName || "Your Organization",
+        organizationId: organization_id,
         invitationLink,
         role,
       },

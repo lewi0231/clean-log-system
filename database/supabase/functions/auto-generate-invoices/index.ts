@@ -563,13 +563,18 @@ serve(async (req: Request) => {
               const reviewUrl =
                 `${baseUrl}/dashboard/invoicing?status=pending_review`;
 
-              const emailResult = await sendAdminInvoiceNotificationEmail({
-                organizationName,
-                recipientEmails: adminEmails,
-                invoiceCount: generatedInvoices.length,
-                invoices: generatedInvoices,
-                reviewUrl,
-              }, false);
+              const emailResult = await sendAdminInvoiceNotificationEmail(
+                supabase,
+                {
+                  organizationName,
+                  organizationId: org.id,
+                  recipientEmails: adminEmails,
+                  invoiceCount: generatedInvoices.length,
+                  invoices: generatedInvoices,
+                  reviewUrl,
+                },
+                false,
+              );
 
               if (emailResult.success) {
                 logger.info("Admin notification email sent", {

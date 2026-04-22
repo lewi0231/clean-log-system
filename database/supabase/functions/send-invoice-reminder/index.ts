@@ -184,9 +184,10 @@ serve(async (req: Request) => {
     const invoiceUrl = baseUrl ? `${baseUrl}/invoice/${invoice_id}` : undefined;
 
     // Send the reminder email
-    const emailResult = await sendInvoiceReminderEmail({
+    const emailResult = await sendInvoiceReminderEmail(supabase, {
       invoiceNumber: invoice.invoice_number,
       organizationName: organization.name,
+      organizationId: invoice.organization_id,
       recipientEmails,
       invoiceUrl,
       paymentLinkUrl: invoice.payment_link_url || undefined,

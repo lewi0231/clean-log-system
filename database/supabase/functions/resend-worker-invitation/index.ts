@@ -147,10 +147,12 @@ serve(async (req) => {
 
     // Send invitation email using shared utility
     const emailResult = await sendWorkerInvitationEmail(
+      supabase,
       {
         workerName: worker.name,
         workerEmail: worker.email,
         organizationName: orgName,
+        organizationId: organization_id,
         invitationToken,
       },
       true, // throw on error

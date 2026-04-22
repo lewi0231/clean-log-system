@@ -108,10 +108,12 @@ serve(async (req) => {
 
     // Send invitation email (don't throw on error - worker and invitation are already created)
     const emailResult = await sendWorkerInvitationEmail(
+      supabase,
       {
         workerName: name, // Use computed name for email
         workerEmail: email,
         organizationName: orgName,
+        organizationId: organization_id,
         invitationToken,
       },
       false,

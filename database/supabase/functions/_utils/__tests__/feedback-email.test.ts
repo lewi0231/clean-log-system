@@ -21,6 +21,34 @@ import type {
   JobContext,
 } from "../invoice-email.ts";
 
+/** Supabase mock so `resolveOrgMailFrom` falls back to platform domain */
+const createMailResolverSupabase = (): SupabaseClient => {
+  return {
+    from: (table: string) => {
+      if (table === "organization") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: { custom_email_domain_enabled: false },
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+      };
+    },
+  } as unknown as SupabaseClient;
+};
+
 // Mock supabase client for Deno tests
 const createMockSupabase = () => {
   let mockSingleResponse: { data: unknown; error: unknown } | null = null;
@@ -228,6 +256,7 @@ Deno.test("P0: should send to test address when RESEND_TEST_MODE=true", async ()
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -256,7 +285,11 @@ Deno.test("P0: should send to test address when RESEND_TEST_MODE=true", async ()
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -305,6 +338,7 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE=false", async
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -333,7 +367,11 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE=false", async
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -377,6 +415,7 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE unset", async
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -405,7 +444,11 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE unset", async
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -443,6 +486,7 @@ Deno.test("P0: should handle missing FEEDBACK_REVIEW_BASE_URL gracefully", async
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -450,7 +494,11 @@ Deno.test("P0: should handle missing FEEDBACK_REVIEW_BASE_URL gracefully", async
     feedbackReviewUrl: "https://test.com/review/test-token-123",
   };
 
-  const result = await sendFeedbackRequestEmail(emailData, false);
+  const result = await sendFeedbackRequestEmail(
+    createMailResolverSupabase(),
+    emailData,
+    false,
+  );
 
   assertEquals(result.success, false);
   assertEquals(
@@ -472,6 +520,7 @@ Deno.test("P0: should handle Resend API errors gracefully", async () => {
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -494,7 +543,11 @@ Deno.test("P0: should handle Resend API errors gracefully", async () => {
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, false);
     assertExists(result.error);
@@ -517,6 +570,7 @@ Deno.test("P0: should return email ID on successful send", async () => {
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -539,7 +593,11 @@ Deno.test("P0: should return email ID on successful send", async () => {
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, true);
     assertEquals(result.emailId, "resend-email-id-456");

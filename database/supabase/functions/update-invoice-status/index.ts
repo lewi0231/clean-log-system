@@ -414,6 +414,7 @@ serve(async (req: Request) => {
       const emailData: InvoiceEmailData = {
         invoiceNumber: invoice.invoice_number,
         organizationName,
+        organizationId: invoice.organization_id,
         recipientEmails: emailRecipients,
         total: invoice.total,
         currency: invoice.currency || "AUD",
@@ -432,7 +433,7 @@ serve(async (req: Request) => {
         has_payment_link: !!paymentLinkUrl,
       });
 
-      const emailResult = await sendInvoiceEmail(emailData, false);
+      const emailResult = await sendInvoiceEmail(supabase, emailData, false);
 
       if (!emailResult.success) {
         logger.error("Failed to send invoice email", undefined, {

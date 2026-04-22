@@ -9,14 +9,12 @@ import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { OrganizationSettings } from "@/lib/types";
 import useOrganization from "./useOrganization";
 
-async function fetchOrganizationSettings(
-  organizationId: string,
-): Promise<OrganizationSettings> {
+async function fetchOrganizationSettings(organizationId: string): Promise<OrganizationSettings> {
   const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
     "get-organization-settings",
     {
       organization_id: organizationId,
-    },
+    }
   );
 
   if (!data?.settings) {
@@ -33,8 +31,7 @@ async function fetchOrganizationSettings(
     primary_contact_phone: data.settings.primary_contact_phone ?? null,
     business_address: data.settings.business_address ?? null,
     invoice_send_immediately: data.settings.invoice_send_immediately ?? false,
-    feedback_email_send_immediately:
-      data.settings.feedback_email_send_immediately ?? false,
+    feedback_email_send_immediately: data.settings.feedback_email_send_immediately ?? false,
     rating_config: data.settings.rating_config ?? {
       type: "single",
       dimensions: ["overall"],
@@ -43,21 +40,18 @@ async function fetchOrganizationSettings(
     payment_provider: data.settings.payment_provider ?? null,
     currency: data.settings.currency ?? "AUD",
     locale: data.settings.locale ?? "en-AU",
-    default_exclusive_group_label:
-      data.settings.default_exclusive_group_label ?? null,
-    auto_generate_invoices_immediately:
-      data.settings.auto_generate_invoices_immediately ?? false,
+    default_exclusive_group_label: data.settings.default_exclusive_group_label ?? null,
+    auto_generate_invoices_immediately: data.settings.auto_generate_invoices_immediately ?? false,
     bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
-    bank_transfer_account_number: data.settings.bank_transfer_account_number ??
-      null,
-    bank_transfer_account_name: data.settings.bank_transfer_account_name ??
-      null,
-    show_bank_transfer_on_invoices:
-      data.settings.show_bank_transfer_on_invoices ?? true,
+    bank_transfer_account_number: data.settings.bank_transfer_account_number ?? null,
+    bank_transfer_account_name: data.settings.bank_transfer_account_name ?? null,
+    show_bank_transfer_on_invoices: data.settings.show_bank_transfer_on_invoices ?? true,
     default_invoice_due_days: data.settings.default_invoice_due_days ?? 30,
     gst_registered: data.settings.gst_registered ?? false,
     gst_inclusive: data.settings.gst_inclusive ?? true,
     gst_rate_percent: data.settings.gst_rate_percent ?? 10,
+    edit_window_minutes: data.settings.edit_window_minutes ?? 180,
+    custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
   };
 }
 
@@ -75,9 +69,7 @@ export function useOrganizationSettings() {
   useEffect(() => {
     if (query.error) {
       log.error("useOrganizationSettings: Failed to fetch settings", {
-        error: query.error instanceof Error
-          ? query.error.message
-          : "Unknown error",
+        error: query.error instanceof Error ? query.error.message : "Unknown error",
       });
     }
   }, [query.error]);

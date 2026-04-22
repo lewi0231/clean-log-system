@@ -463,17 +463,21 @@ serve(async (req) => {
                     const invoiceUrl = `${baseUrl}/invoice/${invoiceId}`;
 
                     // Send payment confirmation email
-                    const emailResult = await sendPaymentConfirmationEmail({
-                      invoiceNumber: invoiceForEmail.invoice_number,
-                      organizationName,
-                      recipientEmails: emailRecipients,
-                      paymentAmount: amount,
-                      currency: currency,
-                      paymentMethod: paymentMethodDisplay,
-                      transactionId: paymentIntent.id,
-                      paymentDate: new Date().toISOString(),
-                      invoiceUrl: invoiceUrl,
-                    });
+                    const emailResult = await sendPaymentConfirmationEmail(
+                      supabase,
+                      {
+                        invoiceNumber: invoiceForEmail.invoice_number,
+                        organizationName,
+                        organizationId: invoiceForEmail.organization_id,
+                        recipientEmails: emailRecipients,
+                        paymentAmount: amount,
+                        currency: currency,
+                        paymentMethod: paymentMethodDisplay,
+                        transactionId: paymentIntent.id,
+                        paymentDate: new Date().toISOString(),
+                        invoiceUrl: invoiceUrl,
+                      },
+                    );
 
                     if (emailResult.success) {
                       logger.info("Payment confirmation email sent", {

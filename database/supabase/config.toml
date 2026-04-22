@@ -894,3 +894,21 @@ entrypoint = "./functions/convert-admin-to-worker/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/update-worker-payment-status/index.ts"
+
+[functions.register-org-sending-domain]
+enabled = true
+verify_jwt = false
+import_map = "./functions/register-org-sending-domain/deno.json"
+entrypoint = "./functions/register-org-sending-domain/index.ts"
+
+[functions.refresh-org-sending-domain-status]
+enabled = true
+verify_jwt = false
+import_map = "./functions/refresh-org-sending-domain-status/deno.json"
+entrypoint = "./functions/refresh-org-sending-domain-status/index.ts"
+
+[functions.remove-org-sending-domain]
+enabled = true
+verify_jwt = false
+import_map = "./functions/remove-org-sending-domain/deno.json"
+entrypoint = "./functions/remove-org-sending-domain/index.ts"

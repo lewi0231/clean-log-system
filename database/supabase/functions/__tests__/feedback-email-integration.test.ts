@@ -8,6 +8,33 @@
  */
 
 import { assertEquals, assertExists } from "@std/assert";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+const createMailResolverSupabase = (): SupabaseClient =>
+  ({
+    from: (table: string) => {
+      if (table === "organization") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: { custom_email_domain_enabled: false },
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+          }),
+        }),
+      };
+    },
+  }) as unknown as SupabaseClient;
 
 // Note: These are integration tests that would require a real Supabase instance
 // For now, we'll test the logic patterns that can be unit tested
@@ -62,6 +89,7 @@ Deno.test("P0: should send email to test address when RESEND_TEST_MODE=true", as
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-integration-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -90,7 +118,11 @@ Deno.test("P0: should send email to test address when RESEND_TEST_MODE=true", as
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -194,6 +226,7 @@ Deno.test("P0: should handle email send failure gracefully", async () => {
     recipientEmail: "customer@example.com",
     recipientName: "John Doe",
     organizationName: "Test Org",
+    organizationId: "00000000-0000-0000-0000-000000000001",
     jobId: "job-error-123",
     jobCompletedAt: new Date().toISOString(),
     locationName: "Test Location",
@@ -217,7 +250,11 @@ Deno.test("P0: should handle email send failure gracefully", async () => {
 
   try {
     // Should not throw, but return error result
-    const result = await sendFeedbackRequestEmail(emailData, false);
+    const result = await sendFeedbackRequestEmail(
+      createMailResolverSupabase(),
+      emailData,
+      false,
+    );
 
     assertEquals(result.success, false);
     assertExists(result.error);

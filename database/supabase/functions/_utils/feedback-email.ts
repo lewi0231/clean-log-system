@@ -10,6 +10,7 @@ import {
   isTestMode,
   validateEmailConfig,
 } from "./email.ts";
+import { resolveOrgMailFrom } from "./org-mail-from.ts";
 import { createLoggerWithoutRequest } from "./logger.ts";
 import {
   getInvoiceEmailRecipient,
@@ -21,6 +22,7 @@ export interface FeedbackEmailData {
   recipientEmail: string;
   recipientName: string | null;
   organizationName: string;
+  organizationId: string;
   jobId: string;
   jobCompletedAt: string;
   locationName: string | null;
@@ -64,6 +66,7 @@ export async function getFeedbackEmailRecipient(
  * Sends a personalized email with a secure token-based review link
  */
 export async function sendFeedbackRequestEmail(
+  supabase: SupabaseClient,
   data: FeedbackEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -79,6 +82,20 @@ export async function sendFeedbackRequestEmail(
   }
 
   const config = configResult.config;
+
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "feedback_request",
+    platformDomain: config.resendFromDomain,
+  });
+
+  logger.info("email from resolved", {
+    mail_kind: "feedback_request",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
   const feedbackReviewBaseUrl = Deno.env.get("FEEDBACK_REVIEW_BASE_URL");
 
   if (!feedbackReviewBaseUrl) {
@@ -202,7 +219,7 @@ The ${data.organizationName} Team
       text: string;
       tags?: Array<{ name: string; value: string }>;
     } = {
-      from: `noreply@${config.resendFromDomain}`,
+      from: resolvedFrom.from,
       to: [testRecipient],
       subject: emailSubject,
       html: emailHtml,

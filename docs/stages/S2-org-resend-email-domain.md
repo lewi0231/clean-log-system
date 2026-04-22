@@ -1,4 +1,4 @@
-# S2 — Features & Functions / High-Level Plan: Per-organization sending domain (Resend)
+# S2 — Features & Functions: Per-organization sending domain (Resend)
 
 | Field                  | Value                                                           |
 | ---------------------- | --------------------------------------------------------------- |
@@ -221,24 +221,23 @@ Multiple rules can apply. **`resolveOrgMailFrom`** (or equivalent) **must** eval
 
 ---
 
-## 10. Handoff to S3 (HLP / DAP prep)
+## 10. Handoff to S3 (HLP) and S4 (DAP)
 
-**S4 DAP (execution-ready):** `docs/stages/S4-org-resend-email-domain.md`
+| Artifact                      | Path                                        | Notes                                                                               |
+| ----------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **S3 — High-Level Plan**      | `docs/stages/S3-org-resend-email-domain.md` | System context, workstreams, mermaid sequences, **§7** concurrency, risks, rollout. |
+| **S4 — Detailed Action Plan** | `docs/stages/S4-org-resend-email-domain.md` | File paths, PRESERVE, verify commands, rollback.                                    |
 
-Next artifacts (besides the DAP above):
-
-1. **HLP (S3, optional if S4 is sufficient for your process)** — sequence diagram, concurrency decision for two-admin edits.
-2. **Sequence diagram** — admin: add domain → DNS → verified → first invoice email.
-3. **Resend** — verify **DELETE domain** and **get domain** response shapes in OpenAPI.
-4. **Concurrency** — document **last-write-wins** vs optimistic locking for domain row updates (two admins). _S4 §2 / §6 covers last-write; refine if you need DB row locks._
+**Before S5 build:** confirm Resend **DELETE** / **get domain** response shapes in OpenAPI against the Edge implementation.
 
 ---
 
 ## 11. References
 
-- S4: `docs/stages/S4-org-resend-email-domain.md` (Detailed Action Plan)
-- S1: `docs/stages/S1-org-resend-email-domain.md`
 - S0: `docs/stages/S0-org-resend-email-domain.md`
+- S1: `docs/stages/S1-org-resend-email-domain.md`
+- S3: `docs/stages/S3-org-resend-email-domain.md` (High-Level Plan)
+- S4: `docs/stages/S4-org-resend-email-domain.md` (Detailed Action Plan)
 - Resend: [Domains](https://resend.com/docs/dashboard/domains/introduction), [Create domain](https://resend.com/docs/api-reference/domains/create-domain), [Multi-tenant (official)](https://resend.com/docs/knowledge-base/setting-up-resend-for-multi-tenants), [Webhooks](https://resend.com/docs/dashboard/webhooks/introduction), [Pricing](https://resend.com/pricing)
 - Code: `database/supabase/functions/_utils/email.ts`, `feedback-email.ts`
 
@@ -343,4 +342,4 @@ Longer narrative version of the same review: `docs/research/resend-official-alig
 
 ---
 
-_End of S2 — S4 DAP: `docs/stages/S4-org-resend-email-domain.md`_
+_End of S2 — S3 HLP: `docs/stages/S3-org-resend-email-domain.md` · S4 DAP: `docs/stages/S4-org-resend-email-domain.md`_

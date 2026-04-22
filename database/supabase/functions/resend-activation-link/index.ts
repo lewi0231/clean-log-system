@@ -115,10 +115,12 @@ serve(async (req) => {
 
     // 5. Send verification email using custom template
     const emailResult = await sendEmailVerificationEmail(
+      supabase,
       {
         email: email,
         verificationLink: linkData.properties.action_link,
         organizationName: organizationName,
+        organizationId: orgUser?.organization_id ?? "",
       },
       false, // Don't throw on error - we'll handle it gracefully
     );

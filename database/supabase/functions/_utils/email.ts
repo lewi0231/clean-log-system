@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createLoggerWithoutRequest } from "./logger.ts";
+import { resolveOrgMailFrom } from "./org-mail-from.ts";
 
 export interface EmailConfig {
   apiKey: string;
@@ -14,6 +15,8 @@ export interface WorkerInvitationData {
   workerName: string;
   workerEmail: string;
   organizationName: string;
+  /** Required for custom sending domain resolution */
+  organizationId: string;
   invitationToken: string;
 }
 
@@ -21,6 +24,8 @@ export interface EmailVerificationData {
   email: string;
   verificationLink: string;
   organizationName?: string;
+  /** For resolver; org signup mail still uses platform domain (S2 §4.4 step 1) */
+  organizationId?: string;
 }
 
 export interface EmailValidationResult {
@@ -141,6 +146,7 @@ export function getTestModeTags(
 export function formatWorkerInvitationData(
   data: WorkerInvitationData,
   config: EmailConfig,
+  fromEmail: string,
 ): {
   from: string;
   to: string[];
@@ -165,8 +171,6 @@ export function formatWorkerInvitationData(
     INVITATION_LINK: invitationLink,
   };
 
-  const fromEmail =
-    `${data.organizationName} <onboarding@${config.resendFromDomain}>`;
   const emailSubject = `${data.organizationName} requires you to authenticate`;
 
   return {
@@ -184,6 +188,7 @@ export function validateWorkerInvitationData(
   workerName: string,
   workerEmail: string,
   organizationName: string,
+  organizationId: string,
   invitationToken: string,
 ): { valid: boolean; error?: string } {
   if (
@@ -222,6 +227,17 @@ export function validateWorkerInvitationData(
     };
   }
 
+  if (
+    !organizationId ||
+    typeof organizationId !== "string" ||
+    organizationId.trim() === ""
+  ) {
+    return {
+      valid: false,
+      error: "Organization id is required",
+    };
+  }
+
   if (!invitationToken || typeof invitationToken !== "string") {
     return {
       valid: false,
@@ -236,6 +252,7 @@ export function validateWorkerInvitationData(
  * Send worker invitation email via Resend API
  */
 export async function sendWorkerInvitationEmail(
+  supabase: SupabaseClient,
   data: WorkerInvitationData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -255,6 +272,7 @@ export async function sendWorkerInvitationEmail(
     data.workerName,
     data.workerEmail,
     data.organizationName,
+    data.organizationId,
     data.invitationToken,
   );
   if (!validationResult.valid) {
@@ -265,8 +283,26 @@ export async function sendWorkerInvitationEmail(
     return { success: false, error };
   }
 
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "worker_invitation",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+
+  logger.info("email from resolved", {
+    mail_kind: "worker_invitation",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
+
   // Format email data
-  const emailData = formatWorkerInvitationData(data, configResult.config);
+  const emailData = formatWorkerInvitationData(
+    data,
+    configResult.config,
+    resolvedFrom.from,
+  );
 
   // Check if test mode is enabled
   const testMode = isTestMode();
@@ -433,6 +469,7 @@ export async function sendWorkerInvitationEmail(
  * Send email verification email via Resend API
  */
 export async function sendEmailVerificationEmail(
+  supabase: SupabaseClient,
   data: EmailVerificationData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -455,6 +492,19 @@ export async function sendEmailVerificationEmail(
     }
     return { success: false, error };
   }
+
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId ?? "",
+    organizationName: data.organizationName ?? "Organization",
+    mailKind: "org_signup_verification",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+
+  logger.info("email from resolved", {
+    mail_kind: "org_signup_verification",
+    from_domain_source: resolvedFrom.fromDomainSource,
+  });
 
   // Check if test mode is enabled
   const testMode = isTestMode();
@@ -509,7 +559,7 @@ export async function sendEmailVerificationEmail(
     html: string;
     tags?: Array<{ name: string; value: string }>;
   } = {
-    from: `Clean Log <noreply@${configResult.config.resendFromDomain}>`,
+    from: resolvedFrom.from,
     to: [testRecipient],
     subject: emailSubject,
     html,
@@ -636,6 +686,7 @@ export function isValidEmail(email: string): boolean {
 export interface InvoiceEmailData {
   invoiceNumber: string;
   organizationName: string;
+  organizationId: string;
   recipientEmails: string[];
   invoiceUrl?: string; // URL to view invoice (optional, can be added later)
   paymentLinkUrl?: string; // Stripe payment link URL (optional)
@@ -662,6 +713,7 @@ function escapeHtml(s: string): string {
 export interface InvoiceReminderEmailData {
   invoiceNumber: string;
   organizationName: string;
+  organizationId: string;
   recipientEmails: string[];
   invoiceUrl?: string;
   paymentLinkUrl?: string;
@@ -674,6 +726,7 @@ export interface InvoiceReminderEmailData {
 
 export interface AdminInvoiceNotificationData {
   organizationName: string;
+  organizationId: string;
   recipientEmails: string[];
   invoiceCount: number;
   invoices: Array<{
@@ -689,6 +742,7 @@ export interface AdminInvoiceNotificationData {
 export interface PaymentConfirmationEmailData {
   invoiceNumber: string;
   organizationName: string;
+  organizationId: string;
   recipientEmails: string[];
   paymentAmount: number;
   currency: string;
@@ -703,6 +757,7 @@ export interface PaymentConfirmationEmailData {
  * Send invoice email via Resend API
  */
 export async function sendInvoiceEmail(
+  supabase: SupabaseClient,
   data: InvoiceEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -783,8 +838,20 @@ export async function sendInvoiceEmail(
     day: "numeric",
   });
 
-  const fromEmail =
-    `${data.organizationName} <invoices@${configResult.config.resendFromDomain}>`;
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "invoice",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+  const fromEmail = resolvedFrom.from;
+
+  logger.info("email from resolved", {
+    mail_kind: "invoice",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
 
   // Check if test mode is enabled
   const testMode = isTestMode();
@@ -1070,6 +1137,7 @@ ${data.invoiceUrl ? `View invoice: ${data.invoiceUrl}\n` : ""}${data.paymentLink
  * This is a receipt-style email sent after successful payment
  */
 export async function sendPaymentConfirmationEmail(
+  supabase: SupabaseClient,
   data: PaymentConfirmationEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -1131,9 +1199,6 @@ export async function sendPaymentConfirmationEmail(
     minute: "2-digit",
   });
 
-  const fromEmail =
-    `${data.organizationName} <payments@${configResult.config.resendFromDomain}>`;
-
   // Check if test mode is enabled
   const testMode = isTestMode();
 
@@ -1152,6 +1217,21 @@ export async function sendPaymentConfirmationEmail(
     // Return success without actually sending
     return { success: true, emailId: `mock-payment-email-${Date.now()}` };
   }
+
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "payment_confirmation",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+  const fromEmail = resolvedFrom.from;
+
+  logger.info("email from resolved", {
+    mail_kind: "payment_confirmation",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
 
   // Determine recipients and subject based on test mode
   // In test mode, redirect all recipients to test address
@@ -1409,6 +1489,7 @@ export async function sendPaymentConfirmationEmail(
  * Send admin notification email when invoices are auto-generated
  */
 export async function sendAdminInvoiceNotificationEmail(
+  supabase: SupabaseClient,
   data: AdminInvoiceNotificationData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -1456,8 +1537,20 @@ export async function sendAdminInvoiceNotificationEmail(
     return { success: true, emailId: `mock-admin-notification-${Date.now()}` };
   }
 
-  const fromEmail =
-    `${data.organizationName} <noreply@${configResult.config.resendFromDomain}>`;
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "admin_invoice_notification",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+  const fromEmail = resolvedFrom.from;
+
+  logger.info("email from resolved", {
+    mail_kind: "admin_invoice_notification",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
 
   // Check if test mode is enabled
   const testMode = isTestMode();
@@ -1678,6 +1771,7 @@ This is an automated notification from ${data.organizationName}.
  * Used for overdue invoices with more urgent messaging
  */
 export async function sendInvoiceReminderEmail(
+  supabase: SupabaseClient,
   data: InvoiceReminderEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -1750,8 +1844,20 @@ export async function sendInvoiceReminderEmail(
     day: "numeric",
   });
 
-  const fromEmail =
-    `${data.organizationName} <invoices@${configResult.config.resendFromDomain}>`;
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "invoice_reminder",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+  const fromEmail = resolvedFrom.from;
+
+  logger.info("email from resolved", {
+    mail_kind: "invoice_reminder",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
 
   // Check if test mode is enabled
   const testMode = isTestMode();
@@ -1968,6 +2074,7 @@ export interface AdminInvitationEmailData {
   firstName: string;
   lastName: string;
   organizationName: string;
+  organizationId: string;
   invitationLink: string;
   role: "admin" | "viewer";
 }
@@ -1977,6 +2084,7 @@ export interface AdminInvitationEmailData {
  * This is for inviting dashboard users (admins/viewers), not workers
  */
 export async function sendAdminInvitationEmail(
+  supabase: SupabaseClient,
   data: AdminInvitationEmailData,
   throwOnError = false,
 ): Promise<{ success: boolean; error?: string; emailId?: string }> {
@@ -1999,6 +2107,28 @@ export async function sendAdminInvitationEmail(
     }
     return { success: false, error };
   }
+
+  if (!data.organizationId) {
+    const error = "Organization id is required";
+    if (throwOnError) {
+      throw new Error(error);
+    }
+    return { success: false, error };
+  }
+
+  const resolvedFrom = await resolveOrgMailFrom({
+    supabase,
+    organizationId: data.organizationId,
+    organizationName: data.organizationName,
+    mailKind: "admin_user_invitation",
+    platformDomain: configResult.config.resendFromDomain,
+  });
+
+  logger.info("email from resolved", {
+    mail_kind: "admin_user_invitation",
+    from_domain_source: resolvedFrom.fromDomainSource,
+    organization_id: data.organizationId,
+  });
 
   // Check if test mode is enabled
   const testMode = isTestMode();
@@ -2062,13 +2192,7 @@ export async function sendAdminInvitationEmail(
     html: string;
     tags?: Array<{ name: string; value: string }>;
   } = {
-    // Future note: we intend to send admin/org emails from a dedicated
-    // "admin users (organizations)" domain for a more professional experience.
-    // For now, allow an override while defaulting to `RESEND_FROM_DOMAIN`.
-    from: `${data.organizationName} <invitations@${
-      Deno.env.get("RESEND_ADMIN_INVITES_FROM_DOMAIN") ||
-      configResult.config.resendFromDomain
-    }>`,
+    from: resolvedFrom.from,
     to: [testRecipient],
     subject: emailSubject,
     html,

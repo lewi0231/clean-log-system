@@ -626,6 +626,7 @@ serve(async (req) => {
               recipientEmail,
               recipientName,
               organizationName: orgSettings.name || "Our Team",
+              organizationId: job.organization_id,
               jobId: job.id,
               jobCompletedAt: jobWithLocation.completed_at,
               locationName: locationData?.name || null,
@@ -635,6 +636,7 @@ serve(async (req) => {
 
             // Send feedback email
             const emailResult = await sendFeedbackRequestEmail(
+              supabaseAdmin,
               feedbackEmailData,
               false, // Don't throw on error - job creation should succeed
             );

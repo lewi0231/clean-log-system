@@ -127,10 +127,12 @@ serve(async (req) => {
       // 4. Send verification email
       const orgName = await getOrganizationName(supabase, org.id);
       await sendEmailVerificationEmail(
+        supabase,
         {
           email: admin_email,
           verificationLink: linkData.properties.action_link,
           organizationName: orgName,
+          organizationId: org.id,
         },
         false, // Don't throw on error - registration succeeded even if email fails
       );

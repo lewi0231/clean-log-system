@@ -114,6 +114,8 @@ export interface OrganizationSettings {
   gst_rate_percent: number;
   // Job approval workflow settings
   edit_window_minutes: number;
+  /** Entitlement: send from org-owned domain (Resend). Server-side only until migration applied. */
+  custom_email_domain_enabled: boolean;
 }
 
 // Job approval workflow types
@@ -171,12 +173,7 @@ export interface Job {
   has_feedback?: boolean;
 }
 
-export type PricingType =
-  | "unit"
-  | "fixed"
-  | "tiered"
-  | "percentage"
-  | "conditional";
+export type PricingType = "unit" | "fixed" | "tiered" | "percentage" | "conditional";
 export type WorkerPaymentType = "same_structure" | "percentage" | "fixed_rate";
 export type PricingScope = "field" | "option" | "base" | "global";
 
@@ -383,13 +380,7 @@ export interface LocationHierarchyNode {
   } | null;
 }
 
-export type InvoiceStatus =
-  | "draft"
-  | "pending_review"
-  | "sent"
-  | "paid"
-  | "overdue"
-  | "cancelled";
+export type InvoiceStatus = "draft" | "pending_review" | "sent" | "paid" | "overdue" | "cancelled";
 
 export interface Invoice {
   id: string;
@@ -478,13 +469,7 @@ export interface LineItemDisplayConfig {
 
 export interface ServiceAddressConfig {
   source: "auto" | "location" | "form_fields";
-  location_fields?: (
-    | "name"
-    | "email"
-    | "address"
-    | "contact_person"
-    | "phone"
-  )[];
+  location_fields?: ("name" | "email" | "address" | "contact_person" | "phone")[];
   form_fields?: string[]; // Field config names (for form_fields source)
 }
 
@@ -495,10 +480,7 @@ export interface BillingAddressConfig {
 }
 
 export interface InvoiceEmailRecipientConfig {
-  location_email_source:
-    | "location_email"
-    | "hierarchy_billing_email"
-    | "location_contact_email";
+  location_email_source: "location_email" | "hierarchy_billing_email" | "location_contact_email";
   form_field_email: string | null; // Field config ID that contains email for jobs without location
   /** @deprecated No longer used; fallback removed. Kept for backward compatibility. */
   default_email?: string | null;

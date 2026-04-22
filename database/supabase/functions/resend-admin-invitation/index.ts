@@ -121,11 +121,13 @@ serve(async (req) => {
     }
 
     const emailResult = await sendAdminInvitationEmail(
+      supabase,
       {
         email: orgUser.email,
         firstName: orgUser.first_name || "",
         lastName: orgUser.last_name || "",
         organizationName: organizationName || "Your Organization",
+        organizationId: organization_id,
         invitationLink: linkData.properties.action_link,
         role: orgUser.role,
       },
