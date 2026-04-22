@@ -2,12 +2,15 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { log } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-interface AutoSaveInputProps
-  extends Omit<React.ComponentProps<typeof Input>, "value" | "onChange"> {
+interface AutoSaveInputProps extends Omit<
+  React.ComponentProps<typeof Input>,
+  "value" | "onChange"
+> {
   label?: string;
   value: string | null;
   onSave: (value: string) => Promise<void>;
@@ -94,7 +97,7 @@ export function AutoSaveInput({
       // On error, restore the value and mark as having unsaved changes
       setLocalValue(value || "");
       setHasUnsavedChanges(false);
-      console.error("Failed to save input value:", error);
+      log.error("Failed to save input value:", error);
     } finally {
       setIsSaving(false);
     }
@@ -129,9 +132,7 @@ export function AutoSaveInput({
     }
   };
 
-  const inputId =
-    id ||
-    `auto-save-input-${label?.toLowerCase().replace(/\s+/g, "-") || "input"}`;
+  const inputId = id || `auto-save-input-${label?.toLowerCase().replace(/\s+/g, "-") || "input"}`;
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -139,9 +140,7 @@ export function AutoSaveInput({
         <Label htmlFor={inputId} className="flex items-center gap-2">
           {label}
           {required && <span className="text-destructive">*</span>}
-          {isSaving && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          )}
+          {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
         </Label>
       )}
       <Input
@@ -153,9 +152,7 @@ export function AutoSaveInput({
         aria-invalid={hasUnsavedChanges && required && !localValue.trim()}
         {...inputProps}
       />
-      {description && (
-        <p className="text-xs text-muted-foreground">{description}</p>
-      )}
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
     </div>
   );
 }

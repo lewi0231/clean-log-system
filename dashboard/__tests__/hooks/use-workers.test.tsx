@@ -51,9 +51,7 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
@@ -115,9 +113,7 @@ describe("useWorkers", () => {
 
   it("should handle error state", async () => {
     const mockError = new Error("Failed to fetch");
-    vi.mocked(WorkersService.listWorkersAndLocations).mockRejectedValue(
-      mockError
-    );
+    vi.mocked(WorkersService.listWorkersAndLocations).mockRejectedValue(mockError);
 
     const { result } = renderHook(() => useWorkers(), {
       wrapper: createWrapper(),
@@ -138,7 +134,10 @@ describe("useWorkers", () => {
       workers: [],
       locations: [],
     });
-    vi.mocked(WorkersService.create).mockResolvedValue(mockWorker);
+    vi.mocked(WorkersService.create).mockResolvedValue({
+      worker: mockWorker,
+      emailSent: true,
+    });
 
     const { result } = renderHook(() => useWorkers(), {
       wrapper: createWrapper(),
@@ -150,7 +149,8 @@ describe("useWorkers", () => {
 
     await result.current.createWorker({
       organization_id: "org-1",
-      name: "John Doe",
+      first_name: "John",
+      last_name: "Doe",
       email: "john@example.com",
       phone: "1234567890",
     });

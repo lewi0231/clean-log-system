@@ -1,17 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
+import { log } from "@/lib/logger";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -21,14 +16,13 @@ interface OptionPricingEditorProps {
   locationId?: string | null;
 }
 
-export default function OptionPricingEditor({
-  fieldConfig,
-  locationId,
-}: OptionPricingEditorProps) {
-  const { optionPricing, loading, error, upsertPricing, deletePricing } =
-    useOptionPricing(fieldConfig.id, {
+export default function OptionPricingEditor({ fieldConfig, locationId }: OptionPricingEditorProps) {
+  const { optionPricing, loading, error, upsertPricing, deletePricing } = useOptionPricing(
+    fieldConfig.id,
+    {
       locationId,
-    });
+    }
+  );
 
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer: string; worker: string }>
@@ -54,11 +48,7 @@ export default function OptionPricingEditor({
 
   const options = fieldConfig.options || [];
 
-  const handlePriceChange = (
-    optionValue: string,
-    type: "customer" | "worker",
-    value: string
-  ) => {
+  const handlePriceChange = (optionValue: string, type: "customer" | "worker", value: string) => {
     setEditingPrices((prev) => ({
       ...prev,
       [optionValue]: {
@@ -78,9 +68,7 @@ export default function OptionPricingEditor({
     }
 
     const workerPrice =
-      editing.worker && editing.worker.trim() !== ""
-        ? parseFloat(editing.worker)
-        : null;
+      editing.worker && editing.worker.trim() !== "" ? parseFloat(editing.worker) : null;
 
     if (workerPrice !== null && (isNaN(workerPrice) || workerPrice < 0)) {
       return;
@@ -98,7 +86,7 @@ export default function OptionPricingEditor({
         return next;
       });
     } catch (error) {
-      console.error("Failed to save option pricing", error);
+      log.error("Failed to save option pricing", error);
     } finally {
       setSaving((prev) => {
         const next = { ...prev };
@@ -113,7 +101,7 @@ export default function OptionPricingEditor({
     try {
       await deletePricing(pricingId);
     } catch (error) {
-      console.error("Failed to delete option pricing", error);
+      log.error("Failed to delete option pricing", error);
     } finally {
       setDeleting((prev) => {
         const next = { ...prev };
@@ -128,9 +116,7 @@ export default function OptionPricingEditor({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-4 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-4 text-destructive">Error: {error}</div>;
   }
 
   if (options.length === 0) {
@@ -139,8 +125,7 @@ export default function OptionPricingEditor({
         <CardHeader>
           <CardTitle className="text-sm">No Options</CardTitle>
           <CardDescription>
-            This field has no options configured. Add options in Mobile
-            Application first.
+            This field has no options configured. Add options in Mobile Application first.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -156,22 +141,20 @@ export default function OptionPricingEditor({
           editing?.customer !== undefined
             ? editing.customer
             : existingPricing
-            ? existingPricing.customer_price.toString()
-            : "";
+              ? existingPricing.customer_price.toString()
+              : "";
         const currentWorkerPrice =
           editing?.worker !== undefined
             ? editing.worker
             : existingPricing?.worker_payment_rate !== null &&
-              existingPricing?.worker_payment_rate !== undefined
-            ? existingPricing.worker_payment_rate.toString()
-            : "";
+                existingPricing?.worker_payment_rate !== undefined
+              ? existingPricing.worker_payment_rate.toString()
+              : "";
 
         const hasChanges =
           editing !== undefined &&
-          (editing.customer !==
-            (existingPricing?.customer_price.toString() || "") ||
-            editing.worker !==
-              (existingPricing?.worker_payment_rate?.toString() || ""));
+          (editing.customer !== (existingPricing?.customer_price.toString() || "") ||
+            editing.worker !== (existingPricing?.worker_payment_rate?.toString() || ""));
 
         const isSaving = saving[optionValue] || false;
         const isDeleting = deleting[optionValue] || false;
@@ -186,9 +169,7 @@ export default function OptionPricingEditor({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() =>
-                        handleDelete(optionValue, existingPricing.id)
-                      }
+                      onClick={() => handleDelete(optionValue, existingPricing.id)}
                       disabled={isSaving || isDeleting}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -197,10 +178,7 @@ export default function OptionPricingEditor({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label
-                      htmlFor={`customer-${optionValue}`}
-                      className="text-xs"
-                    >
+                    <Label htmlFor={`customer-${optionValue}`} className="text-xs">
                       Customer Price (USD)
                     </Label>
                     <div className="relative">
@@ -212,25 +190,15 @@ export default function OptionPricingEditor({
                         min="0"
                         placeholder="0.00"
                         value={currentCustomerPrice}
-                        onChange={(e) =>
-                          handlePriceChange(
-                            optionValue,
-                            "customer",
-                            e.target.value
-                          )
-                        }
+                        onChange={(e) => handlePriceChange(optionValue, "customer", e.target.value)}
                         className="pl-7 h-9 text-sm"
                         disabled={isSaving || isDeleting}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label
-                      htmlFor={`worker-${optionValue}`}
-                      className="text-xs"
-                    >
-                      Worker Rate (USD){" "}
-                      <span className="text-muted-foreground">(optional)</span>
+                    <Label htmlFor={`worker-${optionValue}`} className="text-xs">
+                      Worker Rate (USD) <span className="text-muted-foreground">(optional)</span>
                     </Label>
                     <div className="relative">
                       <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -241,13 +209,7 @@ export default function OptionPricingEditor({
                         min="0"
                         placeholder="0.00"
                         value={currentWorkerPrice}
-                        onChange={(e) =>
-                          handlePriceChange(
-                            optionValue,
-                            "worker",
-                            e.target.value
-                          )
-                        }
+                        onChange={(e) => handlePriceChange(optionValue, "worker", e.target.value)}
                         className="pl-7 h-9 text-sm"
                         disabled={isSaving || isDeleting}
                       />

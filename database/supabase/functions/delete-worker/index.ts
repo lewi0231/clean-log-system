@@ -35,7 +35,7 @@ serve(async (req) => {
     // Fetch worker to get organization_id and verify it exists
     const { data: worker, error: fetchError } = await supabase
       .from("worker")
-      .select("id, organization_id, name")
+      .select("id, organization_id, name, auth_user_id")
       .eq("id", id)
       .single();
 
@@ -74,6 +74,26 @@ serve(async (req) => {
         organization_id: worker.organization_id,
       });
       throw deleteError;
+    }
+
+    // Remove Supabase Auth user so the same email can accept a fresh invitation
+    // after the worker row is re-created (otherwise createUser fails as duplicate).
+    if (worker.auth_user_id) {
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(
+        worker.auth_user_id,
+      );
+      if (authDeleteError) {
+        logger.warn("Worker row deleted but auth user removal failed", {
+          worker_id: id,
+          auth_user_id: worker.auth_user_id,
+          error: authDeleteError.message,
+        });
+      } else {
+        logger.info("Removed auth user for deleted worker", {
+          worker_id: id,
+          auth_user_id: worker.auth_user_id,
+        });
+      }
     }
 
     logger.info("Worker deleted successfully", {

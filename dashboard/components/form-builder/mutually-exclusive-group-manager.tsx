@@ -2,25 +2,11 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -28,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { log } from "@/lib/logger";
 import { FieldConfig } from "@clean-log/shared";
 import {
   Check,
@@ -45,10 +32,7 @@ import React, { useMemo, useState } from "react";
 
 interface MutuallyExclusiveGroupManagerProps {
   fields: FieldConfig[];
-  onUpdateField: (
-    fieldId: string,
-    updates: Partial<FieldConfig>,
-  ) => Promise<void>;
+  onUpdateField: (fieldId: string, updates: Partial<FieldConfig>) => Promise<void>;
   createdClusters: string[];
   onCreatedClustersChange: (clusters: string[]) => void;
   defaultExclusiveGroupLabel?: string | null;
@@ -108,13 +92,9 @@ export function MutuallyExclusiveGroupManager({
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [newClusterName, setNewClusterName] = useState("");
   const [editingDefaultLabel, setEditingDefaultLabel] = useState(false);
-  const [defaultLabelValue, setDefaultLabelValue] = useState(
-    defaultExclusiveGroupLabel || "",
-  );
+  const [defaultLabelValue, setDefaultLabelValue] = useState(defaultExclusiveGroupLabel || "");
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [fieldSelectionOpen, setFieldSelectionOpen] = useState<string | null>(
-    null,
-  );
+  const [fieldSelectionOpen, setFieldSelectionOpen] = useState<string | null>(null);
 
   // Build groups and clusters from existing fields
   const groups = useMemo(() => {
@@ -181,7 +161,7 @@ export function MutuallyExclusiveGroupManager({
         onUpdateField(fieldId, {
           mutually_exclusive_group: null,
           group_cluster: null,
-        }),
+        })
       );
       await Promise.all(updatePromises);
     }
@@ -196,7 +176,7 @@ export function MutuallyExclusiveGroupManager({
   const handleAddFieldToCluster = (clusterId: string, fieldId: string) => {
     // Close popover first to prevent layout shift
     setFieldSelectionOpen(null);
-    
+
     // Use requestAnimationFrame to batch the update with the next paint
     // This ensures the popover closes smoothly before the field update triggers re-render
     requestAnimationFrame(() => {
@@ -207,9 +187,9 @@ export function MutuallyExclusiveGroupManager({
         onUpdateField(fieldId, {
           mutually_exclusive_group: DEFAULT_EXCLUSIVE_GROUP,
           group_cluster: clusterId,
-        }),
+        })
       ).catch((err) => {
-        console.error("Failed to add field to option:", err);
+        log.error("Failed to add field to option:", err);
       });
     });
   };
@@ -236,9 +216,7 @@ export function MutuallyExclusiveGroupManager({
     setDefaultLabelValue(defaultExclusiveGroupLabel || "");
   }, [defaultExclusiveGroupLabel]);
 
-  const hasDefaultExclusiveGroup = groups.some(
-    (g) => g.id === DEFAULT_EXCLUSIVE_GROUP,
-  );
+  const hasDefaultExclusiveGroup = groups.some((g) => g.id === DEFAULT_EXCLUSIVE_GROUP);
 
   // Find default exclusive group clusters for preview
   const defaultGroupClusters = useMemo(() => {
@@ -287,8 +265,7 @@ export function MutuallyExclusiveGroupManager({
                   Dropdown Label
                 </Label>
                 <p className="text-xs text-muted-foreground mb-4">
-                  This text appears as the prompt for the question in the mobile
-                  app.
+                  This text appears as the prompt for the question in the mobile app.
                 </p>
                 <div className="relative">
                   {editingDefaultLabel ? (
@@ -310,11 +287,7 @@ export function MutuallyExclusiveGroupManager({
                       <Button onClick={handleSaveDefaultLabel} size="sm">
                         Save
                       </Button>
-                      <Button
-                        onClick={handleCancelDefaultLabel}
-                        variant="outline"
-                        size="sm"
-                      >
+                      <Button onClick={handleCancelDefaultLabel} variant="outline" size="sm">
                         Cancel
                       </Button>
                     </div>
@@ -387,12 +360,10 @@ export function MutuallyExclusiveGroupManager({
                       </div>
                     </div>
                   </div>
-                  <h3 className="text-2xl font-bold mb-2">
-                    No options created yet
-                  </h3>
+                  <h3 className="text-2xl font-bold mb-2">No options created yet</h3>
                   <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                    Define the choices workers can select from. Each option can
-                    be assigned specific fields to streamline their workflow.
+                    Define the choices workers can select from. Each option can be assigned specific
+                    fields to streamline their workflow.
                   </p>
                   {!showCreateForm ? (
                     <Button
@@ -484,17 +455,13 @@ export function MutuallyExclusiveGroupManager({
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
-                              <span className="font-bold">
-                                {cluster.displayName}
-                              </span>
+                              <span className="font-bold">{cluster.displayName}</span>
                               <Badge
                                 variant="secondary"
                                 className="text-[10px] uppercase tracking-wider font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded"
                               >
                                 {cluster.fieldIds.length}{" "}
-                                {cluster.fieldIds.length === 1
-                                  ? "Field"
-                                  : "Fields Assigned"}
+                                {cluster.fieldIds.length === 1 ? "Field" : "Fields Assigned"}
                               </Badge>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -517,12 +484,9 @@ export function MutuallyExclusiveGroupManager({
                                           onUpdateField(field.id, {
                                             mutually_exclusive_group: null,
                                             group_cluster: null,
-                                          }),
+                                          })
                                         ).catch((err) => {
-                                          console.error(
-                                            "Failed to remove field from option:",
-                                            err,
-                                          );
+                                          log.error("Failed to remove field from option:", err);
                                         });
                                       });
                                     }}
@@ -550,9 +514,7 @@ export function MutuallyExclusiveGroupManager({
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-slate-400 hover:text-primary transition-colors"
-                                  onClick={() =>
-                                    setFieldSelectionOpen(cluster.id)
-                                  }
+                                  onClick={() => setFieldSelectionOpen(cluster.id)}
                                 >
                                   <Plus className="w-4 h-4" />
                                 </Button>
@@ -572,10 +534,7 @@ export function MutuallyExclusiveGroupManager({
                                         variant="ghost"
                                         className="w-full justify-start text-sm h-auto py-2"
                                         onClick={() =>
-                                          handleAddFieldToCluster(
-                                            cluster.id,
-                                            field.id,
-                                          )
+                                          handleAddFieldToCluster(cluster.id, field.id)
                                         }
                                       >
                                         {field.label}
@@ -591,12 +550,7 @@ export function MutuallyExclusiveGroupManager({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-slate-400 hover:text-red-500 transition-colors"
-                            onClick={() =>
-                              handleDeleteCluster(
-                                DEFAULT_EXCLUSIVE_GROUP,
-                                cluster.id,
-                              )
-                            }
+                            onClick={() => handleDeleteCluster(DEFAULT_EXCLUSIVE_GROUP, cluster.id)}
                           >
                             <X className="w-4 h-4" />
                           </Button>
@@ -667,9 +621,8 @@ export function MutuallyExclusiveGroupManager({
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-lg flex gap-3">
             <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
             <p className="text-sm text-blue-800 dark:text-blue-300">
-              To add a new option, create it above, then assign fields to it in
-              their individual settings. The option will appear active once
-              fields are linked.
+              To add a new option, create it above, then assign fields to it in their individual
+              settings. The option will appear active once fields are linked.
             </p>
           </div>
         </div>
@@ -683,9 +636,8 @@ export function MutuallyExclusiveGroupManager({
       <CardHeader>
         <CardTitle>Choose One Options</CardTitle>
         <CardDescription>
-          Create options where workers can only select one at a time. For
-          example, &quot;Simple Toggle&quot; vs &quot;Detailed Breakdown&quot; -
-          workers choose either one, not both.
+          Create options where workers can only select one at a time. For example, &quot;Simple
+          Toggle&quot; vs &quot;Detailed Breakdown&quot; - workers choose either one, not both.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -694,8 +646,7 @@ export function MutuallyExclusiveGroupManager({
           <div>
             <Label className="text-sm font-semibold">Create New Option</Label>
             <p className="text-xs text-muted-foreground mt-1">
-              Give your option a name, then assign fields to it in their
-              settings.
+              Give your option a name, then assign fields to it in their settings.
             </p>
           </div>
           <div className="flex gap-2">
@@ -710,11 +661,7 @@ export function MutuallyExclusiveGroupManager({
                 }
               }}
             />
-            <Button
-              onClick={handleCreateCluster}
-              disabled={!newClusterName.trim()}
-              size="sm"
-            >
+            <Button onClick={handleCreateCluster} disabled={!newClusterName.trim()} size="sm">
               <Plus className="w-4 h-4 mr-1" />
               Create Option
             </Button>
@@ -738,11 +685,7 @@ export function MutuallyExclusiveGroupManager({
         {/* How It Works - Collapsible */}
         <Collapsible open={showHowItWorks} onOpenChange={setShowHowItWorks}>
           <CollapsibleTrigger asChild>
-            <Button
-              variant="ghost"
-              className="w-full justify-between text-sm"
-              size="sm"
-            >
+            <Button variant="ghost" className="w-full justify-between text-sm" size="sm">
               <div className="flex items-center gap-2">
                 <HelpCircle className="w-4 h-4" />
                 <span>How it works?</span>
@@ -782,21 +725,16 @@ export function MutuallyExclusiveGroupManager({
               </div>
               <div className="rounded-lg border border-dashed p-3 bg-background">
                 <p className="text-xs text-muted-foreground">
-                  <strong>In the mobile app:</strong> Workers see a dropdown
-                  asking them to choose one option. Once selected, only the
-                  fields for that option appear.
+                  <strong>In the mobile app:</strong> Workers see a dropdown asking them to choose
+                  one option. Once selected, only the fields for that option appear.
                 </p>
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-medium">Steps:</p>
                 <ol className="text-xs text-muted-foreground space-y-1 pl-4 list-decimal">
                   <li>Create an option name above</li>
-                  <li>
-                    Go to a field&apos;s settings and assign it to that option
-                  </li>
-                  <li>
-                    Repeat for other fields that belong to the same option
-                  </li>
+                  <li>Go to a field&apos;s settings and assign it to that option</li>
+                  <li>Repeat for other fields that belong to the same option</li>
                   <li>Create additional options as needed</li>
                 </ol>
               </div>
@@ -809,9 +747,8 @@ export function MutuallyExclusiveGroupManager({
           <div className="rounded-lg border p-3 bg-muted/30 space-y-2">
             <Label className="text-sm font-semibold">Dropdown Label</Label>
             <p className="text-xs text-muted-foreground">
-              Customize the question text that appears in the mobile app
-              dropdown. For example: &quot;Select tracking method&quot; or
-              &quot;Choose an option&quot;.
+              Customize the question text that appears in the mobile app dropdown. For example:
+              &quot;Select tracking method&quot; or &quot;Choose an option&quot;.
             </p>
             {editingDefaultLabel ? (
               <div className="flex gap-2">
@@ -831,24 +768,14 @@ export function MutuallyExclusiveGroupManager({
                 <Button onClick={handleSaveDefaultLabel} size="sm">
                   Save
                 </Button>
-                <Button
-                  onClick={handleCancelDefaultLabel}
-                  variant="outline"
-                  size="sm"
-                >
+                <Button onClick={handleCancelDefaultLabel} variant="outline" size="sm">
                   Cancel
                 </Button>
               </div>
             ) : (
               <div className="flex items-center justify-between p-2 bg-background rounded-md border">
-                <span className="text-sm">
-                  {defaultExclusiveGroupLabel || "Select an option"}
-                </span>
-                <Button
-                  onClick={() => setEditingDefaultLabel(true)}
-                  variant="ghost"
-                  size="sm"
-                >
+                <span className="text-sm">{defaultExclusiveGroupLabel || "Select an option"}</span>
+                <Button onClick={() => setEditingDefaultLabel(true)} variant="ghost" size="sm">
                   Edit
                 </Button>
               </div>
@@ -871,10 +798,7 @@ export function MutuallyExclusiveGroupManager({
                   const clusters = Array.from(group.clusters.values());
 
                   return (
-                    <div
-                      key={group.id}
-                      className="border rounded-lg overflow-hidden bg-card"
-                    >
+                    <div key={group.id} className="border rounded-lg overflow-hidden bg-card">
                       <div className="flex items-center gap-2 p-3 bg-muted/30">
                         <button
                           onClick={toggleGroup}
@@ -897,9 +821,7 @@ export function MutuallyExclusiveGroupManager({
                           {/* Clusters in this group */}
                           {clusters.map((cluster) => {
                             const clusterFields = cluster.fieldIds
-                              .map((fieldId) =>
-                                fields.find((f) => f.id === fieldId),
-                              )
+                              .map((fieldId) => fields.find((f) => f.id === fieldId))
                               .filter((f): f is FieldConfig => f !== undefined);
 
                             return (
@@ -912,10 +834,7 @@ export function MutuallyExclusiveGroupManager({
                                     <span className="text-sm font-medium">
                                       {cluster.displayName}
                                     </span>
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-xs"
-                                    >
+                                    <Badge variant="secondary" className="text-xs">
                                       {cluster.fieldIds.length} field
                                       {cluster.fieldIds.length !== 1 ? "s" : ""}
                                     </Badge>
@@ -924,9 +843,7 @@ export function MutuallyExclusiveGroupManager({
                                     variant="ghost"
                                     size="icon"
                                     className="h-6 w-6"
-                                    onClick={() =>
-                                      handleDeleteCluster(group.id, cluster.id)
-                                    }
+                                    onClick={() => handleDeleteCluster(group.id, cluster.id)}
                                   >
                                     <X className="w-3 h-3 text-destructive" />
                                   </Button>
@@ -953,9 +870,8 @@ export function MutuallyExclusiveGroupManager({
                           {/* Info about adding options */}
                           <div className="rounded-md border border-dashed p-2 bg-muted/20">
                             <p className="text-xs text-muted-foreground">
-                              To add a new option, create it above, then assign
-                              fields to it in their settings. The option will
-                              appear here once fields are assigned.
+                              To add a new option, create it above, then assign fields to it in
+                              their settings. The option will appear here once fields are assigned.
                             </p>
                           </div>
                         </div>
@@ -966,58 +882,46 @@ export function MutuallyExclusiveGroupManager({
               </div>
 
               {/* Mobile Preview - Show when group is expanded */}
-              {isExpanded &&
-                hasDefaultExclusiveGroup &&
-                defaultGroupClusters.length > 0 && (
-                  <div className="hidden lg:block w-[380px] shrink-0">
-                    <div className="sticky top-4">
-                      <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Smartphone className="w-4 h-4 text-muted-foreground" />
-                          <Label className="text-xs font-semibold">
-                            Mobile App Preview
-                          </Label>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Preview of how this appears in the mobile app
-                        </p>
-                        <div className="rounded-lg border bg-muted/50 p-4">
-                          <div className="space-y-3">
-                            <div>
-                              <Label className="text-xs font-medium text-foreground mb-1.5 block">
-                                {defaultExclusiveGroupLabel ||
-                                  "Select an option"}
-                              </Label>
-                              <div className="border border-border rounded-lg overflow-hidden bg-card">
-                                <MobilePreviewSelect
-                                  clusters={defaultGroupClusters.map(
-                                    (cluster) => ({
-                                      id: cluster.id,
-                                      displayName: cluster.displayName,
-                                      fieldLabels: cluster.fieldIds
-                                        .map((fieldId) =>
-                                          fields.find((f) => f.id === fieldId),
-                                        )
-                                        .filter(
-                                          (f): f is FieldConfig =>
-                                            f !== undefined,
-                                        )
-                                        .map((f) => f.label),
-                                    }),
-                                  )}
-                                />
-                              </div>
+              {isExpanded && hasDefaultExclusiveGroup && defaultGroupClusters.length > 0 && (
+                <div className="hidden lg:block w-[380px] shrink-0">
+                  <div className="sticky top-4">
+                    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-muted-foreground" />
+                        <Label className="text-xs font-semibold">Mobile App Preview</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Preview of how this appears in the mobile app
+                      </p>
+                      <div className="rounded-lg border bg-muted/50 p-4">
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-xs font-medium text-foreground mb-1.5 block">
+                              {defaultExclusiveGroupLabel || "Select an option"}
+                            </Label>
+                            <div className="border border-border rounded-lg overflow-hidden bg-card">
+                              <MobilePreviewSelect
+                                clusters={defaultGroupClusters.map((cluster) => ({
+                                  id: cluster.id,
+                                  displayName: cluster.displayName,
+                                  fieldLabels: cluster.fieldIds
+                                    .map((fieldId) => fields.find((f) => f.id === fieldId))
+                                    .filter((f): f is FieldConfig => f !== undefined)
+                                    .map((f) => f.label),
+                                }))}
+                              />
                             </div>
-                            <p className="text-[10px] text-muted-foreground">
-                              Edit the label above to customize how it appears
-                              in the mobile app dropdown.
-                            </p>
                           </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            Edit the label above to customize how it appears in the mobile app
+                            dropdown.
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1026,16 +930,14 @@ export function MutuallyExclusiveGroupManager({
           <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
             <p className="text-sm font-medium">No options created yet</p>
             <p className="text-xs mt-2">
-              Create your first option above to get started. Options let workers
-              choose between different ways to track the same thing.
+              Create your first option above to get started. Options let workers choose between
+              different ways to track the same thing.
             </p>
             <div className="mt-4 text-left max-w-md mx-auto space-y-1">
               <p className="text-xs font-medium">Example:</p>
               <ul className="text-xs text-muted-foreground space-y-1 pl-4">
                 <li>• &quot;Simple&quot; - quick yes/no toggle</li>
-                <li>
-                  • &quot;Detailed&quot; - multiple checkboxes for breakdown
-                </li>
+                <li>• &quot;Detailed&quot; - multiple checkboxes for breakdown</li>
               </ul>
             </div>
           </div>

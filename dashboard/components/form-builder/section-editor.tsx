@@ -2,11 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -17,11 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -31,22 +23,14 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import {
-  FieldConfig,
-  FieldType,
-  FormSectionWithFields,
-} from "@clean-log/shared";
+import { FieldConfig, FieldType, FormSectionWithFields } from "@clean-log/shared";
 import {
   AlignLeft,
   Calendar,
@@ -58,7 +42,6 @@ import {
   FolderPlus,
   GripVertical,
   Hash,
-  HelpCircle,
   Image,
   Layers,
   List,
@@ -77,24 +60,15 @@ interface SectionEditorProps {
   sections: FormSectionWithFields[];
   fields: FieldConfig[];
   onAddSection: (
-    section: Omit<
-      FormSectionWithFields,
-      "id" | "organization_id" | "created_at" | "updated_at"
-    >,
+    section: Omit<FormSectionWithFields, "id" | "organization_id" | "created_at" | "updated_at">
   ) => void;
-  onUpdateSection: (
-    sectionId: string,
-    updates: Partial<FormSectionWithFields>,
-  ) => void;
+  onUpdateSection: (sectionId: string, updates: Partial<FormSectionWithFields>) => void;
   onDeleteSection: (sectionId: string) => void;
   onReorderSections: (sectionIds: string[]) => void;
   draggedFieldId?: string | null;
   onDropFieldToSection?: (sectionId: string, fieldId: string) => void;
   onRemoveFieldFromSection?: (fieldId: string) => void;
-  onUpdateField?: (
-    fieldId: string,
-    updates: Partial<FieldConfig>,
-  ) => void | Promise<void>;
+  onUpdateField?: (fieldId: string, updates: Partial<FieldConfig>) => void | Promise<void>;
   onReorderFields?: (fieldIds: string[]) => Promise<void>;
   onSectionFieldDragStart?: (fieldId: string) => void;
   onSectionFieldDragEnd?: () => void;
@@ -149,26 +123,23 @@ export function SectionEditor({
   organizationId,
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSection, setEditingSection] =
-    useState<FormSectionWithFields | null>(null);
+  const [editingSection, setEditingSection] = useState<FormSectionWithFields | null>(null);
   const [formData, setFormData] = useState<SectionFormData>({
     title: "",
     description: "",
     collapsed_by_default: false,
   });
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(sections.map((s) => s.id)),
-  );
+  // Accordion open state in the builder: mirrors "collapsed by default" — sections that
+  // start collapsed on mobile should start collapsed here too. New sections are synced in useEffect.
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => {
+    return new Set(sections.filter((s) => !s.collapsed_by_default).map((s) => s.id));
+  });
   const [draggedSection, setDraggedSection] = useState<string | null>(null);
-  const [sectionOrder, setSectionOrder] = useState<string[]>(() =>
-    sections.map((s) => s.id),
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => sections.map((s) => s.id));
+  const [draggedSectionField, setDraggedSectionField] = useState<string | null>(null);
+  const [sectionFieldOrders, setSectionFieldOrders] = useState<Map<string, string[]>>(
+    () => new Map(sections.map((s) => [s.id, s.field_ids || []]))
   );
-  const [draggedSectionField, setDraggedSectionField] = useState<string | null>(
-    null,
-  );
-  const [sectionFieldOrders, setSectionFieldOrders] = useState<
-    Map<string, string[]>
-  >(() => new Map(sections.map((s) => [s.id, s.field_ids || []])));
 
   // Sync sectionFieldOrders when sections.field_ids change (e.g., from optimistic updates)
   useEffect(() => {
@@ -199,35 +170,45 @@ export function SectionEditor({
     });
   }, [sections]);
 
-  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
-    Map<string, boolean>
-  >(new Map());
+  // New sections (e.g. after "Add Section") get an id that was never in `expandedSections`,
+  // so the accordion stayed collapsed. Add new ids when `collapsed_by_default` is false.
+  // Remove ids when a section is deleted.
+  useEffect(() => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      const sectionIds = new Set(sections.map((s) => s.id));
+      for (const id of next) {
+        if (!sectionIds.has(id)) next.delete(id);
+      }
+      for (const s of sections) {
+        if (!prev.has(s.id) && !s.collapsed_by_default) {
+          next.add(s.id);
+        }
+      }
+      return next;
+    });
+  }, [sections]);
+
+  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<Map<string, boolean>>(new Map());
   // Local state for text inputs to prevent re-render issues during typing
-  const [optionsInputValues, setOptionsInputValues] = useState<
-    Map<string, string>
-  >(new Map());
-  const [labelInputValues, setLabelInputValues] = useState<Map<string, string>>(
-    new Map(),
+  const [optionsInputValues, setOptionsInputValues] = useState<Map<string, string>>(new Map());
+  const [labelInputValues, setLabelInputValues] = useState<Map<string, string>>(new Map());
+  const [descriptionInputValues, setDescriptionInputValues] = useState<Map<string, string>>(
+    new Map()
   );
-  const [descriptionInputValues, setDescriptionInputValues] = useState<
-    Map<string, string>
-  >(new Map());
   // Location restrictions state
-  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<
-    Map<string, string[]>
-  >(new Map());
-  const [restrictToLocationsMap, setRestrictToLocationsMap] = useState<
-    Map<string, boolean>
-  >(new Map());
+  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<Map<string, string[]>>(
+    new Map()
+  );
+  const [restrictToLocationsMap, setRestrictToLocationsMap] = useState<Map<string, boolean>>(
+    new Map()
+  );
   // Track which fields are currently being edited to prevent sync overwrites
   const editingFieldsRef = useRef<Set<string>>(new Set());
 
   const { locations } = useLocations();
   const { settings } = useOrganizationSettings();
-  const fieldMap = useMemo(
-    () => new Map(fields.map((field) => [field.id, field])),
-    [fields],
-  );
+  const fieldMap = useMemo(() => new Map(fields.map((field) => [field.id, field])), [fields]);
 
   // Handle options update for select fields - update local state immediately
   const handleOptionsChange = (fieldId: string, optionsString: string) => {
@@ -244,27 +225,20 @@ export function SectionEditor({
     if (!organizationId) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "list-field-configs",
-        {
-          body: {
-            organization_id: organizationId,
-            include_location_restrictions: true,
-          },
+      const { data, error } = await supabase.functions.invoke("list-field-configs", {
+        body: {
+          organization_id: organizationId,
+          include_location_restrictions: true,
         },
-      );
+      });
 
       if (error) throw error;
 
       const config = data?.field_configs?.find(
-        (fc: FieldConfig & { location_restrictions?: string[] }) =>
-          fc.id === fieldId,
+        (fc: FieldConfig & { location_restrictions?: string[] }) => fc.id === fieldId
       );
 
-      if (
-        config?.location_restrictions &&
-        config.location_restrictions.length > 0
-      ) {
+      if (config?.location_restrictions && config.location_restrictions.length > 0) {
         setRestrictToLocationsMap((prev) => {
           const next = new Map(prev);
           next.set(fieldId, true);
@@ -343,7 +317,7 @@ export function SectionEditor({
             field_config_id: fieldId,
             location_ids: locationIds,
           },
-        },
+        }
       );
 
       if (locationError) {
@@ -382,10 +356,7 @@ export function SectionEditor({
   };
 
   // Get the current options input value, falling back to field value if not in local state
-  const getOptionsInputValue = (
-    fieldId: string,
-    field: FieldConfig,
-  ): string => {
+  const getOptionsInputValue = (fieldId: string, field: FieldConfig): string => {
     if (optionsInputValues.has(fieldId)) {
       return optionsInputValues.get(fieldId) || "";
     }
@@ -421,10 +392,7 @@ export function SectionEditor({
   };
 
   // Get the current description input value, falling back to field value if not in local state
-  const getDescriptionInputValue = (
-    fieldId: string,
-    field: FieldConfig,
-  ): string => {
+  const getDescriptionInputValue = (fieldId: string, field: FieldConfig): string => {
     if (descriptionInputValues.has(fieldId)) {
       return descriptionInputValues.get(fieldId) || "";
     }
@@ -437,15 +405,12 @@ export function SectionEditor({
 
     async function fetchAllLocationRestrictions() {
       try {
-        const { data, error } = await supabase.functions.invoke(
-          "list-field-configs",
-          {
-            body: {
-              organization_id: organizationId,
-              include_location_restrictions: true,
-            },
+        const { data, error } = await supabase.functions.invoke("list-field-configs", {
+          body: {
+            organization_id: organizationId,
+            include_location_restrictions: true,
           },
-        );
+        });
 
         if (error) throw error;
 
@@ -454,16 +419,13 @@ export function SectionEditor({
 
         (data?.field_configs || []).forEach(
           (fc: FieldConfig & { location_restrictions?: string[] }) => {
-            if (
-              fc.location_restrictions &&
-              fc.location_restrictions.length > 0
-            ) {
+            if (fc.location_restrictions && fc.location_restrictions.length > 0) {
               restrictionsMap.set(fc.id, fc.location_restrictions);
               restrictMap.set(fc.id, true);
             } else {
               restrictMap.set(fc.id, false);
             }
-          },
+          }
         );
 
         setLocationRestrictionsMap(restrictionsMap);
@@ -488,9 +450,7 @@ export function SectionEditor({
   // Keep section field orders in sync when sections change externally
   useEffect(() => {
     if (!draggedSectionField) {
-      setSectionFieldOrders(
-        new Map(sections.map((s) => [s.id, s.field_ids || []])),
-      );
+      setSectionFieldOrders(new Map(sections.map((s) => [s.id, s.field_ids || []])));
     }
   }, [sections, draggedSectionField]);
 
@@ -500,7 +460,7 @@ export function SectionEditor({
       sectionOrder
         .map((id) => sections.find((s) => s.id === id))
         .filter((s): s is FormSectionWithFields => s !== undefined),
-    [sectionOrder, sections],
+    [sectionOrder, sections]
   );
 
   const handleOpenDialog = (section?: FormSectionWithFields) => {
@@ -604,7 +564,7 @@ export function SectionEditor({
   const handleSectionFieldDragOver = (
     e: React.DragEvent,
     sectionId: string,
-    targetFieldId: string,
+    targetFieldId: string
   ) => {
     e.preventDefault();
     if (!draggedSectionField || draggedSectionField === targetFieldId) return;
@@ -639,23 +599,17 @@ export function SectionEditor({
     // This ensures the order persists after refetch
     if (onReorderFields) {
       // Get all fields ordered by their current order_position
-      const allFieldsOrdered = [...fields].sort(
-        (a, b) => a.order_position - b.order_position,
-      );
+      const allFieldsOrdered = [...fields].sort((a, b) => a.order_position - b.order_position);
 
       // Split into: fields before this section, fields in this section (reordered), fields after this section
       const sectionFieldsInNewOrder = newOrder
         .map((id) => fieldMap.get(id))
         .filter((f): f is FieldConfig => Boolean(f));
 
-      const fieldsBeforeSection = allFieldsOrdered.filter(
-        (f) => f.section_id !== sectionId,
-      );
+      const fieldsBeforeSection = allFieldsOrdered.filter((f) => f.section_id !== sectionId);
 
       // Find where this section's fields start in the global order
-      const firstSectionField = allFieldsOrdered.find(
-        (f) => f.section_id === sectionId,
-      );
+      const firstSectionField = allFieldsOrdered.find((f) => f.section_id === sectionId);
       const sectionStartIndex = firstSectionField
         ? allFieldsOrdered.indexOf(firstSectionField)
         : fieldsBeforeSection.length;
@@ -684,25 +638,12 @@ export function SectionEditor({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Label className="text-sm font-semibold">Form Sections</Label>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-xs">
-                <div className="space-y-1">
-                  <p className="font-medium text-xs text-slate-50">
-                    Form Sections
-                  </p>
-                  <p className="text-xs text-slate-200">
-                    Sections and their containing fields can be viewed in the
-                    mobile preview. Fields must be in a section to appear in the
-                    mobile app.
-                  </p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <ContextualHelp label="Form sections" side="right" align="start">
+            <p>
+              Sections and their fields appear as steps in the mobile preview. Fields must be
+              assigned to a section to show in the mobile app.
+            </p>
+          </ContextualHelp>
         </div>
         <Button
           variant="outline"
@@ -720,8 +661,8 @@ export function SectionEditor({
           <FolderPlus className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No sections yet</p>
           <p className="text-xs">
-            Add sections to organize your form fields. Fields only appear in the
-            mobile preview when they are inside a section.
+            Add sections to organize your form fields. Fields only appear in the mobile preview when
+            they are inside a section.
           </p>
         </div>
       ) : (
@@ -740,17 +681,12 @@ export function SectionEditor({
                 onDragStart={() => handleDragStart(section.id)}
                 onDragOver={(e) => {
                   // If dragging a field (from main list or from another section) into this section, allow drop
-                  if (
-                    (draggedFieldId || draggedSectionField) &&
-                    onDropFieldToSection
-                  ) {
+                  if ((draggedFieldId || draggedSectionField) && onDropFieldToSection) {
                     e.preventDefault();
                   }
                   // If dragging a field within the same section, ignore section drag (handled by field drag)
                   else if (draggedSectionField) {
-                    const draggedField = fields.find(
-                      (f) => f.id === draggedSectionField,
-                    );
+                    const draggedField = fields.find((f) => f.id === draggedSectionField);
                     // If dragging within the same section, let field reordering handle it
                     if (draggedField?.section_id === section.id) {
                       return;
@@ -766,27 +702,15 @@ export function SectionEditor({
                 onDrop={async (e) => {
                   e.preventDefault();
                   // Handle drop from main fields list
-                  if (
-                    draggedFieldId &&
-                    !draggedSectionField &&
-                    onDropFieldToSection
-                  ) {
+                  if (draggedFieldId && !draggedSectionField && onDropFieldToSection) {
                     handleFieldDrop(e, section.id);
                   }
                   // Handle drop from another section
                   else if (draggedSectionField && onDropFieldToSection) {
-                    const draggedField = fields.find(
-                      (f) => f.id === draggedSectionField,
-                    );
+                    const draggedField = fields.find((f) => f.id === draggedSectionField);
                     // Only move if dropping into a different section
-                    if (
-                      draggedField &&
-                      draggedField.section_id !== section.id
-                    ) {
-                      await onDropFieldToSection(
-                        section.id,
-                        draggedSectionField,
-                      );
+                    if (draggedField && draggedField.section_id !== section.id) {
+                      await onDropFieldToSection(section.id, draggedSectionField);
                       setDraggedSectionField(null);
                       onSectionFieldDragEnd?.();
                     }
@@ -845,29 +769,25 @@ export function SectionEditor({
                       const localOrder = sectionFieldOrders.get(section.id) || [];
                       // Use section.field_ids as the source of truth for which fields belong
                       const sectionFieldIds = section.field_ids || [];
-                      
+
                       // Merge: keep local order for existing fields, append any new fields not in local order
                       const localOrderSet = new Set(localOrder);
                       const orderedFieldIds = [
                         ...localOrder.filter((id) => sectionFieldIds.includes(id)),
                         ...sectionFieldIds.filter((id) => !localOrderSet.has(id)),
                       ];
-                      
+
                       // Map to ordered fields
                       const orderedSectionFields = orderedFieldIds
                         .map((fieldId) => fieldMap.get(fieldId))
-                        .filter((field): field is FieldConfig =>
-                          Boolean(field),
-                        );
+                        .filter((field): field is FieldConfig => Boolean(field));
 
                       return (
                         sectionFields.length > 0 && (
                           <div className="space-y-2">
                             {orderedSectionFields.map((field) => {
                               const FieldIcon =
-                                FIELD_TYPES.find(
-                                  (t) => t.type === field.field_type,
-                                )?.icon || Type;
+                                FIELD_TYPES.find((t) => t.type === field.field_type)?.icon || Type;
                               const groupId = field.mutually_exclusive_group;
                               const clusterId = field.group_cluster;
                               return (
@@ -876,28 +796,19 @@ export function SectionEditor({
                                   draggable
                                   onDragStart={(e) => {
                                     e.stopPropagation();
-                                    handleSectionFieldDragStart(
-                                      section.id,
-                                      field.id,
-                                    );
+                                    handleSectionFieldDragStart(section.id, field.id);
                                   }}
                                   onDragOver={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    handleSectionFieldDragOver(
-                                      e,
-                                      section.id,
-                                      field.id,
-                                    );
+                                    handleSectionFieldDragOver(e, section.id, field.id);
                                   }}
                                   onDragEnd={(e) => {
                                     e.stopPropagation();
                                     handleSectionFieldDragEnd(section.id);
                                   }}
                                   className={`group flex items-center gap-3 p-3 border rounded-lg hover:border-primary/50 transition-all cursor-move ${
-                                    groupId
-                                      ? "bg-primary/5 border-primary/50"
-                                      : "bg-card"
+                                    groupId ? "bg-primary/5 border-primary/50" : "bg-card"
                                   } ${
                                     draggedSectionField === field.id
                                       ? "opacity-50 scale-[0.98]"
@@ -921,24 +832,16 @@ export function SectionEditor({
                                         </Badge>
                                       )}
                                       {field.conditional_logic && (
-                                        <Badge
-                                          variant="outline"
-                                          className="text-[10px] px-1.5"
-                                        >
+                                        <Badge variant="outline" className="text-[10px] px-1.5">
                                           Conditional
                                         </Badge>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                                      <Badge
-                                        variant="secondary"
-                                        className="text-[10px] px-1.5"
-                                      >
+                                      <Badge variant="secondary" className="text-[10px] px-1.5">
                                         {field.field_type}
                                       </Badge>
-                                      <span className="font-mono truncate">
-                                        {field.name}
-                                      </span>
+                                      <span className="font-mono truncate">{field.name}</span>
                                       {clusterId && (
                                         <TooltipProvider>
                                           <Tooltip>
@@ -951,31 +854,21 @@ export function SectionEditor({
                                               </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                              Fields sharing a cluster act as
-                                              one option inside their exclusive
-                                              group (e.g., wiped + soaped
-                                              details).
+                                              Fields sharing a cluster act as one option inside
+                                              their exclusive group (e.g., wiped + soaped details).
                                             </TooltipContent>
                                           </Tooltip>
                                         </TooltipProvider>
                                       )}
                                       {locationRestrictionsMap.get(field.id) &&
-                                        locationRestrictionsMap.get(field.id)!
-                                          .length > 0 && (
+                                        locationRestrictionsMap.get(field.id)!.length > 0 && (
                                           <Badge
                                             variant="outline"
                                             className="text-[10px] px-1.5 bg-amber-50 text-amber-700 border-amber-300"
                                           >
                                             <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                                            {
-                                              locationRestrictionsMap.get(
-                                                field.id,
-                                              )!.length
-                                            }{" "}
-                                            location
-                                            {locationRestrictionsMap.get(
-                                              field.id,
-                                            )!.length !== 1
+                                            {locationRestrictionsMap.get(field.id)!.length} location
+                                            {locationRestrictionsMap.get(field.id)!.length !== 1
                                               ? "s"
                                               : ""}
                                           </Badge>
@@ -1017,19 +910,11 @@ export function SectionEditor({
 
                                             {/* Label */}
                                             <div className="space-y-1">
-                                              <Label className="text-xs">
-                                                Label
-                                              </Label>
+                                              <Label className="text-xs">Label</Label>
                                               <Input
-                                                value={getLabelInputValue(
-                                                  field.id,
-                                                  field,
-                                                )}
+                                                value={getLabelInputValue(field.id, field)}
                                                 onChange={(e) =>
-                                                  handleLabelChange(
-                                                    field.id,
-                                                    e.target.value,
-                                                  )
+                                                  handleLabelChange(field.id, e.target.value)
                                                 }
                                               />
                                             </div>
@@ -1040,15 +925,9 @@ export function SectionEditor({
                                                 Description / Placeholder
                                               </Label>
                                               <Textarea
-                                                value={getDescriptionInputValue(
-                                                  field.id,
-                                                  field,
-                                                )}
+                                                value={getDescriptionInputValue(field.id, field)}
                                                 onChange={(e) =>
-                                                  handleDescriptionChange(
-                                                    field.id,
-                                                    e.target.value,
-                                                  )
+                                                  handleDescriptionChange(field.id, e.target.value)
                                                 }
                                                 rows={2}
                                               />
@@ -1056,22 +935,14 @@ export function SectionEditor({
 
                                             {/* Field Type */}
                                             <div className="space-y-1">
-                                              <Label className="text-xs">
-                                                Field Type
-                                              </Label>
+                                              <Label className="text-xs">Field Type</Label>
                                               <Select
                                                 value={field.field_type}
-                                                onValueChange={async (
-                                                  v: string,
-                                                ) => {
+                                                onValueChange={async (v: string) => {
                                                   if (onUpdateField) {
-                                                    await onUpdateField(
-                                                      field.id,
-                                                      {
-                                                        field_type:
-                                                          v as FieldType,
-                                                      },
-                                                    );
+                                                    await onUpdateField(field.id, {
+                                                      field_type: v as FieldType,
+                                                    });
                                                   }
                                                 }}
                                               >
@@ -1079,38 +950,26 @@ export function SectionEditor({
                                                   <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                  {FIELD_TYPES.map(
-                                                    ({ type, label }) => (
-                                                      <SelectItem
-                                                        key={type}
-                                                        value={type}
-                                                      >
-                                                        {label}
-                                                      </SelectItem>
-                                                    ),
-                                                  )}
+                                                  {FIELD_TYPES.map(({ type, label }) => (
+                                                    <SelectItem key={type} value={type}>
+                                                      {label}
+                                                    </SelectItem>
+                                                  ))}
                                                 </SelectContent>
                                               </Select>
                                             </div>
 
                                             {/* Options for select/grouped_breakdown */}
                                             {(field.field_type === "select" ||
-                                              field.field_type ===
-                                                "grouped_breakdown") && (
+                                              field.field_type === "grouped_breakdown") && (
                                               <div className="space-y-1">
                                                 <Label className="text-xs">
                                                   Options (comma-separated)
                                                 </Label>
                                                 <Input
-                                                  value={getOptionsInputValue(
-                                                    field.id,
-                                                    field,
-                                                  )}
+                                                  value={getOptionsInputValue(field.id, field)}
                                                   onChange={(e) =>
-                                                    handleOptionsChange(
-                                                      field.id,
-                                                      e.target.value,
-                                                    )
+                                                    handleOptionsChange(field.id, e.target.value)
                                                   }
                                                   placeholder="Option 1, Option 2, Option 3"
                                                 />
@@ -1120,26 +979,14 @@ export function SectionEditor({
                                             {/* Section Assignment */}
                                             {sections.length > 0 && (
                                               <div className="space-y-1">
-                                                <Label className="text-xs">
-                                                  Section
-                                                </Label>
+                                                <Label className="text-xs">Section</Label>
                                                 <Select
-                                                  value={
-                                                    field.section_id || "none"
-                                                  }
-                                                  onValueChange={async (
-                                                    v: string,
-                                                  ) => {
+                                                  value={field.section_id || "none"}
+                                                  onValueChange={async (v: string) => {
                                                     if (onUpdateField) {
-                                                      await onUpdateField(
-                                                        field.id,
-                                                        {
-                                                          section_id:
-                                                            v === "none"
-                                                              ? null
-                                                              : v,
-                                                        },
-                                                      );
+                                                      await onUpdateField(field.id, {
+                                                        section_id: v === "none" ? null : v,
+                                                      });
                                                     }
                                                   }}
                                                 >
@@ -1147,9 +994,7 @@ export function SectionEditor({
                                                     <SelectValue placeholder="No section" />
                                                   </SelectTrigger>
                                                   <SelectContent>
-                                                    <SelectItem value="none">
-                                                      No section
-                                                    </SelectItem>
+                                                    <SelectItem value="none">No section</SelectItem>
                                                     {sections.map((section) => (
                                                       <SelectItem
                                                         key={section.id}
@@ -1165,21 +1010,14 @@ export function SectionEditor({
 
                                             {/* Required Toggle */}
                                             <div className="flex items-center justify-between">
-                                              <Label className="text-xs">
-                                                Required Field
-                                              </Label>
+                                              <Label className="text-xs">Required Field</Label>
                                               <Switch
                                                 checked={field.required}
-                                                onCheckedChange={async (
-                                                  checked: boolean,
-                                                ) => {
+                                                onCheckedChange={async (checked: boolean) => {
                                                   if (onUpdateField) {
-                                                    await onUpdateField(
-                                                      field.id,
-                                                      {
-                                                        required: checked,
-                                                      },
-                                                    );
+                                                    await onUpdateField(field.id, {
+                                                      required: checked,
+                                                    });
                                                   }
                                                 }}
                                                 className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
@@ -1194,49 +1032,34 @@ export function SectionEditor({
                                                     Allow Multiple Selections
                                                   </Label>
                                                   <p className="text-[10px] text-muted-foreground">
-                                                    Enable multiple option
-                                                    selection
+                                                    Enable multiple option selection
                                                   </p>
                                                 </div>
                                                 <Switch
                                                   checked={
-                                                    field.validation_rules
-                                                      ?.allow_multiple || false
+                                                    field.validation_rules?.allow_multiple || false
                                                   }
-                                                  onCheckedChange={async (
-                                                    checked: boolean,
-                                                  ) => {
+                                                  onCheckedChange={async (checked: boolean) => {
                                                     if (onUpdateField) {
                                                       // Preserve other validation rules when toggling allow_multiple
                                                       const existingRules =
-                                                        field.validation_rules ||
-                                                        {};
-                                                      const updatedRules =
-                                                        checked
-                                                          ? {
-                                                              ...existingRules,
-                                                              allow_multiple: true,
-                                                            }
-                                                          : Object.fromEntries(
-                                                              Object.entries(
-                                                                existingRules,
-                                                              ).filter(
-                                                                ([key]) =>
-                                                                  key !==
-                                                                  "allow_multiple",
-                                                              ),
-                                                            );
-                                                      await onUpdateField(
-                                                        field.id,
-                                                        {
-                                                          validation_rules:
-                                                            Object.keys(
-                                                              updatedRules,
-                                                            ).length > 0
-                                                              ? updatedRules
-                                                              : null,
-                                                        },
-                                                      );
+                                                        field.validation_rules || {};
+                                                      const updatedRules = checked
+                                                        ? {
+                                                            ...existingRules,
+                                                            allow_multiple: true,
+                                                          }
+                                                        : Object.fromEntries(
+                                                            Object.entries(existingRules).filter(
+                                                              ([key]) => key !== "allow_multiple"
+                                                            )
+                                                          );
+                                                      await onUpdateField(field.id, {
+                                                        validation_rules:
+                                                          Object.keys(updatedRules).length > 0
+                                                            ? updatedRules
+                                                            : null,
+                                                      });
                                                     }
                                                   }}
                                                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
@@ -1251,37 +1074,20 @@ export function SectionEditor({
                                                   <Switch
                                                     id={`restrict-locations-${field.id}`}
                                                     checked={
-                                                      restrictToLocationsMap.get(
-                                                        field.id,
-                                                      ) || false
+                                                      restrictToLocationsMap.get(field.id) || false
                                                     }
-                                                    onCheckedChange={(
-                                                      checked,
-                                                    ) => {
-                                                      setRestrictToLocationsMap(
-                                                        (prev) => {
-                                                          const next = new Map(
-                                                            prev,
-                                                          );
-                                                          next.set(
-                                                            field.id,
-                                                            checked,
-                                                          );
-                                                          return next;
-                                                        },
-                                                      );
+                                                    onCheckedChange={(checked) => {
+                                                      setRestrictToLocationsMap((prev) => {
+                                                        const next = new Map(prev);
+                                                        next.set(field.id, checked);
+                                                        return next;
+                                                      });
                                                       if (!checked) {
-                                                        setLocationRestrictionsMap(
-                                                          (prev) => {
-                                                            const next =
-                                                              new Map(prev);
-                                                            next.set(
-                                                              field.id,
-                                                              [],
-                                                            );
-                                                            return next;
-                                                          },
-                                                        );
+                                                        setLocationRestrictionsMap((prev) => {
+                                                          const next = new Map(prev);
+                                                          next.set(field.id, []);
+                                                          return next;
+                                                        });
                                                       }
                                                     }}
                                                     className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
@@ -1290,93 +1096,67 @@ export function SectionEditor({
                                                     htmlFor={`restrict-locations-${field.id}`}
                                                     className="text-xs cursor-pointer"
                                                   >
-                                                    Restrict to specific
-                                                    locations
+                                                    Restrict to specific locations
                                                   </Label>
                                                 </div>
-                                                {restrictToLocationsMap.get(
-                                                  field.id,
-                                                ) && (
+                                                {restrictToLocationsMap.get(field.id) && (
                                                   <div className="space-y-2 pl-6 border-l-2 border-muted">
                                                     {locations.length === 0 ? (
                                                       <p className="text-xs text-muted-foreground">
-                                                        No locations available.
-                                                        Create locations first.
+                                                        No locations available. Create locations
+                                                        first.
                                                       </p>
                                                     ) : (
                                                       <div className="rounded-md border border-input bg-transparent shadow-sm">
                                                         <div className="max-h-48 overflow-y-auto p-2">
                                                           {locations
-                                                            .filter(
-                                                              (loc) =>
-                                                                loc.active,
-                                                            )
+                                                            .filter((loc) => loc.active)
                                                             .map((location) => {
-                                                              const isSelected =
-                                                                (
-                                                                  locationRestrictionsMap.get(
-                                                                    field.id,
-                                                                  ) || []
-                                                                ).includes(
-                                                                  location.id,
-                                                                );
+                                                              const isSelected = (
+                                                                locationRestrictionsMap.get(
+                                                                  field.id
+                                                                ) || []
+                                                              ).includes(location.id);
                                                               return (
                                                                 <div
-                                                                  key={
-                                                                    location.id
-                                                                  }
+                                                                  key={location.id}
                                                                   className={cn(
                                                                     "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                                                                    isSelected &&
-                                                                      "bg-accent/50",
+                                                                    isSelected && "bg-accent/50"
                                                                   )}
                                                                   onClick={() => {
                                                                     const currentIds =
                                                                       locationRestrictionsMap.get(
-                                                                        field.id,
+                                                                        field.id
                                                                       ) || [];
-                                                                    if (
-                                                                      isSelected
-                                                                    ) {
+                                                                    if (isSelected) {
                                                                       setLocationRestrictionsMap(
-                                                                        (
-                                                                          prev,
-                                                                        ) => {
-                                                                          const next =
-                                                                            new Map(
-                                                                              prev,
-                                                                            );
+                                                                        (prev) => {
+                                                                          const next = new Map(
+                                                                            prev
+                                                                          );
                                                                           next.set(
                                                                             field.id,
                                                                             currentIds.filter(
-                                                                              (
-                                                                                id,
-                                                                              ) =>
-                                                                                id !==
-                                                                                location.id,
-                                                                            ),
+                                                                              (id) =>
+                                                                                id !== location.id
+                                                                            )
                                                                           );
                                                                           return next;
-                                                                        },
+                                                                        }
                                                                       );
                                                                     } else {
                                                                       setLocationRestrictionsMap(
-                                                                        (
-                                                                          prev,
-                                                                        ) => {
-                                                                          const next =
-                                                                            new Map(
-                                                                              prev,
-                                                                            );
-                                                                          next.set(
-                                                                            field.id,
-                                                                            [
-                                                                              ...currentIds,
-                                                                              location.id,
-                                                                            ],
+                                                                        (prev) => {
+                                                                          const next = new Map(
+                                                                            prev
                                                                           );
+                                                                          next.set(field.id, [
+                                                                            ...currentIds,
+                                                                            location.id,
+                                                                          ]);
                                                                           return next;
-                                                                        },
+                                                                        }
                                                                       );
                                                                     }
                                                                   }}
@@ -1390,66 +1170,45 @@ export function SectionEditor({
                                                                     htmlFor={`section-location-${field.id}-${location.id}`}
                                                                     className="text-xs font-normal cursor-pointer flex-1"
                                                                   >
-                                                                    {
-                                                                      location.name
-                                                                    }
+                                                                    {location.name}
                                                                   </Label>
                                                                   <input
                                                                     type="checkbox"
                                                                     id={`section-location-${field.id}-${location.id}`}
-                                                                    checked={
-                                                                      isSelected
-                                                                    }
-                                                                    onChange={(
-                                                                      e,
-                                                                    ) => {
+                                                                    checked={isSelected}
+                                                                    onChange={(e) => {
                                                                       const currentIds =
                                                                         locationRestrictionsMap.get(
-                                                                          field.id,
+                                                                          field.id
                                                                         ) || [];
-                                                                      if (
-                                                                        e.target
-                                                                          .checked
-                                                                      ) {
+                                                                      if (e.target.checked) {
                                                                         setLocationRestrictionsMap(
-                                                                          (
-                                                                            prev,
-                                                                          ) => {
-                                                                            const next =
-                                                                              new Map(
-                                                                                prev,
-                                                                              );
-                                                                            next.set(
-                                                                              field.id,
-                                                                              [
-                                                                                ...currentIds,
-                                                                                location.id,
-                                                                              ],
+                                                                          (prev) => {
+                                                                            const next = new Map(
+                                                                              prev
                                                                             );
+                                                                            next.set(field.id, [
+                                                                              ...currentIds,
+                                                                              location.id,
+                                                                            ]);
                                                                             return next;
-                                                                          },
+                                                                          }
                                                                         );
                                                                       } else {
                                                                         setLocationRestrictionsMap(
-                                                                          (
-                                                                            prev,
-                                                                          ) => {
-                                                                            const next =
-                                                                              new Map(
-                                                                                prev,
-                                                                              );
+                                                                          (prev) => {
+                                                                            const next = new Map(
+                                                                              prev
+                                                                            );
                                                                             next.set(
                                                                               field.id,
                                                                               currentIds.filter(
-                                                                                (
-                                                                                  id,
-                                                                                ) =>
-                                                                                  id !==
-                                                                                  location.id,
-                                                                              ),
+                                                                                (id) =>
+                                                                                  id !== location.id
+                                                                              )
                                                                             );
                                                                             return next;
-                                                                          },
+                                                                          }
                                                                         );
                                                                       }
                                                                     }}
@@ -1469,19 +1228,13 @@ export function SectionEditor({
 
                                             {/* Advanced Section */}
                                             <Collapsible
-                                              open={
-                                                advancedSectionsOpen.get(
-                                                  field.id,
-                                                ) || false
-                                              }
+                                              open={advancedSectionsOpen.get(field.id) || false}
                                               onOpenChange={(open) => {
-                                                setAdvancedSectionsOpen(
-                                                  (prev) => {
-                                                    const next = new Map(prev);
-                                                    next.set(field.id, open);
-                                                    return next;
-                                                  },
-                                                );
+                                                setAdvancedSectionsOpen((prev) => {
+                                                  const next = new Map(prev);
+                                                  next.set(field.id, open);
+                                                  return next;
+                                                });
                                               }}
                                             >
                                               <CollapsibleTrigger asChild>
@@ -1490,12 +1243,8 @@ export function SectionEditor({
                                                   size="sm"
                                                   className="w-full justify-between cursor-pointer"
                                                 >
-                                                  <span className="text-xs">
-                                                    Advanced Options
-                                                  </span>
-                                                  {advancedSectionsOpen.get(
-                                                    field.id,
-                                                  ) ? (
+                                                  <span className="text-xs">Advanced Options</span>
+                                                  {advancedSectionsOpen.get(field.id) ? (
                                                     <ChevronDown className="w-3 h-3" />
                                                   ) : (
                                                     <ChevronRight className="w-3 h-3" />
@@ -1508,105 +1257,72 @@ export function SectionEditor({
                                                   <div className="flex items-start justify-between gap-2">
                                                     <div className="flex-1">
                                                       <Label className="text-xs">
-                                                        Mutually Exclusive
-                                                        Cluster
+                                                        Mutually Exclusive Cluster
                                                       </Label>
                                                       <p className="text-[11px] text-muted-foreground mt-1">
-                                                        Assign this field to a
-                                                        cluster where only one
-                                                        option can be selected
-                                                        at a time. All clusters
-                                                        share a single implicit
-                                                        group behind the scenes.
+                                                        Assign this field to a cluster where only
+                                                        one option can be selected at a time. All
+                                                        clusters share a single implicit group
+                                                        behind the scenes.
                                                       </p>
                                                     </div>
                                                   </div>
                                                   <p className="text-[11px] text-muted-foreground italic">
-                                                    💡 Need to create a new
-                                                    cluster name? Click the{" "}
+                                                    💡 Need to create a new cluster name? Click the{" "}
                                                     <span className="font-medium text-primary">
                                                       Field Group Settings
                                                     </span>{" "}
-                                                    button at the top of the
-                                                    page to create option names
-                                                    first.
+                                                    button at the top of the page to create option
+                                                    names first.
                                                   </p>
                                                   {(() => {
                                                     // Get all clusters from all fields AND created clusters
-                                                    const clustersFromFields =
-                                                      Array.from(
-                                                        new Set(
-                                                          fields
-                                                            .map(
-                                                              (f) =>
-                                                                f.group_cluster,
-                                                            )
-                                                            .filter(
-                                                              (
-                                                                c,
-                                                              ): c is string =>
-                                                                Boolean(c),
-                                                            ),
-                                                        ),
-                                                      );
+                                                    const clustersFromFields = Array.from(
+                                                      new Set(
+                                                        fields
+                                                          .map((f) => f.group_cluster)
+                                                          .filter((c): c is string => Boolean(c))
+                                                      )
+                                                    );
                                                     // Combine with created clusters that haven't been assigned yet
-                                                    const allClusters =
-                                                      Array.from(
-                                                        new Set([
-                                                          ...clustersFromFields,
-                                                          ...createdClusters,
-                                                        ]),
-                                                      ).sort();
+                                                    const allClusters = Array.from(
+                                                      new Set([
+                                                        ...clustersFromFields,
+                                                        ...createdClusters,
+                                                      ])
+                                                    ).sort();
 
                                                     // Convert cluster ID to display name
-                                                    const getClusterDisplayName =
-                                                      (clusterId: string) => {
-                                                        return clusterId
-                                                          .split("_")
-                                                          .map(
-                                                            (word) =>
-                                                              word
-                                                                .charAt(0)
-                                                                .toUpperCase() +
-                                                              word.slice(1),
-                                                          )
-                                                          .join(" ");
-                                                      };
+                                                    const getClusterDisplayName = (
+                                                      clusterId: string
+                                                    ) => {
+                                                      return clusterId
+                                                        .split("_")
+                                                        .map(
+                                                          (word) =>
+                                                            word.charAt(0).toUpperCase() +
+                                                            word.slice(1)
+                                                        )
+                                                        .join(" ");
+                                                    };
 
                                                     return (
                                                       <div className="space-y-2">
                                                         <Select
-                                                          value={
-                                                            field.group_cluster ||
-                                                            "none"
-                                                          }
-                                                          onValueChange={async (
-                                                            value: string,
-                                                          ) => {
-                                                            if (!onUpdateField)
-                                                              return;
-                                                            if (
-                                                              value === "none"
-                                                            ) {
-                                                              await onUpdateField(
-                                                                field.id,
-                                                                {
-                                                                  mutually_exclusive_group:
-                                                                    null,
-                                                                  group_cluster:
-                                                                    null,
-                                                                },
-                                                              );
+                                                          value={field.group_cluster || "none"}
+                                                          onValueChange={async (value: string) => {
+                                                            if (!onUpdateField) return;
+                                                            if (value === "none") {
+                                                              await onUpdateField(field.id, {
+                                                                mutually_exclusive_group: null,
+                                                                group_cluster: null,
+                                                              });
                                                             } else {
-                                                              await onUpdateField(
-                                                                field.id,
-                                                                {
-                                                                  mutually_exclusive_group:
-                                                                    DEFAULT_EXCLUSIVE_GROUP,
-                                                                  group_cluster:
-                                                                    value,
-                                                                },
-                                                              );
+                                                              await onUpdateField(field.id, {
+                                                                mutually_exclusive_group:
+                                                                  DEFAULT_EXCLUSIVE_GROUP,
+                                                                group_cluster: value,
+                                                              });
                                                             }
                                                           }}
                                                         >
@@ -1617,90 +1333,58 @@ export function SectionEditor({
                                                             <SelectItem value="none">
                                                               No cluster
                                                             </SelectItem>
-                                                            {allClusters.map(
-                                                              (clusterId) => (
-                                                                <SelectItem
-                                                                  key={
-                                                                    clusterId
-                                                                  }
-                                                                  value={
-                                                                    clusterId
-                                                                  }
-                                                                >
-                                                                  {getClusterDisplayName(
-                                                                    clusterId,
-                                                                  )}
-                                                                </SelectItem>
-                                                              ),
-                                                            )}
+                                                            {allClusters.map((clusterId) => (
+                                                              <SelectItem
+                                                                key={clusterId}
+                                                                value={clusterId}
+                                                              >
+                                                                {getClusterDisplayName(clusterId)}
+                                                              </SelectItem>
+                                                            ))}
                                                           </SelectContent>
                                                         </Select>
                                                         <Input
                                                           value={
                                                             field.group_cluster
                                                               ? getClusterDisplayName(
-                                                                  field.group_cluster,
+                                                                  field.group_cluster
                                                                 )
                                                               : ""
                                                           }
-                                                          onChange={async (
-                                                            e,
-                                                          ) => {
+                                                          onChange={async (e) => {
                                                             // Allow typing freely; apply on blur
-                                                            if (
-                                                              !e.target.value &&
-                                                              onUpdateField
-                                                            ) {
-                                                              const result =
-                                                                onUpdateField(
-                                                                  field.id,
-                                                                  {
-                                                                    mutually_exclusive_group:
-                                                                      null,
-                                                                    group_cluster:
-                                                                      null,
-                                                                  },
-                                                                );
-                                                              if (
-                                                                result instanceof
-                                                                Promise
-                                                              ) {
+                                                            if (!e.target.value && onUpdateField) {
+                                                              const result = onUpdateField(
+                                                                field.id,
+                                                                {
+                                                                  mutually_exclusive_group: null,
+                                                                  group_cluster: null,
+                                                                }
+                                                              );
+                                                              if (result instanceof Promise) {
                                                                 await result;
                                                               }
                                                             }
                                                           }}
                                                           onBlur={async (e) => {
-                                                            if (!onUpdateField)
-                                                              return;
+                                                            if (!onUpdateField) return;
                                                             const clusterName =
                                                               e.target.value.trim();
                                                             if (clusterName) {
-                                                              const clusterId =
-                                                                clusterName
-                                                                  .toLowerCase()
-                                                                  .replace(
-                                                                    /[^a-z0-9]+/g,
-                                                                    "_",
-                                                                  )
-                                                                  .replace(
-                                                                    /^_|_$/g,
-                                                                    "",
-                                                                  );
+                                                              const clusterId = clusterName
+                                                                .toLowerCase()
+                                                                .replace(/[^a-z0-9]+/g, "_")
+                                                                .replace(/^_|_$/g, "");
 
-                                                              await onUpdateField(
-                                                                field.id,
-                                                                {
-                                                                  mutually_exclusive_group:
-                                                                    DEFAULT_EXCLUSIVE_GROUP,
-                                                                  group_cluster:
-                                                                    clusterId,
-                                                                },
-                                                              );
+                                                              await onUpdateField(field.id, {
+                                                                mutually_exclusive_group:
+                                                                  DEFAULT_EXCLUSIVE_GROUP,
+                                                                group_cluster: clusterId,
+                                                              });
                                                             }
                                                           }}
                                                           placeholder={
-                                                            allClusters.length >
-                                                            0
+                                                            allClusters.length > 0
                                                               ? "Or type new cluster name"
                                                               : "Type cluster name (e.g., Simple Toggle)"
                                                           }
@@ -1716,13 +1400,9 @@ export function SectionEditor({
                                                   allFields={fields}
                                                   onChange={async (logic) => {
                                                     if (onUpdateField) {
-                                                      await onUpdateField(
-                                                        field.id,
-                                                        {
-                                                          conditional_logic:
-                                                            logic,
-                                                        },
-                                                      );
+                                                      await onUpdateField(field.id, {
+                                                        conditional_logic: logic,
+                                                      });
                                                     }
                                                   }}
                                                 />
@@ -1737,9 +1417,7 @@ export function SectionEditor({
                                         variant="ghost"
                                         size="icon"
                                         className="h-6 w-6 text-destructive hover:text-destructive cursor-pointer"
-                                        onClick={() =>
-                                          onRemoveFieldFromSection(field.id)
-                                        }
+                                        onClick={() => onRemoveFieldFromSection(field.id)}
                                       >
                                         <Trash2 className="w-3 h-3" />
                                       </Button>
@@ -1759,11 +1437,7 @@ export function SectionEditor({
                           : ""
                       }`}
                       onDragOver={(e) => {
-                        if (
-                          draggedFieldId &&
-                          !draggedSectionField &&
-                          onDropFieldToSection
-                        ) {
+                        if (draggedFieldId && !draggedSectionField && onDropFieldToSection) {
                           e.preventDefault();
                         }
                       }}
@@ -1789,9 +1463,7 @@ export function SectionEditor({
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingSection ? "Edit Section" : "Add Section"}
-            </DialogTitle>
+            <DialogTitle>{editingSection ? "Edit Section" : "Add Section"}</DialogTitle>
             <DialogDescription>
               {editingSection
                 ? "Update the section details below"
@@ -1804,9 +1476,7 @@ export function SectionEditor({
               <Input
                 id="title"
                 value={formData.title}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, title: e.target.value }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder="e.g., Customer Information"
               />
             </div>

@@ -1,4 +1,3 @@
-import { locationHierarchyKey } from "@/app/query-provider";
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
 import { LocationHierarchyService } from "@/lib/services";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -37,9 +36,7 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
@@ -115,33 +112,33 @@ describe("useLocationHierarchy", () => {
     });
   });
 
-    it("should update node and refetch", async () => {
-      const mockNode = createMockLocationHierarchyNode({ name: "Updated Name" });
-      vi.mocked(LocationHierarchyService.list).mockResolvedValue({
-        nodes: [createMockLocationHierarchyNode()],
-      });
-      vi.mocked(LocationHierarchyService.update).mockResolvedValue(mockNode);
-
-      const { result } = renderHook(() => useLocationHierarchy(), {
-        wrapper: createWrapper(),
-      });
-
-      await waitFor(() => {
-        expect(result.current.loading).toBe(false);
-      });
-
-      await result.current.updateNode({
-        id: "node-1",
-        name: "Updated Name",
-      });
-
-      expect(LocationHierarchyService.update).toHaveBeenCalled();
-      const callArgs = vi.mocked(LocationHierarchyService.update).mock.calls[0][0];
-      expect(callArgs).toMatchObject({
-        id: "node-1",
-        name: "Updated Name",
-      });
+  it("should update node and refetch", async () => {
+    const mockNode = createMockLocationHierarchyNode({ name: "Updated Name" });
+    vi.mocked(LocationHierarchyService.list).mockResolvedValue({
+      nodes: [createMockLocationHierarchyNode()],
     });
+    vi.mocked(LocationHierarchyService.update).mockResolvedValue(mockNode);
+
+    const { result } = renderHook(() => useLocationHierarchy(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    await result.current.updateNode({
+      id: "node-1",
+      name: "Updated Name",
+    });
+
+    expect(LocationHierarchyService.update).toHaveBeenCalled();
+    const callArgs = vi.mocked(LocationHierarchyService.update).mock.calls[0][0];
+    expect(callArgs).toMatchObject({
+      id: "node-1",
+      name: "Updated Name",
+    });
+  });
 
   it("should delete node and refetch", async () => {
     vi.mocked(LocationHierarchyService.list).mockResolvedValue({
@@ -184,9 +181,7 @@ describe("useLocationHierarchy", () => {
       nodes: [],
     });
     const validationError = new Error("Name is required");
-    vi.mocked(LocationHierarchyService.create).mockRejectedValue(
-      validationError
-    );
+    vi.mocked(LocationHierarchyService.create).mockRejectedValue(validationError);
 
     const { result } = renderHook(() => useLocationHierarchy(), {
       wrapper: createWrapper(),

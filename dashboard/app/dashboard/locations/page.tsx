@@ -7,11 +7,9 @@ import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
 import { locationsTourSteps } from "@/components/tours/tour-definitions";
 import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import { Button } from "@/components/ui/button";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 import { ErrorState } from "@/components/ui/error-state";
-import {
-  PageHeaderSkeleton,
-  TableSkeleton,
-} from "@/components/ui/skeleton-loaders";
+import { PageHeaderSkeleton, TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLocations } from "@/hooks/use-locations";
 import useOrganization from "@/hooks/useOrganization";
@@ -22,19 +20,9 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 export default function LocationsPage() {
-  const {
-    organizationId,
-    loading: orgLoading,
-    error: orgError,
-  } = useOrganization();
-  const {
-    locations,
-    loading,
-    error,
-    createLocation,
-    updateLocation,
-    deleteLocation,
-  } = useLocations();
+  const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
+  const { locations, loading, error, createLocation, updateLocation, deleteLocation } =
+    useLocations();
   const searchParams = useSearchParams();
   const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
 
@@ -64,9 +52,7 @@ export default function LocationsPage() {
       });
       toast.success("Location created");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to create location",
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to create location");
       throw err;
     }
   };
@@ -94,9 +80,7 @@ export default function LocationsPage() {
       });
       toast.success("Location updated");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update location",
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to update location");
       throw err;
     }
   };
@@ -106,9 +90,7 @@ export default function LocationsPage() {
       await deleteLocation({ id: locationId });
       toast.success("Location deleted");
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to delete location",
-      );
+      toast.error(err instanceof Error ? err.message : "Failed to delete location");
       throw err;
     }
   };
@@ -126,12 +108,7 @@ export default function LocationsPage() {
   }
 
   if (orgError || !organizationId) {
-    return (
-      <ErrorState
-        message={orgError || "Failed to load organization"}
-        fullScreen
-      />
-    );
+    return <ErrorState message={orgError || "Failed to load organization"} fullScreen />;
   }
 
   return (
@@ -140,15 +117,7 @@ export default function LocationsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Locations</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your organization&apos;s locations and location hierarchy for
-            regional pricing. Configure location settings{" "}
-            <Link
-              href="/dashboard/settings?tab=features"
-              className="text-primary hover:underline font-medium"
-            >
-              here
-            </Link>
-            .
+            Manage customer sites and optional hierarchy for regional pricing.
           </p>
         </div>
         <TourTriggerButton />
@@ -156,26 +125,33 @@ export default function LocationsPage() {
 
       <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList>
-          <TabsTrigger
-            value="locations"
-            data-tour="locations-tab"
-            className="cursor-pointer"
-          >
+          <TabsTrigger value="locations" data-tour="locations-tab" className="cursor-pointer">
             <MapPin className="h-4 w-4 mr-2" />
             Customer Locations
           </TabsTrigger>
-          <TabsTrigger
-            value="hierarchy"
-            data-tour="hierarchy-tab"
-            className="cursor-pointer"
-          >
+          <TabsTrigger value="hierarchy" data-tour="hierarchy-tab" className="cursor-pointer">
             <Layers className="h-4 w-4 mr-2" />
             Location Hierarchy
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="locations" className="space-y-6">
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-2">
+            <ContextualHelp label="Customer locations">
+              <p>
+                Customer locations are the <strong>static sites</strong> a worker can pick when
+                submitting a job (e.g. depots or branches). They are not the worker&apos;s GPS
+                position — they define <strong>where</strong> the work was done for pricing and
+                reporting. Optional feature toggles live in{" "}
+                <Link
+                  href="/dashboard/settings?tab=features"
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Settings → Features
+                </Link>
+                .
+              </p>
+            </ContextualHelp>
             <Button
               onClick={() => setIsLocationFormOpen(true)}
               className="cursor-pointer"
@@ -197,7 +173,17 @@ export default function LocationsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="hierarchy">
+        <TabsContent value="hierarchy" className="space-y-4">
+          <div className="flex items-start gap-2">
+            <ContextualHelp label="Location hierarchy" className="mt-0.5">
+              <p>
+                Use hierarchy to group customer locations (e.g. by company or region) for{" "}
+                <strong>structured pricing</strong> and reporting. Workers still pick a{" "}
+                <strong>customer location</strong> on the job; hierarchy helps organize those
+                locations and apply rules at the right level.
+              </p>
+            </ContextualHelp>
+          </div>
           <LocationHierarchyManager />
         </TabsContent>
       </Tabs>

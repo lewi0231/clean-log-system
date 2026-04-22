@@ -4,11 +4,9 @@ import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
 import { usersTourSteps } from "@/components/tours/tour-definitions";
 import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import { Button } from "@/components/ui/button";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 import { ErrorState } from "@/components/ui/error-state";
-import {
-  PageHeaderSkeleton,
-  TableSkeleton,
-} from "@/components/ui/skeleton-loaders";
+import { PageHeaderSkeleton, TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OrganizationUserForm from "@/components/users/organization-user-form";
 import OrganizationUserList from "@/components/users/organization-user-list";
@@ -23,11 +21,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export default function UsersPage() {
-  const {
-    organizationId,
-    loading: orgLoading,
-    error: orgError,
-  } = useOrganization();
+  const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
   const {
     organizationUsers,
     loading: orgUsersLoading,
@@ -58,17 +52,21 @@ export default function UsersPage() {
   }) => {
     if (!organizationId) return;
     try {
-      await createWorker({
+      const { emailSent, emailError } = await createWorker({
         organization_id: organizationId,
         ...workerData,
       });
-      toast.success(
-        `Worker created. Invitation will be sent to ${workerData.email}`
-      );
+      if (emailSent) {
+        toast.success(`Invitation email sent to ${workerData.email}`);
+      } else {
+        toast.warning(
+          emailError
+            ? `Worker created, but the invitation email could not be sent: ${emailError}`
+            : `Worker created, but the invitation email could not be sent. Use Resend or check email settings.`
+        );
+      }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create worker"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to create worker");
     }
   };
 
@@ -113,13 +111,9 @@ export default function UsersPage() {
         last_name: userData.last_name,
         phone: userData.phone || undefined,
       });
-      toast.success(
-        `Invitation sent to ${userData.email}`
-      );
+      toast.success(`Invitation sent to ${userData.email}`);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create user"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to create user");
     }
   };
 
@@ -141,9 +135,7 @@ export default function UsersPage() {
       });
       toast.success("User updated successfully");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update user"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to update user");
     }
   };
 
@@ -152,9 +144,7 @@ export default function UsersPage() {
       await deleteOrganizationUser({ id: userId });
       toast.success("User deleted");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete user"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to delete user");
     }
   };
 
@@ -164,9 +154,7 @@ export default function UsersPage() {
       await resendOrgUserInvitation(userId, organizationId);
       toast.success("Invitation resent");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to resend invitation"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to resend invitation");
     }
   };
 
@@ -180,9 +168,7 @@ export default function UsersPage() {
         toast.success("User can now use the mobile app with their existing credentials");
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to convert user to worker"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to convert user to worker");
     }
   };
 
@@ -199,12 +185,7 @@ export default function UsersPage() {
   }
 
   if (orgError || !organizationId) {
-    return (
-      <ErrorState
-        message={orgError || "Failed to load organization"}
-        fullScreen
-      />
-    );
+    return <ErrorState message={orgError || "Failed to load organization"} fullScreen />;
   }
 
   return (
@@ -221,17 +202,27 @@ export default function UsersPage() {
 
       <Tabs defaultValue="dashboard-users" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="dashboard-users" data-tour="dashboard-users-tab">
+          <TabsTrigger
+            value="dashboard-users"
+            data-tour="dashboard-users-tab"
+            className="cursor-pointer"
+          >
             Dashboard Users
           </TabsTrigger>
-          <TabsTrigger value="workers" data-tour="workers-tab">
+          <TabsTrigger value="workers" data-tour="workers-tab" className="cursor-pointer">
             Workers
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard-users" className="space-y-4">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1" />
+          <div className="flex items-center justify-between mb-6 gap-2">
+            <ContextualHelp label="Dashboard users">
+              <p>
+                These people sign in to <strong>this web dashboard</strong> (roles: admin or
+                viewer). They are separate from <strong>workers</strong>, who use the mobile app to
+                complete jobs.
+              </p>
+            </ContextualHelp>
             <Button
               className="cursor-pointer"
               onClick={() => setIsOrgUserFormOpen(true)}
@@ -254,21 +245,19 @@ export default function UsersPage() {
         </TabsContent>
 
         <TabsContent value="workers" className="space-y-4">
-          <div className="mb-4 p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              Workers complete jobs via our mobile application. Which you can
-              configure{" "}
-              <Link
-                href="/dashboard/mobile-config"
-                className="text-primary hover:underline font-medium"
-              >
-                here
-              </Link>
-              .
-            </p>
-          </div>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1" />
+          <div className="flex items-center justify-between mb-6 gap-2">
+            <ContextualHelp label="Workers and the mobile app">
+              <p>
+                Workers complete jobs using the mobile app. Forms and fields are configured in{" "}
+                <Link
+                  href="/dashboard/mobile-config"
+                  className="text-primary font-medium underline-offset-4 hover:underline"
+                >
+                  Mobile configuration
+                </Link>
+                .
+              </p>
+            </ContextualHelp>
             <Button
               className="cursor-pointer"
               onClick={() => setIsWorkerFormOpen(true)}
@@ -314,9 +303,7 @@ export default function UsersPage() {
             await handleUpdateOrgUser(userId, userData);
           } else {
             if (userData?.email) {
-              await handleAddOrgUser(
-                userData as { email: string; role: "admin" | "viewer" }
-              );
+              await handleAddOrgUser(userData as { email: string; role: "admin" | "viewer" });
             }
           }
         }}

@@ -1,13 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { notificationsKey } from "@/app/query-provider";
 import { log } from "@/lib/logger";
-import {
-  NotificationService,
-  type Notification,
-} from "@/lib/services/notification.service";
+import { NotificationService, type Notification } from "@/lib/services/notification.service";
 import useOrganization from "./useOrganization";
 import { useRealtimeNotifications } from "./use-realtime-notifications";
 
@@ -28,19 +26,19 @@ export function useNotifications(): UseNotificationsResult {
   // Subscribe to real-time notification changes (auto-invalidates cache)
   useRealtimeNotifications(organizationId, organizationUserId ?? null);
 
-  // DEBUG: Log notification query parameters
-  log.info("useNotifications: Query params", {
-    organizationId,
-    organizationUserId,
-    queryEnabled: !!organizationId && !!organizationUserId,
-  });
+  useEffect(() => {
+    log.debug("useNotifications: enabled state", {
+      organizationId,
+      organizationUserId,
+      queryEnabled: !!organizationId && !!organizationUserId,
+    });
+  }, [organizationId, organizationUserId]);
 
   // Fetch notifications using React Query
   const query = useQuery({
     queryKey: notificationsKey(organizationId, organizationUserId ?? null),
     enabled: !!organizationId && !!organizationUserId,
-    queryFn: () =>
-      NotificationService.getNotifications(organizationId!, organizationUserId!),
+    queryFn: () => NotificationService.getNotifications(organizationId!, organizationUserId!),
     // Notifications are time-sensitive, use shorter stale time
     staleTime: 30_000, // 30 seconds
     // Refetch on window focus for notifications (override global default)
@@ -49,8 +47,7 @@ export function useNotifications(): UseNotificationsResult {
 
   // Mutation for marking single notification as read
   const markAsReadMutation = useMutation({
-    mutationFn: (notificationId: string) =>
-      NotificationService.markAsRead(notificationId),
+    mutationFn: (notificationId: string) => NotificationService.markAsRead(notificationId),
     onMutate: async (notificationId) => {
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({
@@ -69,9 +66,7 @@ export function useNotifications(): UseNotificationsResult {
           if (!old) return old;
           return {
             notifications: old.notifications.map((n) =>
-              n.id === notificationId
-                ? { ...n, read: true, read_at: new Date().toISOString() }
-                : n
+              n.id === notificationId ? { ...n, read: true, read_at: new Date().toISOString() } : n
             ),
             unreadCount: Math.max(0, old.unreadCount - 1),
           };
@@ -97,8 +92,7 @@ export function useNotifications(): UseNotificationsResult {
 
   // Mutation for marking all notifications as read
   const markAllAsReadMutation = useMutation({
-    mutationFn: () =>
-      NotificationService.markAllAsRead(organizationId!, organizationUserId!),
+    mutationFn: () => NotificationService.markAllAsRead(organizationId!, organizationUserId!),
     onMutate: async () => {
       await queryClient.cancelQueries({
         queryKey: notificationsKey(organizationId, organizationUserId ?? null),

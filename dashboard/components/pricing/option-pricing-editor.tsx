@@ -2,21 +2,13 @@
 
 import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
 import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
-import {
-  buildScopedPricingMap,
-  getPricingScopeSource,
-} from "@/lib/pricing-scope";
+import { buildScopedPricingMap, getPricingScopeSource } from "@/lib/pricing-scope";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { AlertCircle, DollarSign, Save } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
@@ -66,13 +58,13 @@ export default function OptionPricingEditor({
   const loading = showBothContexts
     ? customerLoading || workerLoading
     : pricingContext === "customer"
-    ? customerLoading
-    : workerLoading;
+      ? customerLoading
+      : workerLoading;
   const error = showBothContexts
     ? customerError || workerError
     : pricingContext === "customer"
-    ? customerError
-    : workerError;
+      ? customerError
+      : workerError;
   const { expirationDate } = usePricingScope();
   const { workers } = useWorkers();
   const hasWorkers = workers && workers.length > 0;
@@ -108,8 +100,8 @@ export default function OptionPricingEditor({
   const pricingMap = showBothContexts
     ? customerPricingMap
     : pricingContext === "customer"
-    ? customerPricingMap
-    : workerPricingMap;
+      ? customerPricingMap
+      : workerPricingMap;
 
   const options = fieldConfig.options || [];
 
@@ -142,14 +134,11 @@ export default function OptionPricingEditor({
       const customerEntry = customerPricingMap[optionValue];
       const workerEntry = workerPricingMap[optionValue];
 
-      const existingCustomerPrice =
-        customerEntry?.record?.customer_price.toString() || "";
-      const existingWorkerPrice =
-        workerEntry?.record?.worker_payment_rate?.toString() || "";
+      const existingCustomerPrice = customerEntry?.record?.customer_price.toString() || "";
+      const existingWorkerPrice = workerEntry?.record?.worker_payment_rate?.toString() || "";
 
       const hasCustomerChange =
-        editing.customer !== undefined &&
-        editing.customer !== existingCustomerPrice;
+        editing.customer !== undefined && editing.customer !== existingCustomerPrice;
       const hasWorkerChange =
         editing.worker !== undefined && editing.worker !== existingWorkerPrice;
 
@@ -175,10 +164,7 @@ export default function OptionPricingEditor({
         }
       }
 
-      if (
-        change.customerPrice !== undefined ||
-        change.workerPrice !== undefined
-      ) {
+      if (change.customerPrice !== undefined || change.workerPrice !== undefined) {
         changesToSave.push(change);
       }
     }
@@ -188,38 +174,31 @@ export default function OptionPricingEditor({
     startTransition(async () => {
       try {
         // Save all changes in parallel
-        const promises = changesToSave.flatMap(
-          ({ optionValue, customerPrice, workerPrice }) => {
-            const ops = [];
-            if (customerPrice !== undefined) {
-              ops.push(
-                upsertCustomerPricing(
-                  fieldConfig.id,
-                  optionValue,
-                  customerPrice,
-                  {
-                    locationId,
-                    locationHierarchyId,
-                    expirationDate,
-                    pricingContext: "customer",
-                  }
-                )
-              );
-            }
-            if (workerPrice !== undefined) {
-              ops.push(
-                upsertWorkerPricing(fieldConfig.id, optionValue, workerPrice, {
-                  locationId,
-                  locationHierarchyId,
-                  expirationDate,
-                  pricingContext: "worker",
-                  workerPaymentRate: workerPrice,
-                })
-              );
-            }
-            return ops;
+        const promises = changesToSave.flatMap(({ optionValue, customerPrice, workerPrice }) => {
+          const ops = [];
+          if (customerPrice !== undefined) {
+            ops.push(
+              upsertCustomerPricing(fieldConfig.id, optionValue, customerPrice, {
+                locationId,
+                locationHierarchyId,
+                expirationDate,
+                pricingContext: "customer",
+              })
+            );
           }
-        );
+          if (workerPrice !== undefined) {
+            ops.push(
+              upsertWorkerPricing(fieldConfig.id, optionValue, workerPrice, {
+                locationId,
+                locationHierarchyId,
+                expirationDate,
+                pricingContext: "worker",
+                workerPaymentRate: workerPrice,
+              })
+            );
+          }
+          return ops;
+        });
 
         await Promise.all(promises);
 
@@ -256,15 +235,9 @@ export default function OptionPricingEditor({
       const entry = pricingMap[opt];
       if (entry?.source !== scopeSource) return false;
       if (pricingContext === "customer") {
-        return (
-          entry.record.customer_price != null &&
-          entry.record.customer_price > 0
-        );
+        return entry.record.customer_price != null && entry.record.customer_price > 0;
       } else {
-        return (
-          entry.record.worker_payment_rate != null &&
-          entry.record.worker_payment_rate > 0
-        );
+        return entry.record.worker_payment_rate != null && entry.record.worker_payment_rate > 0;
       }
     }
   }).length;
@@ -273,51 +246,42 @@ export default function OptionPricingEditor({
   const hasUnpricedOptions = pricedCount < options.length;
 
   // Count pending changes
-  const pendingChangesCount = Object.keys(editingPrices).filter(
-    (optionValue) => {
-      const editing = editingPrices[optionValue];
-      if (!editing) return false;
+  const pendingChangesCount = Object.keys(editingPrices).filter((optionValue) => {
+    const editing = editingPrices[optionValue];
+    if (!editing) return false;
 
-      if (showBothContexts) {
-        const customerEntry = customerPricingMap[optionValue];
-        const workerEntry = workerPricingMap[optionValue];
-        const existingCustomerPrice =
-          customerEntry?.record.customer_price.toString() || "";
-        const existingWorkerPrice =
-          workerEntry?.record.worker_payment_rate?.toString() || "";
+    if (showBothContexts) {
+      const customerEntry = customerPricingMap[optionValue];
+      const workerEntry = workerPricingMap[optionValue];
+      const existingCustomerPrice = customerEntry?.record.customer_price.toString() || "";
+      const existingWorkerPrice = workerEntry?.record.worker_payment_rate?.toString() || "";
 
-        return (
-          (editing.customer !== undefined &&
-            editing.customer !== existingCustomerPrice) ||
-          (editing.worker !== undefined &&
-            editing.worker !== existingWorkerPrice)
-        );
-      } else {
-        const priceValue =
-          pricingContext === "customer" ? editing.customer : editing.worker;
-        if (!priceValue || priceValue.trim() === "") return false;
+      return (
+        (editing.customer !== undefined && editing.customer !== existingCustomerPrice) ||
+        (editing.worker !== undefined && editing.worker !== existingWorkerPrice)
+      );
+    } else {
+      const priceValue = pricingContext === "customer" ? editing.customer : editing.worker;
+      if (!priceValue || priceValue.trim() === "") return false;
 
-        const price = parseFloat(priceValue);
-        if (isNaN(price) || price < 0) return false;
+      const price = parseFloat(priceValue);
+      if (isNaN(price) || price < 0) return false;
 
-        const pricingEntry = pricingMap[optionValue];
-        const existingPrice =
-          pricingContext === "customer"
-            ? pricingEntry?.record.customer_price.toString() || ""
-            : pricingEntry?.record.worker_payment_rate?.toString() || "";
-        return priceValue !== existingPrice;
-      }
+      const pricingEntry = pricingMap[optionValue];
+      const existingPrice =
+        pricingContext === "customer"
+          ? pricingEntry?.record.customer_price.toString() || ""
+          : pricingEntry?.record.worker_payment_rate?.toString() || "";
+      return priceValue !== existingPrice;
     }
-  ).length;
+  }).length;
 
   if (loading) {
     return <TableSkeleton rows={5} columns={3} />;
   }
 
   if (error) {
-    return (
-      <div className="text-center py-4 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-4 text-destructive">Error: {error}</div>;
   }
 
   if (options.length === 0) {
@@ -326,8 +290,7 @@ export default function OptionPricingEditor({
         <CardHeader>
           <CardTitle className="text-sm">No Options</CardTitle>
           <CardDescription>
-            This field has no options configured. Add options in Mobile
-            Application first.
+            This field has no options configured. Add options in Mobile Application first.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -341,9 +304,7 @@ export default function OptionPricingEditor({
         {/* Table Header */}
         <div
           className={`grid ${
-            showBothContexts
-              ? "grid-cols-[1fr_140px_140px]"
-              : "grid-cols-[1fr_140px]"
+            showBothContexts ? "grid-cols-[1fr_140px_140px]" : "grid-cols-[1fr_140px]"
           } gap-2 p-3 bg-muted/50 border-b text-sm font-medium`}
         >
           <div>Option</div>
@@ -351,7 +312,8 @@ export default function OptionPricingEditor({
             Customer
             {hasUnpricedOptions && (
               <span className="text-muted-foreground font-normal">
-                {" "}({pricedCount}/{options.length})
+                {" "}
+                ({pricedCount}/{options.length})
               </span>
             )}
           </div>
@@ -360,7 +322,8 @@ export default function OptionPricingEditor({
               Worker
               {hasUnpricedOptions && (
                 <span className="text-muted-foreground font-normal">
-                  {" "}({pricedCount}/{options.length})
+                  {" "}
+                  ({pricedCount}/{options.length})
                 </span>
               )}
             </div>
@@ -380,28 +343,23 @@ export default function OptionPricingEditor({
               editing?.customer !== undefined
                 ? editing.customer
                 : customerPricing
-                ? customerPricing.customer_price.toString()
-                : "";
+                  ? customerPricing.customer_price.toString()
+                  : "";
             const currentWorkerPrice =
               editing?.worker !== undefined
                 ? editing.worker
                 : workerPricing
-                ? workerPricing.worker_payment_rate?.toString() || ""
-                : "";
+                  ? workerPricing.worker_payment_rate?.toString() || ""
+                  : "";
 
             return (
               <div
                 key={optionValue}
                 className={`grid ${
-                  showBothContexts
-                    ? "grid-cols-[1fr_140px_140px]"
-                    : "grid-cols-[1fr_140px]"
+                  showBothContexts ? "grid-cols-[1fr_140px_140px]" : "grid-cols-[1fr_140px]"
                 } gap-2 p-2 items-center hover:bg-muted/30 transition-colors`}
               >
-                <div
-                  className="text-sm font-medium truncate"
-                  title={optionValue}
-                >
+                <div className="text-sm font-medium truncate" title={optionValue}>
                   {optionValue}
                 </div>
                 <div className="relative">
@@ -412,9 +370,7 @@ export default function OptionPricingEditor({
                     min="0"
                     placeholder="0.00"
                     value={currentCustomerPrice}
-                    onChange={(e) =>
-                      handlePriceChange(optionValue, e.target.value, "customer")
-                    }
+                    onChange={(e) => handlePriceChange(optionValue, e.target.value, "customer")}
                     className="pl-6 h-8 text-sm"
                     disabled={isPending}
                   />
@@ -428,9 +384,7 @@ export default function OptionPricingEditor({
                       min="0"
                       placeholder="0.00"
                       value={currentWorkerPrice}
-                      onChange={(e) =>
-                        handlePriceChange(optionValue, e.target.value, "worker")
-                      }
+                      onChange={(e) => handlePriceChange(optionValue, e.target.value, "worker")}
                       className="pl-6 h-8 text-sm"
                       disabled={isPending || !hasWorkers}
                       title={
@@ -452,15 +406,15 @@ export default function OptionPricingEditor({
         <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
           <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           <p className="text-sm text-amber-800 dark:text-amber-200">
-            Worker payment fields are disabled. Add workers to your organization
-            to enable worker payment settings.
+            Worker payment fields are disabled. Add workers to your organization to enable worker
+            payment settings.
           </p>
         </div>
       )}
 
-      {/* Save Button Bar */}
-      <div className="flex items-center justify-end gap-4 p-3 rounded-lg border bg-muted/30">
-        {pendingChangesCount > 0 && (
+      {/* Save bar only when there are unsaved edits — avoids an empty gray strip after save */}
+      {pendingChangesCount > 0 && (
+        <div className="flex items-center justify-end gap-4 p-3 rounded-lg border bg-muted/30">
           <Button
             size="sm"
             onClick={handleSaveAllBoth}
@@ -470,8 +424,8 @@ export default function OptionPricingEditor({
             <Save className="h-3 w-3" />
             {isPending ? "Saving..." : `Save (${pendingChangesCount})`}
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

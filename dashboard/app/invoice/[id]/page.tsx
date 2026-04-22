@@ -1,23 +1,17 @@
 "use client";
 
-import { InvoiceDocument } from "@/components/invoicing/invoice-document";
 import type { InvoiceDocumentOrgInfo } from "@/components/invoicing/invoice-document";
+import { InvoiceDocument } from "@/components/invoicing/invoice-document";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { log } from "@/lib/logger";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { InvoiceWithJobs } from "@/lib/types";
-import {
-  AlertCircle,
-  CheckCircle2,
-  CreditCard,
-  Download,
-  Loader2,
-} from "lucide-react";
+import { AlertCircle, CheckCircle2, CreditCard, Download, Loader2 } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 interface InvoiceJob {
   job: {
@@ -141,20 +135,27 @@ function InvoicePageContent() {
           primary_contact_email: org?.primary_contact_email ?? null,
           primary_contact_phone: org?.primary_contact_phone ?? null,
           default_invoice_due_days: org?.default_invoice_due_days ?? 30,
-          show_bank_transfer_on_invoices:
-            org?.show_bank_transfer_on_invoices ?? true,
+          show_bank_transfer_on_invoices: org?.show_bank_transfer_on_invoices ?? true,
           bank_transfer_bsb: org?.bank_transfer_bsb ?? null,
-          bank_transfer_account_number:
-            org?.bank_transfer_account_number ?? null,
+          bank_transfer_account_number: org?.bank_transfer_account_number ?? null,
           bank_transfer_account_name: org?.bank_transfer_account_name ?? null,
           stripe_account_id: org?.stripe_account_id ?? null,
         });
       } catch (err) {
+        const message =
+          err instanceof EdgeFunctionError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : typeof err === "string"
+                ? err
+                : "Failed to load invoice";
         log.error("PublicInvoice: Failed to fetch invoice", {
-          error: err instanceof Error ? err.message : "Unknown error",
+          error: message,
           hasInvoiceId: !!invoiceId,
+          status: err instanceof EdgeFunctionError ? err.status : undefined,
         });
-        setError(err instanceof Error ? err.message : "Failed to load invoice");
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -238,8 +239,7 @@ function InvoicePageContent() {
             <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
             <h1 className="text-xl font-semibold mb-2">Invoice Not Found</h1>
             <p className="text-muted-foreground">
-              {error ||
-                "This invoice may have been removed or the link is invalid."}
+              {error || "This invoice may have been removed or the link is invalid."}
             </p>
           </CardContent>
         </Card>
@@ -262,8 +262,7 @@ function InvoicePageContent() {
                   Payment Successful!
                 </p>
                 <p className="text-sm text-green-700 dark:text-green-300">
-                  Thank you for your payment. A confirmation email has been sent
-                  to you.
+                  Thank you for your payment. A confirmation email has been sent to you.
                 </p>
               </div>
             </CardContent>
@@ -281,8 +280,7 @@ function InvoicePageContent() {
                   Payment Cancelled
                 </p>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  Your payment was not completed. Click &ldquo;Pay Now&rdquo;
-                  below to try again.
+                  Your payment was not completed. Click &ldquo;Pay Now&rdquo; below to try again.
                 </p>
               </div>
             </CardContent>
@@ -297,7 +295,7 @@ function InvoicePageContent() {
             !paymentStatus ? "pt-4" : ""
           }`}
         >
-          <Button variant="outline" onClick={handleDownloadPDF}>
+          <Button variant="outline" onClick={handleDownloadPDF} className="cursor-pointer">
             <Download className="mr-2 h-4 w-4" />
             Download PDF
           </Button>

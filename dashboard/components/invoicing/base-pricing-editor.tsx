@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,6 +14,7 @@ import {
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
+import { log } from "@/lib/logger";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -28,17 +23,14 @@ interface BasePricingEditorProps {
   locationId?: string | null;
 }
 
-export default function BasePricingEditor({
-  locationId,
-}: BasePricingEditorProps) {
+export default function BasePricingEditor({ locationId }: BasePricingEditorProps) {
   const { fieldConfigs } = useFieldConfigs();
-  const { basePricing, loading, error, upsertPricing, deletePricing } =
-    useBasePricing({ locationId });
+  const { basePricing, loading, error, upsertPricing, deletePricing } = useBasePricing({
+    locationId,
+  });
 
   const [isFieldBased, setIsFieldBased] = useState(true);
-  const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
-    string | null
-  >(null);
+  const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<string | null>(null);
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer: string; worker: string }>
   >({});
@@ -78,11 +70,7 @@ export default function BasePricingEditor({
     return map;
   }, [basePricing]);
 
-  const handlePriceChange = (
-    key: string,
-    type: "customer" | "worker",
-    value: string
-  ) => {
+  const handlePriceChange = (key: string, type: "customer" | "worker", value: string) => {
     setEditingPrices((prev) => ({
       ...prev,
       [key]: {
@@ -102,9 +90,7 @@ export default function BasePricingEditor({
     }
 
     const workerPrice =
-      editing.worker && editing.worker.trim() !== ""
-        ? parseFloat(editing.worker)
-        : null;
+      editing.worker && editing.worker.trim() !== "" ? parseFloat(editing.worker) : null;
 
     if (workerPrice !== null && (isNaN(workerPrice) || workerPrice < 0)) {
       return;
@@ -123,7 +109,7 @@ export default function BasePricingEditor({
         return next;
       });
     } catch (error) {
-      console.error("Failed to save standalone base pricing", error);
+      log.error("Failed to save standalone base pricing", error);
     } finally {
       setSaving((prev) => {
         const next = { ...prev };
@@ -143,9 +129,7 @@ export default function BasePricingEditor({
     }
 
     const workerPrice =
-      editing.worker && editing.worker.trim() !== ""
-        ? parseFloat(editing.worker)
-        : null;
+      editing.worker && editing.worker.trim() !== "" ? parseFloat(editing.worker) : null;
 
     if (workerPrice !== null && (isNaN(workerPrice) || workerPrice < 0)) {
       return;
@@ -169,7 +153,7 @@ export default function BasePricingEditor({
         return next;
       });
     } catch (error) {
-      console.error("Failed to save field-based base pricing", error);
+      log.error("Failed to save field-based base pricing", error);
     } finally {
       setSaving((prev) => {
         const next = { ...prev };
@@ -184,7 +168,7 @@ export default function BasePricingEditor({
     try {
       await deletePricing(id);
     } catch (error) {
-      console.error("Failed to delete base pricing", error);
+      log.error("Failed to delete base pricing", error);
     } finally {
       setDeleting((prev) => {
         const next = { ...prev };
@@ -207,9 +191,7 @@ export default function BasePricingEditor({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-4 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-4 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -227,8 +209,7 @@ export default function BasePricingEditor({
             <div className="space-y-0.5">
               <Label>Field-Based Pricing</Label>
               <p className="text-sm text-muted-foreground">
-                Base price varies by job type (e.g., Installation vs
-                Maintenance)
+                Base price varies by job type (e.g., Installation vs Maintenance)
               </p>
             </div>
             <Switch checked={isFieldBased} onCheckedChange={setIsFieldBased} />
@@ -241,16 +222,12 @@ export default function BasePricingEditor({
         <Card>
           <CardHeader>
             <CardTitle>Standalone Base Price</CardTitle>
-            <CardDescription>
-              A fixed base price applied to all jobs
-            </CardDescription>
+            <CardDescription>A fixed base price applied to all jobs</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="standalone-customer">
-                  Customer Base Price (USD)
-                </Label>
+                <Label htmlFor="standalone-customer">Customer Base Price (USD)</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -263,21 +240,12 @@ export default function BasePricingEditor({
                       editingPrices["standalone"]?.customer !== undefined
                         ? editingPrices["standalone"].customer
                         : standalonePricing
-                        ? standalonePricing.customer_base_price.toString()
-                        : ""
+                          ? standalonePricing.customer_base_price.toString()
+                          : ""
                     }
-                    onChange={(e) =>
-                      handlePriceChange(
-                        "standalone",
-                        "customer",
-                        e.target.value
-                      )
-                    }
+                    onChange={(e) => handlePriceChange("standalone", "customer", e.target.value)}
                     className="pl-9"
-                    disabled={
-                      saving["standalone"] ||
-                      deleting[standalonePricing?.id || ""]
-                    }
+                    disabled={saving["standalone"] || deleting[standalonePricing?.id || ""]}
                   />
                 </div>
               </div>
@@ -298,18 +266,13 @@ export default function BasePricingEditor({
                       editingPrices["standalone"]?.worker !== undefined
                         ? editingPrices["standalone"].worker
                         : standalonePricing?.worker_base_payment !== null &&
-                          standalonePricing?.worker_base_payment !== undefined
-                        ? standalonePricing.worker_base_payment.toString()
-                        : ""
+                            standalonePricing?.worker_base_payment !== undefined
+                          ? standalonePricing.worker_base_payment.toString()
+                          : ""
                     }
-                    onChange={(e) =>
-                      handlePriceChange("standalone", "worker", e.target.value)
-                    }
+                    onChange={(e) => handlePriceChange("standalone", "worker", e.target.value)}
                     className="pl-9"
-                    disabled={
-                      saving["standalone"] ||
-                      deleting[standalonePricing?.id || ""]
-                    }
+                    disabled={saving["standalone"] || deleting[standalonePricing?.id || ""]}
                   />
                 </div>
               </div>
@@ -319,9 +282,7 @@ export default function BasePricingEditor({
                 <Button
                   variant="outline"
                   onClick={() => handleDelete(standalonePricing.id)}
-                  disabled={
-                    saving["standalone"] || deleting[standalonePricing.id]
-                  }
+                  disabled={saving["standalone"] || deleting[standalonePricing.id]}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -356,17 +317,12 @@ export default function BasePricingEditor({
         <Card>
           <CardHeader>
             <CardTitle>Field-Based Base Pricing</CardTitle>
-            <CardDescription>
-              Set base prices for each job type option
-            </CardDescription>
+            <CardDescription>Set base prices for each job type option</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="field-select">Select Field</Label>
-              <Select
-                value={selectedFieldConfigId || ""}
-                onValueChange={setSelectedFieldConfigId}
-              >
+              <Select value={selectedFieldConfigId || ""} onValueChange={setSelectedFieldConfigId}>
                 <SelectTrigger id="field-select">
                   <SelectValue placeholder="Select a field" />
                 </SelectTrigger>
@@ -389,44 +345,33 @@ export default function BasePricingEditor({
                     editing?.customer !== undefined
                       ? editing.customer
                       : existingPricing
-                      ? existingPricing.customer_base_price.toString()
-                      : "";
+                        ? existingPricing.customer_base_price.toString()
+                        : "";
                   const currentWorkerPrice =
                     editing?.worker !== undefined
                       ? editing.worker
                       : existingPricing?.worker_base_payment !== null &&
-                        existingPricing?.worker_base_payment !== undefined
-                      ? existingPricing.worker_base_payment.toString()
-                      : "";
+                          existingPricing?.worker_base_payment !== undefined
+                        ? existingPricing.worker_base_payment.toString()
+                        : "";
 
                   const hasChanges =
                     editing !== undefined &&
-                    (editing.customer !==
-                      (existingPricing?.customer_base_price.toString() || "") ||
-                      editing.worker !==
-                        (existingPricing?.worker_base_payment?.toString() ||
-                          ""));
+                    (editing.customer !== (existingPricing?.customer_base_price.toString() || "") ||
+                      editing.worker !== (existingPricing?.worker_base_payment?.toString() || ""));
 
                   return (
-                    <Card
-                      key={optionValue}
-                      className="border-l-4 border-l-primary"
-                    >
+                    <Card key={optionValue} className="border-l-4 border-l-primary">
                       <CardContent className="pt-4">
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <Label className="font-semibold">
-                              {optionValue}
-                            </Label>
+                            <Label className="font-semibold">{optionValue}</Label>
                             {existingPricing && (
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDelete(existingPricing.id)}
-                                disabled={
-                                  saving[optionValue] ||
-                                  deleting[existingPricing.id]
-                                }
+                                disabled={saving[optionValue] || deleting[existingPricing.id]}
                               >
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
@@ -434,9 +379,7 @@ export default function BasePricingEditor({
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
-                              <Label className="text-xs">
-                                Customer Base Price (USD)
-                              </Label>
+                              <Label className="text-xs">Customer Base Price (USD)</Label>
                               <div className="relative">
                                 <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
                                 <Input
@@ -446,16 +389,11 @@ export default function BasePricingEditor({
                                   placeholder="0.00"
                                   value={currentCustomerPrice}
                                   onChange={(e) =>
-                                    handlePriceChange(
-                                      optionValue,
-                                      "customer",
-                                      e.target.value
-                                    )
+                                    handlePriceChange(optionValue, "customer", e.target.value)
                                   }
                                   className="pl-7 h-9 text-sm"
                                   disabled={
-                                    saving[optionValue] ||
-                                    deleting[existingPricing?.id || ""]
+                                    saving[optionValue] || deleting[existingPricing?.id || ""]
                                   }
                                 />
                               </div>
@@ -463,9 +401,7 @@ export default function BasePricingEditor({
                             <div className="space-y-2">
                               <Label className="text-xs">
                                 Worker Base Payment (USD){" "}
-                                <span className="text-muted-foreground">
-                                  (optional)
-                                </span>
+                                <span className="text-muted-foreground">(optional)</span>
                               </Label>
                               <div className="relative">
                                 <DollarSign className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
@@ -476,16 +412,11 @@ export default function BasePricingEditor({
                                   placeholder="0.00"
                                   value={currentWorkerPrice}
                                   onChange={(e) =>
-                                    handlePriceChange(
-                                      optionValue,
-                                      "worker",
-                                      e.target.value
-                                    )
+                                    handlePriceChange(optionValue, "worker", e.target.value)
                                   }
                                   className="pl-7 h-9 text-sm"
                                   disabled={
-                                    saving[optionValue] ||
-                                    deleting[existingPricing?.id || ""]
+                                    saving[optionValue] || deleting[existingPricing?.id || ""]
                                   }
                                 />
                               </div>

@@ -2,25 +2,27 @@
 
 This document captures project-specific learnings that complement the universal Agent Excellence Framework.
 
-| Document Info         |                       |
-| --------------------- | --------------------- |
-| **Framework Version** | 4.8.1                 |
-| **Project**           | JobFlow |
-| **Created**           | 2026-01-31      |
-| **Last Updated**      | 2026-02-15      |
+| Document Info         |            |
+| --------------------- | ---------- |
+| **Framework Version** | 4.8.1      |
+| **Project**           | JobFlow    |
+| **Created**           | 2026-01-31 |
+| **Last Updated**      | 2026-04-11 |
 
 ---
 
 ## Learnings Index
 
-| #   | Title                                          | Tag        | Date       |
-| --- | ---------------------------------------------- | ---------- | ---------- |
-| 1   | Always use React Query (useQuery) for data fetching | react      | 2026-02-14 |
-| 2   | Real-time pattern: Supabase + React Query invalidation | real-time  | 2026-02-14 |
-| 3   | Job Colleague Confirmation Workflow | workflow   | 2026-02-14 |
-| 4   | Deno TypeScript Strict Literal Type Narrowing | typescript | 2026-02-14 |
-| 5   | Testing React Components with Tooltips in Vitest | testing    | 2026-02-14 |
-| 6   | Don't mix useOptimistic with React Query | react      | 2026-02-15 |
+| #   | Title                                                                           | Tag         | Date       |
+| --- | ------------------------------------------------------------------------------- | ----------- | ---------- |
+| 1   | Always use React Query (useQuery) for data fetching                             | react       | 2026-02-14 |
+| 2   | Real-time pattern: Supabase + React Query invalidation                          | real-time   | 2026-02-14 |
+| 3   | Job Colleague Confirmation Workflow                                             | workflow    | 2026-02-14 |
+| 4   | Deno TypeScript Strict Literal Type Narrowing                                   | typescript  | 2026-02-14 |
+| 5   | Testing React Components with Tooltips in Vitest                                | testing     | 2026-02-14 |
+| 6   | Don't mix useOptimistic with React Query                                        | react       | 2026-02-15 |
+| 7   | Dashboard logging: use `log` / `createLogger`, not `console.*`                  | engineering | 2026-04-11 |
+| 8   | In-app notifications: end-to-end checklist (worker_active, bell, RLS, Realtime) | real-time   | 2026-04-11 |
 
 ---
 
@@ -36,6 +38,7 @@ The dashboard previously had inconsistent patterns for data fetching - some hook
 
 **Learning:**  
 Always use `useQuery` from TanStack React Query for server state management. Benefits:
+
 - Automatic caching and deduplication
 - Built-in loading/error states
 - Background refetching
@@ -44,16 +47,20 @@ Always use `useQuery` from TanStack React Query for server state management. Ben
 - Works well with real-time subscriptions (see Learning #2)
 
 **Don't:**
+
 ```typescript
 // ❌ Manual state management
 const [data, setData] = useState([]);
 const [loading, setLoading] = useState(true);
 useEffect(() => {
-  fetchData().then(setData).finally(() => setLoading(false));
+  fetchData()
+    .then(setData)
+    .finally(() => setLoading(false));
 }, []);
 ```
 
 **Do:**
+
 ```typescript
 // ✅ React Query
 const query = useQuery({
@@ -76,33 +83,39 @@ Needed real-time updates in the dashboard (e.g., worker status changes, notifica
 Combine Supabase Realtime subscriptions with React Query cache invalidation:
 
 1. **Enable table for realtime** in migrations:
+
    ```sql
    ALTER PUBLICATION supabase_realtime ADD TABLE my_table;
    ```
 
 2. **Create a dedicated realtime hook** that invalidates the query cache:
+
    ```typescript
    // hooks/use-realtime-my-entity.ts
    export function useRealtimeMyEntity(orgId: string | null) {
      const queryClient = useQueryClient();
-     
+
      useEffect(() => {
        if (!orgId) return;
-       
+
        const channel = supabase
          .channel(`my-entity:${orgId}`)
-         .on("postgres_changes", {
-           event: "*", // INSERT, UPDATE, DELETE
-           schema: "public",
-           table: "my_table",
-           filter: `organization_id=eq.${orgId}`,
-         }, () => {
-           queryClient.invalidateQueries({
-             queryKey: myEntityKey(orgId),
-           });
-         })
+         .on(
+           "postgres_changes",
+           {
+             event: "*", // INSERT, UPDATE, DELETE
+             schema: "public",
+             table: "my_table",
+             filter: `organization_id=eq.${orgId}`,
+           },
+           () => {
+             queryClient.invalidateQueries({
+               queryKey: myEntityKey(orgId),
+             });
+           }
+         )
          .subscribe();
-       
+
        return () => void supabase.removeChannel(channel);
      }, [orgId, queryClient]);
    }
@@ -112,16 +125,17 @@ Combine Supabase Realtime subscriptions with React Query cache invalidation:
    ```typescript
    export function useMyEntity() {
      const { organizationId } = useOrganization();
-     
+
      // Subscribe to real-time changes
      useRealtimeMyEntity(organizationId);
-     
+
      // Fetch data with React Query
      const query = useQuery({...});
    }
    ```
 
 **Benefits:**
+
 - Single source of truth (React Query cache)
 - Automatic refetch on real-time events
 - Clean separation of concerns
@@ -147,6 +161,7 @@ Implemented a confirmation workflow with the following key design decisions:
 5. **Single-worker jobs bypass:** Jobs without colleagues are auto-approved immediately
 
 **Key files:**
+
 - User story: `docs/user_stories/jobs/008-job-colleague-confirmation-workflow.md`
 - Migration: `database/supabase/migrations/20260214100000_job_colleague_confirmation_workflow.sql`
 - Edge functions: `confirm-job-participation`, `flag-job`, `withdraw-job`, `resolve-flagged-job`, `auto-approve-jobs`, `list-pending-confirmations`
@@ -154,6 +169,7 @@ Implemented a confirmation workflow with the following key design decisions:
 - Mobile: `pending-confirmations.tsx`, `use-pending-confirmations-count.ts`
 
 **Organization setting:**
+
 - `colleague_confirmation_timeout_hours` (1-168, default 24)
 
 ---
@@ -170,6 +186,7 @@ When writing Deno tests for Supabase Edge Functions, TypeScript's strict type ch
 Deno's TypeScript compiler performs aggressive literal type narrowing. When you assign a string literal to a `const`, it becomes that specific literal type, not `string`. This causes TS2367 errors ("This comparison appears to be unintentional") when comparing two different literal values.
 
 **Don't:**
+
 ```typescript
 // ❌ TypeScript narrows to literal types
 const status = "approved";
@@ -177,6 +194,7 @@ const canProcess = status === "pending"; // TS2367: Types have no overlap
 ```
 
 **Do:**
+
 ```typescript
 // ✅ Explicitly type as string
 const status: string = "approved";
@@ -188,6 +206,7 @@ const canProcess = (status as string) === "pending"; // Works
 ```
 
 **When to use each approach:**
+
 - Use `: string` type annotation when the variable will be compared multiple times
 - Use `as string` when you need a one-off comparison
 - This is only needed in tests where you're testing logic with different status values
@@ -206,6 +225,7 @@ Testing tooltip interactions in React components using `@testing-library/react` 
 Instead of testing tooltip content visibility (which requires complex async waiting and may not work in JSDOM), test for tooltip trigger presence:
 
 **Don't:**
+
 ```typescript
 // ❌ Unreliable in JSDOM
 await user.hover(screen.getByText("Pending"));
@@ -215,6 +235,7 @@ await waitFor(() => {
 ```
 
 **Do:**
+
 ```typescript
 // ✅ Test that tooltip trigger is properly configured
 const badge = screen.getByText("Pending").closest("div");
@@ -222,6 +243,7 @@ expect(badge).toHaveAttribute("data-state"); // Radix tooltip marker
 ```
 
 **Alternative approaches:**
+
 - Mock the tooltip component entirely
 - Use integration/E2E tests for tooltip content verification
 - Test the data passed to the tooltip rather than the rendered content
@@ -248,6 +270,7 @@ Implemented optimistic UI for the form builder (create/update/delete field confi
    - `useOptimistic` renders: `[...baseValueWithNewItem, newItem]` = **DUPLICATE!**
 
 **Don't:**
+
 ```typescript
 // ❌ Two state systems fighting each other
 const [optimisticItems, setOptimistic] = useOptimistic(
@@ -257,40 +280,41 @@ const [optimisticItems, setOptimistic] = useOptimistic(
 
 const handleAdd = (data) => {
   startTransition(async () => {
-    setOptimistic(newItem);           // Updates optimistic state
-    queryClient.setQueryData(key, /* also adds newItem */);  // CONFLICT!
+    setOptimistic(newItem); // Updates optimistic state
+    queryClient.setQueryData(key /* also adds newItem */); // CONFLICT!
     await mutation.mutateAsync(data);
   });
 };
 ```
 
 **Do:**
+
 ```typescript
 // ✅ React Query native optimistic updates
 const mutation = useMutation({
   mutationFn: createItem,
-  
+
   onMutate: async (newItem) => {
     // Cancel outgoing refetches
-    await queryClient.cancelQueries({ queryKey: ['items'] });
-    
+    await queryClient.cancelQueries({ queryKey: ["items"] });
+
     // Snapshot for rollback
-    const previousData = queryClient.getQueryData(['items']);
-    
+    const previousData = queryClient.getQueryData(["items"]);
+
     // Optimistically update cache
-    queryClient.setQueryData(['items'], (old) => [...old, newItem]);
-    
+    queryClient.setQueryData(["items"], (old) => [...old, newItem]);
+
     return { previousData };
   },
-  
+
   onError: (err, vars, context) => {
     // Rollback on failure
-    queryClient.setQueryData(['items'], context.previousData);
+    queryClient.setQueryData(["items"], context.previousData);
   },
-  
+
   onSettled: () => {
     // Refetch for consistency
-    queryClient.invalidateQueries({ queryKey: ['items'] });
+    queryClient.invalidateQueries({ queryKey: ["items"] });
   },
 });
 
@@ -302,16 +326,72 @@ const handleAdd = (data) => {
 
 **When to use each:**
 
-| Pattern | Use When |
-|---------|----------|
-| React Query `onMutate` | You're already using React Query for data fetching |
-| React 19 `useOptimistic` | You're using React state (`useState`) or Server Actions |
-| Server Actions + `useOptimistic` | Next.js App Router with Server Components |
+| Pattern                          | Use When                                                |
+| -------------------------------- | ------------------------------------------------------- |
+| React Query `onMutate`           | You're already using React Query for data fetching      |
+| React 19 `useOptimistic`         | You're using React state (`useState`) or Server Actions |
+| Server Actions + `useOptimistic` | Next.js App Router with Server Components               |
 
 **Key files:**
+
 - `dashboard/hooks/use-field-config-mutations.ts` - React Query pattern
 - `dashboard/hooks/use-section-mutations.ts` - React Query pattern
 - `docs/plans/mobile-config-optimistic-ui-plan.md` - Full investigation details
+
+---
+
+### 7. Dashboard logging: use `log` / `createLogger`, not `console.*`
+
+**Date:** 2026-04-11  
+**Tag:** `engineering`
+
+**Context:**  
+Ad-hoc `console.log` / `console.error` is hard to tune per environment, clutters production, and bypasses a single place for future hooks (e.g. Sentry breadcrumbs).
+
+**Learning:**  
+Use the shared module `dashboard/lib/logger.ts` (`loglevel`-based):
+
+- Import `log` or `createLogger("ScopeName")` from `@/lib/logger`.
+- Adjust verbosity with `LOG_LEVEL` or `NEXT_PUBLIC_LOG_LEVEL` (`trace` | `debug` | `info` | `warn` | `error` | `silent`). Default: `debug` in development, `warn` in production.
+- **Do not** add new `console.*` calls in application code; tests and Vitest setup may still use `console` where useful.
+
+**See also:** `docs/code-quality-alignment.md` (Prettier, Husky, ESLint `no-console` on the dashboard).
+
+---
+
+### 8. In-app notifications: end-to-end checklist (worker activation → nav bell)
+
+**Date:** 2026-04-11  
+**Tag:** `real-time`
+
+**Context:**  
+When a worker accepts an invitation, the admin should see an in-app notification (nav bell) without refresh. Several layers must align: Edge Function insert, RLS, Realtime, and dashboard identity.
+
+**How it is wired (worker activated):**
+
+1. **Insert:** `accept-worker-invitation` calls `createNotification()` in `_utils/notifications.ts` with type `worker_active`. No `receiver_id` → one row per **admin** and **owner** in `organization_user` for that org (`role IN ('admin','owner')`).
+2. **Read (dashboard):** `NotificationService.getNotifications` filters `organization_id` + `receiver_id` where `receiver_id` is the logged-in user’s **`organization_user.id`** (not auth user UUID).
+3. **Identity:** `useOrganization()` must return **`organizationUserId`** from `get-organization-id`. If it is `null`, `useNotifications` does not run (`enabled: false`) and **Realtime does not subscribe** — the bell stays empty.
+4. **RLS:** Policies allow `SELECT`/`UPDATE` only when `receiver_id` is in `(SELECT id FROM organization_user WHERE auth_user_id = auth.uid())`. So each admin row in `organization_user` **must have `auth_user_id` set** to their Supabase Auth user id, or they will see **no rows** and Realtime will **not** deliver `postgres_changes` for those rows.
+5. **Realtime:** Table `notification` is in `supabase_realtime` publication (see migrations). `useRealtimeNotifications` subscribes with `filter: receiver_id=eq.<organizationUserId>`. Supabase delivers events only for rows the user may `SELECT` under RLS.
+
+**Likely failure modes:**
+
+| Symptom                                  | What to verify                                                                                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bell never loads / always empty          | `organizationUserId` from `get-organization-id` (admin email → `organization_user` row).                                                                                        |
+| Query returns empty but rows exist in DB | RLS: `organization_user.auth_user_id` for that admin matches `auth.uid()`. Run backfill if needed (see migration `20260128130000_backfill_organization_user_auth_user_id.sql`). |
+| Realtime never fires                     | Same RLS visibility; confirm publication includes `notification`; check browser Network/Realtime for `CHANNEL_ERROR`.                                                           |
+| Only some admins get notified            | `createNotification` without `receiver_id` only targets **admin** and **owner** — not `viewer`.                                                                                 |
+
+**Key files:**  
+`database/supabase/functions/accept-worker-invitation/index.ts`, `_utils/notifications.ts`, `dashboard/hooks/use-notifications.ts`, `use-realtime-notifications.ts`, `useOrganization.ts`, migrations `*notification*`.
+
+**Worker list refresh without manual reload:**  
+`useRealtimeWorkers` is mounted once from `RealtimeSubscriptions` in the dashboard layout. Do **not** also call `useRealtimeWorkers` from `use-workers-locations` (duplicate channels). Use `queryClient.invalidateQueries({ queryKey: workersLocationsKey(orgId), refetchType: "active" })` on worker `postgres_changes`. As a backup, when a **`worker_active`** (or **`worker_created`**) notification row is inserted, invalidate the same query so the Users → Workers table updates even if worker-table realtime is delayed.
+
+**Progressive disclosure for helper copy:**  
+Use `ContextualHelp` (`dashboard/components/ui/contextual-help.tsx`) — icon opens a popover — instead of always-visible paragraphs for experienced users.
 
 ---
 
@@ -330,6 +410,7 @@ const handleAdd = (data) => {
 - **Supabase Realtime requires publication:** Tables must be added to `supabase_realtime` publication for `postgres_changes` to work
 - **React Query staleTime:** Default is 2 minutes (see `query-provider.tsx`); override for time-sensitive data like notifications
 - **Always clean up subscriptions:** Use `supabase.removeChannel()` in useEffect cleanup
+- **Notifications + RLS:** Realtime `postgres_changes` only delivers notification rows the user can `SELECT`; ensure `organization_user.auth_user_id` is set for dashboard admins (see Learning #8)
 
 ### Database Migrations
 
@@ -341,7 +422,7 @@ const handleAdd = (data) => {
   DO $$
   BEGIN
     IF NOT EXISTS (
-      SELECT 1 FROM pg_publication_tables 
+      SELECT 1 FROM pg_publication_tables
       WHERE pubname = 'supabase_realtime' AND tablename = 'your_table'
     ) THEN
       ALTER PUBLICATION supabase_realtime ADD TABLE your_table;

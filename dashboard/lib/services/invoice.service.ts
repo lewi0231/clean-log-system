@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { getInvokeErrorMessage, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type {
   CreateInvoiceRequest,
   InvoiceTemplateConfig,
@@ -93,7 +93,7 @@ export class InvoiceService {
    * Calculate invoice totals for one or more jobs
    */
   static async calculate(
-    request: CalculateInvoiceRequest,
+    request: CalculateInvoiceRequest
   ): Promise<CalculateInvoiceResponse["calculation"]> {
     try {
       log.debug("InvoiceService: Calculating invoice", {
@@ -103,7 +103,7 @@ export class InvoiceService {
 
       const data = await invokeEdgeFunction<CalculateInvoiceResponse>(
         "calculate-invoice",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       if (!data || !data.success || !data.calculation) {
@@ -132,13 +132,12 @@ export class InvoiceService {
 
       const data = await invokeEdgeFunction<CreateInvoiceResponse>(
         "create-invoice",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       if (!data || !data.success || !data.invoice) {
         // Check if there's a more specific error message in the response
-        const errorMessage = (data as { error?: string })?.error ||
-          "Failed to create invoice";
+        const errorMessage = (data as { error?: string })?.error || "Failed to create invoice";
         throw new Error(errorMessage);
       }
 
@@ -155,9 +154,7 @@ export class InvoiceService {
   /**
    * List invoices for an organization with optional filtering and pagination
    */
-  static async list(
-    request: ListInvoicesRequest,
-  ): Promise<{
+  static async list(request: ListInvoicesRequest): Promise<{
     invoices: InvoiceWithJobs[];
     pagination?: ListInvoicesResponse["pagination"];
   }> {
@@ -173,7 +170,7 @@ export class InvoiceService {
 
       const data = await invokeEdgeFunction<ListInvoicesResponse>(
         "list-invoices",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       if (!data || !data.success || !data.invoices) {
@@ -209,10 +206,9 @@ export class InvoiceService {
         invoiceId,
       });
 
-      const data = await invokeEdgeFunction<GetInvoiceDetailsResponse>(
-        "get-invoice-details",
-        { invoice_id: invoiceId },
-      );
+      const data = await invokeEdgeFunction<GetInvoiceDetailsResponse>("get-invoice-details", {
+        invoice_id: invoiceId,
+      });
 
       if (!data || !data.success || !data.invoice || !data.calculation) {
         throw new Error("Failed to get invoice details");
@@ -240,13 +236,8 @@ export class InvoiceService {
    */
   static async updateStatus(
     invoiceId: string,
-    status:
-      | "draft"
-      | "pending_review"
-      | "sent"
-      | "paid"
-      | "overdue"
-      | "cancelled",
+    status: "draft" | "pending_review" | "sent" | "paid" | "overdue" | "cancelled",
+    options?: { senderDisplayName?: string }
   ): Promise<InvoiceWithJobs> {
     try {
       log.debug("InvoiceService: Updating invoice status", {
@@ -254,22 +245,41 @@ export class InvoiceService {
         status,
       });
 
-      const data = await invokeEdgeFunction<
-        { success: boolean; invoice?: InvoiceWithJobs }
-      >(
-        "update-invoice-status",
-        { invoice_id: invoiceId, status },
-      );
+      const body: Record<string, unknown> = { invoice_id: invoiceId, status };
+      if (options?.senderDisplayName?.trim()) {
+        body.sender_display_name = options.senderDisplayName.trim();
+      }
+
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        invoice?: InvoiceWithJobs;
+        message?: string;
+      }>("update-invoice-status", body);
 
       if (!data || !data.success || !data.invoice) {
-        throw new Error("Failed to update invoice status");
+        const keys =
+          data && typeof data === "object" ? Object.keys(data as Record<string, unknown>) : [];
+        log.error("InvoiceService: update-invoice-status returned invalid payload", {
+          invoiceId,
+          status,
+          hasData: Boolean(data),
+          success: data?.success,
+          keys,
+        });
+        throw new Error(
+          typeof data?.message === "string" && data.message.length > 0
+            ? data.message
+            : "Failed to update invoice status (missing invoice in response). Try refreshing the page."
+        );
       }
 
       log.info("InvoiceService: Invoice status updated successfully");
       return data.invoice as InvoiceWithJobs;
     } catch (err) {
+      const message = getInvokeErrorMessage(err);
       log.error("InvoiceService: Failed to update invoice status", {
-        error: err instanceof Error ? err.message : "Unknown error",
+        message,
+        name: err instanceof Error ? err.name : typeof err,
       });
       throw err;
     }
@@ -278,32 +288,53 @@ export class InvoiceService {
   /**
    * Resend an invoice - creates a new payment link and sends the email again
    */
-  static async resendInvoice(invoiceId: string): Promise<InvoiceWithJobs> {
+  static async resendInvoice(
+    invoiceId: string,
+    options?: { senderDisplayName?: string }
+  ): Promise<InvoiceWithJobs> {
     try {
       log.debug("InvoiceService: Resending invoice", {
         invoiceId,
       });
 
-      const data = await invokeEdgeFunction<
-        { success: boolean; invoice?: InvoiceWithJobs }
-      >(
-        "update-invoice-status",
-        {
-          invoice_id: invoiceId,
-          status: "sent",
-          resend: true, // Flag to force resend with new payment link
-        },
-      );
+      const body: Record<string, unknown> = {
+        invoice_id: invoiceId,
+        status: "sent",
+        resend: true,
+      };
+      if (options?.senderDisplayName?.trim()) {
+        body.sender_display_name = options.senderDisplayName.trim();
+      }
+
+      const data = await invokeEdgeFunction<{
+        success: boolean;
+        invoice?: InvoiceWithJobs;
+        message?: string;
+      }>("update-invoice-status", body);
 
       if (!data || !data.success || !data.invoice) {
-        throw new Error("Failed to resend invoice");
+        const keys =
+          data && typeof data === "object" ? Object.keys(data as Record<string, unknown>) : [];
+        log.error("InvoiceService: resend returned invalid payload", {
+          invoiceId,
+          hasData: Boolean(data),
+          success: data?.success,
+          keys,
+        });
+        throw new Error(
+          typeof data?.message === "string" && data.message.length > 0
+            ? data.message
+            : "Failed to resend invoice (missing invoice in response). Try refreshing the page."
+        );
       }
 
       log.info("InvoiceService: Invoice resent successfully");
       return data.invoice as InvoiceWithJobs;
     } catch (err) {
+      const message = getInvokeErrorMessage(err);
       log.error("InvoiceService: Failed to resend invoice", {
-        error: err instanceof Error ? err.message : "Unknown error",
+        message,
+        name: err instanceof Error ? err.name : typeof err,
       });
       throw err;
     }
@@ -314,7 +345,7 @@ export class InvoiceService {
    */
   static async sendReminder(
     invoiceId: string,
-    organizationId: string,
+    organizationId: string
   ): Promise<{
     success: boolean;
     reminder_count: number;
@@ -364,7 +395,7 @@ export class InvoiceService {
    */
   static async generatePdfHtml(
     invoiceId: string,
-    organizationId: string,
+    organizationId: string
   ): Promise<{ html: string; invoiceNumber: string }> {
     try {
       log.debug("InvoiceService: Generating invoice PDF HTML", {

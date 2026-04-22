@@ -175,3 +175,22 @@ export async function getInvoiceEmailRecipients(
 
   return Array.from(emailSet);
 }
+
+/**
+ * First name for "Hello …" from location contact_person (first matching job).
+ */
+export function greetingFirstNameFromJobContexts(
+  jobs: JobContext[],
+): string | null {
+  for (const job of jobs) {
+    const raw = job.location?.contact_person;
+    if (raw && typeof raw === "string") {
+      const t = raw.trim();
+      if (!t) continue;
+      const first = t.split(/\s+/)[0];
+      const cleaned = first.replace(/^[^a-zA-Z]+/, "");
+      if (cleaned.length > 0) return cleaned;
+    }
+  }
+  return null;
+}

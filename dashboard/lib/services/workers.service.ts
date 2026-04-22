@@ -3,6 +3,7 @@ import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { Worker } from "@/lib/types";
 import type {
   CreateWorkerRequest,
+  CreateWorkerResult,
   DeleteWorkerRequest,
   ListWorkersAndLocationsRequest,
   ListWorkersAndLocationsResponse,
@@ -24,7 +25,7 @@ export class WorkersService {
 
       const data = await invokeEdgeFunction<ListWorkersAndLocationsResponse>(
         "list-workers-and-locations",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       if (!data || !data.success) {
@@ -44,7 +45,7 @@ export class WorkersService {
   /**
    * Create a new worker
    */
-  static async create(request: CreateWorkerRequest): Promise<Worker> {
+  static async create(request: CreateWorkerRequest): Promise<CreateWorkerResult> {
     try {
       log.debug("WorkersService: Creating worker", {
         organizationId: request.organization_id,
@@ -72,7 +73,11 @@ export class WorkersService {
         workerId: data.worker.id,
         emailSent: data.email_sent,
       });
-      return data.worker as Worker;
+      return {
+        worker: data.worker as Worker,
+        emailSent: Boolean(data.email_sent),
+        ...(data.email_error && { emailError: data.email_error }),
+      };
     } catch (err) {
       log.error("WorkersService: Failed to create worker", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -92,7 +97,7 @@ export class WorkersService {
 
       const data = await invokeEdgeFunction<{ worker?: Worker }>(
         "update-worker",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       if (!data || !data.worker) {
@@ -122,7 +127,7 @@ export class WorkersService {
 
       await invokeEdgeFunction<{ success?: boolean }>(
         "delete-worker",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       log.info("WorkersService: Worker deleted successfully", {
@@ -139,9 +144,7 @@ export class WorkersService {
   /**
    * Resend invitation email to a worker
    */
-  static async resendInvitation(
-    request: ResendWorkerInvitationRequest
-  ): Promise<void> {
+  static async resendInvitation(request: ResendWorkerInvitationRequest): Promise<void> {
     try {
       log.debug("WorkersService: Resending invitation", {
         workerId: request.worker_id,
@@ -150,7 +153,7 @@ export class WorkersService {
 
       const data = await invokeEdgeFunction<{ success?: boolean }>(
         "resend-worker-invitation",
-        request as unknown as Record<string, unknown>,
+        request as unknown as Record<string, unknown>
       );
 
       if (!data || !data.success) {

@@ -5,7 +5,8 @@ import { useOrganization } from "@/hooks/useOrganization";
 import { supabase } from "@/lib/supabase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -41,6 +42,7 @@ interface Job {
 }
 
 export default function JobsScreen() {
+  const router = useRouter();
   const { user, session } = useAuth();
   const { worker } = useCurrentWorker();
   const { organizationId, loading: orgLoading } = useOrganization();
@@ -112,6 +114,57 @@ export default function JobsScreen() {
       setRefreshing(false);
     }
   }, [user, organizationId, worker, isAdmin, orgLoading]);
+
+  const jobIdsKey = useMemo(
+    () =>
+      jobs
+        .map((j) => j.id)
+        .sort()
+        .join(","),
+    [jobs],
+  );
+
+  useEffect(() => {
+    if (!session?.access_token || !organizationId) return;
+    if (jobs.length === 0) return;
+
+    const ids = jobs.map((j) => j.id);
+    const inList = ids.join(",");
+    const filterJobWorker = `job_id=in.(${inList})`;
+    const filterJob = `id=in.(${inList})`;
+
+    const channel = supabase
+      .channel(`my_jobs:${jobIdsKey.slice(0, 60)}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "job_worker",
+          filter: filterJobWorker,
+        },
+        () => {
+          fetchJobs();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "job",
+          filter: filterJob,
+        },
+        () => {
+          fetchJobs();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.access_token, organizationId, jobIdsKey, fetchJobs]);
 
   useEffect(() => {
     setLoading(true);
@@ -352,6 +405,10 @@ export default function JobsScreen() {
                       : "border-border/50"
                   }`}
                 >
+                  <Pressable
+                    onPress={() => router.push(`/job/${job.id}`)}
+                    className="active:opacity-90"
+                  >
                   <View className="flex-row justify-between items-start mb-2">
                     <View className="flex-1">
                       <View className="flex-row items-center gap-2">
@@ -403,6 +460,23 @@ export default function JobsScreen() {
                     </View>
                   )}
 
+                  {/* Auto-approve countdown for pending jobs (tappable → job detail) */}
+                  {job.approval_status === "pending" &&
+                    job.auto_approve_at &&
+                    !canWithdraw(job) && (
+                      <View className="mt-3 flex-row items-center gap-1.5">
+                        <Ionicons
+                          name="time-outline"
+                          size={14}
+                          color="rgb(161 98 7)"
+                        />
+                        <Text className="text-xs text-yellow-700 dark:text-yellow-400">
+                          Auto-approves in {getTimeRemaining(job.auto_approve_at)}
+                        </Text>
+                      </View>
+                    )}
+                  </Pressable>
+
                   {/* Withdraw button for submitter */}
                   {canWithdraw(job) && (
                     <Pressable
@@ -426,22 +500,6 @@ export default function JobsScreen() {
                       )}
                     </Pressable>
                   )}
-
-                  {/* Auto-approve countdown for pending jobs */}
-                  {job.approval_status === "pending" &&
-                    job.auto_approve_at &&
-                    !canWithdraw(job) && (
-                      <View className="mt-3 flex-row items-center gap-1.5">
-                        <Ionicons
-                          name="time-outline"
-                          size={14}
-                          color="rgb(161 98 7)"
-                        />
-                        <Text className="text-xs text-yellow-700 dark:text-yellow-400">
-                          Auto-approves in {getTimeRemaining(job.auto_approve_at)}
-                        </Text>
-                      </View>
-                    )}
                 </View>
               ))}
             </View>

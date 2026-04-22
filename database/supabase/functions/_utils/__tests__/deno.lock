@@ -1,7 +1,20 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/assert@1": "1.0.16",
+    "jsr:@std/internal@^1.0.12": "1.0.12",
     "npm:@types/node@*": "24.2.0"
+  },
+  "jsr": {
+    "@std/assert@1.0.16": {
+      "integrity": "6a7272ed1eaa77defe76e5ff63ca705d9c495077e2d5fd0126d2b53fc5bd6532",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/internal@1.0.12": {
+      "integrity": "972a634fd5bc34b242024402972cd5143eac68d8dffaca5eaa4dba30ce17b027"
+    }
   },
   "npm": {
     "@types/node@24.2.0": {
@@ -58,5 +71,11 @@
     "https://esm.sh/@supabase/supabase-js@2.83.0": "47bc99ef6eb4d126b7186b04d5944cb8d79870a194cfe2e1859c84a44421c182",
     "https://esm.sh/@supabase/supabase-js@2.83.0/denonext/supabase-js.mjs": "4890ffdce07dfdb941bea6937f94bf720e10491a6f2b29aed6d10e5f0814fb1f",
     "https://esm.sh/tslib@2.8.1/denonext/tslib.mjs": "ebce3cd5facb654623020337f867b426ba95f71596ba87acc9e6c6f4e55905ca"
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@std/assert@1",
+      "npm:stripe@18"
+    ]
   }
 }

@@ -5,18 +5,10 @@ import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -26,22 +18,13 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import {
-  FieldConfig,
-  FieldTemplate,
-  FieldType,
-  FormSectionWithFields,
-} from "@clean-log/shared";
+import { FieldConfig, FieldType, FormSectionWithFields } from "@clean-log/shared";
 import {
   AlignLeft,
   Calendar,
@@ -51,7 +34,6 @@ import {
   Clock,
   GripVertical,
   Hash,
-  HelpCircle,
   Image,
   Layers,
   List,
@@ -97,26 +79,14 @@ interface VisualFormBuilderProps {
   onAddField: (
     field: Omit<
       FieldConfig,
-      | "id"
-      | "organization_id"
-      | "version"
-      | "active"
-      | "archived_at"
-      | "created_at"
-      | "updated_at"
+      "id" | "organization_id" | "version" | "active" | "archived_at" | "created_at" | "updated_at"
     >
   ) => Promise<void>;
-  onUpdateField: (
-    fieldId: string,
-    updates: Partial<FieldConfig>
-  ) => Promise<void>;
+  onUpdateField: (fieldId: string, updates: Partial<FieldConfig>) => Promise<void>;
   onDeleteField: (fieldId: string) => Promise<void>;
   onReorderFields: (fieldIds: string[]) => Promise<void>;
   onAddSection: (
-    section: Omit<
-      FormSectionWithFields,
-      "id" | "organization_id" | "created_at" | "updated_at"
-    >
+    section: Omit<FormSectionWithFields, "id" | "organization_id" | "created_at" | "updated_at">
   ) => void | Promise<void>;
   onUpdateSection: (
     sectionId: string,
@@ -143,26 +113,19 @@ export function VisualFormBuilder({
   organizationId,
 }: VisualFormBuilderProps) {
   const [draggedField, setDraggedField] = useState<string | null>(null);
-  const [draggedSectionField, setDraggedSectionField] = useState<string | null>(
-    null
-  );
-  const [fieldOrder, setFieldOrder] = useState<string[]>(() =>
-    fields.map((f) => f.id)
-  );
-  const [isAddingField, setIsAddingField] = useState(false);
-  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<
-    Map<string, boolean>
-  >(new Map());
+  const [draggedSectionField, setDraggedSectionField] = useState<string | null>(null);
+  const [fieldOrder, setFieldOrder] = useState<string[]>(() => fields.map((f) => f.id));
+  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<Map<string, boolean>>(new Map());
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
-  const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>(
-    null
+  /** Increment when opening the add-field dialog so FieldConfigDialog remounts with fresh state. */
+  const [fieldDialogSession, setFieldDialogSession] = useState(0);
+  const [selectedFieldType, setSelectedFieldType] = useState<FieldType | null>(null);
+  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<Map<string, string[]>>(
+    new Map()
   );
-  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<
-    Map<string, string[]>
-  >(new Map());
-  const [restrictToLocationsMap, setRestrictToLocationsMap] = useState<
-    Map<string, boolean>
-  >(new Map());
+  const [restrictToLocationsMap, setRestrictToLocationsMap] = useState<Map<string, boolean>>(
+    new Map()
+  );
 
   const { locations } = useLocations();
   const { settings } = useOrganizationSettings();
@@ -174,15 +137,13 @@ export function VisualFormBuilder({
       const currentIds = new Set(prev);
       const newIds = fields.map((f) => f.id);
       const addedIds = newIds.filter((id) => !currentIds.has(id));
-      const removedIds = new Set(
-        prev.filter((id) => !newIds.includes(id))
-      );
-      
+      const removedIds = new Set(prev.filter((id) => !newIds.includes(id)));
+
       // If nothing changed, return previous to avoid re-render
       if (addedIds.length === 0 && removedIds.size === 0) {
         return prev;
       }
-      
+
       // Keep existing order for fields that still exist, append new ones
       const filtered = prev.filter((id) => !removedIds.has(id));
       return [...filtered, ...addedIds];
@@ -195,29 +156,22 @@ export function VisualFormBuilder({
   // Load location restrictions for fields - only fetch for IDs we haven't loaded yet
   React.useEffect(() => {
     if (!organizationId) return;
-    
+
     // Find field IDs that have real IDs (not temp-*) and haven't been loaded yet
-    const realFieldIds = fields
-      .filter((f) => !f.id.startsWith("temp-"))
-      .map((f) => f.id);
-    const unloadedIds = realFieldIds.filter(
-      (id) => !loadedRestrictionsRef.current.has(id)
-    );
-    
+    const realFieldIds = fields.filter((f) => !f.id.startsWith("temp-")).map((f) => f.id);
+    const unloadedIds = realFieldIds.filter((id) => !loadedRestrictionsRef.current.has(id));
+
     // If all fields are loaded or there are no real fields, skip
     if (unloadedIds.length === 0) return;
 
     async function fetchAllLocationRestrictions() {
       try {
-        const { data, error } = await supabase.functions.invoke(
-          "list-field-configs",
-          {
-            body: {
-              organization_id: organizationId,
-              include_location_restrictions: true,
-            },
-          }
-        );
+        const { data, error } = await supabase.functions.invoke("list-field-configs", {
+          body: {
+            organization_id: organizationId,
+            include_location_restrictions: true,
+          },
+        });
 
         if (error) throw error;
 
@@ -227,10 +181,7 @@ export function VisualFormBuilder({
         (data?.field_configs || []).forEach(
           (fc: FieldConfig & { location_restrictions?: string[] }) => {
             loadedRestrictionsRef.current.add(fc.id);
-            if (
-              fc.location_restrictions &&
-              fc.location_restrictions.length > 0
-            ) {
+            if (fc.location_restrictions && fc.location_restrictions.length > 0) {
               restrictionsMap.set(fc.id, fc.location_restrictions);
               restrictMap.set(fc.id, true);
             } else {
@@ -265,37 +216,17 @@ export function VisualFormBuilder({
     const inOrder = fieldOrder
       .map((id) => fieldMap.get(id))
       .filter((f): f is FieldConfig => f !== undefined);
-    
+
     // Add any fields that aren't in fieldOrder yet (optimistic adds)
     const inOrderIds = new Set(fieldOrder);
     const notInOrder = fields.filter((f) => !inOrderIds.has(f.id));
-    
+
     return [...inOrder, ...notInOrder];
   }, [fieldOrder, fields]);
 
-  // Helper to generate unique field name
-  const generateFieldName = (
-    label: string,
-    existingNames: string[] = fields.map((f) => f.name)
-  ): string => {
-    const baseName = label
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_|_$/g, "");
-
-    let name = baseName;
-    let counter = 1;
-
-    while (existingNames.includes(name)) {
-      name = `${baseName}_${counter}`;
-      counter++;
-    }
-
-    return name;
-  };
-
   // Open field dialog
   const handleOpenFieldDialog = (type: FieldType) => {
+    setFieldDialogSession((s) => s + 1);
     setSelectedFieldType(type);
     setFieldDialogOpen(true);
   };
@@ -304,13 +235,7 @@ export function VisualFormBuilder({
   const handleSaveFieldFromDialog = async (
     field: Omit<
       FieldConfig,
-      | "id"
-      | "organization_id"
-      | "version"
-      | "active"
-      | "archived_at"
-      | "created_at"
-      | "updated_at"
+      "id" | "organization_id" | "version" | "active" | "archived_at" | "created_at" | "updated_at"
     >
   ) => {
     await onAddField({
@@ -319,69 +244,25 @@ export function VisualFormBuilder({
     });
   };
 
-  // Apply a template
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleApplyTemplate = async (template: FieldTemplate) => {
-    setIsAddingField(true);
-    try {
-      // Capture initial state
-      let currentOrderPosition = fields.length;
-      const existingNames = new Set(fields.map((f) => f.name));
-
-      for (const templateField of template.fields) {
-        // Generate unique name checking against both existing fields and previously added template fields
-        const name = generateFieldName(
-          templateField.label,
-          Array.from(existingNames)
-        );
-        existingNames.add(name); // Track this name to avoid duplicates within the template
-
-        await onAddField({
-          name,
-          label: templateField.label,
-          field_type: templateField.field_type,
-          description: templateField.description || null,
-          required: templateField.required,
-          order_position: currentOrderPosition++,
-          validation_rules: templateField.validation_rules || null,
-          options: templateField.options || null,
-          mutually_exclusive_group: null,
-          group_cluster: null,
-          section_id: null,
-          conditional_logic: null,
-        });
-      }
-    } finally {
-      setIsAddingField(false);
-    }
-  };
-
   // Load location restrictions for a field
   const loadLocationRestrictions = async (fieldId: string) => {
     if (!organizationId) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "list-field-configs",
-        {
-          body: {
-            organization_id: organizationId,
-            include_location_restrictions: true,
-          },
-        }
-      );
+      const { data, error } = await supabase.functions.invoke("list-field-configs", {
+        body: {
+          organization_id: organizationId,
+          include_location_restrictions: true,
+        },
+      });
 
       if (error) throw error;
 
       const config = data?.field_configs?.find(
-        (fc: FieldConfig & { location_restrictions?: string[] }) =>
-          fc.id === fieldId
+        (fc: FieldConfig & { location_restrictions?: string[] }) => fc.id === fieldId
       );
 
-      if (
-        config?.location_restrictions &&
-        config.location_restrictions.length > 0
-      ) {
+      if (config?.location_restrictions && config.location_restrictions.length > 0) {
         setRestrictToLocationsMap((prev) => {
           const next = new Map(prev);
           next.set(fieldId, true);
@@ -413,10 +294,7 @@ export function VisualFormBuilder({
   };
 
   // Update field
-  const handleUpdateField = async (
-    fieldId: string,
-    updates: Partial<FieldConfig>
-  ) => {
+  const handleUpdateField = async (fieldId: string, updates: Partial<FieldConfig>) => {
     await onUpdateField(fieldId, updates);
   };
 
@@ -452,10 +330,7 @@ export function VisualFormBuilder({
   };
 
   // Handle options update for select fields
-  const handleOptionsChange = async (
-    fieldId: string,
-    optionsString: string
-  ) => {
+  const handleOptionsChange = async (fieldId: string, optionsString: string) => {
     const options = optionsString
       .split(",")
       .map((o) => o.trim())
@@ -469,10 +344,7 @@ export function VisualFormBuilder({
   // Also exclude the draggedSectionField if it's being dragged to form fields
   // to prevent duplicate keys during drag operations
   const fieldsNotInSections = React.useMemo(
-    () =>
-      orderedFields.filter(
-        (field) => !field.section_id && field.id !== draggedSectionField
-      ),
+    () => orderedFields.filter((field) => !field.section_id && field.id !== draggedSectionField),
     [orderedFields, draggedSectionField]
   );
 
@@ -482,52 +354,17 @@ export function VisualFormBuilder({
       <div className="mb-4">
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">Form Builder</h2>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Form builder help"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" className="max-w-sm">
-                <div className="space-y-2">
-                  <p className="font-medium text-sm text-slate-50">
-                    How the mobile app works
-                  </p>
-                  <p className="text-xs text-slate-200">
-                    The mobile app always starts with required fields:
-                    colleagues (if any), locations (if customer locations are
-                    enabled), and start/finish times. Additional job information
-                    is collected through sections you create here, with each
-                    section appearing as a separate screen in the mobile app.
-                  </p>
-                  <p className="font-medium text-sm mt-3 text-slate-50">
-                    Drag and drop to reorder fields
-                  </p>
-                  <p className="text-xs text-slate-200">
-                    Fields only appear in the mobile preview when they are
-                    assigned to a section.
-                  </p>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <ContextualHelp label="How the form builder works" side="right">
+            <p>
+              The mobile app starts with required steps: colleagues (if enabled), locations (if
+              customer locations are on), and start/finish times. Each <strong>section</strong> you
+              add becomes its own screen for extra job fields.
+            </p>
+            <p className="mt-2">
+              <strong>Drag and drop</strong> to reorder. Fields only appear in the preview when they
+              are assigned to a section.
+            </p>
+          </ContextualHelp>
         </div>
       </div>
 
@@ -552,8 +389,7 @@ export function VisualFormBuilder({
                         example: "e.g., Customer name, Vehicle model",
                       },
                       number: {
-                        description:
-                          "Numeric input for quantities or measurements",
+                        description: "Numeric input for quantities or measurements",
                         example: "e.g., Number of items, Distance in miles",
                       },
                       email: {
@@ -586,17 +422,14 @@ export function VisualFormBuilder({
                       },
                       image: {
                         description: "Image upload for photos or documents",
-                        example:
-                          "e.g., Before/after photos, Damage documentation",
+                        example: "e.g., Before/after photos, Damage documentation",
                       },
                       address: {
-                        description:
-                          "Address input with autocomplete suggestions",
+                        description: "Address input with autocomplete suggestions",
                         example: "e.g., Customer address, Service location",
                       },
                       grouped_breakdown: {
-                        description:
-                          "Grouped breakdown for itemized lists with quantities",
+                        description: "Grouped breakdown for itemized lists with quantities",
                         example: "e.g., Services performed with quantities",
                       },
                     };
@@ -610,8 +443,7 @@ export function VisualFormBuilder({
                             variant="outline"
                             size="sm"
                             onClick={() => handleOpenFieldDialog(type)}
-                            disabled={isAddingField}
-                            className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
+                            className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1 cursor-pointer"
                           >
                             <Icon className="w-4 h-4" />
                             <span className="text-[10px]">{label}</span>
@@ -619,15 +451,9 @@ export function VisualFormBuilder({
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-xs">
                           <div className="space-y-1">
-                            <p className="font-medium text-xs text-slate-50">
-                              {label}
-                            </p>
-                            <p className="text-xs text-slate-200">
-                              {typeInfo.description}
-                            </p>
-                            <p className="text-xs text-slate-300 italic">
-                              {typeInfo.example}
-                            </p>
+                            <p className="font-medium text-xs text-slate-50">{label}</p>
+                            <p className="text-xs text-slate-200">{typeInfo.description}</p>
+                            <p className="text-xs text-slate-300 italic">{typeInfo.example}</p>
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -679,33 +505,16 @@ export function VisualFormBuilder({
             <CardHeader className="pb-3 shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-sm font-semibold">
-                    Form Fields
-                  </CardTitle>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs">
-                        <div className="space-y-1">
-                          <p className="font-medium text-xs text-slate-50">
-                            Form Fields
-                          </p>
-                          <p className="text-xs text-slate-200">
-                            This is a holding place for configured fields that
-                            are not currently assigned to any section. Fields in
-                            sections appear in the mobile app preview.
-                          </p>
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <CardTitle className="text-sm font-semibold">Form Fields</CardTitle>
+                  <ContextualHelp label="Unassigned form fields" side="right">
+                    <p>
+                      Fields listed here are not assigned to a section yet. Assign them to a section
+                      so they appear in the mobile app and preview.
+                    </p>
+                  </ContextualHelp>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
-                    {fieldsNotInSections.length} fields
-                  </Badge>
+                  <Badge variant="secondary">{fieldsNotInSections.length} fields</Badge>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -718,11 +527,7 @@ export function VisualFormBuilder({
                         Add Field
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      className="w-56 p-2"
-                      align="end"
-                      data-tour="add-field-button"
-                    >
+                    <PopoverContent className="w-56 p-2" align="end" data-tour="add-field-button">
                       <TooltipProvider>
                         <div className="grid grid-cols-2 gap-2">
                           {FIELD_TYPES.map(({ type, icon: Icon, label }) => {
@@ -735,14 +540,11 @@ export function VisualFormBuilder({
                                 example: "e.g., Customer name, Vehicle model",
                               },
                               number: {
-                                description:
-                                  "Numeric input for quantities or measurements",
-                                example:
-                                  "e.g., Number of items, Distance in miles",
+                                description: "Numeric input for quantities or measurements",
+                                example: "e.g., Number of items, Distance in miles",
                               },
                               email: {
-                                description:
-                                  "Email address input with validation",
+                                description: "Email address input with validation",
                                 example: "e.g., customer@example.com",
                               },
                               phone: {
@@ -750,14 +552,11 @@ export function VisualFormBuilder({
                                 example: "e.g., (555) 123-4567",
                               },
                               select: {
-                                description:
-                                  "Dropdown menu with predefined options",
-                                example:
-                                  "e.g., Service type: Basic, Premium, Deluxe",
+                                description: "Dropdown menu with predefined options",
+                                example: "e.g., Service type: Basic, Premium, Deluxe",
                               },
                               textarea: {
-                                description:
-                                  "Multi-line text input for longer content",
+                                description: "Multi-line text input for longer content",
                                 example: "e.g., Notes, Comments, Description",
                               },
                               date: {
@@ -769,27 +568,20 @@ export function VisualFormBuilder({
                                 example: "e.g., Start time, End time",
                               },
                               boolean: {
-                                description:
-                                  "Checkbox for yes/no or true/false values",
+                                description: "Checkbox for yes/no or true/false values",
                                 example: "e.g., Completed, Verified, Approved",
                               },
                               image: {
-                                description:
-                                  "Image upload for photos or documents",
-                                example:
-                                  "e.g., Before/after photos, Damage documentation",
+                                description: "Image upload for photos or documents",
+                                example: "e.g., Before/after photos, Damage documentation",
                               },
                               address: {
-                                description:
-                                  "Address input with autocomplete suggestions",
-                                example:
-                                  "e.g., Customer address, Service location",
+                                description: "Address input with autocomplete suggestions",
+                                example: "e.g., Customer address, Service location",
                               },
                               grouped_breakdown: {
-                                description:
-                                  "Grouped breakdown for itemized lists with quantities",
-                                example:
-                                  "e.g., Services performed with quantities",
+                                description: "Grouped breakdown for itemized lists with quantities",
+                                example: "e.g., Services performed with quantities",
                               },
                             };
 
@@ -802,21 +594,15 @@ export function VisualFormBuilder({
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleOpenFieldDialog(type)}
-                                    disabled={isAddingField}
-                                    className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1"
+                                    className="flex flex-col items-center justify-center gap-1 h-auto py-2 px-1 cursor-pointer"
                                   >
                                     <Icon className="w-4 h-4" />
                                     <span className="text-[10px]">{label}</span>
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent
-                                  side="right"
-                                  className="max-w-xs"
-                                >
+                                <TooltipContent side="right" className="max-w-xs">
                                   <div className="space-y-1">
-                                    <p className="font-medium text-xs">
-                                      {label}
-                                    </p>
+                                    <p className="font-medium text-xs">{label}</p>
                                     <p className="text-xs text-muted-foreground">
                                       {typeInfo.description}
                                     </p>
@@ -896,21 +682,16 @@ export function VisualFormBuilder({
                       const getGroupDisplayName = (groupId: string): string => {
                         return groupId
                           .split("_")
-                          .map(
-                            (word) =>
-                              word.charAt(0).toUpperCase() + word.slice(1)
-                          )
+                          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                           .join(" ");
                       };
 
                       return fieldsNotInSections.map((field) => {
                         const FieldIcon =
-                          FIELD_TYPES.find((t) => t.type === field.field_type)
-                            ?.icon || Type;
+                          FIELD_TYPES.find((t) => t.type === field.field_type)?.icon || Type;
                         const groupId = field.mutually_exclusive_group;
                         const clusterId = field.group_cluster;
-                        const showGroupDivider =
-                          Boolean(groupId) && groupId !== previousGroup;
+                        const showGroupDivider = Boolean(groupId) && groupId !== previousGroup;
                         previousGroup = groupId || null;
 
                         return (
@@ -918,9 +699,7 @@ export function VisualFormBuilder({
                             {showGroupDivider && groupId && (
                               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary/80 mt-4">
                                 <Layers className="w-3 h-3" />
-                                <span>
-                                  Choose one: {getGroupDisplayName(groupId)}
-                                </span>
+                                <span>Choose one: {getGroupDisplayName(groupId)}</span>
                                 <div className="flex-1 border-t border-dashed border-primary/40" />
                               </div>
                             )}
@@ -930,14 +709,8 @@ export function VisualFormBuilder({
                               onDragOver={(e) => handleDragOver(e, field.id)}
                               onDragEnd={handleDragEnd}
                               className={`group flex items-center gap-3 p-3 border rounded-lg hover:border-primary/50 transition-all cursor-move ${
-                                groupId
-                                  ? "bg-primary/5 border-primary/50"
-                                  : "bg-card"
-                              } ${
-                                draggedField === field.id
-                                  ? "opacity-50 scale-[0.98]"
-                                  : ""
-                              }`}
+                                groupId ? "bg-primary/5 border-primary/50" : "bg-card"
+                              } ${draggedField === field.id ? "opacity-50 scale-[0.98]" : ""}`}
                             >
                               <GripVertical className="w-5 h-5 text-muted-foreground shrink-0" />
 
@@ -956,10 +729,7 @@ export function VisualFormBuilder({
                                     </Badge>
                                   )}
                                   {field.conditional_logic && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] px-1.5"
-                                    >
+                                    <Badge variant="outline" className="text-[10px] px-1.5">
                                       Conditional
                                     </Badge>
                                   )}
@@ -970,24 +740,16 @@ export function VisualFormBuilder({
                                         className="text-[10px] px-1.5 text-primary border-primary/40"
                                       >
                                         Multiple
-                                    </Badge>
-                                  )}
+                                      </Badge>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[10px] px-1.5"
-                                  >
+                                  <Badge variant="secondary" className="text-[10px] px-1.5">
                                     {field.field_type}
                                   </Badge>
-                                  <span className="font-mono truncate">
-                                    {field.name}
-                                  </span>
+                                  <span className="font-mono truncate">{field.name}</span>
                                   {!field.section_id && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] px-1.5"
-                                    >
+                                    <Badge variant="outline" className="text-[10px] px-1.5">
                                       No section
                                     </Badge>
                                   )}
@@ -1003,28 +765,21 @@ export function VisualFormBuilder({
                                           </Badge>
                                         </TooltipTrigger>
                                         <TooltipContent>
-                                          Fields sharing a cluster act as one
-                                          option inside their exclusive group
-                                          (e.g., wiped + soaped details).
+                                          Fields sharing a cluster act as one option inside their
+                                          exclusive group (e.g., wiped + soaped details).
                                         </TooltipContent>
                                       </Tooltip>
                                     </TooltipProvider>
                                   )}
                                   {locationRestrictionsMap.get(field.id) &&
-                                    locationRestrictionsMap.get(field.id)!
-                                      .length > 0 && (
+                                    locationRestrictionsMap.get(field.id)!.length > 0 && (
                                       <Badge
                                         variant="outline"
                                         className="text-[10px] px-1.5 bg-amber-50 text-amber-700 border-amber-300"
                                       >
                                         <MapPin className="h-2.5 w-2.5 mr-0.5" />
-                                        {
-                                          locationRestrictionsMap.get(field.id)!
-                                            .length
-                                        }{" "}
-                                        location
-                                        {locationRestrictionsMap.get(field.id)!
-                                          .length !== 1
+                                        {locationRestrictionsMap.get(field.id)!.length} location
+                                        {locationRestrictionsMap.get(field.id)!.length !== 1
                                           ? "s"
                                           : ""}
                                       </Badge>
@@ -1039,11 +794,9 @@ export function VisualFormBuilder({
                                     if (!open) {
                                       // Popover is closing, save location restrictions
                                       const restrictToLocations =
-                                        restrictToLocationsMap.get(field.id) ||
-                                        false;
+                                        restrictToLocationsMap.get(field.id) || false;
                                       const selectedLocationIds =
-                                        locationRestrictionsMap.get(field.id) ||
-                                        [];
+                                        locationRestrictionsMap.get(field.id) || [];
                                       const locationIds = restrictToLocations
                                         ? selectedLocationIds
                                         : [];
@@ -1060,20 +813,13 @@ export function VisualFormBuilder({
                                             }
                                           );
                                           // Refresh location restrictions after save
-                                          await loadLocationRestrictions(
-                                            field.id
-                                          );
+                                          await loadLocationRestrictions(field.id);
                                         } catch (err) {
-                                          log.error(
-                                            "Failed to save location restrictions",
-                                            {
-                                              error:
-                                                err instanceof Error
-                                                  ? err.message
-                                                  : "Unknown error",
-                                              fieldId: field.id,
-                                            }
-                                          );
+                                          log.error("Failed to save location restrictions", {
+                                            error:
+                                              err instanceof Error ? err.message : "Unknown error",
+                                            fieldId: field.id,
+                                          });
                                         }
                                       }
                                     } else {
@@ -1083,11 +829,7 @@ export function VisualFormBuilder({
                                   }}
                                 >
                                   <PopoverTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-8 w-8 p-0"
-                                    >
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                       <Settings className="w-4 h-4" />
                                     </Button>
                                   </PopoverTrigger>
@@ -1096,9 +838,7 @@ export function VisualFormBuilder({
                                     align="end"
                                   >
                                     <div className="space-y-4">
-                                      <h4 className="font-semibold text-sm">
-                                        Field Settings
-                                      </h4>
+                                      <h4 className="font-semibold text-sm">Field Settings</h4>
 
                                       {/* Label */}
                                       <div className="space-y-1">
@@ -1115,15 +855,12 @@ export function VisualFormBuilder({
 
                                       {/* Description */}
                                       <div className="space-y-1">
-                                        <Label className="text-xs">
-                                          Description / Placeholder
-                                        </Label>
+                                        <Label className="text-xs">Description / Placeholder</Label>
                                         <Textarea
                                           value={field.description || ""}
                                           onChange={(e) =>
                                             handleUpdateField(field.id, {
-                                              description:
-                                                e.target.value || null,
+                                              description: e.target.value || null,
                                             })
                                           }
                                           rows={2}
@@ -1132,9 +869,7 @@ export function VisualFormBuilder({
 
                                       {/* Field Type */}
                                       <div className="space-y-1">
-                                        <Label className="text-xs">
-                                          Field Type
-                                        </Label>
+                                        <Label className="text-xs">Field Type</Label>
                                         <Select
                                           value={field.field_type}
                                           onValueChange={(v: string) =>
@@ -1147,37 +882,26 @@ export function VisualFormBuilder({
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent>
-                                            {FIELD_TYPES.map(
-                                              ({ type, label }) => (
-                                                <SelectItem
-                                                  key={type}
-                                                  value={type}
-                                                >
-                                                  {label}
-                                                </SelectItem>
-                                              )
-                                            )}
+                                            {FIELD_TYPES.map(({ type, label }) => (
+                                              <SelectItem key={type} value={type}>
+                                                {label}
+                                              </SelectItem>
+                                            ))}
                                           </SelectContent>
                                         </Select>
                                       </div>
 
                                       {/* Options for select/grouped_breakdown */}
                                       {(field.field_type === "select" ||
-                                        field.field_type ===
-                                          "grouped_breakdown") && (
+                                        field.field_type === "grouped_breakdown") && (
                                         <div className="space-y-1">
                                           <Label className="text-xs">
                                             Options (comma-separated)
                                           </Label>
                                           <Input
-                                            value={(field.options || []).join(
-                                              ", "
-                                            )}
+                                            value={(field.options || []).join(", ")}
                                             onChange={(e) =>
-                                              handleOptionsChange(
-                                                field.id,
-                                                e.target.value
-                                              )
+                                              handleOptionsChange(field.id, e.target.value)
                                             }
                                             placeholder="Option 1, Option 2, Option 3"
                                           />
@@ -1187,15 +911,12 @@ export function VisualFormBuilder({
                                       {/* Section Assignment */}
                                       {sections.length > 0 && (
                                         <div className="space-y-1">
-                                          <Label className="text-xs">
-                                            Section
-                                          </Label>
+                                          <Label className="text-xs">Section</Label>
                                           <Select
                                             value={field.section_id || "none"}
                                             onValueChange={(v: string) =>
                                               handleUpdateField(field.id, {
-                                                section_id:
-                                                  v === "none" ? null : v,
+                                                section_id: v === "none" ? null : v,
                                               })
                                             }
                                           >
@@ -1203,14 +924,9 @@ export function VisualFormBuilder({
                                               <SelectValue placeholder="No section" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              <SelectItem value="none">
-                                                No section
-                                              </SelectItem>
+                                              <SelectItem value="none">No section</SelectItem>
                                               {sections.map((section) => (
-                                                <SelectItem
-                                                  key={section.id}
-                                                  value={section.id}
-                                                >
+                                                <SelectItem key={section.id} value={section.id}>
                                                   {section.title}
                                                 </SelectItem>
                                               ))}
@@ -1221,9 +937,7 @@ export function VisualFormBuilder({
 
                                       {/* Required Toggle */}
                                       <div className="flex items-center justify-between">
-                                        <Label className="text-xs">
-                                          Required Field
-                                        </Label>
+                                        <Label className="text-xs">Required Field</Label>
                                         <Switch
                                           checked={field.required}
                                           onCheckedChange={(checked: boolean) =>
@@ -1242,28 +956,20 @@ export function VisualFormBuilder({
                                             <Switch
                                               id={`restrict-locations-${field.id}`}
                                               checked={
-                                                restrictToLocationsMap.get(
-                                                  field.id
-                                                ) || false
+                                                restrictToLocationsMap.get(field.id) || false
                                               }
                                               onCheckedChange={(checked) => {
-                                                setRestrictToLocationsMap(
-                                                  (prev) => {
-                                                    const next = new Map(prev);
-                                                    next.set(field.id, checked);
-                                                    return next;
-                                                  }
-                                                );
+                                                setRestrictToLocationsMap((prev) => {
+                                                  const next = new Map(prev);
+                                                  next.set(field.id, checked);
+                                                  return next;
+                                                });
                                                 if (!checked) {
-                                                  setLocationRestrictionsMap(
-                                                    (prev) => {
-                                                      const next = new Map(
-                                                        prev
-                                                      );
-                                                      next.set(field.id, []);
-                                                      return next;
-                                                    }
-                                                  );
+                                                  setLocationRestrictionsMap((prev) => {
+                                                    const next = new Map(prev);
+                                                    next.set(field.id, []);
+                                                    return next;
+                                                  });
                                                 }
                                               }}
                                               className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
@@ -1275,9 +981,7 @@ export function VisualFormBuilder({
                                               Restrict to specific locations
                                             </Label>
                                           </div>
-                                          {restrictToLocationsMap.get(
-                                            field.id
-                                          ) && (
+                                          {restrictToLocationsMap.get(field.id) && (
                                             <div className="space-y-2 pl-6 border-l-2 border-muted">
                                               {locations.length === 0 ? (
                                                 <p className="text-xs text-muted-foreground">
@@ -1296,54 +1000,34 @@ export function VisualFormBuilder({
                                                           type="checkbox"
                                                           id={`visual-location-${field.id}-${location.id}`}
                                                           checked={(
-                                                            locationRestrictionsMap.get(
-                                                              field.id
-                                                            ) || []
-                                                          ).includes(
-                                                            location.id
-                                                          )}
+                                                            locationRestrictionsMap.get(field.id) ||
+                                                            []
+                                                          ).includes(location.id)}
                                                           onChange={(e) => {
                                                             const currentIds =
                                                               locationRestrictionsMap.get(
                                                                 field.id
                                                               ) || [];
-                                                            if (
-                                                              e.target.checked
-                                                            ) {
-                                                              setLocationRestrictionsMap(
-                                                                (prev) => {
-                                                                  const next =
-                                                                    new Map(
-                                                                      prev
-                                                                    );
-                                                                  next.set(
-                                                                    field.id,
-                                                                    [
-                                                                      ...currentIds,
-                                                                      location.id,
-                                                                    ]
-                                                                  );
-                                                                  return next;
-                                                                }
-                                                              );
+                                                            if (e.target.checked) {
+                                                              setLocationRestrictionsMap((prev) => {
+                                                                const next = new Map(prev);
+                                                                next.set(field.id, [
+                                                                  ...currentIds,
+                                                                  location.id,
+                                                                ]);
+                                                                return next;
+                                                              });
                                                             } else {
-                                                              setLocationRestrictionsMap(
-                                                                (prev) => {
-                                                                  const next =
-                                                                    new Map(
-                                                                      prev
-                                                                    );
-                                                                  next.set(
-                                                                    field.id,
-                                                                    currentIds.filter(
-                                                                      (id) =>
-                                                                        id !==
-                                                                        location.id
-                                                                    )
-                                                                  );
-                                                                  return next;
-                                                                }
-                                                              );
+                                                              setLocationRestrictionsMap((prev) => {
+                                                                const next = new Map(prev);
+                                                                next.set(
+                                                                  field.id,
+                                                                  currentIds.filter(
+                                                                    (id) => id !== location.id
+                                                                  )
+                                                                );
+                                                                return next;
+                                                              });
                                                             }
                                                           }}
                                                           className="h-4 w-4 rounded border-gray-300"
@@ -1365,10 +1049,7 @@ export function VisualFormBuilder({
 
                                       {/* Advanced Section */}
                                       <Collapsible
-                                        open={
-                                          advancedSectionsOpen.get(field.id) ||
-                                          false
-                                        }
+                                        open={advancedSectionsOpen.get(field.id) || false}
                                         onOpenChange={(open) => {
                                           setAdvancedSectionsOpen((prev) => {
                                             const next = new Map(prev);
@@ -1383,12 +1064,8 @@ export function VisualFormBuilder({
                                             size="sm"
                                             className="w-full justify-between"
                                           >
-                                            <span className="text-xs">
-                                              Advanced Options
-                                            </span>
-                                            {advancedSectionsOpen.get(
-                                              field.id
-                                            ) ? (
+                                            <span className="text-xs">Advanced Options</span>
+                                            {advancedSectionsOpen.get(field.id) ? (
                                               <ChevronDown className="w-3 h-3" />
                                             ) : (
                                               <ChevronRight className="w-3 h-3" />
@@ -1402,47 +1079,31 @@ export function VisualFormBuilder({
                                               Mutually Exclusive Cluster
                                             </Label>
                                             <p className="text-[11px] text-muted-foreground">
-                                              Assign this field to a cluster
-                                              where only one option can be
-                                              selected at a time. All clusters
-                                              share a single implicit group
-                                              behind the scenes.
+                                              Assign this field to a cluster where only one option
+                                              can be selected at a time. All clusters share a single
+                                              implicit group behind the scenes.
                                             </p>
                                             {(() => {
                                               // Get all clusters from all fields AND created clusters
-                                              const clustersFromFields =
-                                                Array.from(
-                                                  new Set(
-                                                    fields
-                                                      .map(
-                                                        (f) => f.group_cluster
-                                                      )
-                                                      .filter(
-                                                        (c): c is string =>
-                                                          Boolean(c)
-                                                      )
-                                                  )
-                                                );
+                                              const clustersFromFields = Array.from(
+                                                new Set(
+                                                  fields
+                                                    .map((f) => f.group_cluster)
+                                                    .filter((c): c is string => Boolean(c))
+                                                )
+                                              );
                                               // Combine with created clusters that haven't been assigned yet
                                               const allClusters = Array.from(
-                                                new Set([
-                                                  ...clustersFromFields,
-                                                  ...createdClusters,
-                                                ])
+                                                new Set([...clustersFromFields, ...createdClusters])
                                               ).sort();
 
                                               // Convert cluster ID to display name
-                                              const getClusterDisplayName = (
-                                                clusterId: string
-                                              ) => {
+                                              const getClusterDisplayName = (clusterId: string) => {
                                                 return clusterId
                                                   .split("_")
                                                   .map(
                                                     (word) =>
-                                                      word
-                                                        .charAt(0)
-                                                        .toUpperCase() +
-                                                      word.slice(1)
+                                                      word.charAt(0).toUpperCase() + word.slice(1)
                                                   )
                                                   .join(" ");
                                               };
@@ -1450,32 +1111,19 @@ export function VisualFormBuilder({
                                               return (
                                                 <div className="space-y-2">
                                                   <Select
-                                                    value={
-                                                      field.group_cluster ||
-                                                      "none"
-                                                    }
-                                                    onValueChange={(
-                                                      value: string
-                                                    ) => {
+                                                    value={field.group_cluster || "none"}
+                                                    onValueChange={(value: string) => {
                                                       if (value === "none") {
-                                                        handleUpdateField(
-                                                          field.id,
-                                                          {
-                                                            mutually_exclusive_group:
-                                                              null,
-                                                            group_cluster: null,
-                                                          }
-                                                        );
+                                                        handleUpdateField(field.id, {
+                                                          mutually_exclusive_group: null,
+                                                          group_cluster: null,
+                                                        });
                                                       } else {
-                                                        handleUpdateField(
-                                                          field.id,
-                                                          {
-                                                            mutually_exclusive_group:
-                                                              DEFAULT_EXCLUSIVE_GROUP,
-                                                            group_cluster:
-                                                              value,
-                                                          }
-                                                        );
+                                                        handleUpdateField(field.id, {
+                                                          mutually_exclusive_group:
+                                                            DEFAULT_EXCLUSIVE_GROUP,
+                                                          group_cluster: value,
+                                                        });
                                                       }
                                                     }}
                                                   >
@@ -1486,66 +1134,44 @@ export function VisualFormBuilder({
                                                       <SelectItem value="none">
                                                         No cluster
                                                       </SelectItem>
-                                                      {allClusters.map(
-                                                        (clusterId) => (
-                                                          <SelectItem
-                                                            key={clusterId}
-                                                            value={clusterId}
-                                                          >
-                                                            {getClusterDisplayName(
-                                                              clusterId
-                                                            )}
-                                                          </SelectItem>
-                                                        )
-                                                      )}
+                                                      {allClusters.map((clusterId) => (
+                                                        <SelectItem
+                                                          key={clusterId}
+                                                          value={clusterId}
+                                                        >
+                                                          {getClusterDisplayName(clusterId)}
+                                                        </SelectItem>
+                                                      ))}
                                                     </SelectContent>
                                                   </Select>
                                                   <Input
                                                     value={
                                                       field.group_cluster
-                                                        ? getClusterDisplayName(
-                                                            field.group_cluster
-                                                          )
+                                                        ? getClusterDisplayName(field.group_cluster)
                                                         : ""
                                                     }
                                                     onChange={(e) => {
                                                       // Allow typing freely; apply on blur
                                                       if (!e.target.value) {
-                                                        handleUpdateField(
-                                                          field.id,
-                                                          {
-                                                            mutually_exclusive_group:
-                                                              null,
-                                                            group_cluster: null,
-                                                          }
-                                                        );
+                                                        handleUpdateField(field.id, {
+                                                          mutually_exclusive_group: null,
+                                                          group_cluster: null,
+                                                        });
                                                       }
                                                     }}
                                                     onBlur={(e) => {
-                                                      const clusterName =
-                                                        e.target.value.trim();
+                                                      const clusterName = e.target.value.trim();
                                                       if (clusterName) {
-                                                        const clusterId =
-                                                          clusterName
-                                                            .toLowerCase()
-                                                            .replace(
-                                                              /[^a-z0-9]+/g,
-                                                              "_"
-                                                            )
-                                                            .replace(
-                                                              /^_|_$/g,
-                                                              ""
-                                                            );
+                                                        const clusterId = clusterName
+                                                          .toLowerCase()
+                                                          .replace(/[^a-z0-9]+/g, "_")
+                                                          .replace(/^_|_$/g, "");
 
-                                                        handleUpdateField(
-                                                          field.id,
-                                                          {
-                                                            mutually_exclusive_group:
-                                                              DEFAULT_EXCLUSIVE_GROUP,
-                                                            group_cluster:
-                                                              clusterId,
-                                                          }
-                                                        );
+                                                        handleUpdateField(field.id, {
+                                                          mutually_exclusive_group:
+                                                            DEFAULT_EXCLUSIVE_GROUP,
+                                                          group_cluster: clusterId,
+                                                        });
                                                       }
                                                     }}
                                                     placeholder={
@@ -1607,8 +1233,8 @@ export function VisualFormBuilder({
             />
             <div className="mt-4 p-3 rounded-md bg-muted/50 border border-muted">
               <p className="text-xs text-muted-foreground">
-                <strong>Note:</strong> Fields will not appear in the preview
-                unless they are added to a Section.
+                <strong>Note:</strong> Fields will not appear in the preview unless they are added
+                to a Section.
               </p>
             </div>
           </Card>
@@ -1618,6 +1244,7 @@ export function VisualFormBuilder({
       {/* Field Configuration Dialog */}
       {selectedFieldType && (
         <FieldConfigDialog
+          key={fieldDialogSession}
           open={fieldDialogOpen}
           onOpenChange={setFieldDialogOpen}
           fieldType={selectedFieldType}

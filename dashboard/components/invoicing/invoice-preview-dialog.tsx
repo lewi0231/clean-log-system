@@ -2,20 +2,18 @@
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
+import { useAuth } from "@/hooks/useAuth";
 import { useInvoiceDetails } from "@/hooks/use-invoice-details";
 import { log } from "@/lib/logger";
+import { senderDisplayNameFromUser } from "@/lib/sender-display-name";
 import { InvoiceService } from "@/lib/services/invoice.service";
+import { getInvokeErrorMessage } from "@/lib/supabase/invoke-edge-function";
 import { Download, Mail, Plus, Printer } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -38,9 +36,8 @@ export default function InvoicePreviewDialog({
   invoiceId,
   organizationId,
 }: InvoicePreviewDialogProps) {
-  const { invoice, loading, error, refetch } = useInvoiceDetails(
-    open ? invoiceId : null
-  );
+  const { user } = useAuth();
+  const { invoice, loading, error, refetch } = useInvoiceDetails(open ? invoiceId : null);
   const [sending, setSending] = useState(false);
   const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
@@ -79,11 +76,10 @@ export default function InvoicePreviewDialog({
         description: "Use 'Save as PDF' in the print dialog",
       });
     } catch (err) {
-      log.error("Failed to generate PDF", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to generate PDF", { message: msg });
       toast.error("Failed to generate PDF", {
-        description: err instanceof Error ? err.message : "Please try again",
+        description: msg,
       });
     } finally {
       setGeneratingPdf(false);
@@ -137,17 +133,18 @@ export default function InvoicePreviewDialog({
       setSending(true);
       log.info("Sending invoice", { invoiceId });
 
-      await InvoiceService.updateStatus(invoiceId, "sent");
+      await InvoiceService.updateStatus(invoiceId, "sent", {
+        senderDisplayName: senderDisplayNameFromUser(user),
+      });
 
       // Refetch invoice to get updated status
       await refetch();
 
       log.info("Invoice sent successfully");
     } catch (err) {
-      log.error("Failed to send invoice", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      alert("Failed to send invoice. Please try again.");
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to send invoice", { message: msg });
+      alert(`Failed to send invoice: ${msg}`);
     } finally {
       setSending(false);
     }
@@ -158,9 +155,7 @@ export default function InvoicePreviewDialog({
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto p-0">
         <VisuallyHidden>
           <DialogTitle>
-            {invoice
-              ? `Invoice ${invoice.invoice_number || invoice.id}`
-              : "Invoice Preview"}
+            {invoice ? `Invoice ${invoice.invoice_number || invoice.id}` : "Invoice Preview"}
           </DialogTitle>
         </VisuallyHidden>
         {loading && (
@@ -185,8 +180,7 @@ export default function InvoicePreviewDialog({
                 <Alert className="mb-4 border-amber-200 bg-amber-50 text-amber-900">
                   <AlertTitle>Test invoice</AlertTitle>
                   <AlertDescription>
-                    This invoice was generated for testing and <b>cannot</b> be
-                    sent to customers.
+                    This invoice was generated for testing and <b>cannot</b> be sent to customers.
                   </AlertDescription>
                 </Alert>
               )}
@@ -234,10 +228,7 @@ export default function InvoicePreviewDialog({
                       <div>
                         <p className="text-muted-foreground">Amount Paid</p>
                         <p className="text-lg font-semibold text-green-600">
-                          {formatCurrency(
-                            invoice.total_paid || 0,
-                            invoice.currency
-                          )}
+                          {formatCurrency(invoice.total_paid || 0, invoice.currency)}
                         </p>
                       </div>
                       <div>
@@ -251,9 +242,7 @@ export default function InvoicePreviewDialog({
                       </div>
                       <div>
                         <p className="text-muted-foreground">Payment Count</p>
-                        <p className="text-lg font-semibold">
-                          {invoice.payment_count || 0}
-                        </p>
+                        <p className="text-lg font-semibold">{invoice.payment_count || 0}</p>
                       </div>
                     </div>
                     {invoice.payment_method_used && (
@@ -274,10 +263,7 @@ export default function InvoicePreviewDialog({
                   <div className="space-y-4 rounded-lg border p-4">
                     <h3 className="text-lg font-semibold">Payment History</h3>
                     <Separator />
-                    <PaymentHistory
-                      invoiceId={invoice.id}
-                      currency={invoice.currency}
-                    />
+                    <PaymentHistory invoiceId={invoice.id} currency={invoice.currency} />
                   </div>
                 </TabsContent>
               </Tabs>
@@ -286,11 +272,7 @@ export default function InvoicePreviewDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleDownloadPdf}
-                disabled={generatingPdf}
-              >
+              <Button variant="outline" onClick={handleDownloadPdf} disabled={generatingPdf}>
                 <Download className="mr-2 h-4 w-4" />
                 {generatingPdf ? "Generating..." : "Download PDF"}
               </Button>
@@ -302,9 +284,7 @@ export default function InvoicePreviewDialog({
                 <Button
                   onClick={handleSend}
                   disabled={sending || invoice.is_test === true}
-                  title={
-                    invoice.is_test ? "Test invoices cannot be sent" : undefined
-                  }
+                  title={invoice.is_test ? "Test invoices cannot be sent" : undefined}
                 >
                   <Mail className="mr-2 h-4 w-4" />
                   {sending ? "Sending..." : "Send Invoice"}

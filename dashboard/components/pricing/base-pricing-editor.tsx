@@ -10,19 +10,10 @@ import {
   type LocationOverrideRow,
 } from "@/components/pricing/location-overrides-matrix";
 import { serializeCondition } from "@/components/pricing/pricing-condition-helpers";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -40,20 +31,10 @@ import { useBasePricing } from "@/hooks/use-base-pricing";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
-import {
-  buildScopedPricingMap,
-  getPricingScopeSource,
-  isEntryForScope,
-} from "@/lib/pricing-scope";
+import { buildScopedPricingMap, getPricingScopeSource, isEntryForScope } from "@/lib/pricing-scope";
 import type { BasePricing } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
-import {
-  AlertCircle,
-  ChevronDown,
-  DollarSign,
-  Save,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, ChevronDown, DollarSign, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 interface BasePricingEditorProps {
@@ -103,28 +84,28 @@ export default function BasePricingEditor({
   const basePricing = showBothContexts
     ? [...customerPricing, ...workerPricing]
     : pricingContext === "customer"
-    ? customerPricing
-    : workerPricing;
+      ? customerPricing
+      : workerPricing;
   const loading = showBothContexts
     ? customerLoading || workerLoading
     : pricingContext === "customer"
-    ? customerLoading
-    : workerLoading;
+      ? customerLoading
+      : workerLoading;
   const error = showBothContexts
     ? customerError || workerError
     : pricingContext === "customer"
-    ? customerError
-    : workerError;
+      ? customerError
+      : workerError;
   const upsertPricing = showBothContexts
     ? upsertCustomerPricing
     : pricingContext === "customer"
-    ? upsertCustomerPricing
-    : upsertWorkerPricing;
+      ? upsertCustomerPricing
+      : upsertWorkerPricing;
   const deletePricing = showBothContexts
     ? deleteCustomerPricing
     : pricingContext === "customer"
-    ? deleteCustomerPricing
-    : deleteWorkerPricing;
+      ? deleteCustomerPricing
+      : deleteWorkerPricing;
   useOrganizationCurrency(); // Hook used for currency context
 
   const scopeParams = useMemo(
@@ -144,9 +125,7 @@ export default function BasePricingEditor({
   const [isFieldBased, setIsFieldBased] = useState(
     () => fieldConfigs.filter((fc) => fc.field_type === "select").length > 0
   );
-  const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<
-    string | null
-  >(null);
+  const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<string | null>(null);
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer?: string; worker?: string }>
   >({});
@@ -181,30 +160,25 @@ export default function BasePricingEditor({
   const standaloneEntry = showBothContexts
     ? customerStandaloneEntry
     : pricingContext === "customer"
-    ? customerStandaloneEntry
-    : workerStandaloneEntry;
+      ? customerStandaloneEntry
+      : workerStandaloneEntry;
 
   const customerStandalonePricing = customerStandaloneEntry?.record ?? null;
   const workerStandalonePricing = workerStandaloneEntry?.record ?? null;
   const standalonePricing = showBothContexts
     ? customerStandalonePricing
     : pricingContext === "customer"
-    ? customerStandalonePricing
-    : workerStandalonePricing;
+      ? customerStandalonePricing
+      : workerStandalonePricing;
   const standaloneConditions = standalonePricing?.source_rule?.conditions ?? [];
-  const standaloneHasScopedValue = isEntryForScope(
-    standaloneEntry,
-    scopeSource
-  );
+  const standaloneHasScopedValue = isEntryForScope(standaloneEntry, scopeSource);
 
   const customerFieldBasedPricingMap = useMemo(() => {
     if (!selectedFieldConfigId) {
       return {};
     }
     return buildScopedPricingMap(
-      customerPricing.filter(
-        (p) => p.job_type_field_config_id === selectedFieldConfigId
-      ),
+      customerPricing.filter((p) => p.job_type_field_config_id === selectedFieldConfigId),
       scopeParams,
       (record) => record.job_type_value || null
     );
@@ -215,9 +189,7 @@ export default function BasePricingEditor({
       return {};
     }
     return buildScopedPricingMap(
-      workerPricing.filter(
-        (p) => p.job_type_field_config_id === selectedFieldConfigId
-      ),
+      workerPricing.filter((p) => p.job_type_field_config_id === selectedFieldConfigId),
       scopeParams,
       (record) => record.job_type_value || null
     );
@@ -227,8 +199,8 @@ export default function BasePricingEditor({
   const fieldBasedPricingMap = showBothContexts
     ? customerFieldBasedPricingMap
     : pricingContext === "customer"
-    ? customerFieldBasedPricingMap
-    : workerFieldBasedPricingMap;
+      ? customerFieldBasedPricingMap
+      : workerFieldBasedPricingMap;
 
   const handlePriceChange = (
     key: string,
@@ -244,9 +216,7 @@ export default function BasePricingEditor({
     }));
   };
 
-  const handleStandaloneRuleSubmit = async (
-    draft: ConditionalRuleDraft
-  ): Promise<void> => {
+  const handleStandaloneRuleSubmit = async (draft: ConditionalRuleDraft): Promise<void> => {
     if (!standalonePricing) {
       setRuleError("Save a standalone base price before adding rules.");
       return;
@@ -272,14 +242,11 @@ export default function BasePricingEditor({
 
       const request = {
         standalone_base_price:
-          (editingAdjustmentTypes["standalone"] ||
-            standalonePricing.adjustment_type) === "add"
+          (editingAdjustmentTypes["standalone"] || standalonePricing.adjustment_type) === "add"
             ? standalonePricing.customer_base_price
             : 0,
         customer_base_price: standalonePricing.customer_base_price,
-        adjustment_type:
-          editingAdjustmentTypes["standalone"] ||
-          standalonePricing.adjustment_type,
+        adjustment_type: editingAdjustmentTypes["standalone"] || standalonePricing.adjustment_type,
         conditions: nextConditions,
         effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
         pricingContext,
@@ -289,18 +256,13 @@ export default function BasePricingEditor({
       log.error("Failed to add conditional rule", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
-      setRuleError(
-        error instanceof Error ? error.message : "Failed to add rule."
-      );
+      setRuleError(error instanceof Error ? error.message : "Failed to add rule.");
     } finally {
       setRuleSaving(false);
     }
   };
 
-  const handleAdjustmentTypeChange = (
-    key: string,
-    type: "add" | "multiply"
-  ) => {
+  const handleAdjustmentTypeChange = (key: string, type: "add" | "multiply") => {
     setEditingAdjustmentTypes((prev) => ({
       ...prev,
       [key]: type,
@@ -313,15 +275,11 @@ export default function BasePricingEditor({
 
     if (showBothContexts) {
       // Save both customer and worker pricing
-      const customerPrice = editing.customer
-        ? parseFloat(editing.customer)
-        : null;
+      const customerPrice = editing.customer ? parseFloat(editing.customer) : null;
       const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
 
       const adjustmentType =
-        editingAdjustmentTypes["standalone"] ||
-        customerStandalonePricing?.adjustment_type ||
-        "add";
+        editingAdjustmentTypes["standalone"] || customerStandalonePricing?.adjustment_type || "add";
 
       if (
         (customerPrice === null || isNaN(customerPrice)) &&
@@ -351,9 +309,7 @@ export default function BasePricingEditor({
       setSaving((prev) => ({ ...prev, standalone: true }));
       try {
         const existingConditions =
-          customerStandalonePricing?.source_rule?.conditions?.map(
-            serializeCondition
-          ) ?? undefined;
+          customerStandalonePricing?.source_rule?.conditions?.map(serializeCondition) ?? undefined;
 
         // Save customer pricing if provided
         if (customerPrice !== null && !isNaN(customerPrice)) {
@@ -405,16 +361,13 @@ export default function BasePricingEditor({
       }
     } else {
       // Original single-context save logic
-      const priceValue =
-        pricingContext === "customer" ? editing.customer : editing.worker;
+      const priceValue = pricingContext === "customer" ? editing.customer : editing.worker;
       if (!priceValue || priceValue.trim() === "") {
         return;
       }
 
       const adjustmentType =
-        editingAdjustmentTypes["standalone"] ||
-        standalonePricing?.adjustment_type ||
-        "add";
+        editingAdjustmentTypes["standalone"] || standalonePricing?.adjustment_type || "add";
 
       const price = parseFloat(priceValue);
       if (isNaN(price)) {
@@ -432,8 +385,7 @@ export default function BasePricingEditor({
       setSaving((prev) => ({ ...prev, standalone: true }));
       try {
         const existingConditions =
-          standalonePricing?.source_rule?.conditions?.map(serializeCondition) ??
-          undefined;
+          standalonePricing?.source_rule?.conditions?.map(serializeCondition) ?? undefined;
         const request = {
           standalone_base_price: adjustmentType === "add" ? price : 0,
           customer_base_price: price,
@@ -479,9 +431,7 @@ export default function BasePricingEditor({
 
     if (showBothContexts) {
       // Save both customer and worker pricing
-      const customerPrice = editing.customer
-        ? parseFloat(editing.customer)
-        : null;
+      const customerPrice = editing.customer ? parseFloat(editing.customer) : null;
       const workerPrice = editing.worker ? parseFloat(editing.worker) : null;
 
       const customerEntry = customerFieldBasedPricingMap[optionValue];
@@ -569,17 +519,14 @@ export default function BasePricingEditor({
       }
     } else {
       // Original single-context save logic
-      const priceValue =
-        pricingContext === "customer" ? editing.customer : editing.worker;
+      const priceValue = pricingContext === "customer" ? editing.customer : editing.worker;
       if (!priceValue || priceValue.trim() === "") {
         return;
       }
 
       const pricingEntry = fieldBasedPricingMap[optionValue];
       const adjustmentType =
-        editingAdjustmentTypes[optionValue] ||
-        pricingEntry?.record?.adjustment_type ||
-        "add";
+        editingAdjustmentTypes[optionValue] || pricingEntry?.record?.adjustment_type || "add";
 
       const price = parseFloat(priceValue);
       if (isNaN(price)) {
@@ -664,12 +611,7 @@ export default function BasePricingEditor({
     if (isFieldBased && hasSelectFields && !selectedFieldConfigId) {
       setSelectedFieldConfigId(selectFieldConfigs[0]?.id || null);
     }
-  }, [
-    isFieldBased,
-    hasSelectFields,
-    selectFieldConfigs,
-    selectedFieldConfigId,
-  ]);
+  }, [isFieldBased, hasSelectFields, selectFieldConfigs, selectedFieldConfigId]);
 
   // Reset selected field when switching to standalone mode
   useEffect(() => {
@@ -683,9 +625,7 @@ export default function BasePricingEditor({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-4 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-4 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -696,8 +636,7 @@ export default function BasePricingEditor({
           <CardHeader>
             <CardTitle>Invoice Adjustment Type</CardTitle>
             <CardDescription>
-              Choose how to adjust the invoice total — universally or based on
-              service type
+              Choose how to adjust the invoice total — universally or based on service type
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -710,10 +649,7 @@ export default function BasePricingEditor({
                     : "Set different adjustments based on service type (e.g., Basic vs Premium)"}
                 </p>
               </div>
-              <Switch
-                checked={isFieldBased}
-                onCheckedChange={setIsFieldBased}
-              />
+              <Switch checked={isFieldBased} onCheckedChange={setIsFieldBased} />
             </div>
           </CardContent>
         </Card>
@@ -725,8 +661,8 @@ export default function BasePricingEditor({
           <CardHeader>
             <CardTitle>Universal Adjustment</CardTitle>
             <CardDescription>
-              Apply a fixed fee (e.g., call-out fee) or multiplier (e.g., profit
-              margin) to every invoice
+              Apply a fixed fee (e.g., call-out fee) or multiplier (e.g., profit margin) to every
+              invoice
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -743,14 +679,9 @@ export default function BasePricingEditor({
                         standalonePricing?.adjustment_type ||
                         "add") === "add"
                     }
-                    onChange={() =>
-                      handleAdjustmentTypeChange("standalone", "add")
-                    }
+                    onChange={() => handleAdjustmentTypeChange("standalone", "add")}
                     className="h-4 w-4"
-                    disabled={
-                      saving["standalone"] ||
-                      deleting[standalonePricing?.id || ""]
-                    }
+                    disabled={saving["standalone"] || deleting[standalonePricing?.id || ""]}
                   />
                   <span className="text-sm">Add Amount</span>
                 </label>
@@ -763,14 +694,9 @@ export default function BasePricingEditor({
                         standalonePricing?.adjustment_type ||
                         "add") === "multiply"
                     }
-                    onChange={() =>
-                      handleAdjustmentTypeChange("standalone", "multiply")
-                    }
+                    onChange={() => handleAdjustmentTypeChange("standalone", "multiply")}
                     className="h-4 w-4"
-                    disabled={
-                      saving["standalone"] ||
-                      deleting[standalonePricing?.id || ""]
-                    }
+                    disabled={saving["standalone"] || deleting[standalonePricing?.id || ""]}
                   />
                   <span className="text-sm">Multiply Invoice</span>
                 </label>
@@ -824,20 +750,13 @@ export default function BasePricingEditor({
                         editingPrices["standalone"]?.customer !== undefined
                           ? editingPrices["standalone"].customer
                           : customerStandalonePricing
-                          ? customerStandalonePricing.customer_base_price.toString()
-                          : ""
+                            ? customerStandalonePricing.customer_base_price.toString()
+                            : ""
                       }
-                      onChange={(e) =>
-                        handlePriceChange(
-                          "standalone",
-                          e.target.value,
-                          "customer"
-                        )
-                      }
+                      onChange={(e) => handlePriceChange("standalone", e.target.value, "customer")}
                       className="pl-9"
                       disabled={
-                        saving["standalone"] ||
-                        deleting[customerStandalonePricing?.id || ""]
+                        saving["standalone"] || deleting[customerStandalonePricing?.id || ""]
                       }
                     />
                   </div>
@@ -875,22 +794,12 @@ export default function BasePricingEditor({
                         editingPrices["standalone"]?.worker !== undefined
                           ? editingPrices["standalone"].worker
                           : workerStandalonePricing
-                          ? workerStandalonePricing.worker_base_payment?.toString() ||
-                            ""
-                          : ""
+                            ? workerStandalonePricing.worker_base_payment?.toString() || ""
+                            : ""
                       }
-                      onChange={(e) =>
-                        handlePriceChange(
-                          "standalone",
-                          e.target.value,
-                          "worker"
-                        )
-                      }
+                      onChange={(e) => handlePriceChange("standalone", e.target.value, "worker")}
                       className="pl-9"
-                      disabled={
-                        saving["standalone"] ||
-                        deleting[workerStandalonePricing?.id || ""]
-                      }
+                      disabled={saving["standalone"] || deleting[workerStandalonePricing?.id || ""]}
                     />
                   </div>
                 </div>
@@ -925,28 +834,19 @@ export default function BasePricingEditor({
                         : "0.00"
                     }
                     value={
-                      editingPrices["standalone"]?.[pricingContext] !==
-                      undefined
+                      editingPrices["standalone"]?.[pricingContext] !== undefined
                         ? editingPrices["standalone"][pricingContext]
                         : standalonePricing
-                        ? pricingContext === "customer"
-                          ? standalonePricing.customer_base_price.toString()
-                          : standalonePricing.worker_base_payment?.toString() ||
-                            ""
-                        : ""
+                          ? pricingContext === "customer"
+                            ? standalonePricing.customer_base_price.toString()
+                            : standalonePricing.worker_base_payment?.toString() || ""
+                          : ""
                     }
                     onChange={(e) =>
-                      handlePriceChange(
-                        "standalone",
-                        e.target.value,
-                        pricingContext
-                      )
+                      handlePriceChange("standalone", e.target.value, pricingContext)
                     }
                     className="pl-9"
-                    disabled={
-                      saving["standalone"] ||
-                      deleting[standalonePricing?.id || ""]
-                    }
+                    disabled={saving["standalone"] || deleting[standalonePricing?.id || ""]}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -963,9 +863,7 @@ export default function BasePricingEditor({
                 <Button
                   variant="outline"
                   onClick={() => handleDelete(standalonePricing.id)}
-                  disabled={
-                    saving["standalone"] || deleting[standalonePricing.id]
-                  }
+                  disabled={saving["standalone"] || deleting[standalonePricing.id]}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
@@ -977,29 +875,18 @@ export default function BasePricingEditor({
                   !editingPrices["standalone"] ||
                   (showBothContexts
                     ? (!editingPrices["standalone"].customer ||
-                        isNaN(
-                          parseFloat(editingPrices["standalone"].customer || "")
-                        ) ||
-                        parseFloat(editingPrices["standalone"].customer || "") <
-                          0) &&
+                        isNaN(parseFloat(editingPrices["standalone"].customer || "")) ||
+                        parseFloat(editingPrices["standalone"].customer || "") < 0) &&
                       (!editingPrices["standalone"].worker ||
-                        isNaN(
-                          parseFloat(editingPrices["standalone"].worker || "")
-                        ) ||
-                        parseFloat(editingPrices["standalone"].worker || "") <
-                          0)
+                        isNaN(parseFloat(editingPrices["standalone"].worker || "")) ||
+                        parseFloat(editingPrices["standalone"].worker || "") < 0)
                     : pricingContext === "customer"
-                    ? !editingPrices["standalone"].customer ||
-                      isNaN(
-                        parseFloat(editingPrices["standalone"].customer || "")
-                      ) ||
-                      parseFloat(editingPrices["standalone"].customer || "") < 0
-                    : !editingPrices["standalone"].worker ||
-                      isNaN(
-                        parseFloat(editingPrices["standalone"].worker || "")
-                      ) ||
-                      parseFloat(editingPrices["standalone"].worker || "") <
-                        0) ||
+                      ? !editingPrices["standalone"].customer ||
+                        isNaN(parseFloat(editingPrices["standalone"].customer || "")) ||
+                        parseFloat(editingPrices["standalone"].customer || "") < 0
+                      : !editingPrices["standalone"].worker ||
+                        isNaN(parseFloat(editingPrices["standalone"].worker || "")) ||
+                        parseFloat(editingPrices["standalone"].worker || "") < 0) ||
                   saving["standalone"] ||
                   deleting[standalonePricing?.id || ""]
                 }
@@ -1039,10 +926,7 @@ export default function BasePricingEditor({
                       await deletePricing(id);
                     } catch (error) {
                       log.error("Failed to delete override", {
-                        error:
-                          error instanceof Error
-                            ? error.message
-                            : "Unknown error",
+                        error: error instanceof Error ? error.message : "Unknown error",
                         pricingId: id,
                       });
                     }
@@ -1056,12 +940,10 @@ export default function BasePricingEditor({
                 <div className="space-y-3 border-t pt-4">
                   <CollapsibleTrigger className="flex w-full items-center justify-between hover:opacity-80 transition-opacity group cursor-pointer">
                     <div className="text-left">
-                      <Label className="text-sm font-semibold">
-                        Conditional Rules
-                      </Label>
+                      <Label className="text-sm font-semibold">Conditional Rules</Label>
                       <p className="text-xs text-muted-foreground">
-                        Add adjustments when other fields meet certain criteria
-                        (e.g., +$50 if vehicle type is &quot;Large Truck&quot;)
+                        Add adjustments when other fields meet certain criteria (e.g., +$50 if
+                        vehicle type is &quot;Large Truck&quot;)
                       </p>
                     </div>
                     <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
@@ -1073,8 +955,7 @@ export default function BasePricingEditor({
                           No conditional rules yet
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Add rules below to trigger automatic adjustments based
-                          on field values
+                          Add rules below to trigger automatic adjustments based on field values
                         </p>
                       </div>
                     ) : (
@@ -1102,11 +983,28 @@ export default function BasePricingEditor({
       {isFieldBased && (
         <Card>
           <CardHeader>
-            <CardTitle>
-              {selectedFieldConfig
-                ? `Service-Based Adjustment by ${selectedFieldConfig.label}`
-                : "Service-Based Adjustment"}
-            </CardTitle>
+            <div className="flex items-center gap-1 flex-wrap">
+              <CardTitle>
+                {selectedFieldConfig
+                  ? `Service-Based Adjustment by ${selectedFieldConfig.label}`
+                  : "Service-Based Adjustment"}
+              </CardTitle>
+              <ContextualHelp label="How service-based adjustments work">
+                {selectedFieldConfig ? (
+                  <p>
+                    Set different adjustments for each {selectedFieldConfig.label} option. For
+                    example, if &quot;Premium Service&quot; has a $50 call-out fee and &quot;Basic
+                    Service&quot; has no fee →{" "}
+                    <span className="font-medium text-foreground">
+                      Premium adds $50, Basic adds $0
+                    </span>{" "}
+                    to the invoice total.
+                  </p>
+                ) : (
+                  <p>Select a service type field below, then set per-option fees or markups.</p>
+                )}
+              </ContextualHelp>
+            </div>
             <CardDescription>
               {selectedFieldConfig
                 ? `Set different adjustments for each ${selectedFieldConfig.label} option (e.g., premium services get higher markup)`
@@ -1114,28 +1012,9 @@ export default function BasePricingEditor({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* How it works */}
-            {selectedFieldConfig && (
-              <div className="bg-muted/50 rounded-md p-3 text-sm">
-                <p className="font-medium text-foreground">How it works:</p>
-                <p className="text-muted-foreground">
-                  Set different adjustments for each {selectedFieldConfig.label}{" "}
-                  option. For example, if &quot;Premium Service&quot; has a $50
-                  call-out fee and &quot;Basic Service&quot; has no fee →{" "}
-                  <span className="font-medium text-foreground">
-                    Premium adds $50, Basic adds $0
-                  </span>{" "}
-                  to the invoice total.
-                </p>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="field-select">Select Field</Label>
-              <Select
-                value={selectedFieldConfigId || ""}
-                onValueChange={setSelectedFieldConfigId}
-              >
+              <Select value={selectedFieldConfigId || ""} onValueChange={setSelectedFieldConfigId}>
                 <SelectTrigger id="field-select">
                   <SelectValue placeholder="Select a field" />
                 </SelectTrigger>
@@ -1170,18 +1049,16 @@ export default function BasePricingEditor({
                   {/* Table Body - Inline Editable Rows */}
                   <div className="divide-y">
                     {selectedFieldConfig.options.map((optionValue) => {
-                      const customerEntry =
-                        customerFieldBasedPricingMap[optionValue];
-                      const workerEntry =
-                        workerFieldBasedPricingMap[optionValue];
+                      const customerEntry = customerFieldBasedPricingMap[optionValue];
+                      const workerEntry = workerFieldBasedPricingMap[optionValue];
                       const customerPricing = customerEntry?.record;
                       const workerPricing = workerEntry?.record;
 
                       const existingPricing = showBothContexts
                         ? customerPricing
                         : pricingContext === "customer"
-                        ? customerPricing
-                        : workerPricing;
+                          ? customerPricing
+                          : workerPricing;
 
                       const editing = editingPrices[optionValue];
                       const currentAdjustmentType =
@@ -1192,14 +1069,14 @@ export default function BasePricingEditor({
                         editing?.customer !== undefined
                           ? editing.customer
                           : customerPricing
-                          ? customerPricing.customer_base_price.toString()
-                          : "";
+                            ? customerPricing.customer_base_price.toString()
+                            : "";
                       const currentWorkerPrice =
                         editing?.worker !== undefined
                           ? editing.worker
                           : workerPricing
-                          ? workerPricing.worker_base_payment?.toString() || ""
-                          : "";
+                            ? workerPricing.worker_base_payment?.toString() || ""
+                            : "";
 
                       return (
                         <div
@@ -1210,10 +1087,7 @@ export default function BasePricingEditor({
                               : "grid-cols-[1fr_120px_140px]"
                           } gap-2 p-2 items-center hover:bg-muted/30 transition-colors`}
                         >
-                          <div
-                            className="text-sm font-medium truncate"
-                            title={optionValue}
-                          >
+                          <div className="text-sm font-medium truncate" title={optionValue}>
                             {optionValue}
                           </div>
                           <div className="flex gap-2">
@@ -1222,13 +1096,10 @@ export default function BasePricingEditor({
                                 type="radio"
                                 name={`adjustment-type-${optionValue}`}
                                 checked={currentAdjustmentType === "add"}
-                                onChange={() =>
-                                  handleAdjustmentTypeChange(optionValue, "add")
-                                }
+                                onChange={() => handleAdjustmentTypeChange(optionValue, "add")}
                                 className="h-3 w-3"
                                 disabled={
-                                  saving[optionValue] ||
-                                  deleting[existingPricing?.id || ""]
+                                  saving[optionValue] || deleting[existingPricing?.id || ""]
                                 }
                               />
                               <span className="text-xs">Add</span>
@@ -1238,16 +1109,10 @@ export default function BasePricingEditor({
                                 type="radio"
                                 name={`adjustment-type-${optionValue}`}
                                 checked={currentAdjustmentType === "multiply"}
-                                onChange={() =>
-                                  handleAdjustmentTypeChange(
-                                    optionValue,
-                                    "multiply"
-                                  )
-                                }
+                                onChange={() => handleAdjustmentTypeChange(optionValue, "multiply")}
                                 className="h-3 w-3"
                                 disabled={
-                                  saving[optionValue] ||
-                                  deleting[existingPricing?.id || ""]
+                                  saving[optionValue] || deleting[existingPricing?.id || ""]
                                 }
                               />
                               <span className="text-xs">×</span>
@@ -1258,29 +1123,14 @@ export default function BasePricingEditor({
                             <Input
                               type="number"
                               step="0.01"
-                              min={
-                                currentAdjustmentType === "multiply"
-                                  ? "0.01"
-                                  : "0"
-                              }
-                              placeholder={
-                                currentAdjustmentType === "multiply"
-                                  ? "1.00"
-                                  : "0.00"
-                              }
+                              min={currentAdjustmentType === "multiply" ? "0.01" : "0"}
+                              placeholder={currentAdjustmentType === "multiply" ? "1.00" : "0.00"}
                               value={currentCustomerPrice}
                               onChange={(e) =>
-                                handlePriceChange(
-                                  optionValue,
-                                  e.target.value,
-                                  "customer"
-                                )
+                                handlePriceChange(optionValue, e.target.value, "customer")
                               }
                               className="pl-6 h-8 text-sm"
-                              disabled={
-                                saving[optionValue] ||
-                                deleting[customerPricing?.id || ""]
-                              }
+                              disabled={saving[optionValue] || deleting[customerPricing?.id || ""]}
                             />
                           </div>
                           {showBothContexts && (
@@ -1289,23 +1139,11 @@ export default function BasePricingEditor({
                               <Input
                                 type="number"
                                 step="0.01"
-                                min={
-                                  currentAdjustmentType === "multiply"
-                                    ? "0.01"
-                                    : "0"
-                                }
-                                placeholder={
-                                  currentAdjustmentType === "multiply"
-                                    ? "1.00"
-                                    : "0.00"
-                                }
+                                min={currentAdjustmentType === "multiply" ? "0.01" : "0"}
+                                placeholder={currentAdjustmentType === "multiply" ? "1.00" : "0.00"}
                                 value={currentWorkerPrice}
                                 onChange={(e) =>
-                                  handlePriceChange(
-                                    optionValue,
-                                    e.target.value,
-                                    "worker"
-                                  )
+                                  handlePriceChange(optionValue, e.target.value, "worker")
                                 }
                                 className="pl-6 h-8 text-sm"
                                 disabled={
@@ -1332,44 +1170,36 @@ export default function BasePricingEditor({
                   <div className="flex items-center gap-2 p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
                     <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Worker payment fields are disabled. Add workers to your
-                      organization to enable worker payment settings.
+                      Worker payment fields are disabled. Add workers to your organization to enable
+                      worker payment settings.
                     </p>
                   </div>
                 )}
 
                 {/* Save Button Bar */}
                 {(() => {
-                  const pendingChanges = selectedFieldConfig.options.filter(
-                    (optionValue) => {
-                      const editing = editingPrices[optionValue];
-                      if (!editing) return false;
+                  const pendingChanges = selectedFieldConfig.options.filter((optionValue) => {
+                    const editing = editingPrices[optionValue];
+                    if (!editing) return false;
 
-                      const customerEntry =
-                        customerFieldBasedPricingMap[optionValue];
-                      const workerEntry =
-                        workerFieldBasedPricingMap[optionValue];
-                      const customerPricing = customerEntry?.record;
-                      const workerPricing = workerEntry?.record;
+                    const customerEntry = customerFieldBasedPricingMap[optionValue];
+                    const workerEntry = workerFieldBasedPricingMap[optionValue];
+                    const customerPricing = customerEntry?.record;
+                    const workerPricing = workerEntry?.record;
 
-                      const hasCustomerChanges =
-                        editing.customer !== undefined &&
-                        editing.customer !==
-                          (customerPricing?.customer_base_price.toString() ||
-                            "");
-                      const hasWorkerChanges =
-                        editing.worker !== undefined &&
-                        editing.worker !==
-                          (workerPricing?.worker_base_payment?.toString() ||
-                            "");
+                    const hasCustomerChanges =
+                      editing.customer !== undefined &&
+                      editing.customer !== (customerPricing?.customer_base_price.toString() || "");
+                    const hasWorkerChanges =
+                      editing.worker !== undefined &&
+                      editing.worker !== (workerPricing?.worker_base_payment?.toString() || "");
 
-                      return showBothContexts
-                        ? hasCustomerChanges || hasWorkerChanges
-                        : pricingContext === "customer"
+                    return showBothContexts
+                      ? hasCustomerChanges || hasWorkerChanges
+                      : pricingContext === "customer"
                         ? hasCustomerChanges
                         : hasWorkerChanges;
-                    }
-                  );
+                  });
 
                   if (pendingChanges.length === 0) return null;
 
@@ -1380,9 +1210,7 @@ export default function BasePricingEditor({
                         onClick={async () => {
                           // Save all pending changes
                           await Promise.all(
-                            pendingChanges.map((optionValue) =>
-                              handleSaveFieldBased(optionValue)
-                            )
+                            pendingChanges.map((optionValue) => handleSaveFieldBased(optionValue))
                           );
                         }}
                         disabled={pendingChanges.some(
@@ -1392,8 +1220,8 @@ export default function BasePricingEditor({
                               (showBothContexts
                                 ? customerFieldBasedPricingMap[opt]?.record
                                 : pricingContext === "customer"
-                                ? customerFieldBasedPricingMap[opt]?.record
-                                : workerFieldBasedPricingMap[opt]?.record
+                                  ? customerFieldBasedPricingMap[opt]?.record
+                                  : workerFieldBasedPricingMap[opt]?.record
                               )?.id || ""
                             ]
                         )}

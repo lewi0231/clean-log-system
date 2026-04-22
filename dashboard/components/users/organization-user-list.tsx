@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
@@ -20,12 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { log } from "@/lib/logger";
 import { OrganizationUser } from "@/lib/types";
 import { Mail, Pencil, Trash2, UserPlus } from "lucide-react";
@@ -62,15 +58,10 @@ export default function OrganizationUserList({
 }: OrganizationUserListProps) {
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [deletingUser, setDeletingUser] = useState<OrganizationUser | null>(
-    null
-  );
-  const [resendingUser, setResendingUser] = useState<OrganizationUser | null>(
-    null
-  );
+  const [deletingUser, setDeletingUser] = useState<OrganizationUser | null>(null);
+  const [resendingUser, setResendingUser] = useState<OrganizationUser | null>(null);
   const [isResending, setIsResending] = useState(false);
-  const [convertingUser, setConvertingUser] =
-    useState<OrganizationUser | null>(null);
+  const [convertingUser, setConvertingUser] = useState<OrganizationUser | null>(null);
   const [isConverting, setIsConverting] = useState(false);
 
   const handleEdit = (user: OrganizationUser) => {
@@ -150,9 +141,7 @@ export default function OrganizationUserList({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -174,8 +163,7 @@ export default function OrganizationUserList({
             {organizationUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8">
-                  No dashboard users found. Invite your first user to get
-                  started.
+                  No dashboard users found. Invite your first user to get started.
                 </TableCell>
               </TableRow>
             ) : (
@@ -184,9 +172,7 @@ export default function OrganizationUserList({
                   <TableCell>
                     <StatusBadge status={user.status} />
                   </TableCell>
-                  <TableCell className="font-medium">
-                    {formatName(user)}
-                  </TableCell>
+                  <TableCell className="font-medium">{formatName(user)}</TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.phone || "-"}</TableCell>
                   <TableCell>
@@ -200,9 +186,7 @@ export default function OrganizationUserList({
                       {user.role === "admin" ? "Admin" : "Viewer"}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    {new Date(user.invited_at).toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{new Date(user.invited_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <TooltipProvider>
                       <div className="flex justify-end gap-2">
@@ -218,30 +202,24 @@ export default function OrganizationUserList({
                                 <Mail className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>
-                              Resend invitation email
-                            </TooltipContent>
+                            <TooltipContent>Resend invitation email</TooltipContent>
                           </Tooltip>
                         )}
-                        {user.status === "active" &&
-                          user.auth_user_id &&
-                          onConvertToWorker && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setConvertingUser(user)}
-                                  className="cursor-pointer"
-                                >
-                                  <UserPlus className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Add as worker (mobile app access)
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
+                        {user.status === "active" && user.auth_user_id && onConvertToWorker && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setConvertingUser(user)}
+                                className="cursor-pointer"
+                              >
+                                <UserPlus className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Add as worker (mobile app access)</TooltipContent>
+                          </Tooltip>
+                        )}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -290,33 +268,21 @@ export default function OrganizationUserList({
         user={editingUser}
       />
 
-      <AlertDialog
+      <ConfirmDestructiveDialog
         open={!!deletingUser}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingUser(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will remove the dashboard user
-              &quot;{deletingUser?.email}&quot; from your organization.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        description={
+          <>
+            This action cannot be undone. This will remove the dashboard user &quot;
+            {deletingUser?.email}&quot; from your organization.
+          </>
+        }
+        onConfirm={handleDelete}
+      />
 
       <AlertDialog
         open={!!resendingUser}
@@ -334,15 +300,17 @@ export default function OrganizationUserList({
               {resendingUser?.first_name && resendingUser?.last_name
                 ? `${resendingUser.first_name} ${resendingUser.last_name}`
                 : resendingUser?.email}
-              &quot; ({resendingUser?.email})? They will receive a link to set
-              up their account.
+              &quot; ({resendingUser?.email})? They will receive a link to set up their account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isResending} className="cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleResendInvitation}
               disabled={isResending}
+              className="cursor-pointer"
             >
               {isResending ? "Sending..." : "Resend Email"}
             </AlertDialogAction>
@@ -366,19 +334,21 @@ export default function OrganizationUserList({
               {convertingUser?.first_name && convertingUser?.last_name
                 ? `${convertingUser.first_name} ${convertingUser.last_name}`
                 : convertingUser?.email}
-              &quot; to use the mobile app with their existing login
-              credentials.
+              &quot; to use the mobile app with their existing login credentials.
               <br />
               <br />
-              They will be able to submit jobs through the mobile app while
-              keeping their dashboard access.
+              They will be able to submit jobs through the mobile app while keeping their dashboard
+              access.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isConverting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isConverting} className="cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConvertToWorker}
               disabled={isConverting}
+              className="cursor-pointer"
             >
               {isConverting ? "Converting..." : "Add as Worker"}
             </AlertDialogAction>

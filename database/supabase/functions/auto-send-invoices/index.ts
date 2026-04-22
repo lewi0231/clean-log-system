@@ -7,9 +7,11 @@ import {
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import {
   getInvoiceEmailRecipients,
+  greetingFirstNameFromJobContexts,
   type InvoiceEmailRecipientConfig,
   type JobContext,
 } from "../_utils/invoice-email.ts";
+import { generateInvoicePdfBase64 } from "../_utils/invoice-pdf.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 
@@ -428,15 +430,34 @@ serve(async (req: Request) => {
               Array.isArray(invoiceWithJobs.invoice_job)
             ) {
               for (const invoiceJob of invoiceWithJobs.invoice_job) {
-                const job = invoiceJob.job;
-                if (job) {
-                  // Handle location which can be array or object from Supabase
-                  const location = Array.isArray(job.location)
-                    ? job.location[0]
-                    : job.location;
+                const jobRaw = invoiceJob.job as unknown;
+                const job = Array.isArray(jobRaw) ? jobRaw[0] : jobRaw;
+                if (job && typeof job === "object") {
+                  const j = job as {
+                    location_id?: string | null;
+                    submission_data?: Record<string, unknown> | null;
+                    location?:
+                      | {
+                        id: string;
+                        email: string | null;
+                        contact_person: string | null;
+                        hierarchy_parent_id: string | null;
+                      }
+                      | Array<{
+                        id: string;
+                        email: string | null;
+                        contact_person: string | null;
+                        hierarchy_parent_id: string | null;
+                      }>
+                      | null;
+                  };
+                  const locationRaw = j.location;
+                  const location = Array.isArray(locationRaw)
+                    ? locationRaw[0]
+                    : locationRaw;
 
                   jobContexts.push({
-                    location_id: job.location_id || null,
+                    location_id: j.location_id || null,
                     location: location
                       ? {
                         id: location.id,
@@ -446,10 +467,7 @@ serve(async (req: Request) => {
                           null,
                       }
                       : null,
-                    submission_data: (job.submission_data as Record<
-                      string,
-                      unknown
-                    >) || null,
+                    submission_data: j.submission_data || null,
                   });
                 }
               }
@@ -503,7 +521,27 @@ serve(async (req: Request) => {
               continue;
             }
 
-            // Send invoice email
+            let pdfAttachment: { base64: string; filename: string };
+            try {
+              const pdf = await generateInvoicePdfBase64(
+                supabase,
+                invoice.id,
+                org.id,
+              );
+              pdfAttachment = { base64: pdf.base64, filename: pdf.filename };
+            } catch (pdfErr) {
+              logger.error("Failed to generate invoice PDF", pdfErr, {
+                invoice_id: invoice.id,
+              });
+              errors.push(
+                `Failed to generate PDF for invoice ${invoice.invoice_number}`,
+              );
+              continue;
+            }
+
+            const greetingName = greetingFirstNameFromJobContexts(jobContexts);
+
+            // Send invoice email with PDF attachment
             const emailData: InvoiceEmailData = {
               invoiceNumber: invoice.invoice_number,
               organizationName,
@@ -511,6 +549,9 @@ serve(async (req: Request) => {
               total: invoiceWithJobs.total,
               currency: invoiceWithJobs.currency || "AUD",
               dueDate: invoiceWithJobs.due_date,
+              pdfBase64: pdfAttachment.base64,
+              pdfFilename: pdfAttachment.filename,
+              recipientGreetingName: greetingName,
             };
 
             const emailResult = await sendInvoiceEmail(emailData, false);

@@ -1,0 +1,11 @@
+.next
+out
+build
+coverage
+playwright-report
+test-results
+.vercel
+node_modules
+pnpm-lock.yaml
+database/supabase/.temp
+**/*.min.js

@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -90,6 +90,57 @@ export default function PendingConfirmationsScreen() {
   useEffect(() => {
     fetchConfirmations();
   }, [fetchConfirmations]);
+
+  const pendingJobIds = useMemo(
+    () => confirmations.map((c) => c.job_id),
+    [confirmations],
+  );
+  const pendingJobIdsKey = useMemo(
+    () => [...pendingJobIds].sort().join(","),
+    [pendingJobIds],
+  );
+
+  // Refetch when a colleague confirms (job_worker) or job status changes (job) — same pattern as dashboard realtime
+  useEffect(() => {
+    if (!session?.access_token) return;
+    if (pendingJobIds.length === 0) return;
+
+    const inList = pendingJobIds.join(",");
+    const filterJobWorker = `job_id=in.(${inList})`;
+    const filterJob = `id=in.(${inList})`;
+
+    const channel = supabase
+      .channel(`pending_confirmations:${pendingJobIdsKey.slice(0, 60)}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "job_worker",
+          filter: filterJobWorker,
+        },
+        () => {
+          fetchConfirmations();
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "job",
+          filter: filterJob,
+        },
+        () => {
+          fetchConfirmations();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.access_token, pendingJobIdsKey, pendingJobIds, fetchConfirmations]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

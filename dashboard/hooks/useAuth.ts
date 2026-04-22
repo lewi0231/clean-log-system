@@ -20,7 +20,7 @@ async function getAuthUser(): Promise<User | null> {
   }
 
   if (user) {
-    log.info("useAuth: User found", {
+    log.debug("useAuth: User found", {
       userId: user.id,
       email: user.email,
     });
@@ -64,11 +64,7 @@ export function useAuth() {
       });
 
       // Invalidate the auth query to refetch user data on actual auth changes
-      if (
-        event === "SIGNED_IN" ||
-        event === "TOKEN_REFRESHED" ||
-        event === "SIGNED_OUT"
-      ) {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "SIGNED_OUT") {
         queryClient.invalidateQueries({ queryKey: ["auth-user"] });
       }
     });

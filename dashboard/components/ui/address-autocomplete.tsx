@@ -101,9 +101,7 @@ export function AddressAutocomplete({
 
   // Get API key from environment (must be prefixed with NEXT_PUBLIC_ for client-side access)
   const apiKey =
-    typeof window !== "undefined"
-      ? process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY
-      : undefined;
+    typeof window !== "undefined" ? process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY : undefined;
 
   // Sync local value with prop value (but only if user isn't actively editing)
   useEffect(() => {
@@ -120,10 +118,7 @@ export function AddressAutocomplete({
   // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setSelectedIndex(-1);
       }
@@ -201,9 +196,7 @@ export function AddressAutocomplete({
               status: response.status,
             });
           } else {
-            const errorText = await response
-              .text()
-              .catch(() => "Unknown error");
+            const errorText = await response.text().catch(() => "Unknown error");
             log.error("AddressAutocomplete: Geoapify API error", {
               status: response.status,
               error: errorText,
@@ -297,7 +290,7 @@ export function AddressAutocomplete({
     try {
       await onSave(fullAddress);
     } catch (error) {
-      console.error("Error saving address:", error);
+      log.error("Error saving address:", error);
       // Restore previous value on error
       setLocalValue(value || "");
     } finally {
@@ -331,9 +324,7 @@ export function AddressAutocomplete({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIndex((prev) =>
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        );
+        setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
         break;
       case "ArrowUp":
         e.preventDefault();
@@ -365,7 +356,7 @@ export function AddressAutocomplete({
     try {
       await onSave(trimmedValue || "");
     } catch (error) {
-      console.error("Error saving address:", error);
+      log.error("Error saving address:", error);
       setLocalValue(value || "");
       setHasUnsavedChanges(true);
     } finally {
@@ -374,10 +365,7 @@ export function AddressAutocomplete({
   };
 
   const inputId =
-    id ||
-    `address-autocomplete-${
-      label?.toLowerCase().replace(/\s+/g, "-") || "input"
-    }`;
+    id || `address-autocomplete-${label?.toLowerCase().replace(/\s+/g, "-") || "input"}`;
 
   // If no API key, fall back to regular input behavior
   const hasAutocomplete = !!apiKey;
@@ -388,9 +376,7 @@ export function AddressAutocomplete({
         <Label htmlFor={inputId} className="flex items-center gap-2">
           {label}
           {required && <span className="text-destructive">*</span>}
-          {isSaving && (
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-          )}
+          {isSaving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
         </Label>
       )}
       <div className="relative">
@@ -414,9 +400,7 @@ export function AddressAutocomplete({
             aria-expanded={isOpen}
             aria-controls={isOpen ? `${inputId}-suggestions` : undefined}
             aria-activedescendant={
-              selectedIndex >= 0
-                ? `${inputId}-suggestion-${selectedIndex}`
-                : undefined
+              selectedIndex >= 0 ? `${inputId}-suggestion-${selectedIndex}` : undefined
             }
             className="pr-10"
           />
@@ -448,8 +432,7 @@ export function AddressAutocomplete({
                   aria-selected={selectedIndex === index}
                   className={cn(
                     "px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors",
-                    selectedIndex === index &&
-                      "bg-accent text-accent-foreground"
+                    selectedIndex === index && "bg-accent text-accent-foreground"
                   )}
                   onMouseDown={(e) => {
                     e.preventDefault(); // Prevent input blur
@@ -462,26 +445,23 @@ export function AddressAutocomplete({
                       suggestion.properties.address_line1 ||
                       "Address"}
                   </div>
-                  {suggestion.properties.city &&
-                    suggestion.properties.state && (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {[
-                          suggestion.properties.city,
-                          suggestion.properties.state,
-                          suggestion.properties.postcode,
-                        ]
-                          .filter(Boolean)
-                          .join(", ")}
-                      </div>
-                    )}
+                  {suggestion.properties.city && suggestion.properties.state && (
+                    <div className="text-xs text-muted-foreground truncate">
+                      {[
+                        suggestion.properties.city,
+                        suggestion.properties.state,
+                        suggestion.properties.postcode,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
+                  )}
                 </li>
               ))}
           </ul>
         )}
       </div>
-      {description && (
-        <p className="text-xs text-muted-foreground">{description}</p>
-      )}
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
       {!hasAutocomplete && (
         <p className="text-xs text-muted-foreground italic">
           Address autocomplete is not available. Please enter address manually.

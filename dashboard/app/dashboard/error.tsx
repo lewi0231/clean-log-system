@@ -1,6 +1,7 @@
 "use client";
 
 import { ErrorState } from "@/components/ui/error-state";
+import { log } from "@/lib/logger";
 import { useEffect } from "react";
 
 export default function DashboardError({
@@ -12,7 +13,7 @@ export default function DashboardError({
 }) {
   useEffect(() => {
     // Log error to error reporting service
-    console.error("Dashboard error:", error);
+    log.error("Dashboard error:", error);
   }, [error]);
 
   return (

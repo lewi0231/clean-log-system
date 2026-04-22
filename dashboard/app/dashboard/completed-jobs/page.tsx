@@ -13,58 +13,36 @@ import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
 import { useAuth } from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
-import {
-  ArrowUpDown,
-  Calculator,
-  Calendar,
-  MapPin,
-  Plus,
-  User,
-} from "lucide-react";
+import { ArrowUpDown, Calculator, Calendar, MapPin, Plus, User } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export default function CompletedJobsPage() {
-  const {
-    organizationId,
-    loading: orgLoading,
-    error: orgError,
-  } = useOrganization();
+  const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
   const [showTests, setShowTests] = useState(false);
-  const {
-    jobs,
-    loading,
-    error,
-    refetch,
-    createJob,
-    updateJob,
-    getJobEdits,
-    sendFeedbackEmail,
-  } = useJobs({
-    includeTests: showTests,
-  });
+  const { jobs, loading, error, refetch, createJob, updateJob, getJobEdits, sendFeedbackEmail } =
+    useJobs({
+      includeTests: showTests,
+    });
   const { user } = useAuth();
   const { organizationUsers } = useOrganizationUsers();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isCalculatePaymentDialogOpen, setIsCalculatePaymentDialogOpen] =
-    useState(false);
-  const [sortBy, setSortBy] = useState<
-    "date" | "location" | "worker" | "status"
-  >("date");
+  const [isCalculatePaymentDialogOpen, setIsCalculatePaymentDialogOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"date" | "location" | "worker" | "status">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Check if current user is admin
   const isAdmin = useMemo(() => {
     if (!user?.email || !organizationUsers.length) return false;
     const email = user.email.trim().toLowerCase();
-    const currentUser = organizationUsers.find(
-      (ou) => ou.email.trim().toLowerCase() === email,
-    );
+    const currentUser = organizationUsers.find((ou) => ou.email.trim().toLowerCase() === email);
     return currentUser?.role === "admin";
   }, [user, organizationUsers]);
 
   // Job-level invoice status for sorting: not_invoiced | invoice_created
-  const getJobInvoiceStatus = (job: { invoice_job?: Array<{ invoice: unknown } | null> | null }): "not_invoiced" | "invoice_created" => {
+  const getJobInvoiceStatus = (job: {
+    invoice_job?: Array<{ invoice: unknown } | null> | null;
+  }): "not_invoiced" | "invoice_created" => {
     const invoices = job.invoice_job?.filter((ij) => ij?.invoice !== null) ?? [];
     return invoices.length === 0 ? "not_invoiced" : "invoice_created";
   };
@@ -78,9 +56,7 @@ export default function CompletedJobsPage() {
 
       switch (sortBy) {
         case "date":
-          comparison =
-            new Date(a.completed_at).getTime() -
-            new Date(b.completed_at).getTime();
+          comparison = new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime();
           break;
         case "location":
           const locationA = a.location?.name || "";
@@ -95,8 +71,7 @@ export default function CompletedJobsPage() {
         case "status":
           // not_invoiced = 0, invoice_created = 1; desc = invoice_created first
           const statusOrder = { not_invoiced: 0, invoice_created: 1 };
-          comparison =
-            statusOrder[getJobInvoiceStatus(a)] - statusOrder[getJobInvoiceStatus(b)];
+          comparison = statusOrder[getJobInvoiceStatus(a)] - statusOrder[getJobInvoiceStatus(b)];
           break;
       }
 
@@ -118,12 +93,7 @@ export default function CompletedJobsPage() {
   }
 
   if (orgError || !organizationId) {
-    return (
-      <ErrorState
-        message={orgError || "Failed to load organization"}
-        fullScreen
-      />
-    );
+    return <ErrorState message={orgError || "Failed to load organization"} fullScreen />;
   }
 
   return (
@@ -137,10 +107,7 @@ export default function CompletedJobsPage() {
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsCalculatePaymentDialogOpen(true)}
-            >
+            <Button variant="outline" onClick={() => setIsCalculatePaymentDialogOpen(true)}>
               <Calculator className="mr-2 h-4 w-4 cursor-pointer" />
               Calculate Payments
             </Button>
@@ -160,37 +127,37 @@ export default function CompletedJobsPage() {
               variant={sortBy === "date" ? "default" : "outline"}
               size="sm"
               onClick={() => handleSort("date")}
+              className="cursor-pointer"
             >
               <Calendar className="mr-2 h-4 w-4" />
-              Sort by Date{" "}
-              {sortBy === "date" && (sortOrder === "desc" ? "↓" : "↑")}
+              Sort by Date {sortBy === "date" && (sortOrder === "desc" ? "↓" : "↑")}
             </Button>
             <Button
               variant={sortBy === "location" ? "default" : "outline"}
               size="sm"
               onClick={() => handleSort("location")}
+              className="cursor-pointer"
             >
               <MapPin className="mr-2 h-4 w-4" />
-              Sort by Location{" "}
-              {sortBy === "location" && (sortOrder === "desc" ? "↓" : "↑")}
+              Sort by Location {sortBy === "location" && (sortOrder === "desc" ? "↓" : "↑")}
             </Button>
             <Button
               variant={sortBy === "worker" ? "default" : "outline"}
               size="sm"
               onClick={() => handleSort("worker")}
+              className="cursor-pointer"
             >
               <User className="mr-2 h-4 w-4" />
-              Sort by Worker{" "}
-              {sortBy === "worker" && (sortOrder === "desc" ? "↓" : "↑")}
+              Sort by Worker {sortBy === "worker" && (sortOrder === "desc" ? "↓" : "↑")}
             </Button>
             <Button
               variant={sortBy === "status" ? "default" : "outline"}
               size="sm"
               onClick={() => handleSort("status")}
+              className="cursor-pointer"
             >
               <ArrowUpDown className="mr-2 h-4 w-4" />
-              Sort by Status{" "}
-              {sortBy === "status" && (sortOrder === "desc" ? "↓" : "↑")}
+              Sort by Status {sortBy === "status" && (sortOrder === "desc" ? "↓" : "↑")}
             </Button>
           </div>
 
@@ -199,11 +166,7 @@ export default function CompletedJobsPage() {
               <Label htmlFor="show-test-jobs" className="text-sm">
                 Show test data
               </Label>
-              <Switch
-                id="show-test-jobs"
-                checked={showTests}
-                onCheckedChange={setShowTests}
-              />
+              <Switch id="show-test-jobs" checked={showTests} onCheckedChange={setShowTests} />
             </div>
           )}
         </div>

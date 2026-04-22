@@ -1,18 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { useLocations } from "@/hooks/use-locations";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
@@ -20,6 +10,7 @@ import { useOnboardingStatus } from "@/hooks/use-onboarding-status";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import {
   CheckCircle2,
   ChevronDown,
@@ -48,15 +39,12 @@ interface SetupStep {
 
 export function OnboardingChecklist() {
   const { organizationId } = useOrganization();
-  const { onboardingStatus, loading: onboardingLoading } =
-    useOnboardingStatus();
+  const { onboardingStatus, loading: onboardingLoading } = useOnboardingStatus();
   const { workers, loading: workersLoading } = useWorkers();
   const { locations, loading: locationsLoading } = useLocations();
-  const { fieldConfigs, loading: configLoading } =
-    useMobileConfig(organizationId);
+  const { fieldConfigs, loading: configLoading } = useMobileConfig(organizationId);
   const { settings, loading: settingsLoading } = useOrganizationSettings();
-  const { isOpen, setIsOpen, isDismissed, setIsDismissed } =
-    useOnboardingChecklist();
+  const { isOpen, setIsOpen, isDismissed, setIsDismissed } = useOnboardingChecklist();
 
   // Check if pricing has been configured
   const [hasPricing, setHasPricing] = useState(false);
@@ -77,7 +65,7 @@ export function OnboardingChecklist() {
         });
         setHasPricing(pricingRules.length > 0);
       } catch (err) {
-        console.error("Failed to check pricing", err);
+        log.error("Failed to check pricing", err);
         setHasPricing(false);
       } finally {
         setPricingLoading(false);
@@ -107,12 +95,7 @@ export function OnboardingChecklist() {
     pricingLoading;
 
   // Only show if onboarding is completed and not dismissed
-  if (
-    !onboardingStatus?.completed ||
-    isDismissed ||
-    loading ||
-    !onboardingStatus?.data
-  ) {
+  if (!onboardingStatus?.completed || isDismissed || loading || !onboardingStatus?.data) {
     return null;
   }
 
@@ -122,10 +105,7 @@ export function OnboardingChecklist() {
     const steps: SetupStep[] = [];
 
     // Step 1: Add Workers (if they have employees)
-    if (
-      onboardingData?.employee_count &&
-      onboardingData.employee_count !== "none"
-    ) {
+    if (onboardingData?.employee_count && onboardingData.employee_count !== "none") {
       const hasWorkers = workers.length > 0;
       steps.push({
         id: "workers",
@@ -157,8 +137,7 @@ export function OnboardingChecklist() {
     steps.push({
       id: "mobile-config",
       title: "Customize Mobile App Forms",
-      description:
-        "Configure the forms your workers will use in the mobile app",
+      description: "Configure the forms your workers will use in the mobile app",
       href: "/dashboard/mobile-config",
       icon: Smartphone,
       required: true,
@@ -181,8 +160,7 @@ export function OnboardingChecklist() {
     steps.push({
       id: "invoice-config",
       title: "Configure Invoice Settings",
-      description:
-        "Upload your logo and set your currency in Organization Settings.",
+      description: "Upload your logo and set your currency in Organization Settings.",
       href: "/dashboard/settings?tab=organization",
       icon: FileText,
       required: true,
@@ -207,12 +185,9 @@ export function OnboardingChecklist() {
   const steps = getSetupSteps();
   const completedSteps = steps.filter((s) => s.completed).length;
   const requiredSteps = steps.filter((s) => s.required);
-  const completedRequiredSteps = requiredSteps.filter(
-    (s) => s.completed
-  ).length;
+  const completedRequiredSteps = requiredSteps.filter((s) => s.completed).length;
   const allRequiredComplete = completedRequiredSteps === requiredSteps.length;
-  const progress =
-    steps.length > 0 ? (completedSteps / steps.length) * 100 : 100;
+  const progress = steps.length > 0 ? (completedSteps / steps.length) * 100 : 100;
 
   // Hide if all required steps are complete and dismissed
   if (allRequiredComplete && isDismissed) {
@@ -237,9 +212,7 @@ export function OnboardingChecklist() {
                     )}
                   </div>
                   <div>
-                    <CardTitle className="text-sm font-semibold">
-                      Getting Started
-                    </CardTitle>
+                    <CardTitle className="text-sm font-semibold">Getting Started</CardTitle>
                     <CardDescription className="text-xs">
                       {allRequiredComplete
                         ? "All set! Optional steps remain"
@@ -298,9 +271,7 @@ export function OnboardingChecklist() {
                       <div className="flex items-center gap-2">
                         <p
                           className={`text-sm font-medium ${
-                            step.completed
-                              ? "text-muted-foreground line-through"
-                              : ""
+                            step.completed ? "text-muted-foreground line-through" : ""
                           }`}
                         >
                           {step.title}
@@ -311,9 +282,7 @@ export function OnboardingChecklist() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {step.description}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
                     </div>
                   </Link>
                 );

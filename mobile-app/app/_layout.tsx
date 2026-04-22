@@ -41,6 +41,7 @@ export default function RootLayout() {
           {user ? (
             <>
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="job/[id]" />
               <Stack.Screen
                 name="modal"
                 options={{

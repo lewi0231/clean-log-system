@@ -24,10 +24,9 @@ try {
 } catch (error) {
   // .env.development might not exist, that's okay
   // (tests that require these env vars will throw a helpful error)
-  // eslint-disable-next-line no-console
   console.warn(
     "Could not load .env.development:",
-    error instanceof Error ? error.message : String(error),
+    error instanceof Error ? error.message : String(error)
   );
 }
 
@@ -35,4 +34,3 @@ try {
 // We intentionally override any .env.development values for these flags.
 process.env.RESEND_TEST_MODE = "true";
 process.env.SKIP_EMAIL_SENDING = "true";
-

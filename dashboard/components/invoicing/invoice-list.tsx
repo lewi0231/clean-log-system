@@ -32,9 +32,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/useAuth";
 import { useInvoices } from "@/hooks/use-invoices";
 import { log } from "@/lib/logger";
+import { senderDisplayNameFromUser } from "@/lib/sender-display-name";
 import { InvoiceService } from "@/lib/services/invoice.service";
+import { getInvokeErrorMessage } from "@/lib/supabase/invoke-edge-function";
 import type { InvoiceWithJobs } from "@/lib/types";
 import { format } from "date-fns";
 import {
@@ -89,9 +92,7 @@ const getDaysOverdue = (dueDate: string): number => {
  * Get the color variant for overdue badge based on days overdue
  * Yellow (1-7 days), Orange (8-14 days), Red (15+ days)
  */
-const getOverdueSeverity = (
-  daysOverdue: number,
-): "warning" | "orange" | "destructive" => {
+const getOverdueSeverity = (daysOverdue: number): "warning" | "orange" | "destructive" => {
   if (daysOverdue <= 7) return "warning";
   if (daysOverdue <= 14) return "orange";
   return "destructive";
@@ -145,12 +146,11 @@ export default function InvoiceList({
   initialStatusFilter,
   isAdmin = false,
 }: InvoiceListProps) {
+  const { user } = useAuth();
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [showTests, setShowTests] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>(
-    initialStatusFilter || "all",
-  );
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter || "all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 25;
@@ -170,34 +170,22 @@ export default function InvoiceList({
     debouncedSearch || undefined,
     statusFilter !== "all" ? statusFilter : undefined,
     currentPage,
-    pageSize,
+    pageSize
   );
 
   // Invoices are already filtered by the backend
   const filteredInvoices = invoices;
   const [sendingInvoiceId, setSendingInvoiceId] = useState<string | null>(null);
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
-  const [invoiceToResend, setInvoiceToResend] =
-    useState<InvoiceWithJobs | null>(null);
-  const [approvingInvoiceId, setApprovingInvoiceId] = useState<string | null>(
-    null,
-  );
-  const [rejectingInvoiceId, setRejectingInvoiceId] = useState<string | null>(
-    null,
-  );
-  const [sendingReminderId, setSendingReminderId] = useState<string | null>(
-    null,
-  );
-  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [invoiceToResend, setInvoiceToResend] = useState<InvoiceWithJobs | null>(null);
+  const [approvingInvoiceId, setApprovingInvoiceId] = useState<string | null>(null);
+  const [rejectingInvoiceId, setRejectingInvoiceId] = useState<string | null>(null);
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+  const [selectedInvoiceIds, setSelectedInvoiceIds] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
 
   const getStatusBadge = (invoice: InvoiceWithJobs) => {
-    const variants: Record<
-      string,
-      "default" | "secondary" | "destructive" | "outline"
-    > = {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       draft: "outline",
       pending_review: "secondary",
       sent: "default",
@@ -208,8 +196,7 @@ export default function InvoiceList({
 
     const status = invoice.status;
     const isPaid = invoice.paid_at !== null;
-    const daysOverdue =
-      status === "overdue" ? getDaysOverdue(invoice.due_date) : 0;
+    const daysOverdue = status === "overdue" ? getDaysOverdue(invoice.due_date) : 0;
 
     // Format status display
     const statusDisplay =
@@ -225,12 +212,8 @@ export default function InvoiceList({
           </Badge>
         )}
         <Badge variant={variants[status] || "default"}>{statusDisplay}</Badge>
-        {isPaid && (
-          <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Paid" />
-        )}
-        {status === "overdue" && daysOverdue > 0 && (
-          <OverdueBadge daysOverdue={daysOverdue} />
-        )}
+        {isPaid && <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="Paid" />}
+        {status === "overdue" && daysOverdue > 0 && <OverdueBadge daysOverdue={daysOverdue} />}
       </div>
     );
   };
@@ -258,10 +241,7 @@ export default function InvoiceList({
   };
 
   const hasFilters =
-    startDate ||
-    endDate ||
-    (statusFilter && statusFilter !== "all") ||
-    searchQuery;
+    startDate || endDate || (statusFilter && statusFilter !== "all") || searchQuery;
 
   const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation(); // Prevent row click
@@ -269,7 +249,9 @@ export default function InvoiceList({
       setSendingInvoiceId(invoiceId);
       log.info("Sending invoice", { invoiceId });
 
-      await InvoiceService.updateStatus(invoiceId, "sent");
+      await InvoiceService.updateStatus(invoiceId, "sent", {
+        senderDisplayName: senderDisplayNameFromUser(user),
+      });
 
       // Refetch invoices to get updated status
       await refetch();
@@ -279,11 +261,10 @@ export default function InvoiceList({
         description: "The invoice has been emailed to the customer.",
       });
     } catch (err) {
-      log.error("Failed to send invoice", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to send invoice", { message: msg });
       toast.error("Failed to send invoice", {
-        description: err instanceof Error ? err.message : "Please try again.",
+        description: msg,
       });
     } finally {
       setSendingInvoiceId(null);
@@ -307,7 +288,9 @@ export default function InvoiceList({
       setSendingInvoiceId(invoiceToResend.id);
       log.info("Resending invoice", { invoiceId: invoiceToResend.id });
 
-      await InvoiceService.resendInvoice(invoiceToResend.id);
+      await InvoiceService.resendInvoice(invoiceToResend.id, {
+        senderDisplayName: senderDisplayNameFromUser(user),
+      });
 
       // Refetch invoices to get updated status
       await refetch();
@@ -317,11 +300,10 @@ export default function InvoiceList({
         description: "A new payment link has been generated and emailed.",
       });
     } catch (err) {
-      log.error("Failed to resend invoice", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to resend invoice", { message: msg });
       toast.error("Failed to resend invoice", {
-        description: err instanceof Error ? err.message : "Please try again.",
+        description: msg,
       });
     } finally {
       setSendingInvoiceId(null);
@@ -329,10 +311,7 @@ export default function InvoiceList({
     }
   };
 
-  const handleSendReminder = async (
-    e: React.MouseEvent,
-    invoice: InvoiceWithJobs,
-  ) => {
+  const handleSendReminder = async (e: React.MouseEvent, invoice: InvoiceWithJobs) => {
     e.stopPropagation();
 
     try {
@@ -349,21 +328,17 @@ export default function InvoiceList({
         description: `Payment reminder sent for invoice ${invoice.invoice_number}.`,
       });
     } catch (err) {
-      log.error("Failed to send invoice reminder", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to send invoice reminder", { message: msg });
       toast.error("Failed to send reminder", {
-        description: err instanceof Error ? err.message : "Please try again.",
+        description: msg,
       });
     } finally {
       setSendingReminderId(null);
     }
   };
 
-  const handleApproveInvoice = async (
-    e: React.MouseEvent,
-    invoiceId: string,
-  ) => {
+  const handleApproveInvoice = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation();
     try {
       setApprovingInvoiceId(invoiceId);
@@ -379,21 +354,17 @@ export default function InvoiceList({
         description: "Invoice is now ready to send.",
       });
     } catch (err) {
-      log.error("Failed to approve invoice", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to approve invoice", { message: msg });
       toast.error("Failed to approve invoice", {
-        description: err instanceof Error ? err.message : "Please try again.",
+        description: msg,
       });
     } finally {
       setApprovingInvoiceId(null);
     }
   };
 
-  const handleRejectInvoice = async (
-    e: React.MouseEvent,
-    invoiceId: string,
-  ) => {
+  const handleRejectInvoice = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation();
     try {
       setRejectingInvoiceId(invoiceId);
@@ -409,11 +380,10 @@ export default function InvoiceList({
         description: "Invoice has been cancelled.",
       });
     } catch (err) {
-      log.error("Failed to reject invoice", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      const msg = getInvokeErrorMessage(err);
+      log.error("Failed to reject invoice", { message: msg });
       toast.error("Failed to reject invoice", {
-        description: err instanceof Error ? err.message : "Please try again.",
+        description: msg,
       });
     } finally {
       setRejectingInvoiceId(null);
@@ -421,11 +391,9 @@ export default function InvoiceList({
   };
 
   // Bulk selection handlers
-  const pendingReviewInvoices = filteredInvoices.filter(
-    (inv) => inv.status === "pending_review",
-  );
+  const pendingReviewInvoices = filteredInvoices.filter((inv) => inv.status === "pending_review");
   const selectedPendingReview = Array.from(selectedInvoiceIds).filter((id) =>
-    pendingReviewInvoices.some((inv) => inv.id === id),
+    pendingReviewInvoices.some((inv) => inv.id === id)
   );
 
   const handleSelectAll = (checked: boolean) => {
@@ -474,15 +442,14 @@ export default function InvoiceList({
 
       if (successCount > 0) {
         toast.success(`Approved ${successCount} invoice(s)`, {
-          description:
-            errorCount > 0 ? `${errorCount} failed to approve` : undefined,
+          description: errorCount > 0 ? `${errorCount} failed to approve` : undefined,
         });
       } else if (errorCount > 0) {
         toast.error(`Failed to approve ${errorCount} invoice(s)`);
       }
     } catch (err) {
       log.error("Bulk approve failed", {
-        error: err instanceof Error ? err.message : "Unknown error",
+        message: getInvokeErrorMessage(err),
       });
       toast.error("Bulk approve failed");
     } finally {
@@ -516,15 +483,14 @@ export default function InvoiceList({
 
       if (successCount > 0) {
         toast.success(`Rejected ${successCount} invoice(s)`, {
-          description:
-            errorCount > 0 ? `${errorCount} failed to reject` : undefined,
+          description: errorCount > 0 ? `${errorCount} failed to reject` : undefined,
         });
       } else if (errorCount > 0) {
         toast.error(`Failed to reject ${errorCount} invoice(s)`);
       }
     } catch (err) {
       log.error("Bulk reject failed", {
-        error: err instanceof Error ? err.message : "Unknown error",
+        message: getInvokeErrorMessage(err),
       });
       toast.error("Bulk reject failed");
     } finally {
@@ -533,9 +499,7 @@ export default function InvoiceList({
   };
 
   if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -616,11 +580,7 @@ export default function InvoiceList({
               <Label htmlFor="show-test-invoices" className="text-sm">
                 Show test data
               </Label>
-              <Switch
-                id="show-test-invoices"
-                checked={showTests}
-                onCheckedChange={setShowTests}
-              />
+              <Switch id="show-test-invoices" checked={showTests} onCheckedChange={setShowTests} />
             </div>
           )}
         </div>
@@ -684,9 +644,7 @@ export default function InvoiceList({
                       <Checkbox
                         checked={
                           pendingReviewInvoices.length > 0 &&
-                          pendingReviewInvoices.every((inv) =>
-                            selectedInvoiceIds.has(inv.id),
-                          )
+                          pendingReviewInvoices.every((inv) => selectedInvoiceIds.has(inv.id))
                         }
                         onCheckedChange={handleSelectAll}
                         aria-label="Select all pending review invoices"
@@ -707,9 +665,7 @@ export default function InvoiceList({
                 {filteredInvoices.map((invoice) => (
                   <TableRow
                     key={invoice.id}
-                    className={
-                      onInvoiceClick ? "cursor-pointer hover:bg-muted/50" : ""
-                    }
+                    className={onInvoiceClick ? "cursor-pointer hover:bg-muted/50" : ""}
                     onClick={() => onInvoiceClick?.(invoice)}
                   >
                     {pendingReviewInvoices.length > 0 && (
@@ -726,12 +682,8 @@ export default function InvoiceList({
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="font-medium">
-                      {invoice.invoice_number}
-                    </TableCell>
-                    <TableCell>
-                      {format(new Date(invoice.created_at), "MMM d, yyyy")}
-                    </TableCell>
+                    <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                    <TableCell>{format(new Date(invoice.created_at), "MMM d, yyyy")}</TableCell>
                     <TableCell>{getJobCount(invoice)}</TableCell>
                     <TableCell className="max-w-[200px] truncate">
                       {getLocationNames(invoice)}
@@ -740,9 +692,7 @@ export default function InvoiceList({
                       ${invoice.total.toFixed(2)}
                     </TableCell>
                     <TableCell>{getStatusBadge(invoice)}</TableCell>
-                    <TableCell>
-                      {format(new Date(invoice.due_date), "MMM d, yyyy")}
-                    </TableCell>
+                    <TableCell>{format(new Date(invoice.due_date), "MMM d, yyyy")}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-2 justify-end">
                         {invoice.status === "pending_review" && (
@@ -750,9 +700,7 @@ export default function InvoiceList({
                             <Button
                               variant="default"
                               size="sm"
-                              onClick={(e) =>
-                                handleApproveInvoice(e, invoice.id)
-                              }
+                              onClick={(e) => handleApproveInvoice(e, invoice.id)}
                               disabled={
                                 approvingInvoiceId === invoice.id ||
                                 rejectingInvoiceId === invoice.id
@@ -760,16 +708,12 @@ export default function InvoiceList({
                               className="cursor-pointer"
                             >
                               <Check className="mr-1 h-3 w-3" />
-                              {approvingInvoiceId === invoice.id
-                                ? "Approving..."
-                                : "Approve"}
+                              {approvingInvoiceId === invoice.id ? "Approving..." : "Approve"}
                             </Button>
                             <Button
                               variant="destructive"
                               size="sm"
-                              onClick={(e) =>
-                                handleRejectInvoice(e, invoice.id)
-                              }
+                              onClick={(e) => handleRejectInvoice(e, invoice.id)}
                               disabled={
                                 approvingInvoiceId === invoice.id ||
                                 rejectingInvoiceId === invoice.id
@@ -777,9 +721,7 @@ export default function InvoiceList({
                               className="cursor-pointer"
                             >
                               <X className="mr-1 h-3 w-3" />
-                              {rejectingInvoiceId === invoice.id
-                                ? "Rejecting..."
-                                : "Reject"}
+                              {rejectingInvoiceId === invoice.id ? "Rejecting..." : "Reject"}
                             </Button>
                           </>
                         )}
@@ -788,21 +730,14 @@ export default function InvoiceList({
                             variant="outline"
                             size="sm"
                             onClick={(e) => handleSendInvoice(e, invoice.id)}
-                            disabled={
-                              sendingInvoiceId === invoice.id ||
-                              isTestInvoice(invoice)
-                            }
+                            disabled={sendingInvoiceId === invoice.id || isTestInvoice(invoice)}
                             className="cursor-pointer"
                             title={
-                              isTestInvoice(invoice)
-                                ? "Test invoices cannot be sent"
-                                : undefined
+                              isTestInvoice(invoice) ? "Test invoices cannot be sent" : undefined
                             }
                           >
                             <Mail className="mr-1 h-3 w-3" />
-                            {sendingInvoiceId === invoice.id
-                              ? "Sending..."
-                              : "Send"}
+                            {sendingInvoiceId === invoice.id ? "Sending..." : "Send"}
                           </Button>
                         )}
                         {invoice.status === "sent" && (
@@ -810,21 +745,14 @@ export default function InvoiceList({
                             variant="outline"
                             size="sm"
                             onClick={(e) => openResendDialog(e, invoice)}
-                            disabled={
-                              sendingInvoiceId === invoice.id ||
-                              isTestInvoice(invoice)
-                            }
+                            disabled={sendingInvoiceId === invoice.id || isTestInvoice(invoice)}
                             className="cursor-pointer"
                             title={
-                              isTestInvoice(invoice)
-                                ? "Test invoices cannot be resent"
-                                : undefined
+                              isTestInvoice(invoice) ? "Test invoices cannot be resent" : undefined
                             }
                           >
                             <RefreshCw className="mr-1 h-3 w-3" />
-                            {sendingInvoiceId === invoice.id
-                              ? "Resending..."
-                              : "Resend"}
+                            {sendingInvoiceId === invoice.id ? "Resending..." : "Resend"}
                           </Button>
                         )}
                         {invoice.status === "overdue" && (
@@ -832,10 +760,7 @@ export default function InvoiceList({
                             variant="destructive"
                             size="sm"
                             onClick={(e) => handleSendReminder(e, invoice)}
-                            disabled={
-                              sendingReminderId === invoice.id ||
-                              isTestInvoice(invoice)
-                            }
+                            disabled={sendingReminderId === invoice.id || isTestInvoice(invoice)}
                             className="cursor-pointer"
                             title={
                               isTestInvoice(invoice)
@@ -844,9 +769,7 @@ export default function InvoiceList({
                             }
                           >
                             <Bell className="mr-1 h-3 w-3" />
-                            {sendingReminderId === invoice.id
-                              ? "Sending..."
-                              : "Remind"}
+                            {sendingReminderId === invoice.id ? "Sending..." : "Remind"}
                           </Button>
                         )}
                       </div>
@@ -863,8 +786,8 @@ export default function InvoiceList({
           <div className="flex items-center justify-between pt-4">
             <p className="text-sm text-muted-foreground">
               Showing {(currentPage - 1) * pageSize + 1} to{" "}
-              {Math.min(currentPage * pageSize, pagination.total_count)} of{" "}
-              {pagination.total_count} invoices
+              {Math.min(currentPage * pageSize, pagination.total_count)} of {pagination.total_count}{" "}
+              invoices
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -881,9 +804,7 @@ export default function InvoiceList({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(pagination.total_pages, p + 1))
-                }
+                onClick={() => setCurrentPage((p) => Math.min(pagination.total_pages, p + 1))}
                 disabled={currentPage >= pagination.total_pages}
               >
                 Next
@@ -899,8 +820,8 @@ export default function InvoiceList({
           <AlertDialogHeader>
             <AlertDialogTitle>Resend Invoice?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will generate a new payment link and send the invoice again
-              to the customer. The previous payment link will no longer work.
+              This will generate a new payment link and send the invoice again to the customer. The
+              previous payment link will no longer work.
               {invoiceToResend && (
                 <span className="block mt-2 font-medium text-foreground">
                   Invoice: {invoiceToResend.invoice_number}
@@ -910,9 +831,7 @@ export default function InvoiceList({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResendConfirmed}>
-              Resend Invoice
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleResendConfirmed}>Resend Invoice</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

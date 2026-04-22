@@ -642,6 +642,21 @@ export interface InvoiceEmailData {
   total: number;
   currency: string;
   dueDate: string;
+  /** When set with pdfFilename, email uses a short personal template + PDF attachment */
+  pdfBase64?: string;
+  pdfFilename?: string;
+  /** First name for "Hello …" (e.g. from location contact) */
+  recipientGreetingName?: string | null;
+  /** Display name of the person who sent (e.g. dashboard user) */
+  senderName?: string | null;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 export interface InvoiceReminderEmailData {
@@ -795,16 +810,55 @@ export async function sendInvoiceEmail(
     });
   }
 
-  // Build email HTML
-  const invoiceUrlHtml = data.invoiceUrl
-    ? `<p><a href="${data.invoiceUrl}" style="background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">View Invoice</a></p>`
-    : "";
+  const useSimplePdfTemplate = Boolean(data.pdfBase64 && data.pdfFilename);
 
-  const paymentLinkHtml = data.paymentLinkUrl
-    ? `<p style="margin-top: 20px;"><a href="${data.paymentLinkUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">Pay Now</a></p>`
-    : "";
+  let html: string;
+  let text: string;
 
-  const html = `
+  if (useSimplePdfTemplate) {
+    const greet = data.recipientGreetingName?.trim();
+    const helloHtml = greet
+      ? `Hello ${escapeHtml(greet)},`
+      : "Hello,";
+    const helloText = greet ? `Hello ${greet},` : "Hello,";
+    const senderHtml = data.senderName?.trim()
+      ? `${escapeHtml(data.senderName.trim())}<br>${escapeHtml(data.organizationName)}`
+      : escapeHtml(data.organizationName);
+    const senderText = data.senderName?.trim()
+      ? `${data.senderName.trim()}\n${data.organizationName}`
+      : data.organizationName;
+    const paymentHtml = data.paymentLinkUrl
+      ? `<p>You can pay securely online: <a href="${data.paymentLinkUrl.replace(/"/g, "&quot;")}">Pay online</a></p>`
+      : "";
+    const paymentText = data.paymentLinkUrl
+      ? `\nPay online: ${data.paymentLinkUrl}\n`
+      : "\n";
+
+    html = `<!DOCTYPE html>
+<html>
+<body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#333">
+<p>${helloHtml}</p>
+<p>Please find attached the invoice for your records.</p>
+${paymentHtml}
+<p>Kind regards,<br>${senderHtml}</p>
+</body>
+</html>`;
+
+    text = `${helloText}
+
+Please find attached the invoice for your records.${paymentText}
+Kind regards,
+${senderText}`;
+  } else {
+    const invoiceUrlHtml = data.invoiceUrl
+      ? `<p><a href="${data.invoiceUrl}" style="background-color: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">View Invoice</a></p>`
+      : "";
+
+    const paymentLinkHtml = data.paymentLinkUrl
+      ? `<p style="margin-top: 20px;"><a href="${data.paymentLinkUrl}" style="background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">Pay Now</a></p>`
+      : "";
+
+    html = `
     <!DOCTYPE html>
     <html>
       <head>
@@ -845,18 +899,39 @@ export async function sendInvoiceEmail(
     </html>
   `;
 
+    text = `Invoice ${data.invoiceNumber} from ${data.organizationName}
+
+Please find your invoice details:
+Invoice Number: ${data.invoiceNumber}
+Total Amount: ${formattedTotal}
+Due Date: ${formattedDueDate}
+${data.invoiceUrl ? `View invoice: ${data.invoiceUrl}\n` : ""}${data.paymentLinkUrl ? `Pay online: ${data.paymentLinkUrl}\n` : ""}`;
+  }
+
   const requestBody: {
     from: string;
     to: string[];
     subject: string;
     html: string;
+    text: string;
+    attachments?: Array<{ filename: string; content: string }>;
     tags?: Array<{ name: string; value: string }>;
   } = {
     from: fromEmail,
     to: testRecipients,
     subject: emailSubject,
     html: html,
+    text: text,
   };
+
+  if (useSimplePdfTemplate) {
+    requestBody.attachments = [
+      {
+        filename: data.pdfFilename!,
+        content: data.pdfBase64!,
+      },
+    ];
+  }
 
   // Add test mode tags if in test mode
   // Use first recipient for original-recipient tag (or combine all)
@@ -869,7 +944,10 @@ export async function sendInvoiceEmail(
   }
 
   const requestBodyStr = JSON.stringify(requestBody);
-  if (requestBodyStr.includes(":null") || requestBodyStr.includes("null,")) {
+  if (
+    !useSimplePdfTemplate &&
+    (requestBodyStr.includes(":null") || requestBodyStr.includes("null,"))
+  ) {
     logger.error("Request body contains null values");
     const error = "Request contains null values";
     if (throwOnError) {

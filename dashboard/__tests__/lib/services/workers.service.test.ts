@@ -45,12 +45,9 @@ describe("WorkersService", () => {
       expect(result.success).toBe(true);
       expect(result.workers).toEqual(mockWorkers);
       expect(result.locations).toEqual(mockLocations);
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "list-workers-and-locations",
-        {
-          body: { organization_id: "org-1" },
-        }
-      );
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("list-workers-and-locations", {
+        body: { organization_id: "org-1" },
+      });
     });
 
     it("should throw error when Supabase returns error", async () => {
@@ -98,22 +95,27 @@ describe("WorkersService", () => {
     it("should return created worker on success", async () => {
       const mockWorker = createMockWorker();
       vi.mocked(supabase.functions.invoke).mockResolvedValue({
-        data: { worker: mockWorker },
+        data: { worker: mockWorker, email_sent: true },
         error: null,
       });
 
       const result = await WorkersService.create({
         organization_id: "org-1",
-        name: "John Doe",
+        first_name: "John",
+        last_name: "Doe",
         email: "john@example.com",
         phone: "1234567890",
       });
 
-      expect(result).toEqual(mockWorker);
+      expect(result).toEqual({
+        worker: mockWorker,
+        emailSent: true,
+      });
       expect(supabase.functions.invoke).toHaveBeenCalledWith("create-worker", {
         body: {
           organization_id: "org-1",
-          name: "John Doe",
+          first_name: "John",
+          last_name: "Doe",
           email: "john@example.com",
           phone: "1234567890",
         },
@@ -130,7 +132,8 @@ describe("WorkersService", () => {
       await expect(
         WorkersService.create({
           organization_id: "org-1",
-          name: "John Doe",
+          first_name: "John",
+          last_name: "Doe",
           email: "john@example.com",
           phone: "1234567890",
         })
@@ -146,7 +149,8 @@ describe("WorkersService", () => {
       await expect(
         WorkersService.create({
           organization_id: "org-1",
-          name: "John Doe",
+          first_name: "John",
+          last_name: "Doe",
           email: "john@example.com",
           phone: "1234567890",
         })
@@ -227,9 +231,7 @@ describe("WorkersService", () => {
         error: mockError,
       });
 
-      await expect(
-        WorkersService.delete({ id: "worker-1" }),
-      ).rejects.toMatchObject(mockError);
+      await expect(WorkersService.delete({ id: "worker-1" })).rejects.toMatchObject(mockError);
     });
   });
 });

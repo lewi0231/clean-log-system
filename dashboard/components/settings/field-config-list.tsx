@@ -1,29 +1,12 @@
 "use client";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import {
-  FieldConfig,
-  FieldType,
-  ValidationRules,
-} from "@clean-log/shared/types";
+import { FieldConfig, FieldType, ValidationRules } from "@clean-log/shared/types";
 import {
   closestCenter,
   DndContext,
@@ -82,14 +65,9 @@ function SortableFieldConfigItem({
 }: SortableFieldConfigItemProps & {
   locationRestrictions?: string[];
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: fieldConfig.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: fieldConfig.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -114,9 +92,7 @@ function SortableFieldConfigItem({
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <CardTitle className="text-lg">{fieldConfig.label}</CardTitle>
                   <Badge variant="secondary">{fieldConfig.field_type}</Badge>
-                  {fieldConfig.required && (
-                    <Badge variant="outline">Required</Badge>
-                  )}
+                  {fieldConfig.required && <Badge variant="outline">Required</Badge>}
                   {fieldConfig.mutually_exclusive_group && (
                     <Badge variant="default" className="bg-blue-600">
                       Group: {fieldConfig.mutually_exclusive_group}
@@ -139,25 +115,18 @@ function SortableFieldConfigItem({
                   )}
                   {fieldConfig.field_type === "select" &&
                     fieldConfig.validation_rules?.allow_multiple && (
-                      <Badge
-                        variant="outline"
-                        className="text-primary border-primary/40"
-                      >
+                      <Badge variant="outline" className="text-primary border-primary/40">
                         Multiple
                       </Badge>
                     )}
                 </div>
                 {fieldConfig.description && (
-                  <CardDescription className="mb-2">
-                    {fieldConfig.description}
-                  </CardDescription>
+                  <CardDescription className="mb-2">{fieldConfig.description}</CardDescription>
                 )}
                 <div className="text-sm text-muted-foreground">
                   <span className="font-mono text-xs">{fieldConfig.name}</span>
                   {fieldConfig.options && fieldConfig.options.length > 0 && (
-                    <span className="ml-4">
-                      Options: {fieldConfig.options.join(", ")}
-                    </span>
+                    <span className="ml-4">Options: {fieldConfig.options.join(", ")}</span>
                   )}
                 </div>
               </div>
@@ -167,6 +136,7 @@ function SortableFieldConfigItem({
                 variant="ghost"
                 size="icon"
                 onClick={() => onEdit(fieldConfig)}
+                className="cursor-pointer"
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -174,6 +144,7 @@ function SortableFieldConfigItem({
                 variant="ghost"
                 size="icon"
                 onClick={() => onDelete(fieldConfig)}
+                className="cursor-pointer"
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
@@ -194,14 +165,12 @@ export default function FieldConfigList({
   onReorderFieldConfigs,
   organizationId,
 }: FieldConfigListProps) {
-  const [editingFieldConfig, setEditingFieldConfig] =
-    useState<FieldConfig | null>(null);
+  const [editingFieldConfig, setEditingFieldConfig] = useState<FieldConfig | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [deletingFieldConfig, setDeletingFieldConfig] =
-    useState<FieldConfig | null>(null);
-  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<
-    Record<string, string[]>
-  >({});
+  const [deletingFieldConfig, setDeletingFieldConfig] = useState<FieldConfig | null>(null);
+  const [locationRestrictionsMap, setLocationRestrictionsMap] = useState<Record<string, string[]>>(
+    {}
+  );
 
   // Fetch location restrictions for all field configs
   useEffect(() => {
@@ -209,25 +178,19 @@ export default function FieldConfigList({
 
     async function fetchLocationRestrictions() {
       try {
-        const { data, error } = await supabase.functions.invoke(
-          "list-field-configs",
-          {
-            body: {
-              organization_id: organizationId,
-              include_location_restrictions: true,
-            },
-          }
-        );
+        const { data, error } = await supabase.functions.invoke("list-field-configs", {
+          body: {
+            organization_id: organizationId,
+            include_location_restrictions: true,
+          },
+        });
 
         if (error) throw error;
 
         const restrictionsMap: Record<string, string[]> = {};
         (data?.field_configs || []).forEach(
           (fc: FieldConfig & { location_restrictions?: string[] }) => {
-            if (
-              fc.location_restrictions &&
-              fc.location_restrictions.length > 0
-            ) {
+            if (fc.location_restrictions && fc.location_restrictions.length > 0) {
               restrictionsMap[fc.id] = fc.location_restrictions;
             }
           }
@@ -235,7 +198,7 @@ export default function FieldConfigList({
 
         setLocationRestrictionsMap(restrictionsMap);
       } catch (err) {
-        console.error("Failed to fetch location restrictions", err);
+        log.error("Failed to fetch location restrictions", err);
       }
     }
 
@@ -299,15 +262,11 @@ export default function FieldConfigList({
   };
 
   if (loading) {
-    return (
-      <div className="text-center py-8">Loading field configurations...</div>
-    );
+    return <div className="text-center py-8">Loading field configurations...</div>;
   }
 
   if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -316,17 +275,11 @@ export default function FieldConfigList({
         <Card>
           <CardHeader>
             <CardTitle>No Field Configurations</CardTitle>
-            <CardDescription>
-              Add your first field configuration to get started.
-            </CardDescription>
+            <CardDescription>Add your first field configuration to get started.</CardDescription>
           </CardHeader>
         </Card>
       ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext
             items={fieldConfigs.map((fc) => fc.id)}
             strategy={verticalListSortingStrategy}
@@ -359,33 +312,21 @@ export default function FieldConfigList({
         organizationId={organizationId}
       />
 
-      <AlertDialog
+      <ConfirmDestructiveDialog
         open={!!deletingFieldConfig}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingFieldConfig(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              field configuration &quot;{deletingFieldConfig?.label}&quot;.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        description={
+          <>
+            This action cannot be undone. This will permanently delete the field configuration
+            &quot;{deletingFieldConfig?.label}&quot;.
+          </>
+        }
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

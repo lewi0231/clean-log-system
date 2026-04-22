@@ -92,11 +92,20 @@ serve(async (req) => {
     }
 
     // Extract job IDs from invoice_job relationships
+    // PostgREST may return `job` as an object or a single-element array — handle both
     const jobIds: string[] = [];
     if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
       for (const invoiceJob of invoice.invoice_job) {
-        if (invoiceJob.job?.id) {
-          jobIds.push(invoiceJob.job.id);
+        const jobRaw = invoiceJob.job as unknown;
+        const job = Array.isArray(jobRaw) ? jobRaw[0] : jobRaw;
+        if (
+          job &&
+          typeof job === "object" &&
+          job !== null &&
+          "id" in job &&
+          typeof (job as { id: unknown }).id === "string"
+        ) {
+          jobIds.push((job as { id: string }).id);
         }
       }
     }

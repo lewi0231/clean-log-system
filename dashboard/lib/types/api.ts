@@ -20,6 +20,13 @@ export interface CreateWorkerRequest {
   phone: string;
 }
 
+/** Result of create-worker edge function (includes email delivery flags). */
+export interface CreateWorkerResult {
+  worker: Worker;
+  emailSent: boolean;
+  emailError?: string;
+}
+
 export interface UpdateWorkerRequest {
   id: string;
   first_name?: string;

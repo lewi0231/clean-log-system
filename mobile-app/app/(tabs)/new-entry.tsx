@@ -186,9 +186,10 @@ export default function NewEntryScreen() {
   };
 
   const filteredColleagues = useMemo(() => {
-    if (!currentUserColleagueId) return colleagues;
-    return colleagues.filter(
-      (colleague) => colleague.id !== currentUserColleagueId
+    const activeOnly = colleagues.filter((c) => c.active === true);
+    if (!currentUserColleagueId) return activeOnly;
+    return activeOnly.filter(
+      (colleague) => colleague.id !== currentUserColleagueId,
     );
   }, [colleagues, currentUserColleagueId]);
 

@@ -2,7 +2,10 @@ import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createNotification } from "../_utils/notifications.ts";
 import { createLogger } from "../_utils/logger.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
+import {
+  createServiceRoleClient,
+  getAuthUserByEmail,
+} from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 serve(async (req) => {
@@ -50,7 +53,7 @@ serve(async (req) => {
         return errorResponse("Invitation already used", 400);
       }
 
-      // Step 2: Create Supabase Auth user
+      // Step 2: Create or link Supabase Auth user (duplicate email if worker was removed but auth remained)
       const { data: authData, error: authError } = await supabase.auth.admin
         .createUser({
           email: invitation.worker_email,
@@ -63,8 +66,74 @@ serve(async (req) => {
           },
         });
 
+      let authUserId: string;
+
       if (authError) {
-        return errorResponse(`Auth error: ${authError.message}`, 400);
+        const msg = (authError.message ?? "").toLowerCase();
+        const looksLikeDuplicate =
+          msg.includes("already") ||
+          msg.includes("registered") ||
+          msg.includes("exists") ||
+          msg.includes("duplicate");
+
+        if (!looksLikeDuplicate) {
+          return errorResponse(`Auth error: ${authError.message}`, 400);
+        }
+
+        const { data: existingWrap, error: lookupErr } = await getAuthUserByEmail(
+          supabase,
+          invitation.worker_email,
+        );
+        const existing = existingWrap?.user as
+          | {
+              id: string;
+              user_metadata?: Record<string, unknown>;
+            }
+          | null
+          | undefined;
+        if (lookupErr || !existing?.id) {
+          return errorResponse(`Auth error: ${authError.message}`, 400);
+        }
+
+        const meta = (existing.user_metadata ?? {}) as Record<string, unknown>;
+        const role = meta.role;
+        if (role && role !== "worker") {
+          return errorResponse(
+            "This email is already registered with a different account type.",
+            400,
+          );
+        }
+        const existingOrg = meta.organization_id as string | undefined;
+        if (
+          existingOrg &&
+          existingOrg !== invitation.organization_id
+        ) {
+          return errorResponse(
+            "This email is already linked to another organization.",
+            400,
+          );
+        }
+
+        const { error: updErr } = await supabase.auth.admin.updateUserById(
+          existing.id,
+          {
+            password,
+            email_confirm: true,
+            user_metadata: {
+              role: "worker",
+              organization_id: invitation.organization_id,
+              worker_id: invitation.worker.id,
+            },
+          },
+        );
+        if (updErr) {
+          return errorResponse(`Auth error: ${updErr.message}`, 400);
+        }
+        authUserId = existing.id;
+      } else if (!authData.user) {
+        return errorResponse("Auth error: user not returned", 500);
+      } else {
+        authUserId = authData.user.id;
       }
 
       // Step 3: Update worker with auth_user_id, address, abn, and set active to true
@@ -72,7 +141,7 @@ serve(async (req) => {
       const { error: updateError } = await supabase
         .from("worker")
         .update({
-          auth_user_id: authData.user.id,
+          auth_user_id: authUserId,
           address: address,
           abn: abn,
           active: true,
@@ -89,7 +158,7 @@ serve(async (req) => {
         .from("worker_invitation")
         .update({
           accepted_at: new Date().toISOString(),
-          auth_user_id: authData.user.id,
+          auth_user_id: authUserId,
         })
         .eq("id", invitation_token);
 
@@ -130,8 +199,8 @@ serve(async (req) => {
         success: true,
         message: "Account created successfully",
         user: {
-          id: authData.user.id,
-          email: authData.user.email,
+          id: authUserId,
+          email: invitation.worker_email,
         },
       });
     } catch (error) {

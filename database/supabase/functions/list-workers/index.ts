@@ -25,6 +25,7 @@ serve(async (req) => {
       .from("worker")
       .select("*")
       .eq("organization_id", organization_id)
+      .eq("active", true)
       .order("created_at", { ascending: false });
 
     if (workersError) throw workersError;

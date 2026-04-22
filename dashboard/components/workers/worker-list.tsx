@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog";
 import {
   Table,
   TableBody,
@@ -19,12 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { log } from "@/lib/logger";
 import { Worker } from "@/lib/types";
 import { Mail, Pencil, Trash2 } from "lucide-react";
@@ -93,9 +89,7 @@ export default function WorkerList({
         error: err instanceof Error ? err.message : "Unknown error",
       });
       toast.error(
-        `Failed to resend invitation: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`,
+        `Failed to resend invitation: ${err instanceof Error ? err.message : "Unknown error"}`
       );
     } finally {
       setIsResending(false);
@@ -122,9 +116,7 @@ export default function WorkerList({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -180,31 +172,25 @@ export default function WorkerList({
                   </TableCell>
                   <TableCell>{worker.email || "-"}</TableCell>
                   <TableCell>{worker.phone || "-"}</TableCell>
-                  <TableCell>
-                    {new Date(worker.created_at).toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{new Date(worker.created_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <TooltipProvider>
                       <div className="flex justify-end gap-2">
-                        {!worker.active &&
-                          !worker.auth_user_id &&
-                          onResendInvitation && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setResendingWorker(worker)}
-                                  className="cursor-pointer"
-                                >
-                                  <Mail className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Resend invitation email
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
+                        {!worker.active && !worker.auth_user_id && onResendInvitation && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setResendingWorker(worker)}
+                                className="cursor-pointer"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Resend invitation email</TooltipContent>
+                          </Tooltip>
+                        )}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -253,33 +239,21 @@ export default function WorkerList({
         worker={editingWorker}
       />
 
-      <AlertDialog
+      <ConfirmDestructiveDialog
         open={!!deletingWorker}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingWorker(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              worker &quot;{deletingWorker?.name}&quot;.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        description={
+          <>
+            This action cannot be undone. This will permanently delete the worker &quot;
+            {deletingWorker?.name}&quot;.
+          </>
+        }
+        onConfirm={handleDelete}
+      />
 
       <AlertDialog
         open={!!resendingWorker}
@@ -293,16 +267,18 @@ export default function WorkerList({
           <AlertDialogHeader>
             <AlertDialogTitle>Resend Invitation Email</AlertDialogTitle>
             <AlertDialogDescription>
-              Send a new invitation email to &quot;{resendingWorker?.name}&quot;
-              ({resendingWorker?.email})? They will receive a link to set up
-              their account.
+              Send a new invitation email to &quot;{resendingWorker?.name}&quot; (
+              {resendingWorker?.email})? They will receive a link to set up their account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isResending} className="cursor-pointer">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleResendInvitation}
               disabled={isResending}
+              className="cursor-pointer"
             >
               {isResending ? "Sending..." : "Resend Email"}
             </AlertDialogAction>

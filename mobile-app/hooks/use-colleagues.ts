@@ -33,7 +33,10 @@ export function useColleagues(organizationId: string | null) {
         });
 
         if (data?.workers) {
-          setColleagues(data.workers);
+          // Only active workers should appear as colleagues on jobs (defense in depth)
+          setColleagues(
+            (data.workers as Worker[]).filter((w) => w.active === true),
+          );
         }
       } catch (err) {
         console.error("Workers: Failed to fetch", {

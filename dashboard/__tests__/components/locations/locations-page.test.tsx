@@ -16,9 +16,7 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
@@ -34,9 +32,7 @@ vi.mock("next/navigation", () => ({
 
 // Mock tour components
 vi.mock("@/components/tours/page-tour-wrapper", () => ({
-  PageTourWrapper: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
+  PageTourWrapper: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("@/components/tours/tour-trigger-button", () => ({
@@ -98,11 +94,7 @@ describe("LocationsPage", () => {
       render(<LocationsPage />, { wrapper: createWrapper() });
 
       expect(screen.getByText("Locations")).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          /Manage your organization's locations and location hierarchy/
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Manage customer sites and optional hierarchy/)).toBeInTheDocument();
     });
 
     it("should render loading state when organization is loading", () => {
@@ -125,9 +117,7 @@ describe("LocationsPage", () => {
 
       render(<LocationsPage />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByText("Failed to load organization")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Failed to load organization")).toBeInTheDocument();
     });
 
     it("should render error state when organization ID is missing", () => {
@@ -145,12 +135,8 @@ describe("LocationsPage", () => {
     it("should render locations tab by default", () => {
       render(<LocationsPage />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByRole("tab", { name: /customer locations/i })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("tab", { name: /location hierarchy/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /customer locations/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /location hierarchy/i })).toBeInTheDocument();
     });
   });
 
@@ -164,18 +150,14 @@ describe("LocationsPage", () => {
       fireEvent.click(hierarchyTab);
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Location Hierarchy")
-        ).toBeInTheDocument();
+        expect(screen.getByText("Location Hierarchy")).toBeInTheDocument();
       });
     });
 
     it("should display Customer Locations tab content", () => {
       render(<LocationsPage />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByRole("tab", { name: /customer locations/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /customer locations/i })).toBeInTheDocument();
     });
   });
 
@@ -247,9 +229,7 @@ describe("LocationsPage", () => {
 
       // Find and click edit button
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       if (editButton) {
         fireEvent.click(editButton);
@@ -288,9 +268,7 @@ describe("LocationsPage", () => {
 
       // Find and click delete button
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       if (deleteButton) {
         fireEvent.click(deleteButton);
@@ -336,9 +314,7 @@ describe("LocationsPage", () => {
       render(<LocationsPage />, { wrapper: createWrapper() });
 
       expect(
-        screen.getByText(
-          "No locations found. Add your first location to get started."
-        )
+        screen.getByText("No locations found. Add your first location to get started.")
       ).toBeInTheDocument();
     });
 
@@ -351,9 +327,7 @@ describe("LocationsPage", () => {
       render(<LocationsPage />, { wrapper: createWrapper() });
 
       // Should show skeleton
-      expect(
-        screen.queryByText("No locations found")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("No locations found")).not.toBeInTheDocument();
     });
 
     it("should display error state", () => {
@@ -364,9 +338,7 @@ describe("LocationsPage", () => {
 
       render(<LocationsPage />, { wrapper: createWrapper() });
 
-      expect(
-        screen.getByText("Error: Failed to load locations")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Error: Failed to load locations")).toBeInTheDocument();
     });
   });
 
@@ -380,9 +352,7 @@ describe("LocationsPage", () => {
       fireEvent.click(hierarchyTab);
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Location Hierarchy")
-        ).toBeInTheDocument();
+        expect(screen.getByText("Location Hierarchy")).toBeInTheDocument();
       });
     });
   });

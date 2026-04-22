@@ -18,7 +18,10 @@
     "test:coverage": "vitest run --coverage",
     "test:coverage:watch": "vitest --coverage",
     "stripe:webhook:listen": "stripe listen --forward-to http://localhost:54321/functions/v1/stripe-webhook",
-    "test:integration:with-webhook": "bash scripts/test-integration-with-webhook.sh"
+    "test:integration:with-webhook": "bash scripts/test-integration-with-webhook.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@clean-log/shared": "workspace:*",
@@ -41,6 +44,7 @@
     "@radix-ui/react-switch": "^1.1.1",
     "@radix-ui/react-tabs": "^1.1.13",
     "@radix-ui/react-tooltip": "^1.1.4",
+    "@sentry/nextjs": "^10.48.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
     "@tanstack/react-query": "^5.90.12",
@@ -75,6 +79,8 @@
     "baseline-browser-mapping": "^2.9.11",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "prettier": "^3.5.0",
     "jsdom": "24.1.3",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",

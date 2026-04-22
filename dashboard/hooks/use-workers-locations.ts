@@ -6,7 +6,6 @@ import { workersLocationsKey } from "@/app/query-provider";
 import { WorkersService } from "@/lib/services";
 import type { ListWorkersAndLocationsResponse } from "@/lib/types/api";
 import useOrganization from "./useOrganization";
-import { useRealtimeWorkers } from "./use-realtime-workers";
 
 async function fetchWorkersAndLocations(
   organizationId: string
@@ -20,8 +19,9 @@ export function useWorkersAndLocations() {
   const { organizationId } = useOrganization();
   const queryClient = useQueryClient();
 
-  // Subscribe to real-time worker changes (auto-invalidates cache)
-  useRealtimeWorkers(organizationId);
+  // Realtime: `RealtimeSubscriptions` in the dashboard layout mounts `useRealtimeWorkers`
+  // once for the whole app — do not subscribe again here (duplicate channels / missed refetches).
+  // `refetchOnWindowFocus` and `refetchOnReconnect` handle browser-level refresh when Realtime drops.
 
   const query = useQuery({
     queryKey: workersLocationsKey(organizationId),
@@ -33,6 +33,8 @@ export function useWorkersAndLocations() {
     }),
     // Keep previous data to avoid loading flicker on org switches
     placeholderData: (previous) => previous,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const invalidateCache = () => {

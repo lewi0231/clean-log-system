@@ -14,9 +14,11 @@ import {
 } from "../_utils/http.ts";
 import {
   getInvoiceEmailRecipients,
+  greetingFirstNameFromJobContexts,
   type InvoiceEmailRecipientConfig,
   type JobContext,
 } from "../_utils/invoice-email.ts";
+import { generateInvoicePdfBase64 } from "../_utils/invoice-pdf.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createStripeClient } from "../_utils/stripe.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -178,8 +180,9 @@ serve(async (req: Request) => {
         | "overdue"
         | "cancelled";
       resend?: boolean;
+      sender_display_name?: string;
     };
-    const { invoice_id, status, resend = false } = body;
+    const { invoice_id, status, resend = false, sender_display_name } = body;
 
     const supabase = createServiceRoleClient();
     const now = new Date();
@@ -387,12 +390,27 @@ serve(async (req: Request) => {
         logger,
       );
 
-      // Determine the base URL for the invoice view
-      const baseUrl = Deno.env.get("NEXT_PUBLIC_APP_URL") ||
-        "http://localhost:3000";
-      const invoiceUrl = `${baseUrl}/invoice/${invoice.id}`;
+      let pdfAttachment: { base64: string; filename: string };
+      try {
+        const pdf = await generateInvoicePdfBase64(
+          supabase,
+          invoice_id,
+          invoice.organization_id,
+        );
+        pdfAttachment = { base64: pdf.base64, filename: pdf.filename };
+      } catch (pdfErr) {
+        logger.error("Failed to generate invoice PDF", pdfErr, {
+          invoice_id,
+        });
+        return errorResponse(
+          "Failed to generate invoice PDF for attachment. Please try again.",
+          500,
+        );
+      }
 
-      // Send invoice email with payment link
+      const greetingName = greetingFirstNameFromJobContexts(jobContexts);
+
+      // Send invoice email with PDF attachment and optional payment link
       const emailData: InvoiceEmailData = {
         invoiceNumber: invoice.invoice_number,
         organizationName,
@@ -400,8 +418,11 @@ serve(async (req: Request) => {
         total: invoice.total,
         currency: invoice.currency || "AUD",
         dueDate: invoice.due_date,
-        invoiceUrl: invoiceUrl,
         paymentLinkUrl: paymentLinkUrl || undefined,
+        pdfBase64: pdfAttachment.base64,
+        pdfFilename: pdfAttachment.filename,
+        recipientGreetingName: greetingName,
+        senderName: sender_display_name?.trim() || undefined,
       };
 
       logger.info("Sending invoice email", {
@@ -461,6 +482,34 @@ serve(async (req: Request) => {
 
       if (updateError) throw updateError;
 
+      // JSON.stringify omits keys whose value is undefined — if updatedInvoice is null
+      // without updateError (edge case), the client would get { success: true } without
+      // `invoice` and InvoiceService would throw. Refetch or fail explicitly.
+      let invoiceAfterSend = updatedInvoice;
+      if (!invoiceAfterSend) {
+        logger.warn(
+          "update-invoice-status: update returned no row without error; refetching",
+          { invoice_id },
+        );
+        const { data: refetched, error: refetchError } = await supabase
+          .from("invoice")
+          .select("*")
+          .eq("id", invoice_id)
+          .single();
+        if (refetchError || !refetched) {
+          logger.error(
+            "update-invoice-status: could not load invoice after send",
+            refetchError ?? new Error("no row"),
+            { invoice_id },
+          );
+          return errorResponse(
+            "Invoice email was sent but the invoice record could not be reloaded. Please refresh the page.",
+            500,
+          );
+        }
+        invoiceAfterSend = refetched;
+      }
+
       // Mark outbox as succeeded (best-effort)
       if (outbox?.id) {
         await supabase
@@ -479,7 +528,7 @@ serve(async (req: Request) => {
       return jsonResponse({
         success: true,
         message: `Invoice sent successfully to: ${emailRecipients.join(", ")}`,
-        invoice: updatedInvoice,
+        invoice: invoiceAfterSend,
         emailSent: true,
         recipients: emailRecipients,
         paymentLinkIncluded: !!paymentLinkUrl,

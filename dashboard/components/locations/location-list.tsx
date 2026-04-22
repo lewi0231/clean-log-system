@@ -1,16 +1,7 @@
 "use client";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDestructiveDialog } from "@/components/ui/confirm-destructive-dialog";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import {
   Table,
@@ -44,7 +35,7 @@ interface LocationListProps {
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
       fixed_price_currency?: string | null;
-    },
+    }
   ) => Promise<void>;
 }
 
@@ -57,9 +48,7 @@ export default function LocationList({
 }: LocationListProps) {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [deletingLocation, setDeletingLocation] = useState<Location | null>(
-    null,
-  );
+  const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
 
   const handleEdit = (location: Location) => {
     setEditingLocation(location);
@@ -86,7 +75,7 @@ export default function LocationList({
       fixed_worker_payment?: number | null;
       fixed_price_currency?: string | null;
     },
-    locationId?: string,
+    locationId?: string
   ) => {
     if (locationId && editingLocation) {
       await onUpdateLocation(locationId, locationData);
@@ -98,9 +87,7 @@ export default function LocationList({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {error}</div>;
   }
 
   return (
@@ -128,10 +115,7 @@ export default function LocationList({
               </TableRow>
             ) : (
               locations.map((location) => (
-                <TableRow
-                  key={location.id}
-                  className="group hover:bg-muted/50 transition-colors"
-                >
+                <TableRow key={location.id} className="group hover:bg-muted/50 transition-colors">
                   <TableCell className="font-medium">{location.name}</TableCell>
                   <TableCell>
                     <span
@@ -161,9 +145,7 @@ export default function LocationList({
                   <TableCell>{location.email}</TableCell>
                   <TableCell>{location.address || "-"}</TableCell>
                   <TableCell>{location.contact_person || "-"}</TableCell>
-                  <TableCell className="text-center">
-                    {location.phone || "-"}
-                  </TableCell>
+                  <TableCell className="text-center">{location.phone || "-"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                       <Button
@@ -205,35 +187,21 @@ export default function LocationList({
         location={editingLocation}
       />
 
-      <AlertDialog
+      <ConfirmDestructiveDialog
         open={!!deletingLocation}
         onOpenChange={(open) => {
           if (!open) {
             setDeletingLocation(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              location &quot;{deletingLocation?.name}&quot;.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="cursor-pointer">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        description={
+          <>
+            This action cannot be undone. This will permanently delete the location &quot;
+            {deletingLocation?.name}&quot;.
+          </>
+        }
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

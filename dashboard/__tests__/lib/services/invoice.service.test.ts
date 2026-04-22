@@ -61,15 +61,12 @@ describe("InvoiceService", () => {
       });
 
       expect(result).toEqual(mockCalculation);
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "calculate-invoice",
-        {
-          body: {
-            organization_id: "org-1",
-            job_ids: ["job-1"],
-          },
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("calculate-invoice", {
+        body: {
+          organization_id: "org-1",
+          job_ids: ["job-1"],
         },
-      );
+      });
     });
 
     it("should throw error when Supabase returns error", async () => {
@@ -83,13 +80,13 @@ describe("InvoiceService", () => {
         InvoiceService.calculate({
           organization_id: "org-1",
           job_ids: ["job-1"],
-        }),
+        })
       ).rejects.toBeInstanceOf(EdgeFunctionError);
       await expect(
         InvoiceService.calculate({
           organization_id: "org-1",
           job_ids: ["job-1"],
-        }),
+        })
       ).rejects.toThrow("Network error");
     });
 
@@ -103,7 +100,7 @@ describe("InvoiceService", () => {
         InvoiceService.calculate({
           organization_id: "org-1",
           job_ids: ["job-1"],
-        }),
+        })
       ).rejects.toThrow("Failed to calculate invoice");
     });
 
@@ -117,7 +114,7 @@ describe("InvoiceService", () => {
         InvoiceService.calculate({
           organization_id: "org-1",
           job_ids: ["job-1"],
-        }),
+        })
       ).rejects.toThrow("Failed to calculate invoice");
     });
   });
@@ -149,16 +146,13 @@ describe("InvoiceService", () => {
       });
 
       expect(result).toEqual(mockInvoice);
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "create-invoice",
-        {
-          body: {
-            organization_id: "org-1",
-            job_ids: ["job-1"],
-            due_date: "2024-02-01",
-          },
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("create-invoice", {
+        body: {
+          organization_id: "org-1",
+          job_ids: ["job-1"],
+          due_date: "2024-02-01",
         },
-      );
+      });
     });
 
     it("should throw error when Supabase returns error", async () => {
@@ -173,14 +167,14 @@ describe("InvoiceService", () => {
           organization_id: "org-1",
           job_ids: ["job-1"],
           due_date: "2024-02-01",
-        }),
+        })
       ).rejects.toBeInstanceOf(EdgeFunctionError);
       await expect(
         InvoiceService.create({
           organization_id: "org-1",
           job_ids: ["job-1"],
           due_date: "2024-02-01",
-        }),
+        })
       ).rejects.toThrow("Network error");
     });
 
@@ -195,7 +189,7 @@ describe("InvoiceService", () => {
           organization_id: "org-1",
           job_ids: ["job-1"],
           due_date: "2024-02-01",
-        }),
+        })
       ).rejects.toThrow("Failed to create invoice");
     });
   });
@@ -280,12 +274,12 @@ describe("InvoiceService", () => {
       await expect(
         InvoiceService.list({
           organization_id: "org-1",
-        }),
+        })
       ).rejects.toBeInstanceOf(EdgeFunctionError);
       await expect(
         InvoiceService.list({
           organization_id: "org-1",
-        }),
+        })
       ).rejects.toThrow("Network error");
     });
 
@@ -298,7 +292,7 @@ describe("InvoiceService", () => {
       await expect(
         InvoiceService.list({
           organization_id: "org-1",
-        }),
+        })
       ).rejects.toThrow("Failed to list invoices");
     });
   });
@@ -340,14 +334,11 @@ describe("InvoiceService", () => {
         calculation: mockCalculation,
         template_config: undefined,
       });
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "get-invoice-details",
-        {
-          body: {
-            invoice_id: "inv-1",
-          },
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("get-invoice-details", {
+        body: {
+          invoice_id: "inv-1",
         },
-      );
+      });
     });
 
     it("should throw error when Supabase returns error", async () => {
@@ -357,12 +348,10 @@ describe("InvoiceService", () => {
         error: mockError,
       });
 
-      await expect(
-        InvoiceService.getInvoiceDetails("inv-1"),
-      ).rejects.toBeInstanceOf(EdgeFunctionError);
-      await expect(InvoiceService.getInvoiceDetails("inv-1")).rejects.toThrow(
-        "Network error",
+      await expect(InvoiceService.getInvoiceDetails("inv-1")).rejects.toBeInstanceOf(
+        EdgeFunctionError
       );
+      await expect(InvoiceService.getInvoiceDetails("inv-1")).rejects.toThrow("Network error");
     });
 
     it("should throw error when invoice or calculation is missing", async () => {
@@ -371,9 +360,9 @@ describe("InvoiceService", () => {
         error: null,
       });
 
-      await expect(
-        InvoiceService.getInvoiceDetails("inv-1"),
-      ).rejects.toThrow("Failed to get invoice details");
+      await expect(InvoiceService.getInvoiceDetails("inv-1")).rejects.toThrow(
+        "Failed to get invoice details"
+      );
     });
   });
 
@@ -400,15 +389,44 @@ describe("InvoiceService", () => {
       const result = await InvoiceService.updateStatus("inv-1", "sent");
 
       expect(result).toEqual(mockInvoice);
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "update-invoice-status",
-        {
-          body: {
-            invoice_id: "inv-1",
-            status: "sent",
-          },
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("update-invoice-status", {
+        body: {
+          invoice_id: "inv-1",
+          status: "sent",
         },
-      );
+      });
+    });
+
+    it("should pass sender_display_name when provided", async () => {
+      const mockInvoice = {
+        id: "inv-1",
+        organization_id: "org-1",
+        invoice_number: "INV-001",
+        status: "sent",
+        total: 1000,
+        currency: "AUD",
+        jobs: [],
+      };
+
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
+        data: {
+          success: true,
+          invoice: mockInvoice,
+        },
+        error: null,
+      });
+
+      await InvoiceService.updateStatus("inv-1", "sent", {
+        senderDisplayName: "Jane Admin",
+      });
+
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("update-invoice-status", {
+        body: {
+          invoice_id: "inv-1",
+          status: "sent",
+          sender_display_name: "Jane Admin",
+        },
+      });
     });
 
     it("should throw error when Supabase returns error", async () => {
@@ -418,12 +436,10 @@ describe("InvoiceService", () => {
         error: mockError,
       });
 
-      await expect(
-        InvoiceService.updateStatus("inv-1", "paid"),
-      ).rejects.toBeInstanceOf(EdgeFunctionError);
-      await expect(
-        InvoiceService.updateStatus("inv-1", "paid"),
-      ).rejects.toThrow("Network error");
+      await expect(InvoiceService.updateStatus("inv-1", "paid")).rejects.toBeInstanceOf(
+        EdgeFunctionError
+      );
+      await expect(InvoiceService.updateStatus("inv-1", "paid")).rejects.toThrow("Network error");
     });
 
     it("should throw error when invoice is missing", async () => {
@@ -432,9 +448,9 @@ describe("InvoiceService", () => {
         error: null,
       });
 
-      await expect(
-        InvoiceService.updateStatus("inv-1", "paid"),
-      ).rejects.toThrow("Failed to update invoice status");
+      await expect(InvoiceService.updateStatus("inv-1", "paid")).rejects.toThrow(
+        "Failed to update invoice status"
+      );
     });
   });
 
@@ -461,16 +477,13 @@ describe("InvoiceService", () => {
       const result = await InvoiceService.resendInvoice("inv-1");
 
       expect(result).toEqual(mockInvoice);
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "update-invoice-status",
-        {
-          body: {
-            invoice_id: "inv-1",
-            status: "sent",
-            resend: true,
-          },
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("update-invoice-status", {
+        body: {
+          invoice_id: "inv-1",
+          status: "sent",
+          resend: true,
         },
-      );
+      });
     });
 
     it("should throw error when Supabase returns error", async () => {
@@ -480,13 +493,8 @@ describe("InvoiceService", () => {
         error: mockError,
       });
 
-      await expect(InvoiceService.resendInvoice("inv-1")).rejects
-        .toBeInstanceOf(
-          EdgeFunctionError,
-        );
-      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toThrow(
-        "Network error",
-      );
+      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toBeInstanceOf(EdgeFunctionError);
+      await expect(InvoiceService.resendInvoice("inv-1")).rejects.toThrow("Network error");
     });
 
     it("should throw error when invoice is missing", async () => {
@@ -496,7 +504,7 @@ describe("InvoiceService", () => {
       });
 
       await expect(InvoiceService.resendInvoice("inv-1")).rejects.toThrow(
-        "Failed to resend invoice",
+        "Failed to resend invoice"
       );
     });
   });
