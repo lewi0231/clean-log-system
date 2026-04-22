@@ -9,6 +9,10 @@ import {
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
+import {
+  computePoolSplitEffectives,
+  splitPoolToShares,
+} from "../_utils/worker-payment-split.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
 // Reuse types from calculate-invoice but adapt for worker payments
@@ -58,6 +62,8 @@ interface WorkerPaymentCalculation {
   total_adjustments: number;
   total_worker_payment: number;
   worker_splits?: WorkerPaymentSplit[];
+  /** Populated when split logic needs admin attention (e.g. mixed job_worker times). */
+  calculation_warnings?: string[];
 }
 
 type FieldConfig = {
@@ -141,10 +147,17 @@ type LocationContext = {
   depthMap: Map<string, number>;
 };
 
+type RateCardModifierType =
+  | "per_unit"
+  | "flat"
+  | "multiplier"
+  | "team_percentage"
+  | "split_weight";
+
 type WorkerRateCard = {
   id: string;
   worker_id: string;
-  modifier_type: "per_unit" | "flat" | "multiplier" | "team_percentage";
+  modifier_type: RateCardModifierType;
   modifier_value: number;
   currency: string;
   role_title: string | null;
@@ -153,16 +166,6 @@ type WorkerRateCard = {
   is_active: boolean;
   // Joined field mappings (for per_unit type)
   field_config_ids?: string[];
-};
-
-type WorkerPaymentAllocation = {
-  id: string;
-  job_id: string;
-  worker_id: string;
-  allocation_type: "percentage" | "amount" | "hours";
-  percentage: number | null;
-  fixed_amount: number | null;
-  hours_worked: number | null;
 };
 
 type JobWorker = {
@@ -176,6 +179,55 @@ type JobWorker = {
     last_name: string;
   };
 };
+
+function buildWorkerRateCardMultiMap(
+  rateCards: unknown[] | null | undefined,
+  logger: ReturnType<typeof createLogger>,
+): Map<string, Map<RateCardModifierType, WorkerRateCard>> {
+  const root = new Map<string, Map<RateCardModifierType, WorkerRateCard>>();
+  for (const raw of rateCards || []) {
+    const row = raw as Record<string, unknown> & {
+      worker_rate_card_field?: { field_config_id: string }[] | null;
+    };
+    const fieldMappings = row.worker_rate_card_field;
+    const rateCard: WorkerRateCard = {
+      id: row.id as string,
+      worker_id: row.worker_id as string,
+      modifier_type: row.modifier_type as RateCardModifierType,
+      modifier_value: Number(row.modifier_value),
+      currency: row.currency as string,
+      role_title: row.role_title as string | null,
+      effective_from: row.effective_from as string,
+      effective_to: row.effective_to as string | null,
+      is_active: row.is_active as boolean,
+      field_config_ids:
+        fieldMappings?.map((f) => f.field_config_id) ?? [],
+    };
+    const workerId = rateCard.worker_id;
+    const mType = rateCard.modifier_type;
+    let inner = root.get(workerId);
+    if (!inner) {
+      inner = new Map();
+      root.set(workerId, inner);
+    }
+    if (inner.has(mType)) {
+      logger.warn(
+        "Duplicate active rate card row for worker and modifier_type; using last fetched row",
+        { worker_id: workerId, modifier_type: mType },
+      );
+    }
+    inner.set(mType, rateCard);
+  }
+  return root;
+}
+
+function getWorkerRateCard(
+  map: Map<string, Map<RateCardModifierType, WorkerRateCard>>,
+  workerId: string,
+  type: RateCardModifierType,
+): WorkerRateCard | undefined {
+  return map.get(workerId)?.get(type);
+}
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -383,46 +435,7 @@ serve(async (req) => {
       });
     }
 
-    // Map rate cards by worker_id, extracting field_config_ids for per_unit types
-    const rateCardMap = new Map<string, WorkerRateCard>();
-    (rateCards || []).forEach((card) => {
-      const fieldMappings = card.worker_rate_card_field as
-        | { field_config_id: string }[]
-        | null;
-      const rateCard: WorkerRateCard = {
-        id: card.id,
-        worker_id: card.worker_id,
-        modifier_type: card.modifier_type,
-        modifier_value: card.modifier_value,
-        currency: card.currency,
-        role_title: card.role_title,
-        effective_from: card.effective_from,
-        effective_to: card.effective_to,
-        is_active: card.is_active,
-        field_config_ids: fieldMappings?.map((f) => f.field_config_id) || [],
-      };
-      rateCardMap.set(card.worker_id, rateCard);
-    });
-
-    // Fetch custom allocations for the jobs
-    const { data: allocations, error: allocationsError } = await supabase
-      .from("worker_payment_allocation")
-      .select("*")
-      .eq("organization_id", organization_id)
-      .in("job_id", job_ids);
-
-    if (allocationsError) {
-      logger.warn("Failed to fetch allocations, proceeding without", {
-        error: allocationsError.message,
-      });
-    }
-
-    const allocationsByJob = new Map<string, WorkerPaymentAllocation[]>();
-    (allocations || []).forEach((alloc) => {
-      const jobAllocs = allocationsByJob.get(alloc.job_id) || [];
-      jobAllocs.push(alloc as WorkerPaymentAllocation);
-      allocationsByJob.set(alloc.job_id, jobAllocs);
-    });
+    const rateCardMap = buildWorkerRateCardMultiMap(rateCards, logger);
 
     // Fetch job workers for split calculations (including time tracking)
     const { data: jobWorkers, error: jobWorkersError } = await supabase
@@ -459,18 +472,20 @@ serve(async (req) => {
 
       // Calculate worker splits with additive bonuses
       const workers = workersByJob.get(job.id) || [];
-      const jobAllocations = allocationsByJob.get(job.id) || [];
 
       if (workers.length > 0) {
-        calculation.worker_splits = calculateWorkerSplits({
+        const { splits, warnings } = calculateWorkerSplits({
           baseWorkerPayment: calculation.total_worker_payment,
           workers,
           rateCardMap,
-          allocations: jobAllocations,
           submissionData: (job.submission_data as Record<string, unknown>) ||
             {},
           fieldConfigMap,
         });
+        calculation.worker_splits = splits;
+        if (warnings.length > 0) {
+          calculation.calculation_warnings = warnings;
+        }
 
         // Update total_worker_payment to include additive bonuses
         const totalBonuses = calculation.worker_splits.reduce(
@@ -1266,42 +1281,36 @@ function evaluateCondition(
 }
 
 /**
- * Calculate how to split the total payment among workers.
+ * Worker payment split pipeline (S2 §5):
+ * 1. Base pool: hours × split_weight (with S1 §2.2 fallbacks) → time_share; optional warnings
+ * 2. Multiplier on time_share
+ * 3. per_unit, flat, team_percentage (additive)
+ * 4. final_payment = time_share + bonuses (excludes multiplier_adjustment — same as prior behavior)
  *
- * New model with ADDITIVE bonuses:
- * 1. Time-based split: Base worker payment is split by hours worked
- * 2. Multipliers: Applied to worker's time-share (increases their portion)
- * 3. Per-unit bonuses: Added ON TOP of time share (not deducted from pool)
- * 4. Flat bonuses: Added ON TOP of time share (not deducted from pool)
- * 5. Team percentage bonuses: Percentage of other workers' time-shares (after multipliers)
- *
- * Bonuses are ADDITIVE - they increase total payout, not redistribute existing pool.
- * This honors the pricing rules (workers receive what's defined per unit).
+ * Bonuses are ADDITIVE — they increase total payout vs pricing pool.
  */
 function calculateWorkerSplits({
   baseWorkerPayment,
   workers,
   rateCardMap,
-  allocations: _allocations, // Reserved for future custom allocation support
   submissionData,
   fieldConfigMap,
 }: {
   baseWorkerPayment: number;
   workers: JobWorker[];
-  rateCardMap: Map<string, WorkerRateCard>;
-  allocations: WorkerPaymentAllocation[];
+  rateCardMap: Map<string, Map<RateCardModifierType, WorkerRateCard>>;
   submissionData: Record<string, unknown>;
   fieldConfigMap: Map<string, FieldConfig>;
-}): WorkerPaymentSplit[] {
-  if (workers.length === 0) return [];
+}): { splits: WorkerPaymentSplit[]; warnings: string[] } {
+  if (workers.length === 0) return { splits: [], warnings: [] };
 
-  // Initialize breakdown for each worker
+  const warnings: string[] = [];
+
   const breakdowns: WorkerPaymentSplit[] = workers.map((worker) => {
     const workerName = worker.worker
       ? `${worker.worker.first_name} ${worker.worker.last_name}`.trim()
       : "Unknown";
 
-    // Calculate hours worked from time tracking
     let hoursWorked = 0;
     if (worker.start_time && worker.end_time) {
       const start = new Date(worker.start_time);
@@ -1326,37 +1335,52 @@ function calculateWorkerSplits({
     };
   });
 
-  // Single worker gets full base payment (no need to split)
   if (workers.length === 1) {
     breakdowns[0].time_share = baseWorkerPayment;
     breakdowns[0].allocation_type = "single_worker";
+    const sw = getWorkerRateCard(rateCardMap, breakdowns[0].worker_id, "split_weight");
+    if (sw) breakdowns[0].rate_card_id = sw.id;
   } else {
-    // Step 1: Time-based split of the FULL base worker payment
-    const totalHours = breakdowns.reduce((sum, b) => sum + b.hours_worked, 0);
+    const hours = breakdowns.map((b) => b.hours_worked);
+    const weights = workers.map((w) => {
+      const card = getWorkerRateCard(rateCardMap, w.worker_id, "split_weight");
+      return card?.modifier_value ?? 1.0;
+    });
 
-    if (totalHours > 0) {
-      // Proportional split by hours worked
-      breakdowns.forEach((breakdown) => {
-        breakdown.time_share = Math.round(
-          ((breakdown.hours_worked / totalHours) * baseWorkerPayment) * 100,
-        ) / 100;
-        breakdown.allocation_type = "time_based";
-      });
-    } else {
-      // Fallback: equal split if no time tracking data
-      const equalShare =
-        Math.round((baseWorkerPayment / workers.length) * 100) / 100;
-      breakdowns.forEach((breakdown) => {
-        breakdown.time_share = equalShare;
-        breakdown.allocation_type = "equal_split";
-      });
+    const { effectives, warnings: splitWarnings, allocationType } =
+      computePoolSplitEffectives(
+        hours,
+        weights,
+      );
+    warnings.push(...splitWarnings);
+
+    let allocationTag = allocationType;
+    let effectivesForPool = effectives;
+    const sumEff = effectives.reduce((a, b) => a + b, 0);
+    if (sumEff <= 0 || !Number.isFinite(sumEff)) {
+      effectivesForPool = workers.map(() => 1);
+      allocationTag = "equal_split";
     }
+
+    const shares = splitPoolToShares(baseWorkerPayment, effectivesForPool);
+    breakdowns.forEach((b, i) => {
+      b.time_share = Math.round(shares[i] * 100) / 100;
+      b.allocation_type = allocationTag;
+    });
+
+    breakdowns.forEach((b) => {
+      const sw = getWorkerRateCard(rateCardMap, b.worker_id, "split_weight");
+      if (sw) b.rate_card_id = sw.id;
+    });
   }
 
-  // Step 2: Apply multipliers to time-share (increases their portion)
   breakdowns.forEach((breakdown) => {
-    const rateCard = rateCardMap.get(breakdown.worker_id);
-    if (rateCard?.modifier_type === "multiplier") {
+    const rateCard = getWorkerRateCard(
+      rateCardMap,
+      breakdown.worker_id,
+      "multiplier",
+    );
+    if (rateCard) {
       const originalShare = breakdown.time_share;
       breakdown.time_share =
         Math.round(originalShare * rateCard.modifier_value * 100) / 100;
@@ -1366,16 +1390,18 @@ function calculateWorkerSplits({
     }
   });
 
-  // Step 3: Calculate ADDITIVE per-unit bonuses (on top of share)
   breakdowns.forEach((breakdown) => {
-    const rateCard = rateCardMap.get(breakdown.worker_id);
-    if (rateCard?.modifier_type === "per_unit" && rateCard.field_config_ids) {
+    const rateCard = getWorkerRateCard(
+      rateCardMap,
+      breakdown.worker_id,
+      "per_unit",
+    );
+    if (rateCard?.field_config_ids?.length) {
       let bonus = 0;
       rateCard.field_config_ids.forEach((fieldConfigId) => {
         const fieldConfig = fieldConfigMap.get(fieldConfigId);
         if (fieldConfig) {
           const fieldValue = submissionData[fieldConfig.name];
-          // Get numeric value from field (could be number, array length, etc.)
           const count = getNumericFieldValue(fieldValue);
           bonus += count * rateCard.modifier_value;
         }
@@ -1385,33 +1411,31 @@ function calculateWorkerSplits({
     }
   });
 
-  // Step 4: Calculate ADDITIVE flat bonuses (on top of share)
   breakdowns.forEach((breakdown) => {
-    const rateCard = rateCardMap.get(breakdown.worker_id);
-    if (rateCard?.modifier_type === "flat") {
+    const rateCard = getWorkerRateCard(rateCardMap, breakdown.worker_id, "flat");
+    if (rateCard) {
       breakdown.flat_bonus = rateCard.modifier_value;
       breakdown.rate_card_id = rateCard.id;
     }
   });
 
-  // Step 5: Calculate ADDITIVE team percentage bonuses
-  // This is calculated as a percentage of OTHER workers' time-shares (after multipliers)
   breakdowns.forEach((breakdown) => {
-    const rateCard = rateCardMap.get(breakdown.worker_id);
-    if (rateCard?.modifier_type === "team_percentage") {
-      // Sum of all other workers' time-shares (excluding this worker)
+    const rateCard = getWorkerRateCard(
+      rateCardMap,
+      breakdown.worker_id,
+      "team_percentage",
+    );
+    if (rateCard) {
       const teamEarnings = breakdowns
         .filter((b) => b.worker_id !== breakdown.worker_id)
         .reduce((sum, b) => sum + b.time_share, 0);
 
-      // modifier_value is a percentage (e.g., 10 for 10%)
       breakdown.team_percentage_bonus =
         Math.round(teamEarnings * (rateCard.modifier_value / 100) * 100) / 100;
       breakdown.rate_card_id = rateCard.id;
     }
   });
 
-  // Step 6: Calculate final payments (share + all bonuses)
   breakdowns.forEach((breakdown) => {
     breakdown.final_payment = Math.round(
       (breakdown.time_share +
@@ -1422,7 +1446,7 @@ function calculateWorkerSplits({
     ) / 100;
   });
 
-  return breakdowns;
+  return { splits: breakdowns, warnings };
 }
 
 /**

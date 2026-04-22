@@ -347,6 +347,8 @@ export const updateInvoiceStatusSchema = z.object({
     "cancelled",
   ]),
   resend: z.boolean().optional(),
+  /** Display name of the user sending the invoice (shown in email sign-off) */
+  sender_display_name: z.string().max(200).optional(),
 });
 
 /**
@@ -405,12 +407,14 @@ export const deleteTestDataSchema = z
  * - flat: Fixed bonus per job (e.g., $20/job)
  * - multiplier: Percentage boost to time-share (e.g., 1.2 = 20% more)
  * - team_percentage: Percentage of other team members' earnings (e.g., 10% of team wages)
+ * - split_weight: Relative share of the worker payment pool (used with hours × weight)
  */
 export const modifierTypeSchema = z.enum([
   "per_unit",
   "flat",
   "multiplier",
   "team_percentage",
+  "split_weight",
 ]);
 
 /**

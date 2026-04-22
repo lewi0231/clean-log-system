@@ -18,7 +18,12 @@ import {
   validateRequest,
 } from "../_utils/zod-schemas.ts";
 
-type ModifierType = "per_unit" | "flat" | "multiplier" | "team_percentage";
+type ModifierType =
+  | "per_unit"
+  | "flat"
+  | "multiplier"
+  | "team_percentage"
+  | "split_weight";
 
 interface CreateRateCardRequest {
   action: "create";
@@ -192,6 +197,42 @@ serve(async (req: Request) => {
           );
         }
 
+        if (
+          createReq.field_config_ids &&
+          createReq.field_config_ids.length > 0 &&
+          createReq.modifier_type !== "per_unit"
+        ) {
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Invalid Request",
+              status: 400,
+              detail:
+                "field_config_ids are only allowed for per_unit modifier type",
+            },
+            400,
+            {},
+            correlationId,
+          );
+        }
+
+        if (
+          createReq.modifier_type === "split_weight" &&
+          createReq.modifier_value > 10
+        ) {
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Validation Failed",
+              status: 400,
+              detail: "Split weight must be 10 or less",
+            },
+            400,
+            {},
+            correlationId,
+          );
+        }
+
         // Create rate card
         const { data: rateCard, error: createError } = await supabase
           .from("worker_rate_card")
@@ -286,7 +327,7 @@ serve(async (req: Request) => {
         // Verify rate card belongs to organization
         const { data: existing, error: fetchError } = await supabase
           .from("worker_rate_card")
-          .select("id")
+          .select("id, modifier_type, modifier_value")
           .eq("id", updateReq.id)
           .eq("organization_id", organization_id)
           .single();
@@ -300,6 +341,48 @@ serve(async (req: Request) => {
               detail: "Rate card not found or access denied",
             },
             404,
+            {},
+            correlationId,
+          );
+        }
+
+        const effectiveModifier: ModifierType =
+          updateReq.modifier_type ??
+          (existing.modifier_type as ModifierType);
+        const effectiveValue =
+          updateReq.modifier_value ?? Number(existing.modifier_value);
+
+        if (
+          effectiveModifier === "split_weight" &&
+          effectiveValue > 10
+        ) {
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Validation Failed",
+              status: 400,
+              detail: "Split weight must be 10 or less",
+            },
+            400,
+            {},
+            correlationId,
+          );
+        }
+
+        if (
+          updateReq.field_config_ids !== undefined &&
+          updateReq.field_config_ids.length > 0 &&
+          effectiveModifier !== "per_unit"
+        ) {
+          return errorResponse(
+            {
+              type: "about:blank",
+              title: "Invalid Request",
+              status: 400,
+              detail:
+                "field_config_ids are only allowed for per_unit modifier type",
+            },
+            400,
             {},
             correlationId,
           );

@@ -1,5 +1,11 @@
 # Worker Payment Split Strategies
 
+## Status (2026-04)
+
+**Implemented:** Relative **split weights** (`modifier_type: split_weight`) with **hours × weight** pool splitting, mixed-time fallbacks, and **multi-card** rate lookup — see staged specs: [S0](../stages/S0-worker-payment-split-weights.md) → [S3](../stages/S3-worker-payment-split-weights.md). **`worker_payment_allocation`** remains schema-only until a later phase.
+
+---
+
 ## Overview
 
 This document outlines proposed solutions for handling worker payment allocation when multiple workers are assigned to the same job, supporting different payment scenarios based on worker roles, experience levels, and work allocation.
@@ -334,10 +340,7 @@ function calculateWorkerPaymentSplit(
 
     case "rate_based":
       // Split based on hourly rates (proportional)
-      const totalRate = Array.from(strategy.rates?.values() || []).reduce(
-        (a, b) => a + b,
-        0
-      );
+      const totalRate = Array.from(strategy.rates?.values() || []).reduce((a, b) => a + b, 0);
       strategy.rates?.forEach((rate, workerId) => {
         payments.set(workerId, (jobTotal * rate) / totalRate);
       });
@@ -345,10 +348,7 @@ function calculateWorkerPaymentSplit(
 
     case "hours_based":
       // Split based on hours worked
-      const totalHours = Array.from(strategy.hours?.values() || []).reduce(
-        (a, b) => a + b,
-        0
-      );
+      const totalHours = Array.from(strategy.hours?.values() || []).reduce((a, b) => a + b, 0);
       strategy.hours?.forEach((hours, workerId) => {
         payments.set(workerId, (jobTotal * hours) / totalHours);
       });
@@ -388,14 +388,12 @@ function calculateWorkerPaymentSplit(
 ## Testing Considerations
 
 1. **Edge Cases**:
-
    - Single worker (should get 100%)
    - Zero allocation (should be prevented)
    - Negative percentages (should be prevented)
    - Percentages > 100% (should be prevented)
 
 2. **Integration Tests**:
-
    - Payment calculation with rate cards
    - Payment calculation with percentage allocations
    - Payment calculation with mixed strategies

@@ -6,7 +6,7 @@
 
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 
-export type ModifierType = "per_unit" | "flat" | "multiplier" | "team_percentage";
+export type ModifierType = "per_unit" | "flat" | "multiplier" | "team_percentage" | "split_weight";
 
 export interface WorkerRateCard {
   id: string;
@@ -83,18 +83,11 @@ export class WorkerRateCardService {
    * Get rate cards for a specific worker
    * Note: Uses list and filters client-side for now
    */
-  static async getForWorker(
-    organizationId: string,
-    workerId: string
-  ): Promise<WorkerRateCard[]> {
+  static async getForWorker(organizationId: string, workerId: string): Promise<WorkerRateCard[]> {
     const allCards = await this.list(organizationId);
     return allCards
       .filter((card) => card.worker_id === workerId)
-      .sort(
-        (a, b) =>
-          new Date(b.effective_from).getTime() -
-          new Date(a.effective_from).getTime()
-      );
+      .sort((a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime());
   }
 
   /**

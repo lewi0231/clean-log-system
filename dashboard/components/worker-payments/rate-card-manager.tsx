@@ -2,19 +2,9 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -81,34 +71,28 @@ const modifierTypeLabels: Record<ModifierType, string> = {
   flat: "Flat Bonus",
   multiplier: "Multiplier",
   team_percentage: "Team Percentage",
+  split_weight: "Split Weight (pool share)",
 };
 
 const modifierTypeDescriptions: Record<ModifierType, string> = {
-  per_unit:
-    "Bonus per unit of output (e.g., $0.50 per car). Added on top of time share.",
+  per_unit: "Bonus per unit of output (e.g., $0.50 per car). Added on top of time share.",
   flat: "Fixed bonus per job (e.g., $20). Added on top of time share.",
-  multiplier:
-    "Multiplies the worker's time-share (e.g., 1.2 = 20% more of the base payment).",
+  multiplier: "Multiplies the worker's time-share (e.g., 1.2 = 20% more of the base payment).",
   team_percentage:
     "Percentage of other team members' earnings (e.g., 10% of team wages). Great for supervisors/team leads.",
+  split_weight:
+    "Relative share of the job worker payment pool. Default is 1.0 (full share). With clock times, pay splits by hours × weight (e.g. 0.6 for a trainee).",
 };
 
 interface RateCardManagerProps {
   fieldConfigs: FieldConfig[];
 }
 
-export default function RateCardManager({
-  fieldConfigs,
-}: RateCardManagerProps) {
+export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) {
   const { formatCurrency } = useOrganizationCurrency();
   const { workers } = useWorkers();
-  const {
-    rateCards,
-    loading,
-    createRateCard,
-    updateRateCard,
-    deactivateRateCard,
-  } = useWorkerRateCards();
+  const { rateCards, loading, createRateCard, updateRateCard, deactivateRateCard } =
+    useWorkerRateCards();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WorkerRateCard | null>(null);
@@ -156,11 +140,13 @@ export default function RateCardManager({
       return;
     }
 
+    if (formData.modifier_type === "split_weight" && modifierValue > 10) {
+      toast.error("Split weight must be 10 or less");
+      return;
+    }
+
     // Validate per_unit type has at least one field selected
-    if (
-      formData.modifier_type === "per_unit" &&
-      formData.field_config_ids.length === 0
-    ) {
+    if (formData.modifier_type === "per_unit" && formData.field_config_ids.length === 0) {
       toast.error("Please select at least one field for per-unit bonus");
       return;
     }
@@ -176,10 +162,7 @@ export default function RateCardManager({
           effective_to: formData.effective_to || null,
           role_title: formData.role_title || null,
           notes: formData.notes || null,
-          field_config_ids:
-            formData.modifier_type === "per_unit"
-              ? formData.field_config_ids
-              : [],
+          field_config_ids: formData.modifier_type === "per_unit" ? formData.field_config_ids : [],
         });
         toast.success("Rate card updated");
       } else {
@@ -191,10 +174,7 @@ export default function RateCardManager({
           effective_to: formData.effective_to || null,
           role_title: formData.role_title || null,
           notes: formData.notes || null,
-          field_config_ids:
-            formData.modifier_type === "per_unit"
-              ? formData.field_config_ids
-              : [],
+          field_config_ids: formData.modifier_type === "per_unit" ? formData.field_config_ids : [],
         });
         toast.success("Rate card created");
       }
@@ -202,9 +182,7 @@ export default function RateCardManager({
       setFormData(emptyFormData);
       setEditingCard(null);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save rate card"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to save rate card");
     } finally {
       setSaving(false);
     }
@@ -223,11 +201,7 @@ export default function RateCardManager({
       await deactivateRateCard(card.id);
       toast.success("Rate card deactivated");
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to deactivate rate card"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to deactivate rate card");
     }
   };
 
@@ -255,6 +229,9 @@ export default function RateCardManager({
     if (card.modifier_type === "team_percentage") {
       return `${card.modifier_value}%`;
     }
+    if (card.modifier_type === "split_weight") {
+      return `${card.modifier_value}`;
+    }
     return `${formatCurrency(card.modifier_value)}`;
   };
 
@@ -272,6 +249,8 @@ export default function RateCardManager({
       }
       case "team_percentage":
         return `${card.modifier_value}% of team earnings`;
+      case "split_weight":
+        return `Weight ${card.modifier_value} (1.0 = full share)`;
       default:
         return "";
     }
@@ -279,74 +258,72 @@ export default function RateCardManager({
 
   return (
     <>
-
-<div className="flex justify-between">
-      {/* Info Banner - Collapsible */}
-      <Collapsible open={isInfoOpen} onOpenChange={setIsInfoOpen}>
-        <Card className="mb-2 bg-muted/50">
-          <CollapsibleTrigger asChild>
-            <CardContent className=" cursor-pointer hover:bg-muted/70 transition-colors min-w-[700px]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex gap-3 flex-1">
-                  <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+      <div className="flex justify-between">
+        {/* Info Banner - Collapsible */}
+        <Collapsible open={isInfoOpen} onOpenChange={setIsInfoOpen}>
+          <Card className="mb-2 bg-muted/50">
+            <CollapsibleTrigger asChild>
+              <CardContent className=" cursor-pointer hover:bg-muted/70 transition-colors min-w-[700px]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex gap-3 flex-1">
+                    <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">How Rate Cards Work</p>
+                      {!isInfoOpen && (
+                        <p className="text-xs mt-0.5">
+                          Rate cards define additive bonuses for workers
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+                      isInfoOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </div>
+              </CardContent>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0 pb-6">
+                <div className="flex gap-3 pl-8">
                   <div className="text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">
-                      How Rate Cards Work
+                    <p className="mb-2">
+                      Rate cards define <strong>additive bonuses</strong> for workers. When a job is
+                      completed:
                     </p>
-                    {!isInfoOpen && (
-                      <p className="text-xs mt-0.5">
-                        Rate cards define additive bonuses for workers
-                      </p>
-                    )}
+                    <ol className="list-decimal ml-4 space-y-1">
+                      <li>
+                        The base worker payment (from pricing rules) is split using{" "}
+                        <strong>hours × split weight</strong> when everyone has clock times (weights
+                        default to 1.0)
+                      </li>
+                      <li>
+                        <strong>Multipliers</strong> increase a worker&apos;s time share (e.g., 1.2x
+                        = 20% more)
+                      </li>
+                      <li>
+                        <strong>Per-unit</strong> and <strong>flat bonuses</strong> are added on top
+                        (not deducted from pool)
+                      </li>
+                      <li>
+                        <strong>Team percentage</strong> bonuses give supervisors a percentage of
+                        other workers&apos; earnings
+                      </li>
+                    </ol>
                   </div>
                 </div>
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
-                    isInfoOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </div>
-            </CardContent>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0 pb-6">
-              <div className="flex gap-3 pl-8">
-                <div className="text-sm text-muted-foreground">
-                  <p className="mb-2">
-                    Rate cards define <strong>additive bonuses</strong> for
-                    workers. When a job is completed:
-                  </p>
-                  <ol className="list-decimal ml-4 space-y-1">
-                    <li>
-                      The base worker payment (from pricing rules) is split among
-                      workers based on <strong>time worked</strong>
-                    </li>
-                    <li>
-                      <strong>Multipliers</strong> increase a worker&apos;s time
-                      share (e.g., 1.2x = 20% more)
-                    </li>
-                    <li>
-                      <strong>Per-unit</strong> and <strong>flat bonuses</strong>{" "}
-                      are added on top (not deducted from pool)
-                    </li>
-                    <li>
-                      <strong>Team percentage</strong> bonuses give supervisors a
-                      percentage of other workers&apos; earnings
-                    </li>
-                  </ol>
-                </div>
-              </div>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex-1" />
-        <Button onClick={handleOpenCreate}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Rate Card
-        </Button>
-      </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex-1" />
+          <Button onClick={handleOpenCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Rate Card
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -358,9 +335,7 @@ export default function RateCardManager({
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-8 text-center text-muted-foreground">
-              Loading rate cards...
-            </div>
+            <div className="py-8 text-center text-muted-foreground">Loading rate cards...</div>
           ) : activeRateCards.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground">
               <p>No rate cards configured yet.</p>
@@ -391,21 +366,15 @@ export default function RateCardManager({
                     </TableCell>
                     <TableCell>{card.role_title || "-"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">
-                        {modifierTypeLabels[card.modifier_type]}
-                      </Badge>
+                      <Badge variant="outline">{modifierTypeLabels[card.modifier_type]}</Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="font-mono">
-                        {formatModifierValue(card)}
-                      </div>
+                      <div className="font-mono">{formatModifierValue(card)}</div>
                       <div className="text-xs text-muted-foreground">
                         {getModifierDescription(card)}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {format(new Date(card.effective_from), "MMM d, yyyy")}
-                    </TableCell>
+                    <TableCell>{format(new Date(card.effective_from), "MMM d, yyyy")}</TableCell>
                     <TableCell>
                       {card.effective_to
                         ? format(new Date(card.effective_to), "MMM d, yyyy")
@@ -413,18 +382,10 @@ export default function RateCardManager({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenEdit(card)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(card)}>
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeactivate(card)}
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleDeactivate(card)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -440,9 +401,7 @@ export default function RateCardManager({
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingCard ? "Edit Rate Card" : "Create Rate Card"}
-            </DialogTitle>
+            <DialogTitle>{editingCard ? "Edit Rate Card" : "Create Rate Card"}</DialogTitle>
             <DialogDescription>
               {editingCard
                 ? "Update the rate card details below."
@@ -457,9 +416,7 @@ export default function RateCardManager({
               </Label>
               <Select
                 value={formData.worker_id}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, worker_id: value })
-                }
+                onValueChange={(value) => setFormData({ ...formData, worker_id: value })}
                 disabled={!!editingCard}
               >
                 <SelectTrigger id="worker">
@@ -485,8 +442,7 @@ export default function RateCardManager({
                   setFormData({
                     ...formData,
                     modifier_type: value as ModifierType,
-                    field_config_ids:
-                      value !== "per_unit" ? [] : formData.field_config_ids,
+                    field_config_ids: value !== "per_unit" ? [] : formData.field_config_ids,
                   })
                 }
               >
@@ -495,15 +451,12 @@ export default function RateCardManager({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="flat">Flat Bonus (per job)</SelectItem>
-                  <SelectItem value="per_unit">
-                    Per Unit Bonus (per output)
-                  </SelectItem>
-                  <SelectItem value="multiplier">
-                    Multiplier (time share)
-                  </SelectItem>
+                  <SelectItem value="per_unit">Per Unit Bonus (per output)</SelectItem>
+                  <SelectItem value="multiplier">Multiplier (time share)</SelectItem>
                   <SelectItem value="team_percentage">
                     Team Percentage (supervisor bonus)
                   </SelectItem>
+                  <SelectItem value="split_weight">Split weight (pool share)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
@@ -517,7 +470,9 @@ export default function RateCardManager({
                   ? "Multiplier"
                   : formData.modifier_type === "team_percentage"
                     ? "Percentage"
-                    : "Amount"}{" "}
+                    : formData.modifier_type === "split_weight"
+                      ? "Relative weight"
+                      : "Amount"}{" "}
                 <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -536,12 +491,12 @@ export default function RateCardManager({
                     ? "1.2"
                     : formData.modifier_type === "team_percentage"
                       ? "10"
-                      : "0.00"
+                      : formData.modifier_type === "split_weight"
+                        ? "1.0"
+                        : "0.00"
                 }
                 value={formData.modifier_value}
-                onChange={(e) =>
-                  setFormData({ ...formData, modifier_value: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, modifier_value: e.target.value })}
               />
               {formData.modifier_type === "multiplier" && (
                 <p className="text-xs text-muted-foreground">
@@ -553,42 +508,35 @@ export default function RateCardManager({
                   10 = 10% of team earnings (excluding this worker)
                 </p>
               )}
+              {formData.modifier_type === "split_weight" && (
+                <p className="text-xs text-muted-foreground">
+                  1.0 = full share of the pool; 0.6 ≈ 60% of a full slot. Max 10.
+                </p>
+              )}
             </div>
 
             {/* Field selection for per_unit type */}
             {formData.modifier_type === "per_unit" && (
               <div className="space-y-2">
                 <Label>
-                  Applies to Fields{" "}
-                  <span className="text-destructive">*</span>
+                  Applies to Fields <span className="text-destructive">*</span>
                 </Label>
                 <p className="text-xs text-muted-foreground mb-2">
                   Select which fields this per-unit bonus applies to
                 </p>
                 <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
                   {numericFieldConfigs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No numeric fields configured
-                    </p>
+                    <p className="text-sm text-muted-foreground">No numeric fields configured</p>
                   ) : (
                     numericFieldConfigs.map((fc) => (
-                      <div
-                        key={fc.id}
-                        className="flex items-center space-x-2"
-                      >
+                      <div key={fc.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`field-${fc.id}`}
                           checked={formData.field_config_ids.includes(fc.id)}
                           onCheckedChange={() => toggleFieldConfig(fc.id)}
                         />
-                        <label
-                          htmlFor={`field-${fc.id}`}
-                          className="text-sm cursor-pointer"
-                        >
-                          {fc.label}{" "}
-                          <span className="text-muted-foreground">
-                            ({fc.name})
-                          </span>
+                        <label htmlFor={`field-${fc.id}`} className="text-sm cursor-pointer">
+                          {fc.label} <span className="text-muted-foreground">({fc.name})</span>
                         </label>
                       </div>
                     ))
@@ -603,9 +551,7 @@ export default function RateCardManager({
                 id="role-title"
                 placeholder="e.g., Supervisor, Senior Technician"
                 value={formData.role_title}
-                onChange={(e) =>
-                  setFormData({ ...formData, role_title: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, role_title: e.target.value })}
               />
             </div>
 
@@ -616,9 +562,7 @@ export default function RateCardManager({
                   id="effective-from"
                   type="date"
                   value={formData.effective_from}
-                  onChange={(e) =>
-                    setFormData({ ...formData, effective_from: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, effective_from: e.target.value })}
                 />
               </div>
 
@@ -628,13 +572,9 @@ export default function RateCardManager({
                   id="effective-to"
                   type="date"
                   value={formData.effective_to}
-                  onChange={(e) =>
-                    setFormData({ ...formData, effective_to: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, effective_to: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Leave blank for no end date
-                </p>
+                <p className="text-xs text-muted-foreground">Leave blank for no end date</p>
               </div>
             </div>
 
@@ -644,20 +584,14 @@ export default function RateCardManager({
                 id="notes"
                 placeholder="Additional notes..."
                 value={formData.notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={2}
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-              disabled={saving}
-            >
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>

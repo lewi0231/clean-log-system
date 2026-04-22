@@ -1,12 +1,10 @@
 "use client";
 
 import { PricingScopeProvider } from "@/components/pricing/pricing-scope-context";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
-import {
-  PageHeaderSkeleton,
-  TableSkeleton,
-} from "@/components/ui/skeleton-loaders";
+import { PageHeaderSkeleton, TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import PaymentHistoryList from "@/components/worker-payments/payment-history-list";
@@ -18,17 +16,14 @@ import { useJobs } from "@/hooks/use-jobs";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { Calculator } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function WorkerPaymentsPage() {
-  const {
-    organizationId,
-    loading: orgLoading,
-    error: orgError,
-  } = useOrganization();
+  const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
 
   if (orgLoading) {
@@ -44,20 +39,12 @@ export default function WorkerPaymentsPage() {
   }
 
   if (orgError || !organizationId) {
-    return (
-      <ErrorState
-        message={orgError || "Failed to load organization"}
-        fullScreen
-      />
-    );
+    return <ErrorState message={orgError || "Failed to load organization"} fullScreen />;
   }
 
   return (
     <PricingScopeProvider fieldConfigs={fieldConfigs}>
-      <WorkerPaymentsPageContent
-        organizationId={organizationId}
-        fieldConfigs={fieldConfigs}
-      />
+      <WorkerPaymentsPageContent organizationId={organizationId} fieldConfigs={fieldConfigs} />
     </PricingScopeProvider>
   );
 }
@@ -89,11 +76,11 @@ function WorkerPaymentsPageContent({
         await WorkerPaymentService.savePayment(organizationId, result, jobIds);
         addPayment(result, jobIds);
       } catch (error) {
-        console.error("Failed to save payment:", error);
+        log.error("Failed to save payment:", error);
         toast.error(
           error instanceof Error
             ? error.message
-            : "Failed to save payment. Showing results locally.",
+            : "Failed to save payment. Showing results locally."
         );
         // Still add to local state for now
         addPayment(result, jobIds);
@@ -106,11 +93,26 @@ function WorkerPaymentsPageContent({
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Worker Payments</h1>
         <p className="text-muted-foreground mt-2">
-          Calculate, view, and manage worker payments for completed jobs. Worker
-          payments are calculated based on the pricing rules configured in the
-          Pricing section.
+          Calculate, view, and manage worker payments for completed jobs. Worker payments are
+          calculated based on the pricing rules configured in the Pricing section.
         </p>
       </div>
+
+      <Alert className="mb-6 border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
+        <AlertDescription>
+          Worker payment splits allocate the priced worker total among your team. They do not
+          replace Australian award, NES, or minimum pay obligations. See the{" "}
+          <a
+            href="https://www.fairwork.gov.au/pay-and-wages/minimum-wages/piece-rates-and-commission-payments"
+            className="underline font-medium"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Fair Work Ombudsman — piece rates and commission
+          </a>{" "}
+          for context. Verify payroll compliance outside this app.
+        </AlertDescription>
+      </Alert>
 
       <div className="flex items-center justify-end mb-6">
         <Button

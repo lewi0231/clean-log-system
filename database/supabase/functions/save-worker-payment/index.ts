@@ -23,6 +23,7 @@ interface WorkerSplit {
   multiplier_adjustment: number;
   per_unit_bonus: number;
   flat_bonus: number;
+  team_percentage_bonus?: number;
   final_payment: number;
   rate_card_id?: string;
   allocation_type: string;
@@ -249,6 +250,7 @@ serve(async (req: Request) => {
                 multiplier_adjustment: split.multiplier_adjustment,
                 per_unit_bonus: split.per_unit_bonus,
                 flat_bonus: split.flat_bonus,
+                team_percentage_bonus: split.team_percentage_bonus,
                 allocation_type: split.allocation_type,
                 rate_card_id: split.rate_card_id,
               },

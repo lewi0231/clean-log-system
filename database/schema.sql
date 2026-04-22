@@ -1653,7 +1653,7 @@ CREATE TABLE IF NOT EXISTS "public"."worker_rate_card" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "modifier_type" "text" DEFAULT 'flat'::"text" NOT NULL,
-    CONSTRAINT "worker_rate_card_modifier_type_check" CHECK (("modifier_type" = ANY (ARRAY['per_unit'::"text", 'flat'::"text", 'multiplier'::"text", 'team_percentage'::"text"]))),
+    CONSTRAINT "worker_rate_card_modifier_type_check" CHECK (("modifier_type" = ANY (ARRAY['per_unit'::"text", 'flat'::"text", 'multiplier'::"text", 'team_percentage'::"text", 'split_weight'::"text"]))),
     CONSTRAINT "worker_rate_card_modifier_value_check" CHECK (("modifier_value" > (0)::numeric))
 );
 

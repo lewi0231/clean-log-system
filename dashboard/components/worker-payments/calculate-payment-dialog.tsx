@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,11 +53,8 @@ export default function CalculatePaymentDialog({
 }: CalculatePaymentDialogProps) {
   const { calculatePayments, loading } = useWorkerPayments();
   const { formatCurrency } = useOrganizationCurrency();
-  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(
-    new Set(preselectedJobIds)
-  );
-  const [preview, setPreview] =
-    useState<CalculateWorkerPaymentsResponse | null>(null);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set(preselectedJobIds));
+  const [preview, setPreview] = useState<CalculateWorkerPaymentsResponse | null>(null);
   const [calculating, setCalculating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,14 +103,11 @@ export default function CalculatePaymentDialog({
         setPreview(result);
         // Expand first job by default if there are any
         if (result.calculation.job_calculations.length > 0) {
-          setExpandedJobs(
-            new Set([result.calculation.job_calculations[0].job_id])
-          );
+          setExpandedJobs(new Set([result.calculation.job_calculations[0].job_id]));
         }
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to calculate payments";
+      const errorMessage = err instanceof Error ? err.message : "Failed to calculate payments";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -133,8 +128,7 @@ export default function CalculatePaymentDialog({
       setPreview(null);
       setExpandedJobs(new Set());
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to save payment";
+      const errorMessage = err instanceof Error ? err.message : "Failed to save payment";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -168,8 +162,7 @@ export default function CalculatePaymentDialog({
         <DialogHeader>
           <DialogTitle>Calculate Worker Payments</DialogTitle>
           <DialogDescription>
-            Select jobs to calculate worker payments. Only jobs with assigned
-            workers are shown.
+            Select jobs to calculate worker payments. Only jobs with assigned workers are shown.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,9 +177,7 @@ export default function CalculatePaymentDialog({
                 {selectedJobIds.size} of {jobsWithWorkers.length} jobs selected
               </Label>
               <Button variant="outline" size="sm" onClick={handleSelectAll}>
-                {selectedJobIds.size === jobsWithWorkers.length
-                  ? "Deselect All"
-                  : "Select All"}
+                {selectedJobIds.size === jobsWithWorkers.length ? "Deselect All" : "Select All"}
               </Button>
             </div>
 
@@ -248,6 +239,23 @@ export default function CalculatePaymentDialog({
 
                 {preview && (
                   <div className="space-y-4">
+                    {preview.calculation.job_calculations.some(
+                      (jc) => (jc.calculation_warnings?.length ?? 0) > 0
+                    ) && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Calculation notices</AlertTitle>
+                        <AlertDescription>
+                          <ul className="list-disc pl-4 space-y-1">
+                            {preview.calculation.job_calculations.flatMap((jc) =>
+                              (jc.calculation_warnings ?? []).map((w, idx) => (
+                                <li key={`${jc.job_id}-${idx}`}>{w}</li>
+                              ))
+                            )}
+                          </ul>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                     {/* Summary Card */}
                     <div className="border rounded-md p-4 space-y-3 bg-muted/50">
                       <div className="flex justify-between items-center">
@@ -265,14 +273,10 @@ export default function CalculatePaymentDialog({
                         <span>
                           {
                             new Set(
-                              preview.calculation.job_calculations.flatMap(
-                                (calc) => {
-                                  const job = jobs.find(
-                                    (j) => j.id === calc.job_id
-                                  );
-                                  return (job?.workers ?? []).map((w) => w.id);
-                                }
-                              )
+                              preview.calculation.job_calculations.flatMap((calc) => {
+                                const job = jobs.find((j) => j.id === calc.job_id);
+                                return (job?.workers ?? []).map((w) => w.id);
+                              })
                             ).size
                           }
                         </span>
@@ -282,19 +286,14 @@ export default function CalculatePaymentDialog({
                     {/* Detailed Breakdown */}
                     <div className="border rounded-md overflow-hidden">
                       <div className="bg-muted/50 px-4 py-2 border-b">
-                        <h4 className="font-medium text-sm">
-                          Payment Breakdown by Job
-                        </h4>
+                        <h4 className="font-medium text-sm">Payment Breakdown by Job</h4>
                       </div>
                       <div className="max-h-[250px] overflow-y-auto">
                         {preview.calculation.job_calculations.map((calc) => {
                           const job = jobs.find((j) => j.id === calc.job_id);
                           const isExpanded = expandedJobs.has(calc.job_id);
                           return (
-                            <div
-                              key={calc.job_id}
-                              className="border-b last:border-b-0"
-                            >
+                            <div key={calc.job_id} className="border-b last:border-b-0">
                               <button
                                 type="button"
                                 onClick={() => toggleJobExpanded(calc.job_id)}
@@ -312,15 +311,9 @@ export default function CalculatePaymentDialog({
                                     </div>
                                     <div className="text-xs text-muted-foreground">
                                       {job?.completed_at
-                                        ? format(
-                                            new Date(job.completed_at),
-                                            "MMM d, yyyy"
-                                          )
+                                        ? format(new Date(job.completed_at), "MMM d, yyyy")
                                         : "Unknown date"}{" "}
-                                      •{" "}
-                                      {(job?.workers ?? [])
-                                        .map((w) => w.name)
-                                        .join(", ")}
+                                      • {(job?.workers ?? []).map((w) => w.name).join(", ")}
                                     </div>
                                   </div>
                                 </div>
@@ -335,15 +328,9 @@ export default function CalculatePaymentDialog({
                                     <TableHeader>
                                       <TableRow className="text-xs">
                                         <TableHead className="h-8">Item</TableHead>
-                                        <TableHead className="h-8 text-right">
-                                          Qty
-                                        </TableHead>
-                                        <TableHead className="h-8 text-right">
-                                          Unit Price
-                                        </TableHead>
-                                        <TableHead className="h-8 text-right">
-                                          Total
-                                        </TableHead>
+                                        <TableHead className="h-8 text-right">Qty</TableHead>
+                                        <TableHead className="h-8 text-right">Unit Price</TableHead>
+                                        <TableHead className="h-8 text-right">Total</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -393,13 +380,7 @@ export default function CalculatePaymentDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={
-              selectedJobIds.size === 0 ||
-              calculating ||
-              loading ||
-              saving ||
-              !preview
-            }
+            disabled={selectedJobIds.size === 0 || calculating || loading || saving || !preview}
           >
             {saving ? (
               <>
