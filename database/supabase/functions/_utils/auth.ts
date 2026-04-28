@@ -216,6 +216,38 @@ export async function verifyOrganizationMembership(
 }
 
 /**
+ * Resolves {@link organization_user} primary key for `worker_payment.paid_by`.
+ * That column references `organization_user(id)`, not `auth.users(id)`.
+ */
+export async function getOrganizationUserIdForPaidBy(
+  supabase: SupabaseClient,
+  organizationId: string,
+  authUserId: string | null,
+  userEmail: string | null,
+): Promise<string | null> {
+  if (authUserId) {
+    const { data, error } = await supabase
+      .from("organization_user")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("auth_user_id", authUserId)
+      .maybeSingle();
+    if (!error && data?.id) return data.id;
+  }
+  if (userEmail) {
+    const normalized = userEmail.trim().toLowerCase();
+    const { data, error } = await supabase
+      .from("organization_user")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .ilike("email", normalized)
+      .maybeSingle();
+    if (!error && data?.id) return data.id;
+  }
+  return null;
+}
+
+/**
  * Verify organization membership from a request
  * Extracts auth token, gets user info, and verifies membership
  * Returns user info if verified, null if not verified

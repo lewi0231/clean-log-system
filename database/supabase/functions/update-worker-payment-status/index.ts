@@ -2,6 +2,7 @@ import { serve } from "server";
 import {
   extractAuthToken,
   getAuthUser,
+  getOrganizationUserIdForPaidBy,
   verifyOrganizationMembership,
 } from "../_utils/auth.ts";
 import {
@@ -131,8 +132,15 @@ serve(async (req: Request) => {
       updateData.paid_at = payment_date
         ? new Date(payment_date).toISOString()
         : new Date().toISOString();
-      if (userId) {
-        updateData.paid_by = userId;
+      // paid_by FK → organization_user(id), not auth.users.id
+      const paidByOrgUserId = await getOrganizationUserIdForPaidBy(
+        supabase,
+        organization_id,
+        userId,
+        userEmail,
+      );
+      if (paidByOrgUserId) {
+        updateData.paid_by = paidByOrgUserId;
       }
       // Payment method and reference can be set when marking as paid
       if (payment_method) {
