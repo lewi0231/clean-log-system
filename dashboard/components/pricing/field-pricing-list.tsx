@@ -8,13 +8,7 @@ import {
 } from "@/components/pricing/pricing-condition-helpers";
 import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -35,11 +29,7 @@ import {
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { log } from "@/lib/logger";
-import {
-  buildScopedPricingMap,
-  getPricingScopeSource,
-  isEntryForScope,
-} from "@/lib/pricing-scope";
+import { buildScopedPricingMap, getPricingScopeSource, isEntryForScope } from "@/lib/pricing-scope";
 import { getLocationOverrides } from "@/lib/pricing-utils";
 import type { PricingCondition, PricingType } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
@@ -59,6 +49,8 @@ interface FieldPricingListProps {
   refreshToken?: number;
   fieldTypeFilter?: FieldType; // Filter to show only specific field type
   organizationId: string | null;
+  /** Callback to navigate to History tab. @see S2 §4.6.4 */
+  onNavigateToHistory?: () => void;
 }
 
 export default function FieldPricingList({
@@ -70,6 +62,7 @@ export default function FieldPricingList({
   refreshToken,
   fieldTypeFilter,
   organizationId,
+  onNavigateToHistory,
 }: FieldPricingListProps) {
   const pricingDebug = process.env.NEXT_PUBLIC_PRICING_DEBUG === "true";
   const { pricingContext, showBothContexts } = usePricingScope();
@@ -104,26 +97,19 @@ export default function FieldPricingList({
 
   // Note: fieldPricing was previously used but is now replaced by
   // customerPricing and workerPricing arrays used directly in getLocationOverrides
-  const pricingLoading = showBothContexts
-    ? customerLoading || workerLoading
-    : customerLoading;
-  const pricingError = showBothContexts
-    ? customerError || workerError
-    : customerError;
+  const pricingLoading = showBothContexts ? customerLoading || workerLoading : customerLoading;
+  const pricingError = showBothContexts ? customerError || workerError : customerError;
   const upsertPricing = showBothContexts
     ? upsertCustomerPricing
     : pricingContext === "customer"
-    ? upsertCustomerPricing
-    : upsertWorkerPricing;
-  const { setSelectedFieldId, expirationDate, refreshPricingHistory } =
-    usePricingScope();
+      ? upsertCustomerPricing
+      : upsertWorkerPricing;
+  const { setSelectedFieldId, expirationDate, refreshPricingHistory } = usePricingScope();
 
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer?: string; worker?: string }>
   >({});
-  const [ruleModalField, setRuleModalField] = useState<FieldConfig | null>(
-    null
-  );
+  const [ruleModalField, setRuleModalField] = useState<FieldConfig | null>(null);
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
   const [ruleForm, setRuleForm] = useState<ConditionalRuleForm>({
@@ -136,9 +122,7 @@ export default function FieldPricingList({
 
   // Filter to only field types that support pricing
   const pricingFieldConfigs = useMemo(() => {
-    let filtered = fieldConfigs.filter((fc) =>
-      PRICING_SUPPORTED_TYPES.includes(fc.field_type)
-    );
+    let filtered = fieldConfigs.filter((fc) => PRICING_SUPPORTED_TYPES.includes(fc.field_type));
     // If a specific field type filter is provided, apply it
     if (fieldTypeFilter) {
       filtered = filtered.filter((fc) => fc.field_type === fieldTypeFilter);
@@ -172,8 +156,8 @@ export default function FieldPricingList({
   const pricingMap = showBothContexts
     ? customerPricingMap
     : pricingContext === "customer"
-    ? customerPricingMap
-    : workerPricingMap;
+      ? customerPricingMap
+      : workerPricingMap;
 
   const handlePriceChange = (
     fieldConfigId: string,
@@ -188,6 +172,19 @@ export default function FieldPricingList({
       },
     }));
     setSelectedFieldId(fieldConfigId);
+  };
+
+  /**
+   * Discard unsaved changes for a field by removing its entry from editingPrices.
+   * This causes the UI to revert to customerPricingRecord/workerPricingRecord values.
+   * @see S2-pricing-tab-redesign.md §4.7
+   */
+  const handleDiscard = (fieldConfigId: string) => {
+    setEditingPrices((prev) => {
+      const next = { ...prev };
+      delete next[fieldConfigId];
+      return next;
+    });
   };
 
   const handleSave = async (fieldConfig: FieldConfig) => {
@@ -218,11 +215,7 @@ export default function FieldPricingList({
         const workerEntry = workerPricingMap[fieldConfig.id];
 
         // Save customer pricing if provided
-        if (
-          customerPrice !== null &&
-          !isNaN(customerPrice) &&
-          customerPrice >= 0
-        ) {
+        if (customerPrice !== null && !isNaN(customerPrice) && customerPrice >= 0) {
           const isLocationOverride = !!(locationId || locationHierarchyId);
           const existingCustomerRule = customerEntry?.record;
 
@@ -240,14 +233,10 @@ export default function FieldPricingList({
 
           await upsertCustomerPricing(fieldConfig.id, customerPrice, {
             appliesToFieldType: fieldConfig.field_type,
-            pricingType:
-              fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+            pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
             locationHierarchyId,
             locationId,
-            conditions:
-              customerEntry?.record?.source_rule?.conditions?.map(
-                serializeCondition
-              ),
+            conditions: customerEntry?.record?.source_rule?.conditions?.map(serializeCondition),
             expirationDate,
             effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "customer",
@@ -275,14 +264,10 @@ export default function FieldPricingList({
 
           await upsertWorkerPricing(fieldConfig.id, workerPrice, {
             appliesToFieldType: fieldConfig.field_type,
-            pricingType:
-              fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+            pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
             locationHierarchyId,
             locationId,
-            conditions:
-              workerEntry?.record?.source_rule?.conditions?.map(
-                serializeCondition
-              ),
+            conditions: workerEntry?.record?.source_rule?.conditions?.map(serializeCondition),
             expirationDate,
             effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
             pricingContext: "worker",
@@ -307,8 +292,7 @@ export default function FieldPricingList({
       }
     } else {
       // Original single-context save logic
-      const priceValue =
-        pricingContext === "customer" ? editing.customer : editing.worker;
+      const priceValue = pricingContext === "customer" ? editing.customer : editing.worker;
       if (!priceValue || priceValue.trim() === "") {
         return;
       }
@@ -340,10 +324,7 @@ export default function FieldPricingList({
           pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
           locationHierarchyId,
           locationId,
-          conditions:
-            pricingEntry?.record?.source_rule?.conditions?.map(
-              serializeCondition
-            ),
+          conditions: pricingEntry?.record?.source_rule?.conditions?.map(serializeCondition),
           expirationDate,
           effectiveAt: effectiveAt, // Pass the scope's effective date for timeline support
           pricingContext,
@@ -438,9 +419,7 @@ export default function FieldPricingList({
         error: error instanceof Error ? error.message : "Unknown error",
         fieldConfigId: ruleModalField.id,
       });
-      setRuleError(
-        error instanceof Error ? error.message : "Failed to add rule."
-      );
+      setRuleError(error instanceof Error ? error.message : "Failed to add rule.");
     } finally {
       setRuleSaving(false);
     }
@@ -453,11 +432,7 @@ export default function FieldPricingList({
   }
 
   if (pricingError) {
-    return (
-      <div className="text-center py-8 text-destructive">
-        Error: {pricingError}
-      </div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {pricingError}</div>;
   }
 
   if (pricingFieldConfigs.length === 0) {
@@ -466,8 +441,8 @@ export default function FieldPricingList({
         <CardHeader>
           <CardTitle>No Fields Available for Pricing</CardTitle>
           <CardDescription>
-            To configure field pricing, you need to add number or boolean fields
-            to your mobile app forms.
+            To configure field pricing, you need to add number or boolean fields to your mobile app
+            forms.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -496,42 +471,40 @@ export default function FieldPricingList({
           const pricingEntry = showBothContexts
             ? customerEntry
             : pricingContext === "customer"
-            ? customerEntry
-            : workerEntry;
+              ? customerEntry
+              : workerEntry;
           const scopedPricing = showBothContexts
             ? customerPricingRecord
             : pricingContext === "customer"
-            ? customerPricingRecord
-            : workerPricingRecord;
+              ? customerPricingRecord
+              : workerPricingRecord;
 
           const editing = editingPrices[fieldConfig.id];
           const currentCustomerPrice =
             editing?.customer !== undefined
               ? editing.customer
               : customerPricingRecord
-              ? customerPricingRecord.customer_price.toString()
-              : "";
+                ? customerPricingRecord.customer_price.toString()
+                : "";
           const currentWorkerPrice =
             editing?.worker !== undefined
               ? editing.worker
               : workerPricingRecord
-              ? workerPricingRecord.worker_payment_value?.toString() || ""
-              : "";
+                ? workerPricingRecord.worker_payment_value?.toString() || ""
+                : "";
 
           // Compare as numbers to handle "0" correctly
           const hasCustomerChanges =
             editing?.customer !== undefined &&
-            parseFloat(editing.customer || "0") !==
-              (customerPricingRecord?.customer_price ?? 0);
+            parseFloat(editing.customer || "0") !== (customerPricingRecord?.customer_price ?? 0);
           const hasWorkerChanges =
             editing?.worker !== undefined &&
-            parseFloat(editing.worker || "0") !==
-              (workerPricingRecord?.worker_payment_value ?? 0);
+            parseFloat(editing.worker || "0") !== (workerPricingRecord?.worker_payment_value ?? 0);
           const hasChanges = showBothContexts
             ? hasCustomerChanges || hasWorkerChanges
             : pricingContext === "customer"
-            ? hasCustomerChanges
-            : hasWorkerChanges;
+              ? hasCustomerChanges
+              : hasWorkerChanges;
 
           // Get location overrides for both customer and worker contexts when showBothContexts is true
           // When showBothContexts, we show customer overrides with customer price and worker payment
@@ -539,8 +512,7 @@ export default function FieldPricingList({
           // CRITICAL: Filter by pricing_context to ensure worker rules don't appear in customer overrides
           const customerOverrides = getLocationOverrides(
             customerPricing.filter(
-              (p) =>
-                (p.source_rule?.pricing_context || "customer") === "customer"
+              (p) => (p.source_rule?.pricing_context || "customer") === "customer"
             ), // Defensive filter: ensure only customer context rules
             fieldConfig.id,
             locationId,
@@ -549,9 +521,7 @@ export default function FieldPricingList({
           );
           const workerOverrides = showBothContexts
             ? getLocationOverrides(
-                workerPricing.filter(
-                  (p) => p.source_rule?.pricing_context === "worker"
-                ), // Defensive filter: ensure only worker context rules
+                workerPricing.filter((p) => p.source_rule?.pricing_context === "worker"), // Defensive filter: ensure only worker context rules
                 fieldConfig.id,
                 locationId,
                 locationHierarchyId,
@@ -560,8 +530,7 @@ export default function FieldPricingList({
             : [];
           // Combine overrides - customer first, then worker
           const overrides = [...customerOverrides, ...workerOverrides];
-          const conditions =
-            customerPricingRecord?.source_rule?.conditions ?? [];
+          const conditions = customerPricingRecord?.source_rule?.conditions ?? [];
           const hasScopedValue = isEntryForScope(pricingEntry, scopeSource);
 
           const handleDeleteOverride = async (id: string) => {
@@ -570,9 +539,7 @@ export default function FieldPricingList({
               const override = overrides.find((o) => o.id === id);
               const overrideContext =
                 override?.pricingContext ||
-                (customerOverrides.some((o) => o.id === id)
-                  ? "customer"
-                  : "worker");
+                (customerOverrides.some((o) => o.id === id) ? "customer" : "worker");
 
               if (pricingDebug) {
                 log.debug("[Pricing Debug] Deleting location override", {
@@ -593,10 +560,7 @@ export default function FieldPricingList({
 
               // Refetch both contexts to ensure UI updates immediately
               if (showBothContexts) {
-                await Promise.all([
-                  refetchCustomerPricing(),
-                  refetchWorkerPricing(),
-                ]);
+                await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
               } else {
                 if (overrideContext === "customer") {
                   await refetchCustomerPricing();
@@ -635,6 +599,8 @@ export default function FieldPricingList({
               locationHierarchyId={locationHierarchyId}
               onPriceChange={handlePriceChange}
               onSave={handleSave}
+              onDiscard={() => handleDiscard(fieldConfig.id)}
+              onNavigateToHistory={onNavigateToHistory}
               onDeleteOverride={handleDeleteOverride}
               onOpenConditionalModal={openConditionalModal}
             />
@@ -702,9 +668,7 @@ function ConditionalRuleDialog({
             <Label>Trigger field</Label>
             <Select
               value={form.conditionFieldId || field?.id || ""}
-              onValueChange={(value) =>
-                setForm((prev) => ({ ...prev, conditionFieldId: value }))
-              }
+              onValueChange={(value) => setForm((prev) => ({ ...prev, conditionFieldId: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Choose a field" />

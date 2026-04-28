@@ -7,24 +7,9 @@ import {
   type LocationOverrideRow,
 } from "@/components/pricing/location-overrides-matrix";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFieldPricingCardState } from "@/hooks/use-field-pricing-card-state";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import type { ScopedPricingEntry } from "@/lib/pricing-scope";
@@ -34,6 +19,8 @@ import type { FieldConfig } from "@clean-log/shared";
 import { ChevronDown, ChevronRight, Save, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { FieldPriceInput } from "./field-price-input";
+import { FormulaPreview } from "./formula-preview";
+import { PricingInsightsCard } from "./pricing-insights-card";
 
 interface FieldPricingCardProps {
   fieldConfig: FieldConfig;
@@ -49,26 +36,15 @@ interface FieldPricingCardProps {
   hasScopedValue: boolean;
   locationId: string | null;
   locationHierarchyId: string | null;
-  onPriceChange: (
-    fieldId: string,
-    value: string,
-    context: "customer" | "worker"
-  ) => void;
+  onPriceChange: (fieldId: string, value: string, context: "customer" | "worker") => void;
   onSave: (fieldConfig: FieldConfig) => Promise<void>;
+  /** Discard unsaved changes and revert to server values. @see S2 §4.7 */
+  onDiscard?: () => void;
+  /** Navigate to History tab. @see S2 §4.6.4 */
+  onNavigateToHistory?: () => void;
   onDeleteOverride: (id: string) => Promise<void>;
   onOpenConditionalModal: (field: FieldConfig) => void;
 }
-
-const getEquationPreview = (fieldType: string): string => {
-  switch (fieldType) {
-    case "number":
-      return "Total = price_per_unit × quantity";
-    case "boolean":
-      return "Total = base_price (when field is true)";
-    default:
-      return "";
-  }
-};
 
 export function FieldPricingCard({
   fieldConfig,
@@ -85,12 +61,15 @@ export function FieldPricingCard({
   locationHierarchyId,
   onPriceChange,
   onSave,
+  onDiscard,
+  onNavigateToHistory,
   onDeleteOverride,
   onOpenConditionalModal,
 }: FieldPricingCardProps) {
   const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
-  const { isExpanded, setIsExpanded, isSaving, setIsSaving } = 
-    useFieldPricingCardState(fieldConfig.id);
+  const { isExpanded, setIsExpanded, isSaving, setIsSaving } = useFieldPricingCardState(
+    fieldConfig.id
+  );
   const [deletingOverrideId, setDeletingOverrideId] = useState<string | null>(null);
   const { formatCurrency } = useOrganizationCurrency();
 
@@ -134,9 +113,7 @@ export function FieldPricingCard({
                   <div className="flex items-center gap-3 text-xs">
                     {customerPricingRecord && (
                       <div>
-                        <span className="text-muted-foreground">
-                          Customer:{" "}
-                        </span>
+                        <span className="text-muted-foreground">Customer: </span>
                         <span className="font-medium text-primary">
                           {formatCurrency(customerPricingRecord.customer_price)}
                         </span>
@@ -146,16 +123,12 @@ export function FieldPricingCard({
                       <div>
                         <span className="text-muted-foreground">Worker: </span>
                         <span className="font-medium text-primary">
-                          {formatCurrency(
-                            workerPricingRecord.worker_payment_value || 0
-                          )}
+                          {formatCurrency(workerPricingRecord.worker_payment_value || 0)}
                         </span>
                       </div>
                     )}
                     {!customerPricingRecord && !workerPricingRecord && (
-                      <span className="text-muted-foreground">
-                        No prices set
-                      </span>
+                      <span className="text-muted-foreground">No prices set</span>
                     )}
                   </div>
                 ) : scopedPricing ? (
@@ -167,28 +140,30 @@ export function FieldPricingCard({
                     )}
                   </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground">
-                    No price set
-                  </span>
+                  <span className="text-xs text-muted-foreground">No price set</span>
                 )}
               </div>
             </div>
             {fieldConfig.description && (
-              <CardDescription className="ml-6">
-                {fieldConfig.description}
-              </CardDescription>
+              <CardDescription className="ml-6">{fieldConfig.description}</CardDescription>
             )}
           </CardHeader>
         </CollapsibleTrigger>
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-3">
-            <div className="bg-muted/50 rounded-md p-2 text-sm">
-              <span className="text-muted-foreground">Equation: </span>
-              <span className="font-mono font-medium">
-                {getEquationPreview(fieldConfig.field_type)}
-              </span>
-            </div>
+            {/* Formula Preview with live values (S2 §4.4) */}
+            <FormulaPreview
+              fieldType={fieldConfig.field_type}
+              customerPriceStr={currentCustomerPrice}
+              workerPriceStr={currentWorkerPrice}
+              workerPaymentType={
+                workerPricingRecord?.worker_payment_type ??
+                scopedPricing?.worker_payment_type ??
+                null
+              }
+              formatCurrency={formatCurrency}
+            />
 
             <FieldPriceInput
               fieldConfig={fieldConfig}
@@ -222,22 +197,22 @@ export function FieldPricingCard({
                         return !customerValid && !workerValid;
                       })()
                     : pricingContext === "customer"
-                    ? currentCustomerPrice === undefined ||
-                      currentCustomerPrice === null ||
-                      currentCustomerPrice.trim() === "" ||
-                      isNaN(parseFloat(currentCustomerPrice)) ||
-                      parseFloat(currentCustomerPrice) < 0
-                    : currentWorkerPrice === undefined ||
-                      currentWorkerPrice === null ||
-                      currentWorkerPrice.trim() === "" ||
-                      isNaN(parseFloat(currentWorkerPrice)) ||
-                      parseFloat(currentWorkerPrice) < 0)
+                      ? currentCustomerPrice === undefined ||
+                        currentCustomerPrice === null ||
+                        currentCustomerPrice.trim() === "" ||
+                        isNaN(parseFloat(currentCustomerPrice)) ||
+                        parseFloat(currentCustomerPrice) < 0
+                      : currentWorkerPrice === undefined ||
+                        currentWorkerPrice === null ||
+                        currentWorkerPrice.trim() === "" ||
+                        isNaN(parseFloat(currentWorkerPrice)) ||
+                        parseFloat(currentWorkerPrice) < 0)
                 }
               >
                 {isSaving ? (
                   "Saving..."
                 ) : hasScopedValue ? (
-                  "Update"
+                  "Update Rule"
                 ) : (
                   <>
                     <Save className="mr-2 h-4 w-4" />
@@ -245,6 +220,17 @@ export function FieldPricingCard({
                   </>
                 )}
               </Button>
+              {/* Discard button - S2 §4.7 */}
+              {onDiscard && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onDiscard}
+                  disabled={!hasChanges || isSaving}
+                >
+                  Discard
+                </Button>
+              )}
               {isPricingRulesEnabled() && (
                 <TooltipProvider>
                   <Tooltip>
@@ -263,14 +249,30 @@ export function FieldPricingCard({
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
                       <p>
-                        Click to create if/then adjustments for this price.
-                        Rules appear as chips below the price input.
+                        Click to create if/then adjustments for this price. Rules appear as chips
+                        below the price input.
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
             </div>
+
+            {/* Profitability Check + Last Update (S2 §4.5, §4.6) */}
+            <PricingInsightsCard
+              fieldType={fieldConfig.field_type}
+              customerPriceStr={currentCustomerPrice}
+              workerPriceStr={currentWorkerPrice}
+              workerPaymentType={
+                workerPricingRecord?.worker_payment_type ??
+                scopedPricing?.worker_payment_type ??
+                null
+              }
+              customerPricingRecord={customerPricingRecord}
+              workerPricingRecord={workerPricingRecord}
+              formatCurrency={formatCurrency}
+              onViewHistory={onNavigateToHistory}
+            />
 
             {/* Only show location overrides when organizational default is selected and there are overrides */}
             {!locationId && !locationHierarchyId && overrides.length > 0 && (
@@ -283,10 +285,7 @@ export function FieldPricingCard({
             )}
 
             {conditions.length > 0 && (
-              <ConditionalRuleChips
-                conditions={conditions}
-                fieldLabels={fieldLabelLookup}
-              />
+              <ConditionalRuleChips conditions={conditions} fieldLabels={fieldLabelLookup} />
             )}
           </CardContent>
         </CollapsibleContent>

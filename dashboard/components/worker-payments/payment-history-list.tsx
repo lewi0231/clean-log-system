@@ -1,14 +1,7 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,164 +17,152 @@ import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { Job } from "@/lib/types";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
-import { cn } from "@/lib/utils";
+import { getWorkerSettlementStatus } from "@/lib/worker-payments/payment-settlement-status";
 import { format } from "date-fns";
-import {
-  CheckCircle2,
-  Clock,
-  Download,
-  Loader2,
-  XCircle,
-} from "lucide-react";
+import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import MarkPaymentPaidDialog from "./mark-payment-paid-dialog";
 import PaymentDetailDialog from "./payment-detail-dialog";
-
-type PaymentStatus =
-  | "calculated"
-  | "approved"
-  | "processing"
-  | "completed"
-  | "paid"
-  | "failed"
-  | "cancelled";
-
-const statusConfig: Record<
-  PaymentStatus,
-  {
-    label: string;
-    variant: "default" | "secondary" | "destructive" | "outline";
-    icon?: React.ReactNode;
-    className?: string;
-  }
-> = {
-  calculated: {
-    label: "Calculated",
-    variant: "outline",
-    icon: <Clock className="h-3 w-3 mr-1" />,
-  },
-  approved: {
-    label: "Approved",
-    variant: "secondary",
-    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
-    className: "bg-blue-500/10 text-blue-700 border-blue-200",
-  },
-  processing: {
-    label: "Processing",
-    variant: "secondary",
-    icon: <Loader2 className="h-3 w-3 mr-1 animate-spin" />,
-    className: "bg-yellow-500/10 text-yellow-700 border-yellow-200",
-  },
-  completed: {
-    label: "Completed",
-    variant: "default",
-    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
-    className: "bg-green-500/10 text-green-700 border-green-200",
-  },
-  paid: {
-    label: "Paid",
-    variant: "default",
-    icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
-    className: "bg-green-500/10 text-green-700 border-green-200",
-  },
-  failed: {
-    label: "Failed",
-    variant: "destructive",
-    icon: <XCircle className="h-3 w-3 mr-1" />,
-  },
-  cancelled: {
-    label: "Cancelled",
-    variant: "outline",
-    icon: <XCircle className="h-3 w-3 mr-1" />,
-    className: "text-muted-foreground",
-  },
-};
 
 interface PaymentHistoryListProps {
   jobs: Job[];
   organizationId: string | null;
 }
 
-export default function PaymentHistoryList({
-  jobs,
-  organizationId,
-}: PaymentHistoryListProps) {
+export default function PaymentHistoryList({ jobs, organizationId }: PaymentHistoryListProps) {
   const { formatCurrency } = useOrganizationCurrency();
-  const { paymentHistory, filterByDateRange, invalidate } =
-    useWorkerPaymentHistory(jobs);
+  const { paymentHistory, filterByDateRange, refetch } = useWorkerPaymentHistory(jobs);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
-    null
-  );
+  const [detailSelection, setDetailSelection] = useState<{
+    payment: PaymentRecord;
+    workerId: string;
+  } | null>(null);
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
-  const [isMarkPaidDialogOpen, setIsMarkPaidDialogOpen] = useState(false);
-  const [approvingBatchId, setApprovingBatchId] = useState<string | null>(null);
-
   const filteredHistory = useMemo(() => {
     return filterByDateRange(startDate || undefined, endDate || undefined);
   }, [startDate, endDate, filterByDateRange]);
 
-  const handleViewDetails = (payment: PaymentRecord) => {
-    setSelectedPayment(payment);
+  const workerHistoryRows = useMemo(() => {
+    const rows: {
+      key: string;
+      payment: PaymentRecord;
+      workerId: string;
+      workerName: string;
+      workerTotal: number;
+      settlement: ReturnType<typeof getWorkerSettlementStatus>;
+    }[] = [];
+    for (const payment of filteredHistory) {
+      const pays = payment.payments;
+      if (!pays?.length) continue;
+      const workerIds = [...new Set(pays.map((p) => p.worker_id))];
+      for (const workerId of workerIds) {
+        const settlement = getWorkerSettlementStatus(pays, workerId);
+        /** History lists workers who have at least one recorded payment line; unpaid-only stays on Summary. */
+        if (settlement === "none") continue;
+
+        const workerTotal = pays
+          .filter((p) => p.worker_id === workerId)
+          .reduce((s, p) => s + p.amount, 0);
+        rows.push({
+          key: `${payment.id}-${workerId}`,
+          payment,
+          workerId,
+          workerName: WorkerPaymentService.resolveWorkerNameForExport(payment, workerId, jobs),
+          workerTotal,
+          settlement,
+        });
+      }
+    }
+    rows.sort((a, b) => {
+      const tb = new Date(b.payment.calculatedAt).getTime();
+      const ta = new Date(a.payment.calculatedAt).getTime();
+      if (tb !== ta) return tb - ta;
+      return a.workerName.localeCompare(b.workerName, undefined, {
+        sensitivity: "base",
+      });
+    });
+    return rows;
+  }, [filteredHistory, jobs]);
+
+  const handleViewDetails = (row: (typeof workerHistoryRows)[0]) => {
+    setDetailSelection({ payment: row.payment, workerId: row.workerId });
     setIsDetailDialogOpen(true);
   };
 
-  const handleExport = (payment: PaymentRecord) => {
-    const csvContent = WorkerPaymentService.exportPaymentsToCSV(payment, jobs);
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `worker-payments-${payment.id}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  /** Batches the API confirmed have zero `worker_payment` rows — export not available. */
+  const isOrphanHandoff = (p: PaymentRecord) =>
+    Array.isArray(p.payments) && p.payments.length === 0;
 
-  const handleApprove = async (batchId: string) => {
-    if (!organizationId) return;
-
-    setApprovingBatchId(batchId);
-    try {
-      await WorkerPaymentService.updatePaymentStatus(organizationId, {
-        batchId,
-        status: "approved",
-      });
-      toast.success("Payment batch approved");
-      invalidate();
-    } catch (error) {
+  const handleExport = async (payment: PaymentRecord) => {
+    if (isOrphanHandoff(payment)) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to approve payment"
+        "This batch has no per-worker lines to export. Contact support with batch id: " +
+          (payment.batch_id ?? payment.id)
       );
-    } finally {
-      setApprovingBatchId(null);
+      return;
     }
-  };
+    if (!organizationId) {
+      toast.error("Organization not loaded; try again.");
+      return;
+    }
 
-  const getStatusBadge = (status?: string) => {
-    const statusKey = (status || "calculated") as PaymentStatus;
-    const config = statusConfig[statusKey] || statusConfig.calculated;
+    let batch = payment;
+    if (!batch.payments?.length) {
+      const res = (await refetch()) as { data?: PaymentRecord[] };
+      const list = res.data ?? paymentHistory;
+      const match = list.find((p) => p.id === payment.id);
+      if (match) batch = match;
+    }
 
-    return (
-      <Badge
-        variant={config.variant}
-        className={cn("font-medium", config.className)}
-      >
-        {config.icon}
-        {config.label}
-      </Badge>
-    );
+    if (!batch.payments?.length) {
+      toast.error(
+        "Cannot export: no per-worker lines for this batch. If this batch was just saved, wait a moment and try again, or contact support with batch id: " +
+          (batch.batch_id ?? batch.id)
+      );
+      return;
+    }
+
+    try {
+      const csv = WorkerPaymentService.exportBatchWorkerSummaryToCsv(batch, {
+        organizationId,
+        jobs,
+      });
+      const name = `tally-worker-payments-${batch.batch_id ?? batch.id}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Export failed";
+      if (msg === "EXPORT_NO_LINE_ITEMS") {
+        toast.error(
+          "Cannot export: no per-worker lines for this batch. Contact support with batch id: " +
+            (batch.batch_id ?? batch.id)
+        );
+      } else if (msg.startsWith("RECONCILE_FAIL")) {
+        toast.error(
+          "Cannot export: batch total does not match per-worker line items. Contact support with batch id: " +
+            (batch.batch_id ?? batch.id)
+        );
+      } else {
+        toast.error(msg);
+      }
+    }
   };
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Payment History</CardTitle>
+          <CardTitle>History</CardTitle>
           <CardDescription>
-            View calculated worker payments by date range
+            One row per worker per pay run once at least some work is recorded as paid. Unpaid-only
+            lines stay on the <strong>Summary</strong> tab. Date filters use each run&apos;s job
+            date range.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -208,6 +189,7 @@ export default function PaymentHistoryList({
               {(startDate || endDate) && (
                 <Button
                   variant="outline"
+                  className="cursor-pointer"
                   onClick={() => {
                     setStartDate("");
                     setEndDate("");
@@ -218,96 +200,77 @@ export default function PaymentHistoryList({
               )}
             </div>
 
-            {filteredHistory.length === 0 ? (
+            {workerHistoryRows.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 {paymentHistory.length === 0
                   ? "No payment calculations yet. Click 'Calculate Payments' to get started."
-                  : "No payments found for the selected date range."}
+                  : startDate || endDate
+                    ? "No payments found for the selected date range."
+                    : "No recorded payments to workers yet. When you mark work as paid on the Summary tab, it will appear here."}
               </div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date Range</TableHead>
-                    <TableHead>Jobs</TableHead>
-                    <TableHead>Workers</TableHead>
-                    <TableHead className="text-right">Total Payment</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Calculated</TableHead>
+                    <TableHead>Worker</TableHead>
+                    <TableHead>Pay period</TableHead>
+                    <TableHead className="text-right">Amount (worker)</TableHead>
+                    <TableHead>Recorded</TableHead>
+                    <TableHead>Run calculated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredHistory.map((payment) => (
-                    <TableRow key={payment.id}>
+                  {workerHistoryRows.map((row) => (
+                    <TableRow key={row.key}>
                       <TableCell>
-                        {format(
-                          new Date(payment.dateRange.start),
-                          "MMM d, yyyy"
-                        )}{" "}
-                        -{" "}
-                        {format(new Date(payment.dateRange.end), "MMM d, yyyy")}
+                        <div className="font-medium">{row.workerName}</div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {row.workerId}
+                        </div>
                       </TableCell>
-                      <TableCell>{payment.jobIds.length}</TableCell>
-                      <TableCell>{payment.workerCount}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(payment.totalPayment)}
-                      </TableCell>
-                      <TableCell>{getStatusBadge(payment.status)}</TableCell>
                       <TableCell>
-                        {format(
-                          new Date(payment.calculatedAt),
-                          "MMM d, yyyy HH:mm"
+                        {format(new Date(row.payment.dateRange.start), "MMM d, yyyy")} -{" "}
+                        {format(new Date(row.payment.dateRange.end), "MMM d, yyyy")}
+                        <div className="text-xs text-muted-foreground">
+                          {row.payment.jobIds.length} job
+                          {row.payment.jobIds.length === 1 ? "" : "s"} in run
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium font-mono">
+                        {formatCurrency(row.workerTotal)}
+                      </TableCell>
+                      <TableCell>
+                        {row.settlement === "complete" && (
+                          <span className="text-sm">Paid in full</span>
+                        )}
+                        {row.settlement === "partial" && (
+                          <span className="text-sm">Partly paid</span>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {format(new Date(row.payment.calculatedAt), "MMM d, yyyy HH:mm")}
+                      </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 flex-wrap">
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleViewDetails(payment)}
+                            className="cursor-pointer"
+                            onClick={() => handleViewDetails(row)}
                           >
-                            View Details
+                            View
                           </Button>
-                          {/* Approve button - only for calculated status */}
-                          {payment.batch_id &&
-                            (!payment.status ||
-                              payment.status === "calculated") && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => handleApprove(payment.batch_id!)}
-                                disabled={approvingBatchId === payment.batch_id}
-                              >
-                                {approvingBatchId === payment.batch_id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  "Approve"
-                                )}
-                              </Button>
-                            )}
-                          {/* Mark as Paid button - for approved or processing status */}
-                          {payment.batch_id &&
-                            payment.status &&
-                            ["approved", "processing"].includes(
-                              payment.status
-                            ) && (
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedBatchId(payment.batch_id!);
-                                  setIsMarkPaidDialogOpen(true);
-                                }}
-                              >
-                                Mark as Paid
-                              </Button>
-                            )}
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleExport(payment)}
-                            title="Export to CSV"
+                            className="cursor-pointer"
+                            disabled={isOrphanHandoff(row.payment)}
+                            onClick={() => {
+                              void handleExport(row.payment);
+                            }}
+                            title="Download full run summary (CSV, all workers)"
+                            aria-label="Download worker payment summary CSV for this run"
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -322,30 +285,16 @@ export default function PaymentHistoryList({
         </CardContent>
       </Card>
 
-      {selectedPayment && (
+      {detailSelection && (
         <PaymentDetailDialog
           open={isDetailDialogOpen}
-          onOpenChange={setIsDetailDialogOpen}
-          payment={selectedPayment}
-          jobs={jobs}
-        />
-      )}
-
-      {selectedBatchId && (
-        <MarkPaymentPaidDialog
-          open={isMarkPaidDialogOpen}
           onOpenChange={(open) => {
-            setIsMarkPaidDialogOpen(open);
-            if (!open) {
-              setSelectedBatchId(null);
-            }
+            setIsDetailDialogOpen(open);
+            if (!open) setDetailSelection(null);
           }}
-          batchId={selectedBatchId}
-          onSuccess={() => {
-            // Invalidate cache to refresh payment history
-            invalidate();
-          }}
-          organizationId={organizationId}
+          payment={detailSelection.payment}
+          focusWorkerId={detailSelection.workerId}
+          jobs={jobs}
         />
       )}
     </>

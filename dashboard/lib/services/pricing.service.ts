@@ -1,11 +1,6 @@
 import { log } from "@/lib/logger";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-import type {
-  PricingCondition,
-  PricingRule,
-  PricingScope,
-  PricingType,
-} from "@/lib/types";
+import type { PricingCondition, PricingRule, PricingScope, PricingType } from "@/lib/types";
 
 export interface ListPricingRulesRequest {
   organization_id: string;
@@ -48,12 +43,7 @@ export interface UpsertPricingRuleRequest {
   conditions?: Array<
     Omit<
       PricingCondition,
-      | "id"
-      | "pricing_rule_id"
-      | "metadata"
-      | "priority"
-      | "condition_value"
-      | "action_value"
+      "id" | "pricing_rule_id" | "metadata" | "priority" | "condition_value" | "action_value"
     > & {
       condition_value: string | number;
       action_value: number;
@@ -64,9 +54,7 @@ export interface UpsertPricingRuleRequest {
 }
 
 export class PricingService {
-  static async listRules(
-    request: ListPricingRulesRequest,
-  ): Promise<PricingRule[]> {
+  static async listRules(request: ListPricingRulesRequest): Promise<PricingRule[]> {
     try {
       log.debug("PricingService: listing pricing rules", {
         organizationId: request.organization_id,
@@ -92,12 +80,8 @@ export class PricingService {
     }
   }
 
-  static async upsertRule(
-    request: UpsertPricingRuleRequest,
-  ): Promise<PricingRule> {
-    const functionName = request.id
-      ? "update-pricing-rule"
-      : "create-pricing-rule";
+  static async upsertRule(request: UpsertPricingRuleRequest): Promise<PricingRule> {
+    const functionName = request.id ? "update-pricing-rule" : "create-pricing-rule";
 
     try {
       log.debug("PricingService: upserting pricing rule", {
@@ -115,9 +99,8 @@ export class PricingService {
 
       // Check for error in response data (edge functions return errors in data.error)
       if (data && typeof data === "object" && "error" in data) {
-        const errorMessage = typeof data.error === "string"
-          ? data.error
-          : "Failed to upsert pricing rule";
+        const errorMessage =
+          typeof data.error === "string" ? data.error : "Failed to upsert pricing rule";
         log.error("PricingService: Edge function returned error", {
           error: errorMessage,
           data,
@@ -135,11 +118,12 @@ export class PricingService {
 
       return data.pricing_rule as PricingRule;
     } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : typeof err === "object" && err !== null && "message" in err
-        ? String(err.message)
-        : "Unknown error";
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String(err.message)
+            : "Unknown error";
 
       log.error("PricingService: Failed to upsert pricing rule", {
         error: errorMessage,
@@ -160,11 +144,9 @@ export class PricingService {
     try {
       log.debug("PricingService: deleting pricing rule", { id });
 
-      const data = await invokeEdgeFunction<
-        { success: boolean; error?: string }
-      >(
+      const data = await invokeEdgeFunction<{ success: boolean; error?: string }>(
         "delete-pricing-rule",
-        { id },
+        { id }
       );
       if (!data || !data.success) {
         throw new Error("Failed to delete pricing rule");
@@ -183,7 +165,7 @@ export class PricingService {
       dateFrom?: string;
       dateTo?: string;
       pricingContext?: "customer" | "worker";
-    },
+    }
   ): Promise<PricingHistoryEntry[]> {
     try {
       log.debug("PricingService: listing pricing history", {
@@ -214,20 +196,19 @@ export class PricingService {
       }
 
       if (!Array.isArray(data.pricing_history)) {
-        throw new Error(
-          "Invalid response format: pricing_history is not an array",
-        );
+        throw new Error("Invalid response format: pricing_history is not an array");
       }
 
       return data.pricing_history as PricingHistoryEntry[];
     } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : typeof err === "object" && err !== null && "message" in err
-        ? String(err.message)
-        : typeof err === "string"
-        ? err
-        : JSON.stringify(err);
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String(err.message)
+            : typeof err === "string"
+              ? err
+              : JSON.stringify(err);
       log.error("PricingService: Failed to list pricing history", {
         error: errorMessage,
         errorObject: err,
@@ -241,7 +222,12 @@ export interface PricingHistoryEntry {
   id: string;
   field_name: string;
   option_value?: string;
+  /** Display label for a location or hierarchy node; empty when the rule is org-wide (default). */
   location_name?: string;
+  /** Set when the rule applies to a specific site; null means not location-scoped. */
+  location_id?: string | null;
+  /** Set when the rule applies to a region/company node; null means not node-scoped. */
+  location_hierarchy_id?: string | null;
   old_price?: number;
   new_price: number;
   effective_at: string;

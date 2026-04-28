@@ -52,6 +52,8 @@ interface WorkerPaymentSplit {
   final_payment: number; // Total for this worker
   rate_card_id?: string;
   allocation_type: string;
+  /** Rate-card pool share weight (default 1.0). Hours × weight drives the base pool split. */
+  split_weight: number;
 }
 
 interface WorkerPaymentCalculation {
@@ -1332,14 +1334,16 @@ function calculateWorkerSplits({
       team_percentage_bonus: 0,
       final_payment: 0,
       allocation_type: "time_based",
+      split_weight: 1.0,
     };
   });
 
   if (workers.length === 1) {
-    breakdowns[0].time_share = baseWorkerPayment;
-    breakdowns[0].allocation_type = "single_worker";
-    const sw = getWorkerRateCard(rateCardMap, breakdowns[0].worker_id, "split_weight");
-    if (sw) breakdowns[0].rate_card_id = sw.id;
+    const sw = getWorkerRateCard(rateCardMap, breakdowns[0]!.worker_id, "split_weight");
+    breakdowns[0]!.split_weight = sw?.modifier_value ?? 1.0;
+    breakdowns[0]!.time_share = baseWorkerPayment;
+    breakdowns[0]!.allocation_type = "single_worker";
+    if (sw) breakdowns[0]!.rate_card_id = sw.id;
   } else {
     const hours = breakdowns.map((b) => b.hours_worked);
     const weights = workers.map((w) => {
@@ -1364,8 +1368,9 @@ function calculateWorkerSplits({
 
     const shares = splitPoolToShares(baseWorkerPayment, effectivesForPool);
     breakdowns.forEach((b, i) => {
-      b.time_share = Math.round(shares[i] * 100) / 100;
+      b.time_share = Math.round(shares[i]! * 100) / 100;
       b.allocation_type = allocationTag;
+      b.split_weight = weights[i] ?? 1.0;
     });
 
     breakdowns.forEach((b) => {

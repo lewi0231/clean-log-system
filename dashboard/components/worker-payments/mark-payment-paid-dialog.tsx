@@ -2,21 +2,21 @@
 
 import { Button } from "@/components/ui/button";
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { log } from "@/lib/logger";
@@ -43,9 +43,7 @@ export default function MarkPaymentPaidDialog({
     "bank_transfer" | "cash" | "check" | "payroll_system" | "other" | ""
   >("");
   const [paymentReference, setPaymentReference] = useState("");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -87,11 +85,7 @@ export default function MarkPaymentPaidDialog({
         organizationId,
         batchId,
       });
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to mark payment as paid"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to mark payment as paid");
     } finally {
       setLoading(false);
     }
@@ -104,8 +98,8 @@ export default function MarkPaymentPaidDialog({
           <DialogHeader>
             <DialogTitle>Mark Payment as Paid</DialogTitle>
             <DialogDescription>
-              Record payment details after processing payments externally (bank
-              transfer, cash, check, etc.).
+              Record that you completed payment in your bank, payroll, or other system. Tally only
+              stores this record here—it does not move money (see help on the Worker Payments page).
             </DialogDescription>
           </DialogHeader>
 
@@ -118,17 +112,12 @@ export default function MarkPaymentPaidDialog({
                 value={paymentMethod}
                 onValueChange={(value) =>
                   setPaymentMethod(
-                    value as
-                      | "bank_transfer"
-                      | "cash"
-                      | "check"
-                      | "payroll_system"
-                      | "other"
+                    value as "bank_transfer" | "cash" | "check" | "payroll_system" | "other"
                   )
                 }
                 required
               >
-                <SelectTrigger id="payment-method">
+                <SelectTrigger id="payment-method" className="cursor-pointer">
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
@@ -183,12 +172,13 @@ export default function MarkPaymentPaidDialog({
             <Button
               type="button"
               variant="outline"
+              className="cursor-pointer"
               onClick={() => onOpenChange(false)}
               disabled={loading}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="cursor-pointer">
               {loading ? "Saving..." : "Mark as Paid"}
             </Button>
           </DialogFooter>

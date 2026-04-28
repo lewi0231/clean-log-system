@@ -8,15 +8,17 @@ import NumberPricingList from "@/components/pricing/number-pricing-list";
 import OptionPricingEditor from "@/components/pricing/option-pricing-editor";
 import { PricingHistory } from "@/components/pricing/pricing-history";
 import { PricingScopeProvider, usePricingScope } from "@/components/pricing/pricing-scope-context";
+import {
+  PricingFieldTypeNav,
+  type InnerFieldType,
+} from "@/components/pricing/pricing-field-type-nav";
 import TestInvoiceModal from "@/components/pricing/test-invoice-modal";
 import { PageTourWrapper } from "@/components/tours/page-tour-wrapper";
 import { pricingTourSteps } from "@/components/tours/tour-definitions";
 import { TourTriggerButton } from "@/components/tours/tour-trigger-button";
 import { ContextualHelp } from "@/components/ui/contextual-help";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ErrorState } from "@/components/ui/error-state";
 import { FormSkeleton, PageHeaderSkeleton } from "@/components/ui/skeleton-loaders";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,18 +28,18 @@ import useOrganization from "@/hooks/useOrganization";
 import {
   AlertTriangle,
   CheckSquare,
-  ChevronDown,
   DollarSign,
   ExternalLink,
   Hash,
   Layers,
   List,
+  MapPin,
   ScrollText,
   Sparkles,
   TestTube,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export default function PricingPage() {
   const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
@@ -130,7 +132,9 @@ function PricingPageContent({
   const { isFixedPricing, location } = useLocationFixedPricingGuard(locationId);
   const { formatCurrency } = useOrganizationCurrency();
   const [testInvoiceOpen, setTestInvoiceOpen] = useState(false);
-  const [adjustmentsExpanded, setAdjustmentsExpanded] = useState(false);
+  const [mainTab, setMainTab] = useState("pricing");
+
+  const resolvedMainTab = isFixedPricing && mainTab === "invoice-adjustments" ? "pricing" : mainTab;
 
   // Check if there are any priceable fields
   const totalPriceableFields =
@@ -140,8 +144,8 @@ function PricingPageContent({
     groupedBreakdownFields.length;
   const hasNoPriceableFields = totalPriceableFields === 0;
 
-  // Determine the first active tab (leftmost tab that has fields)
-  const defaultTab = useMemo(() => {
+  // Determine the first active field type (leftmost type that has fields)
+  const defaultFieldType = useMemo((): InnerFieldType => {
     if (!isFixedPricing) {
       if (numberFields.length > 0) return "number-pricing";
       if (booleanFields.length > 0) return "boolean-pricing";
@@ -158,6 +162,14 @@ function PricingPageContent({
     groupedBreakdownFields.length,
   ]);
 
+  // Inner field type selection for sidebar navigation (S2 §4.1.2)
+  const [innerFieldType, setInnerFieldType] = useState<InnerFieldType>(defaultFieldType);
+
+  // Callback for "View history" from field cards (S2 §4.6.4)
+  const handleNavigateToHistory = useCallback(() => {
+    setMainTab("history");
+  }, []);
+
   return (
     <PageTourWrapper pageId="pricing" steps={pricingTourSteps}>
       <div className="mb-8 flex items-start justify-between">
@@ -173,32 +185,45 @@ function PricingPageContent({
         </div>
       </div>
 
-      <Tabs defaultValue="set-pricing" className="space-y-6">
-        <TabsList className="w-full justify-start">
-          <TabsTrigger value="set-pricing" className="cursor-pointer">
+      <Tabs value={resolvedMainTab} onValueChange={setMainTab} className="space-y-6">
+        <TabsList className="w-full h-auto min-h-10 flex-wrap justify-start gap-1">
+          <TabsTrigger
+            value="pricing"
+            className="cursor-pointer"
+            title="Set prices by field type for the current scope"
+          >
             <DollarSign className="h-4 w-4 mr-2" />
             Pricing
           </TabsTrigger>
-          <TabsTrigger value="pricing-history" className="cursor-pointer">
+          <TabsTrigger
+            value="history"
+            className="cursor-pointer"
+            title="Chronological log of pricing changes—what changed, when, and the scope they applied to"
+          >
             <ScrollText className="h-4 w-4 mr-2" />
-            Pricing History
+            History
           </TabsTrigger>
+          <TabsTrigger
+            value="scope"
+            className="cursor-pointer"
+            title="Choose organization-wide, region/company, or a specific site, and the effective date range for new rules"
+          >
+            <MapPin className="h-4 w-4 mr-2" />
+            Scope
+          </TabsTrigger>
+          {!isFixedPricing && (
+            <TabsTrigger
+              value="invoice-adjustments"
+              className="cursor-pointer"
+              title="Call-out fees, markups, and other base invoice adjustments for the current scope"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Invoice adjustments
+            </TabsTrigger>
+          )}
         </TabsList>
 
-        <TabsContent value="set-pricing" className="space-y-6">
-          <div data-tour="location-scope">
-            <LocationScopeSelector
-              selectedNodeId={locationNodeId}
-              selectedLocationId={locationId}
-              onNodeChange={setLocationNodeId}
-              onLocationChange={setLocationId}
-              effectiveDate={effectiveDate}
-              onEffectiveDateChange={setEffectiveDate}
-              expirationDate={expirationDate}
-              onExpirationDateChange={setExpirationDate}
-            />
-          </div>
-
+        <TabsContent value="pricing" className="space-y-6">
           {isFixedPricing && location && (
             <Card className="border-amber-500/20 bg-amber-500/5">
               <CardContent className="pt-6">
@@ -242,59 +267,6 @@ function PricingPageContent({
           )}
 
           <div className="space-y-6">
-            {/* Invoice Adjustments - Prominent Card Above Tabs */}
-            {!isFixedPricing && (
-              <Card className="border-primary/20 bg-primary/5" data-tour="invoice-adjustments">
-                <Collapsible open={adjustmentsExpanded} onOpenChange={setAdjustmentsExpanded}>
-                  <CollapsibleTrigger asChild>
-                    <CardHeader className="cursor-pointer hover:bg-primary/10 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                            <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <CardTitle className="text-base">Invoice Adjustments</CardTitle>
-                              <ContextualHelp label="How invoice adjustments work">
-                                <p>
-                                  Add a call-out fee or a markup to every invoice. Example:{" "}
-                                  <span className="font-medium text-foreground">
-                                    $100 job + $50 fee = $150
-                                  </span>
-                                  , or multiply by 1.15 for a 15% markup.
-                                </p>
-                              </ContextualHelp>
-                            </div>
-                            <CardDescription>
-                              Add call-out fees, markups, or service-based adjustments to every
-                              invoice
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <ChevronDown
-                          className={`h-5 w-5 text-muted-foreground transition-transform ${
-                            adjustmentsExpanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      </div>
-                    </CardHeader>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <CardContent className="pt-0">
-                      <BasePricingEditor
-                        fieldConfigs={fieldConfigs}
-                        locationHierarchyId={locationNodeId}
-                        locationId={locationId}
-                        effectiveAt={effectiveDate}
-                        organizationId={organizationId}
-                      />
-                    </CardContent>
-                  </CollapsibleContent>
-                </Collapsible>
-              </Card>
-            )}
-
             {/* Smart Empty State for First-Time Users */}
             {hasNoPriceableFields && (
               <Card className="border-dashed">
@@ -350,286 +322,354 @@ function PricingPageContent({
               </Card>
             )}
 
-            {/* Field Type Pricing Tabs */}
+            {/* Field Type Pricing — Sidebar + Main Layout (S2 §4.1) */}
             {!hasNoPriceableFields && (
-              <Tabs defaultValue={defaultTab} className="space-y-6">
-                <TabsList className="w-full justify-start" data-tour="pricing-tabs">
-                  <TabsTrigger
-                    value="number-pricing"
-                    disabled={isFixedPricing || numberFields.length === 0}
-                    data-tour="number-pricing-tab"
-                    className={`cursor-pointer ${numberFields.length === 0 ? "opacity-50" : ""}`}
-                  >
-                    <div className="h-5 w-5 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-2">
-                      <Hash className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    Number
-                    {numberFields.length > 0 ? (
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {numberFields.length}
-                      </Badge>
-                    ) : (
-                      <span className="ml-2 text-xs text-muted-foreground">(0)</span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="boolean-pricing"
-                    disabled={isFixedPricing || booleanFields.length === 0}
-                    data-tour="boolean-pricing-tab"
-                    className={`cursor-pointer ${booleanFields.length === 0 ? "opacity-50" : ""}`}
-                  >
-                    <div className="h-5 w-5 rounded bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-2">
-                      <CheckSquare className="h-3 w-3 text-green-600 dark:text-green-400" />
-                    </div>
-                    Boolean
-                    {booleanFields.length > 0 ? (
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {booleanFields.length}
-                      </Badge>
-                    ) : (
-                      <span className="ml-2 text-xs text-muted-foreground">(0)</span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="select-pricing"
-                    disabled={isFixedPricing || selectFields.length === 0}
-                    data-tour="select-pricing-tab"
-                    className={`cursor-pointer ${selectFields.length === 0 ? "opacity-50" : ""}`}
-                  >
-                    <div className="h-5 w-5 rounded bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-2">
-                      <List className="h-3 w-3 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    Select
-                    {selectFields.length > 0 ? (
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {selectFields.length}
-                      </Badge>
-                    ) : (
-                      <span className="ml-2 text-xs text-muted-foreground">(0)</span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="group-pricing"
-                    disabled={isFixedPricing || groupedBreakdownFields.length === 0}
-                    data-tour="group-pricing-tab"
-                    className={`cursor-pointer ${
-                      groupedBreakdownFields.length === 0 ? "opacity-50" : ""
-                    }`}
-                  >
-                    <div className="h-5 w-5 rounded bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mr-2">
-                      <Layers className="h-3 w-3 text-orange-600 dark:text-orange-400" />
-                    </div>
-                    Group
-                    {groupedBreakdownFields.length > 0 ? (
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        {groupedBreakdownFields.length}
-                      </Badge>
-                    ) : (
-                      <span className="ml-2 text-xs text-muted-foreground">(0)</span>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
+              <div className="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-6">
+                {/* Sidebar: Field type navigation (desktop: vertical, mobile: horizontal scroll) */}
+                <aside className="hidden lg:block">
+                  <PricingFieldTypeNav
+                    value={innerFieldType}
+                    onValueChange={setInnerFieldType}
+                    numberCount={numberFields.length}
+                    booleanCount={booleanFields.length}
+                    selectCount={selectFields.length}
+                    groupCount={groupedBreakdownFields.length}
+                    disabled={fieldConfigsLoading}
+                    isFixedPricing={isFixedPricing}
+                  />
+                </aside>
 
-                <TabsContent value="number-pricing" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <CardTitle>Number Field Pricing</CardTitle>
-                        <ContextualHelp label="How number field pricing works">
-                          <p>
-                            If &quot;Windows&quot; costs $5 each and a worker enters 10 windows →{" "}
-                            <span className="font-medium text-foreground">$50</span>
-                          </p>
-                        </ContextualHelp>
-                      </div>
-                      <CardDescription>
-                        Set per-unit prices for countable items. Workers enter a quantity, and the
-                        price is calculated automatically.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <NumberPricingList
-                        fieldConfigs={fieldConfigs}
-                        configsLoading={fieldConfigsLoading}
-                        locationHierarchyId={locationNodeId}
-                        locationId={locationId}
-                        effectiveAt={effectiveDate}
-                        organizationId={organizationId}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                {/* Mobile: Horizontal scroll row of field types */}
+                <div className="lg:hidden overflow-x-auto -mx-4 px-4 pb-2">
+                  <div className="flex gap-2 min-w-max" role="radiogroup" aria-label="Field type">
+                    {[
+                      {
+                        type: "number-pricing" as const,
+                        label: "Number",
+                        count: numberFields.length,
+                        icon: Hash,
+                        color: "blue",
+                      },
+                      {
+                        type: "boolean-pricing" as const,
+                        label: "Boolean",
+                        count: booleanFields.length,
+                        icon: CheckSquare,
+                        color: "green",
+                      },
+                      {
+                        type: "select-pricing" as const,
+                        label: "Select",
+                        count: selectFields.length,
+                        icon: List,
+                        color: "purple",
+                      },
+                      {
+                        type: "group-pricing" as const,
+                        label: "Group",
+                        count: groupedBreakdownFields.length,
+                        icon: Layers,
+                        color: "orange",
+                      },
+                    ].map(({ type, label, count, icon: Icon, color }) => {
+                      const isSelected = innerFieldType === type;
+                      const isDisabled = isFixedPricing || count === 0;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          role="radio"
+                          aria-checked={isSelected}
+                          disabled={isDisabled}
+                          onClick={() => !isDisabled && setInnerFieldType(type)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm whitespace-nowrap min-h-[44px] transition-colors
+                            ${isSelected ? "bg-primary/10 border border-primary/30 text-primary font-medium" : "bg-muted/50 border border-transparent hover:bg-muted"}
+                            ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                        >
+                          <Icon className={`h-4 w-4 text-${color}-600 dark:text-${color}-400`} />
+                          {label}
+                          <span className="text-xs text-muted-foreground">({count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                <TabsContent value="boolean-pricing" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <CardTitle>Boolean Field Pricing</CardTitle>
-                        <ContextualHelp label="How boolean field pricing works">
-                          <p>
-                            If &quot;Premium Materials&quot; costs $25 and is checked →{" "}
-                            <span className="font-medium text-foreground">+$25</span> added to
-                            invoice.
-                          </p>
-                        </ContextualHelp>
-                      </div>
-                      <CardDescription>
-                        Set fixed prices for yes/no options. The price is added only when the worker
-                        checks the box.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <BooleanPricingList
-                        fieldConfigs={fieldConfigs}
-                        configsLoading={fieldConfigsLoading}
-                        locationHierarchyId={locationNodeId}
-                        locationId={locationId}
-                        effectiveAt={effectiveDate}
-                        organizationId={organizationId}
-                      />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                {/* Main content area */}
+                <main className="min-h-0 overflow-y-auto">
+                  {/* Number Field Pricing */}
+                  {innerFieldType === "number-pricing" && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <CardTitle>Number Field Pricing</CardTitle>
+                          <ContextualHelp label="How number field pricing works">
+                            <p>
+                              If &quot;Windows&quot; costs $5 each and a worker enters 10 windows →{" "}
+                              <span className="font-medium text-foreground">$50</span>
+                            </p>
+                          </ContextualHelp>
+                        </div>
+                        <CardDescription>
+                          Set per-unit prices for countable items. Workers enter a quantity, and the
+                          price is calculated automatically.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <NumberPricingList
+                          fieldConfigs={fieldConfigs}
+                          configsLoading={fieldConfigsLoading}
+                          locationHierarchyId={locationNodeId}
+                          locationId={locationId}
+                          effectiveAt={effectiveDate}
+                          organizationId={organizationId}
+                          onNavigateToHistory={handleNavigateToHistory}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
 
-                <TabsContent value="select-pricing" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <CardTitle>Select Field Pricing</CardTitle>
-                        <ContextualHelp label="How select field pricing works">
-                          <p>
-                            If &quot;Service Type&quot; has Basic ($100) and Premium ($200), and the
-                            worker selects Premium →{" "}
-                            <span className="font-medium text-foreground">+$200</span>
-                          </p>
-                        </ContextualHelp>
-                      </div>
-                      <CardDescription>
-                        Set different prices for each option in dropdown fields. Workers choose an
-                        option, and its price is added to the invoice.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {selectFields.length > 0 ? (
-                        <div className="space-y-6">
-                          {selectFields.map((fieldConfig) => (
-                            <div key={fieldConfig.id} className="space-y-4">
-                              <div>
-                                <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
+                  {/* Boolean Field Pricing */}
+                  {innerFieldType === "boolean-pricing" && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <CardTitle>Boolean Field Pricing</CardTitle>
+                          <ContextualHelp label="How boolean field pricing works">
+                            <p>
+                              If &quot;Premium Materials&quot; costs $25 and is checked →{" "}
+                              <span className="font-medium text-foreground">+$25</span> added to
+                              invoice.
+                            </p>
+                          </ContextualHelp>
+                        </div>
+                        <CardDescription>
+                          Set fixed prices for yes/no options. The price is added only when the
+                          worker checks the box.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <BooleanPricingList
+                          fieldConfigs={fieldConfigs}
+                          configsLoading={fieldConfigsLoading}
+                          locationHierarchyId={locationNodeId}
+                          locationId={locationId}
+                          effectiveAt={effectiveDate}
+                          organizationId={organizationId}
+                          onNavigateToHistory={handleNavigateToHistory}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Select Field Pricing */}
+                  {innerFieldType === "select-pricing" && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <CardTitle>Select Field Pricing</CardTitle>
+                          <ContextualHelp label="How select field pricing works">
+                            <p>
+                              If &quot;Service Type&quot; has Basic ($100) and Premium ($200), and
+                              the worker selects Premium →{" "}
+                              <span className="font-medium text-foreground">+$200</span>
+                            </p>
+                          </ContextualHelp>
+                        </div>
+                        <CardDescription>
+                          Set different prices for each option in dropdown fields. Workers choose an
+                          option, and its price is added to the invoice.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {selectFields.length > 0 ? (
+                          <div className="space-y-6">
+                            {selectFields.map((fieldConfig) => (
+                              <div key={fieldConfig.id} className="space-y-4">
+                                <div>
+                                  <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Configure pricing for each option in this field
+                                  </p>
+                                </div>
+                                <OptionPricingEditor
+                                  fieldConfig={fieldConfig}
+                                  locationHierarchyId={locationNodeId}
+                                  locationId={locationId}
+                                  effectiveAt={effectiveDate}
+                                  organizationId={organizationId}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-8">
+                            <div className="text-center space-y-4 max-w-md mx-auto">
+                              <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto">
+                                <List className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <div className="space-y-2">
+                                <h3 className="font-semibold">No select fields... yet</h3>
                                 <p className="text-sm text-muted-foreground">
-                                  Configure pricing for each option in this field
+                                  Select fields let customers choose options like &quot;Basic&quot;
+                                  or &quot;Premium&quot; service tiers. Add one to your mobile app
+                                  forms to set option-based pricing.
                                 </p>
                               </div>
-                              <OptionPricingEditor
-                                fieldConfig={fieldConfig}
-                                locationHierarchyId={locationNodeId}
-                                locationId={locationId}
-                                effectiveAt={effectiveDate}
-                                organizationId={organizationId}
-                              />
+                              <Link href="/dashboard/mobile-config" className="cursor-pointer">
+                                <Button variant="outline" size="sm">
+                                  Go to Mobile App Configuration
+                                </Button>
+                              </Link>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="py-8">
-                          <div className="text-center space-y-4 max-w-md mx-auto">
-                            <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mx-auto">
-                              <List className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                            </div>
-                            <div className="space-y-2">
-                              <h3 className="font-semibold">No select fields... yet</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Select fields let customers choose options like &quot;Basic&quot; or
-                                &quot;Premium&quot; service tiers. Add one to your mobile app forms
-                                to set option-based pricing.
-                              </p>
-                            </div>
-                            <Link href="/dashboard/mobile-config" className="cursor-pointer">
-                              <Button variant="outline" size="sm">
-                                Go to Mobile App Configuration
-                              </Button>
-                            </Link>
                           </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
 
-                <TabsContent value="group-pricing" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <CardTitle>Group Field Pricing</CardTitle>
-                        <ContextualHelp label="How grouped breakdown pricing works">
-                          <p>
-                            If Nissan costs $7 and Toyota costs $8, and the worker enters 5 Nissan +
-                            3 Toyota →{" "}
-                            <span className="font-medium text-foreground">$35 + $24 = $59</span>
-                          </p>
-                        </ContextualHelp>
-                      </div>
-                      <CardDescription>
-                        Set per-unit prices for each category in grouped breakdown fields. Workers
-                        count items by group, and each group can have its own price.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {groupedBreakdownFields.length > 0 ? (
-                        <div className="space-y-6">
-                          {groupedBreakdownFields.map((fieldConfig) => (
-                            <div key={fieldConfig.id} className="space-y-4">
-                              <div>
-                                <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
+                  {/* Group Field Pricing */}
+                  {innerFieldType === "group-pricing" && (
+                    <Card>
+                      <CardHeader>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <CardTitle>Group Field Pricing</CardTitle>
+                          <ContextualHelp label="How grouped breakdown pricing works">
+                            <p>
+                              If Nissan costs $7 and Toyota costs $8, and the worker enters 5 Nissan
+                              + 3 Toyota →{" "}
+                              <span className="font-medium text-foreground">$35 + $24 = $59</span>
+                            </p>
+                          </ContextualHelp>
+                        </div>
+                        <CardDescription>
+                          Set per-unit prices for each category in grouped breakdown fields. Workers
+                          count items by group, and each group can have its own price.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {groupedBreakdownFields.length > 0 ? (
+                          <div className="space-y-6">
+                            {groupedBreakdownFields.map((fieldConfig) => (
+                              <div key={fieldConfig.id} className="space-y-4">
+                                <div>
+                                  <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Configure pricing for each group in this field
+                                  </p>
+                                </div>
+                                <OptionPricingEditor
+                                  fieldConfig={fieldConfig}
+                                  locationHierarchyId={locationNodeId}
+                                  locationId={locationId}
+                                  effectiveAt={effectiveDate}
+                                  organizationId={organizationId}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-8">
+                            <div className="text-center space-y-4 max-w-md mx-auto">
+                              <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto">
+                                <Layers className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                              </div>
+                              <div className="space-y-2">
+                                <h3 className="font-semibold">
+                                  No grouped breakdown fields... yet
+                                </h3>
                                 <p className="text-sm text-muted-foreground">
-                                  Configure pricing for each group in this field
+                                  Grouped breakdown fields let workers count items by category
+                                  (e.g., &quot;5 Nissan, 3 Toyota&quot;). Add one to your mobile app
+                                  forms to set per-group pricing.
                                 </p>
                               </div>
-                              <OptionPricingEditor
-                                fieldConfig={fieldConfig}
-                                locationHierarchyId={locationNodeId}
-                                locationId={locationId}
-                                effectiveAt={effectiveDate}
-                                organizationId={organizationId}
-                              />
+                              <Link href="/dashboard/mobile-config" className="cursor-pointer">
+                                <Button variant="outline" size="sm">
+                                  Go to Mobile App Configuration
+                                </Button>
+                              </Link>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="py-8">
-                          <div className="text-center space-y-4 max-w-md mx-auto">
-                            <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mx-auto">
-                              <Layers className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                            </div>
-                            <div className="space-y-2">
-                              <h3 className="font-semibold">No grouped breakdown fields... yet</h3>
-                              <p className="text-sm text-muted-foreground">
-                                Grouped breakdown fields let workers count items by category (e.g.,
-                                &quot;5 Nissan, 3 Toyota&quot;). Add one to your mobile app forms to
-                                set per-group pricing.
-                              </p>
-                            </div>
-                            <Link href="/dashboard/mobile-config" className="cursor-pointer">
-                              <Button variant="outline" size="sm">
-                                Go to Mobile App Configuration
-                              </Button>
-                            </Link>
                           </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+                </main>
+              </div>
             )}
           </div>
         </TabsContent>
 
-        <TabsContent value="pricing-history" className="space-y-6">
+        <TabsContent value="history" className="space-y-6">
           <div data-tour="pricing-history-tab">
             <PricingHistory organizationId={organizationId} />
           </div>
         </TabsContent>
+
+        <TabsContent value="scope" className="space-y-6">
+          <div data-tour="location-scope" className="space-y-4">
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              Choose the location hierarchy node (or specific location) and the effective date range
+              for prices. This scope applies to the <strong>Pricing</strong> tab and{" "}
+              <strong>Invoice adjustments</strong>.
+            </p>
+            <LocationScopeSelector
+              selectedNodeId={locationNodeId}
+              selectedLocationId={locationId}
+              onNodeChange={setLocationNodeId}
+              onLocationChange={setLocationId}
+              effectiveDate={effectiveDate}
+              onEffectiveDateChange={setEffectiveDate}
+              expirationDate={expirationDate}
+              onExpirationDateChange={setExpirationDate}
+            />
+          </div>
+        </TabsContent>
+
+        {!isFixedPricing && (
+          <TabsContent
+            value="invoice-adjustments"
+            className="space-y-6"
+            data-tour="invoice-adjustments"
+          >
+            <Card>
+              <CardHeader>
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <CardTitle className="text-base">Invoice adjustments</CardTitle>
+                      <ContextualHelp label="How invoice adjustments work">
+                        <p>
+                          Add a call-out fee or a markup to every invoice. Example:{" "}
+                          <span className="font-medium text-foreground">
+                            $100 job + $50 fee = $150
+                          </span>
+                          , or multiply by 1.15 for a 15% markup.
+                        </p>
+                      </ContextualHelp>
+                    </div>
+                    <CardDescription>
+                      Add call-out fees, markups, or service-based adjustments to every invoice.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <BasePricingEditor
+                  fieldConfigs={fieldConfigs}
+                  locationHierarchyId={locationNodeId}
+                  locationId={locationId}
+                  effectiveAt={effectiveDate}
+                  organizationId={organizationId}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Sticky Test Invoice Button */}

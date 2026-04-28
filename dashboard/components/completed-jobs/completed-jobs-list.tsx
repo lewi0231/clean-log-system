@@ -30,6 +30,8 @@ interface CompletedJobsListProps {
   organizationId: string | null;
   /** Field configs from the page (avoids useFieldConfigs in nested components). */
   fieldConfigs: FieldConfig[];
+  /** When set (e.g. `?job=id` from worker payment history), open this job. */
+  focusJobId?: string | null;
 }
 
 // Standard fields that should be displayed in a specific order
@@ -46,8 +48,16 @@ export default function CompletedJobsList({
   sendFeedbackEmail,
   organizationId,
   fieldConfigs: editDialogFieldConfigs,
+  focusJobId,
 }: CompletedJobsListProps) {
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [pickedJob, setPickedJob] = useState<Job | null>(null);
+  const [queryDismissed, setQueryDismissed] = useState(false);
+  const jobFromQuery = useMemo(
+    () => (focusJobId ? (jobs.find((j) => j.id === focusJobId) ?? null) : null),
+    [focusJobId, jobs]
+  );
+  const selectedJob = pickedJob ?? (queryDismissed ? null : jobFromQuery);
+
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
 
   // Extract all unique keys from submission_data across all jobs
@@ -102,9 +112,7 @@ export default function CompletedJobsList({
     });
 
     // Sort sections by order_position
-    const sortedSections = [...sections].sort(
-      (a, b) => a.order_position - b.order_position,
-    );
+    const sortedSections = [...sections].sort((a, b) => a.order_position - b.order_position);
 
     // Create a set of all field IDs that are in sections
     const sectionedFieldIds = new Set<string>();
@@ -123,9 +131,7 @@ export default function CompletedJobsList({
         if (
           fieldConfig &&
           submissionDataKeys.includes(fieldConfig.name) &&
-          !STANDARD_FIELDS.includes(
-            fieldConfig.name as (typeof STANDARD_FIELDS)[number],
-          )
+          !STANDARD_FIELDS.includes(fieldConfig.name as (typeof STANDARD_FIELDS)[number])
         ) {
           // Only add if not already in standard fields
           sectioned.push(fieldConfig.name);
@@ -174,7 +180,7 @@ export default function CompletedJobsList({
     value: unknown,
     fieldExists: boolean,
     fieldName?: string,
-    jobWorkers?: Array<{ id: string; name: string }>,
+    jobWorkers?: Array<{ id: string; name: string }>
   ): string | React.ReactNode => {
     // If field doesn't exist in this job's submission_data, show N/A indicator
     if (!fieldExists) {
@@ -189,10 +195,7 @@ export default function CompletedJobsList({
     // Also handle string "true"/"false" which can occur in JSON
     if (typeof value === "boolean") {
       return value ? (
-        <CheckCircle2
-          className="h-4 w-4 text-green-600 mx-auto"
-          aria-label="Yes"
-        />
+        <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" aria-label="Yes" />
       ) : (
         <span className="text-muted-foreground text-center">-</span>
       );
@@ -259,7 +262,7 @@ export default function CompletedJobsList({
             typeof item === "object" &&
             item !== null &&
             "worker_id" in item &&
-            ("start_time" in item || "finish_time" in item),
+            ("start_time" in item || "finish_time" in item)
         )
       ) {
         // Build a worker name map
@@ -278,23 +281,17 @@ export default function CompletedJobsList({
                   start_time?: string;
                   finish_time?: string;
                 },
-                idx: number,
+                idx: number
               ) => {
-                const workerName =
-                  workerNameMap.get(item.worker_id) || "Unknown";
-                const startStr = item.start_time
-                  ? formatTimeCompact(item.start_time)
-                  : "?";
-                const finishStr = item.finish_time
-                  ? formatTimeCompact(item.finish_time)
-                  : "?";
+                const workerName = workerNameMap.get(item.worker_id) || "Unknown";
+                const startStr = item.start_time ? formatTimeCompact(item.start_time) : "?";
+                const finishStr = item.finish_time ? formatTimeCompact(item.finish_time) : "?";
                 return (
                   <div key={idx}>
-                    <span className="font-medium">{workerName}:</span>{" "}
-                    {startStr} - {finishStr}
+                    <span className="font-medium">{workerName}:</span> {startStr} - {finishStr}
                   </div>
                 );
-              },
+              }
             )}
           </div>
         );
@@ -304,10 +301,7 @@ export default function CompletedJobsList({
       if (
         value.every(
           (item) =>
-            typeof item === "object" &&
-            item !== null &&
-            "brand" in item &&
-            "quantity" in item,
+            typeof item === "object" && item !== null && "brand" in item && "quantity" in item
         )
       ) {
         // Format as "Option: Quantity, Option: Quantity"
@@ -345,7 +339,7 @@ export default function CompletedJobsList({
 
   // Calculate feedback status
   const getFeedbackStatus = (
-    job: Job,
+    job: Job
   ): {
     label: string;
     variant: "default" | "secondary" | "destructive" | "outline";
@@ -375,7 +369,7 @@ export default function CompletedJobsList({
 
   // Job-level invoice status: only whether an invoice exists for this job
   const getJobInvoiceStatus = (
-    job: Job,
+    job: Job
   ): { status: "not_invoiced" | "invoice_created"; label: string } => {
     const invoices = job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
     if (invoices.length === 0) {
@@ -389,9 +383,7 @@ export default function CompletedJobsList({
   }
 
   if (error) {
-    return (
-      <div className="text-center py-8 text-destructive">Error: {error}</div>
-    );
+    return <div className="text-center py-8 text-destructive">Error: {error}</div>;
   }
 
   // Column order: Status, Location, Workers, Ordered Fields, Submitted By, Completed At, Last Updated, Last Updated By
@@ -409,11 +401,7 @@ export default function CompletedJobsList({
               {orderedFields.map((key) => (
                 <TableHead
                   key={key}
-                  className={
-                    key === "notes"
-                      ? "min-w-[200px]"
-                      : "min-w-[120px] text-center"
-                  }
+                  className={key === "notes" ? "min-w-[200px]" : "min-w-[120px] text-center"}
                 >
                   {formatColumnHeader(key)}
                 </TableHead>
@@ -436,7 +424,10 @@ export default function CompletedJobsList({
                 <TableRow
                   key={job.id}
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => setSelectedJob(job)}
+                  onClick={() => {
+                    setPickedJob(job);
+                    setQueryDismissed(true);
+                  }}
                 >
                   <TableCell>
                     <Badge
@@ -462,10 +453,7 @@ export default function CompletedJobsList({
                             </Badge>
                           )}
                           {getFeedbackStatus(job) && (
-                            <Badge
-                              variant={getFeedbackStatus(job)!.variant}
-                              className="text-xs"
-                            >
+                            <Badge variant={getFeedbackStatus(job)!.variant} className="text-xs">
                               {getFeedbackStatus(job)!.label}
                             </Badge>
                           )}
@@ -492,9 +480,7 @@ export default function CompletedJobsList({
                       <TableCell
                         key={key}
                         className={
-                          key === "notes"
-                            ? "max-w-[300px] whitespace-normal"
-                            : "text-center"
+                          key === "notes" ? "max-w-[300px] whitespace-normal" : "text-center"
                         }
                       >
                         {formatValue(value, fieldExists, key, job.workers)}
@@ -508,9 +494,7 @@ export default function CompletedJobsList({
                     {new Date(job.completed_at).toLocaleString()}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {job.last_updated_at
-                      ? new Date(job.last_updated_at).toLocaleString()
-                      : "-"}
+                    {job.last_updated_at ? new Date(job.last_updated_at).toLocaleString() : "-"}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {job.last_updated_by || "-"}
@@ -526,7 +510,8 @@ export default function CompletedJobsList({
         open={!!selectedJob}
         onOpenChange={(open) => {
           if (!open) {
-            setSelectedJob(null);
+            setPickedJob(null);
+            setQueryDismissed(true);
           }
         }}
         job={selectedJob}

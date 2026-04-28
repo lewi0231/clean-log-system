@@ -52,6 +52,7 @@ serve(async (req) => {
       gst_inclusive,
       gst_rate_percent,
       edit_window_minutes,
+      worker_payment_cycle_config,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -463,6 +464,107 @@ serve(async (req) => {
       }
     }
 
+    // Handle worker pay period config (organization_settings.worker_payment_cycle_config JSONB)
+    if (worker_payment_cycle_config !== undefined) {
+      if (
+        worker_payment_cycle_config !== null &&
+        typeof worker_payment_cycle_config !== "object"
+      ) {
+        return errorResponse(
+          "worker_payment_cycle_config must be an object or null",
+          400,
+        );
+      }
+
+      if (worker_payment_cycle_config !== null) {
+        const cfg = worker_payment_cycle_config as Record<string, unknown>;
+        const freq = cfg.payment_frequency;
+        if (
+          freq != null &&
+          freq !== "weekly" && freq !== "fortnightly" && freq !== "monthly"
+        ) {
+          return errorResponse(
+            "worker_payment_cycle_config.payment_frequency must be weekly, fortnightly, or monthly",
+            400,
+          );
+        }
+        const dow = cfg.payment_day_of_week;
+        if (dow != null) {
+          const n = Number(dow);
+          if (
+            isNaN(n) || !Number.isInteger(n) || n < 1 || n > 7
+          ) {
+            return errorResponse(
+              "worker_payment_cycle_config.payment_day_of_week must be 1–7 (ISO: Mon=1 … Sun=7)",
+              400,
+            );
+          }
+        }
+        const dom = cfg.payment_day_of_month;
+        if (dom != null) {
+          const n = Number(dom);
+          if (
+            isNaN(n) || !Number.isInteger(n) || n < 1 || n > 31
+          ) {
+            return errorResponse(
+              "worker_payment_cycle_config.payment_day_of_month must be 1–31",
+              400,
+            );
+          }
+        }
+        const tz = cfg.timezone;
+        if (tz != null && typeof tz === "string" && tz.trim()) {
+          try {
+            new Intl.DateTimeFormat("en-US", { timeZone: tz.trim() });
+          } catch {
+            return errorResponse(
+              "worker_payment_cycle_config.timezone must be a valid IANA time zone",
+              400,
+            );
+          }
+        } else if (tz != null && typeof tz !== "string") {
+          return errorResponse(
+            "worker_payment_cycle_config.timezone must be a string or null",
+            400,
+          );
+        }
+      }
+
+      const { data: existingPaySettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      if (existingPaySettings) {
+        const { error: payErr } = await supabase
+          .from("organization_settings")
+          .update({
+            worker_payment_cycle_config,
+          })
+          .eq("id", existingPaySettings.id);
+
+        if (payErr) {
+          logger.error("Failed to update worker_payment_cycle_config", {
+            error: payErr,
+          });
+        }
+      } else {
+        const { error: payErr } = await supabase
+          .from("organization_settings")
+          .insert({
+            organization_id,
+            worker_payment_cycle_config,
+          });
+
+        if (payErr) {
+          logger.error("Failed to create organization_settings with pay period", {
+            error: payErr,
+          });
+        }
+      }
+    }
+
     // Only update organization table if there are fields to update
     let organization = null;
     if (Object.keys(updateData).length > 0) {
@@ -495,7 +597,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes, worker_payment_cycle_config",
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -565,6 +667,8 @@ serve(async (req) => {
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
         edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
+        worker_payment_cycle_config:
+          orgSettings?.worker_payment_cycle_config ?? null,
       },
     });
   } catch (error) {

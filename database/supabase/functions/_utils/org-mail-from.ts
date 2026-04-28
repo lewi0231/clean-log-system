@@ -14,7 +14,8 @@ export type MailKind =
   | "payment_confirmation"
   | "admin_invoice_notification"
   | "invoice_reminder"
-  | "feedback_request";
+  | "feedback_request"
+  | "worker_remittance";
 
 export type FromDomainSource = "org" | "platform";
 
@@ -45,6 +46,7 @@ function localPartForKind(kind: MailKind): string {
     case "invoice_reminder":
       return "invoices";
     case "payment_confirmation":
+    case "worker_remittance":
       return "payments";
     case "admin_invoice_notification":
       return "noreply";

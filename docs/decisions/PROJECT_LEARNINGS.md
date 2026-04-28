@@ -7,22 +7,23 @@ This document captures project-specific learnings that complement the universal 
 | **Framework Version** | 4.8.1      |
 | **Project**           | JobFlow    |
 | **Created**           | 2026-01-31 |
-| **Last Updated**      | 2026-04-11 |
+| **Last Updated**      | 2026-04-12 |
 
 ---
 
 ## Learnings Index
 
-| #   | Title                                                                           | Tag         | Date       |
-| --- | ------------------------------------------------------------------------------- | ----------- | ---------- |
-| 1   | Always use React Query (useQuery) for data fetching                             | react       | 2026-02-14 |
-| 2   | Real-time pattern: Supabase + React Query invalidation                          | real-time   | 2026-02-14 |
-| 3   | Job Colleague Confirmation Workflow                                             | workflow    | 2026-02-14 |
-| 4   | Deno TypeScript Strict Literal Type Narrowing                                   | typescript  | 2026-02-14 |
-| 5   | Testing React Components with Tooltips in Vitest                                | testing     | 2026-02-14 |
-| 6   | Don't mix useOptimistic with React Query                                        | react       | 2026-02-15 |
-| 7   | Dashboard logging: use `log` / `createLogger`, not `console.*`                  | engineering | 2026-04-11 |
-| 8   | In-app notifications: end-to-end checklist (worker_active, bell, RLS, Realtime) | real-time   | 2026-04-11 |
+| #   | Title                                                                               | Tag         | Date       |
+| --- | ----------------------------------------------------------------------------------- | ----------- | ---------- |
+| 1   | Always use React Query (useQuery) for data fetching                                 | react       | 2026-02-14 |
+| 2   | Real-time pattern: Supabase + React Query invalidation                              | real-time   | 2026-02-14 |
+| 3   | Job Colleague Confirmation Workflow                                                 | workflow    | 2026-02-14 |
+| 4   | Deno TypeScript Strict Literal Type Narrowing                                       | typescript  | 2026-02-14 |
+| 5   | Testing React Components with Tooltips in Vitest                                    | testing     | 2026-02-14 |
+| 6   | Don't mix useOptimistic with React Query                                            | react       | 2026-02-15 |
+| 7   | Dashboard logging: use `log` / `createLogger`, not `console.*`                      | engineering | 2026-04-11 |
+| 8   | In-app notifications: end-to-end checklist (worker_active, bell, RLS, Realtime)     | real-time   | 2026-04-11 |
+| 9   | Supplementary help: prefer `ContextualHelp` over hover `Tooltip` when a click is OK | ui          | 2026-04-12 |
 
 ---
 
@@ -122,6 +123,7 @@ Combine Supabase Realtime subscriptions with React Query cache invalidation:
    ```
 
 3. **Use the realtime hook** in your data hook:
+
    ```typescript
    export function useMyEntity() {
      const { organizationId } = useOrganization();
@@ -391,7 +393,29 @@ When a worker accepts an invitation, the admin should see an in-app notification
 `useRealtimeWorkers` is mounted once from `RealtimeSubscriptions` in the dashboard layout. Do **not** also call `useRealtimeWorkers` from `use-workers-locations` (duplicate channels). Use `queryClient.invalidateQueries({ queryKey: workersLocationsKey(orgId), refetchType: "active" })` on worker `postgres_changes`. As a backup, when a **`worker_active`** (or **`worker_created`**) notification row is inserted, invalidate the same query so the Users → Workers table updates even if worker-table realtime is delayed.
 
 **Progressive disclosure for helper copy:**  
-Use `ContextualHelp` (`dashboard/components/ui/contextual-help.tsx`) — icon opens a popover — instead of always-visible paragraphs for experienced users.
+Use `ContextualHelp` (`dashboard/components/ui/contextual-help.tsx`) — icon opens a popover — instead of always-visible paragraphs for experienced users. For **optional explanations** (not one-line labels), also prefer it over `Tooltip` when a click/tap is acceptable; see Learning #9.
+
+---
+
+### 9. Supplementary help: prefer `ContextualHelp` over hover `Tooltip` when a click is OK
+
+**Date:** 2026-04-12  
+**Tag:** `ui`
+
+**Context:**  
+The Scope card used `HelpCircle` + Radix `Tooltip` beside field labels. Hover works for desktop with a mouse, but it is easy to miss, harder on touch, and long copy is awkward in a small floating layer.
+
+**Learning:**  
+For **supplementary** explanations (how a field works, a paragraph of context), use **`ContextualHelp`** (`dashboard/components/ui/contextual-help.tsx`) — the circle-help icon opens a **popover** on **click/press** so keyboard, screen reader, and mobile users get the same affordance.
+
+| Pattern                           | Prefer when                                                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **`ContextualHelp`**              | Longer copy, onboarding hints, or anything where deliberate open/close is fine                                   |
+| **`Tooltip` (or native `title`)** | Very short, non-critical hints on hover-only affordances, or when the design spec truly requires no click (rare) |
+
+**Do not** replace `Tooltip` on components that are **only** a hover affordance and have no room for a button (e.g. some data-dense custom widgets) without checking design — the rule is: **when a click is possible, default to `ContextualHelp` for this project.**
+
+**See:** `dashboard/components/ui/contextual-help.tsx` (component docstring cites progressive disclosure and touch).
 
 ---
 

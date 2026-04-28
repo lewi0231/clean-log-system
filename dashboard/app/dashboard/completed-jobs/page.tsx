@@ -14,9 +14,12 @@ import { useOrganizationUsers } from "@/hooks/use-organization-users";
 import { useAuth } from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
 import { ArrowUpDown, Calculator, Calendar, MapPin, Plus, User } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 export default function CompletedJobsPage() {
+  const searchParams = useSearchParams();
+  const focusJobIdFromQuery = searchParams.get("job");
   const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
   const [showTests, setShowTests] = useState(false);
@@ -172,6 +175,7 @@ export default function CompletedJobsPage() {
         </div>
 
         <CompletedJobsList
+          key={focusJobIdFromQuery ?? "all-jobs"}
           jobs={sortedJobs}
           loading={loading}
           error={error}
@@ -182,6 +186,7 @@ export default function CompletedJobsPage() {
           sendFeedbackEmail={sendFeedbackEmail}
           organizationId={organizationId}
           fieldConfigs={fieldConfigs}
+          focusJobId={focusJobIdFromQuery}
         />
       </div>
 

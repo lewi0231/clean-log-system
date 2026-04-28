@@ -568,6 +568,8 @@ serve(async (req: Request) => {
         field_name: fieldName,
         option_value: optionValue,
         location_name: locationName,
+        location_id: locationId ?? null,
+        location_hierarchy_id: locationHierarchyId ?? null,
         old_price: oldPrice ?? undefined,
         // Fixed: Only use oldPrice as fallback for DELETE actions, not when newPrice is 0
         // When newPrice is 0, it's a valid value and should be displayed

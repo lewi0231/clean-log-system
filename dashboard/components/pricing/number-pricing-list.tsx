@@ -11,6 +11,7 @@ interface NumberPricingListProps {
   effectiveAt?: string | null;
   refreshToken?: number;
   organizationId: string | null;
+  onNavigateToHistory?: () => void;
 }
 
 export default function NumberPricingList(props: NumberPricingListProps) {

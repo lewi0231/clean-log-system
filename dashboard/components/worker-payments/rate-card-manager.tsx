@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ContextualHelp } from "@/components/ui/contextual-help";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,8 @@ import {
 } from "@/hooks/use-worker-rate-cards";
 import { useWorkers } from "@/hooks/use-workers";
 import { format } from "date-fns";
-import { ChevronDown, Edit2, Info, Plus, Trash2 } from "lucide-react";
+import { Edit2, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -98,7 +99,6 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
   const [editingCard, setEditingCard] = useState<WorkerRateCard | null>(null);
   const [formData, setFormData] = useState<RateCardFormData>(emptyFormData);
   const [saving, setSaving] = useState(false);
-  const [isInfoOpen, setIsInfoOpen] = useState(false);
 
   const activeRateCards = rateCards.filter((card) => card.is_active);
 
@@ -258,72 +258,32 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
 
   return (
     <>
-      <div className="flex justify-between">
-        {/* Info Banner - Collapsible */}
-        <Collapsible open={isInfoOpen} onOpenChange={setIsInfoOpen}>
-          <Card className="mb-2 bg-muted/50">
-            <CollapsibleTrigger asChild>
-              <CardContent className=" cursor-pointer hover:bg-muted/70 transition-colors min-w-[700px]">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-3 flex-1">
-                    <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground">How Rate Cards Work</p>
-                      {!isInfoOpen && (
-                        <p className="text-xs mt-0.5">
-                          Rate cards define additive bonuses for workers
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
-                      isInfoOpen ? "rotate-180" : ""
-                    }`}
-                  />
-                </div>
-              </CardContent>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0 pb-6">
-                <div className="flex gap-3 pl-8">
-                  <div className="text-sm text-muted-foreground">
-                    <p className="mb-2">
-                      Rate cards define <strong>additive bonuses</strong> for workers. When a job is
-                      completed:
-                    </p>
-                    <ol className="list-decimal ml-4 space-y-1">
-                      <li>
-                        The base worker payment (from pricing rules) is split using{" "}
-                        <strong>hours × split weight</strong> when everyone has clock times (weights
-                        default to 1.0)
-                      </li>
-                      <li>
-                        <strong>Multipliers</strong> increase a worker&apos;s time share (e.g., 1.2x
-                        = 20% more)
-                      </li>
-                      <li>
-                        <strong>Per-unit</strong> and <strong>flat bonuses</strong> are added on top
-                        (not deducted from pool)
-                      </li>
-                      <li>
-                        <strong>Team percentage</strong> bonuses give supervisors a percentage of
-                        other workers&apos; earnings
-                      </li>
-                    </ol>
-                  </div>
-                </div>
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex-1" />
-          <Button onClick={handleOpenCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Rate Card
-          </Button>
-        </div>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <ContextualHelp label="How rate cards work" className="mt-0.5 max-w-2xl">
+          <p>
+            Rate cards attach <strong>per-worker modifiers</strong> to payment calculation: extras
+            on top of worker amounts from your{" "}
+            <Link
+              href="/dashboard/pricing"
+              className="text-primary font-medium underline-offset-4 hover:underline"
+            >
+              Pricing
+            </Link>{" "}
+            configuration.
+          </p>
+          <p>
+            <strong>Flat</strong> and <strong>per unit</strong> add fixed amounts.{" "}
+            <strong>Multiplier</strong> scales a worker relative to others.{" "}
+            <strong>Team percentage</strong> is for leads (a cut of the team result).{" "}
+            <strong>Split weight</strong> nudges how share is apportioned when you use that modifier
+            type. Effective dates control when a card applies; deactivating stops new runs from
+            using it.
+          </p>
+        </ContextualHelp>
+        <Button onClick={handleOpenCreate} className="cursor-pointer shrink-0">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Rate Card
+        </Button>
       </div>
 
       <Card>
@@ -382,10 +342,20 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenEdit(card)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer"
+                          onClick={() => handleOpenEdit(card)}
+                        >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDeactivate(card)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer"
+                          onClick={() => handleDeactivate(card)}
+                        >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -419,7 +389,7 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
                 onValueChange={(value) => setFormData({ ...formData, worker_id: value })}
                 disabled={!!editingCard}
               >
-                <SelectTrigger id="worker">
+                <SelectTrigger id="worker" className="cursor-pointer">
                   <SelectValue placeholder="Select a worker" />
                 </SelectTrigger>
                 <SelectContent>
@@ -446,7 +416,7 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
                   })
                 }
               >
-                <SelectTrigger id="modifier-type">
+                <SelectTrigger id="modifier-type" className="cursor-pointer">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -591,10 +561,15 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={saving}>
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => setIsDialogOpen(false)}
+              disabled={saving}
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} className="cursor-pointer">
               {saving ? "Saving..." : editingCard ? "Update" : "Create"}
             </Button>
           </DialogFooter>

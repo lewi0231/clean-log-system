@@ -1,8 +1,8 @@
 "use client";
 
 import type {
-    CalculateWorkerPaymentsResponse,
-    PaymentRecord,
+  CalculateWorkerPaymentsResponse,
+  PaymentRecord,
 } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { Job } from "@/lib/types";
@@ -11,27 +11,25 @@ import { useCallback, useMemo } from "react";
 import useOrganization from "./useOrganization";
 
 export function workerPaymentHistoryKey(organizationId: string | null) {
-    return ["worker-payment-history", organizationId] as const;
+  return ["worker-payment-history", organizationId] as const;
 }
 
 export type WorkerPaymentStatus = PaymentRecord["status"];
 
 interface UseWorkerPaymentHistoryResult {
-    paymentHistory: PaymentRecord[];
-    loading: boolean;
-    error: string | null;
-    refetch: () => void;
-    invalidate: () => void;
-    addPayment: (
-        calculation: CalculateWorkerPaymentsResponse,
-        jobIds: string[],
-        batchId?: string,
-    ) => void;
-    filterByDateRange: (
-        startDate?: string,
-        endDate?: string,
-    ) => PaymentRecord[];
-    filterByWorker: (workerId: string) => PaymentRecord[];
+  paymentHistory: PaymentRecord[];
+  loading: boolean;
+  error: string | null;
+  /** Re-fetch payment batches; await to read fresh `data` (e.g. `payments` on each batch). */
+  refetch: () => Promise<unknown>;
+  invalidate: () => void;
+  addPayment: (
+    calculation: CalculateWorkerPaymentsResponse,
+    jobIds: string[],
+    batchId?: string
+  ) => void;
+  filterByDateRange: (startDate?: string, endDate?: string) => PaymentRecord[];
+  filterByWorker: (workerId: string) => PaymentRecord[];
 }
 
 /**
@@ -41,123 +39,103 @@ interface UseWorkerPaymentHistoryResult {
  * The hook provides methods for filtering and accessing payment records.
  */
 export function useWorkerPaymentHistory(jobs: Job[]): UseWorkerPaymentHistoryResult {
-    const { organizationId } = useOrganization();
-    const queryClient = useQueryClient();
+  const { organizationId } = useOrganization();
+  const queryClient = useQueryClient();
 
-    // Fetch payment history from database
-    const query = useQuery({
+  // Fetch payment history from database
+  const query = useQuery({
+    queryKey: workerPaymentHistoryKey(organizationId),
+    enabled: !!organizationId,
+    queryFn: async () => {
+      if (!organizationId) return [];
+      const result = await WorkerPaymentService.listPayments(organizationId);
+      return result.payments;
+    },
+    staleTime: 30000, // 30 seconds
+    refetchOnWindowFocus: true,
+  });
+
+  // Memoize payment history to prevent unnecessary re-renders in dependent callbacks
+  const paymentHistory = useMemo(() => query.data ?? [], [query.data]);
+
+  // Invalidate cache to trigger refetch
+  const invalidate = useCallback(() => {
+    if (organizationId) {
+      queryClient.invalidateQueries({
         queryKey: workerPaymentHistoryKey(organizationId),
-        enabled: !!organizationId,
-        queryFn: async () => {
-            if (!organizationId) return [];
-            const result = await WorkerPaymentService.listPayments(
-                organizationId,
-            );
-            return result.payments;
+      });
+    }
+  }, [organizationId, queryClient]);
+
+  // Add payment optimistically updates cache after save
+  const addPayment = useCallback(
+    (calculation: CalculateWorkerPaymentsResponse, jobIds: string[], batchId?: string) => {
+      if (!organizationId) return;
+
+      const selectedJobs = jobs.filter((job) => jobIds.includes(job.id));
+      const uniqueWorkers = new Set<string>();
+      selectedJobs.forEach((job) => {
+        job.workers.forEach((worker) => {
+          uniqueWorkers.add(worker.id);
+        });
+      });
+
+      const dates = selectedJobs.map((job) => new Date(job.completed_at).getTime());
+      const minDate = dates.length > 0 ? new Date(Math.min(...dates)) : new Date();
+      const maxDate = dates.length > 0 ? new Date(Math.max(...dates)) : new Date();
+
+      const newRecord: PaymentRecord = {
+        id: batchId || `payment-${Date.now()}`,
+        batch_id: batchId,
+        dateRange: {
+          start: minDate.toISOString(),
+          end: maxDate.toISOString(),
         },
-        staleTime: 30000, // 30 seconds
-        refetchOnWindowFocus: true,
-    });
+        jobIds,
+        totalPayment: calculation.calculation.total_worker_payment,
+        workerCount: uniqueWorkers.size,
+        calculation,
+        calculatedAt: new Date().toISOString(),
+        status: "calculated",
+      };
 
-    // Memoize payment history to prevent unnecessary re-renders in dependent callbacks
-    const paymentHistory = useMemo(() => query.data ?? [], [query.data]);
-
-    // Invalidate cache to trigger refetch
-    const invalidate = useCallback(() => {
-        if (organizationId) {
-            queryClient.invalidateQueries({
-                queryKey: workerPaymentHistoryKey(organizationId),
-            });
+      // Optimistic update - add to cache immediately
+      queryClient.setQueryData(
+        workerPaymentHistoryKey(organizationId),
+        (oldData: PaymentRecord[] | undefined) => {
+          return [newRecord, ...(oldData ?? [])];
         }
-    }, [organizationId, queryClient]);
+      );
 
-    // Add payment optimistically updates cache after save
-    const addPayment = useCallback(
-        (
-            calculation: CalculateWorkerPaymentsResponse,
-            jobIds: string[],
-            batchId?: string,
-        ) => {
-            if (!organizationId) return;
+      // Refetch to ensure sync with database
+      // Small delay to allow database write to complete
+      setTimeout(() => invalidate(), 500);
+    },
+    [organizationId, jobs, queryClient, invalidate]
+  );
 
-            const selectedJobs = jobs.filter((job) => jobIds.includes(job.id));
-            const uniqueWorkers = new Set<string>();
-            selectedJobs.forEach((job) => {
-                job.workers.forEach((worker) => {
-                    uniqueWorkers.add(worker.id);
-                });
-            });
+  const filterByDateRange = useCallback(
+    (startDate?: string, endDate?: string) => {
+      return WorkerPaymentService.filterByDateRange(paymentHistory, startDate, endDate);
+    },
+    [paymentHistory]
+  );
 
-            const dates = selectedJobs.map((job) =>
-                new Date(job.completed_at).getTime()
-            );
-            const minDate = dates.length > 0
-                ? new Date(Math.min(...dates))
-                : new Date();
-            const maxDate = dates.length > 0
-                ? new Date(Math.max(...dates))
-                : new Date();
+  const filterByWorker = useCallback(
+    (workerId: string) => {
+      return WorkerPaymentService.filterByWorker(paymentHistory, workerId, jobs);
+    },
+    [paymentHistory, jobs]
+  );
 
-            const newRecord: PaymentRecord = {
-                id: batchId || `payment-${Date.now()}`,
-                batch_id: batchId,
-                dateRange: {
-                    start: minDate.toISOString(),
-                    end: maxDate.toISOString(),
-                },
-                jobIds,
-                totalPayment: calculation.calculation.total_worker_payment,
-                workerCount: uniqueWorkers.size,
-                calculation,
-                calculatedAt: new Date().toISOString(),
-                status: "calculated",
-            };
-
-            // Optimistic update - add to cache immediately
-            queryClient.setQueryData(
-                workerPaymentHistoryKey(organizationId),
-                (oldData: PaymentRecord[] | undefined) => {
-                    return [newRecord, ...(oldData ?? [])];
-                },
-            );
-
-            // Refetch to ensure sync with database
-            // Small delay to allow database write to complete
-            setTimeout(() => invalidate(), 500);
-        },
-        [organizationId, jobs, queryClient, invalidate],
-    );
-
-    const filterByDateRange = useCallback(
-        (startDate?: string, endDate?: string) => {
-            return WorkerPaymentService.filterByDateRange(
-                paymentHistory,
-                startDate,
-                endDate,
-            );
-        },
-        [paymentHistory],
-    );
-
-    const filterByWorker = useCallback(
-        (workerId: string) => {
-            return WorkerPaymentService.filterByWorker(
-                paymentHistory,
-                workerId,
-                jobs,
-            );
-        },
-        [paymentHistory, jobs],
-    );
-
-    return {
-        paymentHistory,
-        loading: query.isLoading,
-        error: query.error ? (query.error as Error).message : null,
-        refetch: query.refetch,
-        invalidate,
-        addPayment,
-        filterByDateRange,
-        filterByWorker,
-    };
+  return {
+    paymentHistory,
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: () => query.refetch(),
+    invalidate,
+    addPayment,
+    filterByDateRange,
+    filterByWorker,
+  };
 }

@@ -1,8 +1,27 @@
 import PaymentHistoryList from "@/components/worker-payments/payment-history-list";
+import type { Job } from "@/lib/types";
 import type { PaymentRecord } from "@/lib/services/worker-payment.service";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const line = (
+  o: Pick<
+    import("@/lib/worker-payments/export-batch-worker-csv").BatchWorkerPaymentRow,
+    "id" | "job_id" | "worker_id" | "amount" | "currency"
+  > &
+    Partial<import("@/lib/worker-payments/export-batch-worker-csv").BatchWorkerPaymentRow>
+) =>
+  ({
+    status: "calculated",
+    payment_method: null,
+    payment_reference: null,
+    paid_at: null,
+    notes: null,
+    created_at: "2024-01-15T12:00:00Z",
+    calculation_details: {},
+    ...o,
+  }) as import("@/lib/worker-payments/export-batch-worker-csv").BatchWorkerPaymentRow;
 
 // Mock data
 const mockPaymentHistory: PaymentRecord[] = [
@@ -15,6 +34,11 @@ const mockPaymentHistory: PaymentRecord[] = [
     workerCount: 3,
     calculatedAt: "2024-01-15T12:00:00Z",
     status: "calculated",
+    currency: "AUD",
+    payments: [
+      line({ id: "a", job_id: "job-1", worker_id: "w1", amount: 250, currency: "AUD" }),
+      line({ id: "b", job_id: "job-2", worker_id: "w2", amount: 250, currency: "AUD" }),
+    ],
     calculation: {
       success: true,
       calculation: {
@@ -31,7 +55,19 @@ const mockPaymentHistory: PaymentRecord[] = [
     totalPayment: 300,
     workerCount: 2,
     calculatedAt: "2024-01-31T12:00:00Z",
-    status: "paid",
+    status: "completed",
+    currency: "AUD",
+    payments: [
+      line({
+        id: "c",
+        job_id: "job-3",
+        worker_id: "w1",
+        amount: 300,
+        currency: "AUD",
+        status: "paid",
+        paid_at: "2024-01-20T00:00:00Z",
+      }),
+    ],
     calculation: {
       success: true,
       calculation: {
@@ -61,10 +97,16 @@ const mockJobs = [
 ];
 
 // Mock dependencies
+const { mockExportBatch, mockUseWorkerPaymentHistory } = vi.hoisted(() => ({
+  mockExportBatch: vi.fn(() => "\uFEFF# Tally\n# RECONCILIATION: T_batch=100 S_workers=100 OK"),
+  mockUseWorkerPaymentHistory: vi.fn(),
+}));
+
 const mockFilterByDateRange = vi.fn(() => mockPaymentHistory);
 const mockAddPayment = vi.fn();
 const mockInvalidate = vi.fn();
 const mockCalculatePayments = vi.fn();
+const mockRefetch = vi.fn(() => Promise.resolve({ data: mockPaymentHistory }));
 
 vi.mock("@/hooks/useOrganization", () => ({
   default: vi.fn(() => ({ organizationId: "org-123" })),
@@ -89,21 +131,14 @@ vi.mock("@/hooks/use-worker-payments", () => ({
 }));
 
 vi.mock("@/hooks/use-worker-payment-history", () => ({
-  useWorkerPaymentHistory: vi.fn(() => ({
-    paymentHistory: mockPaymentHistory,
-    addPayment: mockAddPayment,
-    filterByDateRange: mockFilterByDateRange,
-    invalidate: mockInvalidate,
-    loading: false,
-    error: null,
-  })),
+  useWorkerPaymentHistory: mockUseWorkerPaymentHistory,
 }));
 
 vi.mock("@/lib/services/worker-payment.service", () => ({
   WorkerPaymentService: {
-    exportPaymentsToCSV: vi.fn(
-      () => "Job ID,Total Payment,Workers\njob-1,100,John"
-    ),
+    exportJobLevelPaymentsToCsv: vi.fn(() => "Job ID,Total Payment,Workers\njob-1,100,John"),
+    exportBatchWorkerSummaryToCsv: mockExportBatch,
+    resolveWorkerNameForExport: vi.fn(() => "Worker"),
   },
 }));
 
@@ -126,9 +161,7 @@ const createWrapper = () => {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 };
 
@@ -136,73 +169,79 @@ describe("PaymentHistoryList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFilterByDateRange.mockReturnValue(mockPaymentHistory);
+    mockUseWorkerPaymentHistory.mockReturnValue({
+      paymentHistory: mockPaymentHistory,
+      addPayment: mockAddPayment,
+      filterByDateRange: mockFilterByDateRange,
+      invalidate: mockInvalidate,
+      refetch: mockRefetch,
+      loading: false,
+      error: null,
+    });
   });
 
-  describe("rendering", () => {
-    it("should render the payment history card", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+  const listProps = {
+    jobs: mockJobs as Job[],
+    organizationId: "org-123" as const,
+  };
 
-      expect(screen.getByText("Payment History")).toBeInTheDocument();
+  describe("rendering", () => {
+    it("should render the history card", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
+
+      expect(screen.getByText("History")).toBeInTheDocument();
     });
 
-    it("should render payment history card", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+    it("should render history card description", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      expect(screen.getByText("Payment History")).toBeInTheDocument();
-      expect(
-        screen.getByText(/View calculated worker payments by date range/)
-      ).toBeInTheDocument();
+      expect(screen.getByText("History")).toBeInTheDocument();
+      expect(screen.getByText(/One row per worker per pay run.*paid/)).toBeInTheDocument();
     });
 
     it("should render date filter inputs", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
       expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
       expect(screen.getByLabelText("End Date")).toBeInTheDocument();
     });
 
     it("should render payment history table headers", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      expect(screen.getByText("Date Range")).toBeInTheDocument();
-      expect(screen.getByText("Jobs")).toBeInTheDocument();
-      expect(screen.getByText("Workers")).toBeInTheDocument();
-      expect(screen.getByText("Total Payment")).toBeInTheDocument();
-      expect(screen.getByText("Status")).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Worker" })).toBeInTheDocument();
+      expect(screen.getByText("Pay period")).toBeInTheDocument();
+      expect(screen.getByText("Amount (worker)")).toBeInTheDocument();
+      expect(screen.getByText("Recorded")).toBeInTheDocument();
+      expect(screen.getByText("Run calculated")).toBeInTheDocument();
       expect(screen.getByText("Actions")).toBeInTheDocument();
     });
 
-    it("should render payment history rows", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+    it("should render payment history rows where at least some pay was recorded", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      // Check payment row data
-      expect(screen.getByText("$500.00")).toBeInTheDocument();
       expect(screen.getByText("$300.00")).toBeInTheDocument();
+      expect(screen.queryByText("$250.00")).toBeNull();
     });
 
-    it("should render status badges", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+    it("should render per-worker settlement state (paid outcomes only)", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      // Find status badges within table body (not header "Calculated" column)
-      const badges = screen.getAllByText(/^(Calculated|Paid)$/);
-      expect(badges.length).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText("Paid in full")).toBeInTheDocument();
+      expect(screen.queryByText("Not paid")).toBeNull();
     });
 
-    it("should show Approve button for calculated payments", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+    it("should not show Mark as Paid in History (settlement is on Summary)", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      // The "Approve" button shows for calculated status payments
-      const approveButtons = screen.getAllByRole("button", {
-        name: /approve/i,
-      });
-      // Only one payment is in "calculated" status
-      expect(approveButtons).toHaveLength(1);
+      expect(screen.queryByRole("button", { name: /mark as paid/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^approve$/i })).toBeNull();
     });
   });
 
   describe("date filtering", () => {
     it("should filter payments when start date is set", async () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
       const startDateInput = screen.getByLabelText("Start Date");
       fireEvent.change(startDateInput, { target: { value: "2024-01-20" } });
@@ -213,7 +252,7 @@ describe("PaymentHistoryList", () => {
     });
 
     it("should filter payments when end date is set", async () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
       const endDateInput = screen.getByLabelText("End Date");
       fireEvent.change(endDateInput, { target: { value: "2024-01-15" } });
@@ -224,7 +263,7 @@ describe("PaymentHistoryList", () => {
     });
 
     it("should show clear button when date filter is set", async () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
       // Set a date filter
       const startDateInput = screen.getByLabelText("Start Date");
@@ -232,14 +271,12 @@ describe("PaymentHistoryList", () => {
 
       // Clear button should now be visible
       await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: "Clear" })
-        ).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
       });
     });
 
     it("should clear date filters when clear button is clicked", async () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
       // Set a date filter
       const startDateInput = screen.getByLabelText("Start Date");
@@ -257,23 +294,76 @@ describe("PaymentHistoryList", () => {
   });
 
   describe("actions", () => {
-    it("should render View Details button for each payment", () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+    it("should render View button for each worker row", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      const viewDetailsButtons = screen.getAllByRole("button", {
-        name: /view details/i,
+      const viewButtons = screen.getAllByRole("button", { name: /^view$/i });
+      expect(viewButtons).toHaveLength(1);
+    });
+
+    it("exposes a11y label on run CSV download buttons", () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
+      const downloads = screen.getAllByLabelText(
+        "Download worker payment summary CSV for this run"
+      );
+      expect(downloads).toHaveLength(1);
+    });
+
+    it("calls exportBatchWorkerSummaryToCsv when download is clicked", async () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
+      const downloads = screen.getAllByLabelText(
+        "Download worker payment summary CSV for this run"
+      );
+      fireEvent.click(downloads[0]);
+      await waitFor(() => {
+        expect(mockExportBatch).toHaveBeenCalled();
       });
-      expect(viewDetailsButtons).toHaveLength(2);
+    });
+
+    it("shows no worker rows for orphan batch (no worker line items)", () => {
+      const orphanRecord: PaymentRecord = {
+        id: "orphan",
+        batch_id: "orphan",
+        dateRange: { start: "2024-01-01T00:00:00Z", end: "2024-01-15T00:00:00Z" },
+        jobIds: ["job-1"],
+        totalPayment: 0,
+        workerCount: 0,
+        currency: "AUD",
+        payments: [],
+        calculatedAt: "2024-01-15T12:00:00Z",
+        status: "calculated",
+        calculation: {
+          success: true,
+          calculation: { total_worker_payment: 0, job_calculations: [] },
+        },
+      };
+      mockUseWorkerPaymentHistory.mockReturnValue({
+        paymentHistory: [orphanRecord],
+        addPayment: mockAddPayment,
+        filterByDateRange: () => [orphanRecord],
+        invalidate: mockInvalidate,
+        refetch: mockRefetch,
+        loading: false,
+        error: null,
+      });
+
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
+      expect(
+        screen.getByText(
+          /No recorded payments to workers yet\. When you mark work as paid on the Summary tab, it will appear here\./
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByLabelText("Download worker payment summary CSV for this run")
+      ).toBeNull();
     });
   });
 
   describe("payment detail dialog", () => {
-    it("should open payment detail dialog when view details is clicked", async () => {
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
+    it("should open payment detail dialog when view is clicked", async () => {
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
 
-      const viewDetailsButtons = screen.getAllByRole("button", {
-        name: /view details/i,
-      });
+      const viewDetailsButtons = screen.getAllByRole("button", { name: /^view$/i });
       fireEvent.click(viewDetailsButtons[0]);
 
       // Dialog should open - the PaymentDetailDialog will be rendered
@@ -285,9 +375,8 @@ describe("PaymentHistoryList", () => {
     });
   });
 
-  describe("mark as paid dialog", () => {
-    it("should show mark as paid button for approved payments", async () => {
-      // Update mock to have an approved payment
+  describe("settlement (mark as paid)", () => {
+    it("History does not offer Mark as Paid (use Summary tab)", () => {
       const mockApprovedPaymentHistory: PaymentRecord[] = [
         {
           id: "batch-1",
@@ -309,14 +398,8 @@ describe("PaymentHistoryList", () => {
       ];
       mockFilterByDateRange.mockReturnValue(mockApprovedPaymentHistory);
 
-      render(<PaymentHistoryList />, { wrapper: createWrapper() });
-
-      // Mark as Paid button should be visible for approved status
-      await waitFor(() => {
-        expect(
-          screen.getByRole("button", { name: /mark as paid/i })
-        ).toBeInTheDocument();
-      });
+      render(<PaymentHistoryList {...listProps} />, { wrapper: createWrapper() });
+      expect(screen.queryByRole("button", { name: /mark as paid/i })).toBeNull();
     });
   });
 });

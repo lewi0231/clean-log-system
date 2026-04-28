@@ -86,6 +86,20 @@ export interface RatingConfig {
   dimensions: string[];
 }
 
+/**
+ * `organization_settings.worker_payment_cycle_config` (JSONB).
+ * Day-of-week: ISO weekday 1 = Monday … 7 = Sunday (aligns with DB comment: cycles start Monday; optional anchor).
+ */
+export interface WorkerPaymentCycleConfig {
+  payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
+  payment_day_of_week?: number | null;
+  payment_day_of_month?: number | null;
+  cut_off_time?: string | null;
+  timezone?: string | null;
+  require_approval?: boolean | null;
+  auto_calculate?: boolean | null;
+}
+
 export interface OrganizationSettings {
   name: string;
   use_predefined_locations: boolean;
@@ -116,6 +130,8 @@ export interface OrganizationSettings {
   edit_window_minutes: number;
   /** Entitlement: send from org-owned domain (Resend). Server-side only until migration applied. */
   custom_email_domain_enabled: boolean;
+  /** Worker pay period; null = not configured (Overview uses calendar-month fallback). */
+  worker_payment_cycle_config: WorkerPaymentCycleConfig | null;
 }
 
 // Job approval workflow types

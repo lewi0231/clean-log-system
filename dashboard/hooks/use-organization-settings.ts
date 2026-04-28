@@ -52,6 +52,7 @@ async function fetchOrganizationSettings(organizationId: string): Promise<Organi
     gst_rate_percent: data.settings.gst_rate_percent ?? 10,
     edit_window_minutes: data.settings.edit_window_minutes ?? 180,
     custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
+    worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
   };
 }
 
@@ -62,7 +63,7 @@ export function useOrganizationSettings() {
     queryKey: organizationSettingsKey(organizationId),
     enabled: !!organizationId,
     queryFn: () => fetchOrganizationSettings(organizationId as string),
-    placeholderData: (previous) => previous,
+    staleTime: 0,
   });
 
   // Log errors when they occur
@@ -78,5 +79,6 @@ export function useOrganizationSettings() {
     settings: query.data ?? null,
     loading: query.isLoading,
     error: query.error ? (query.error as Error).message : null,
+    refetch: query.refetch,
   };
 }

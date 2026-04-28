@@ -3,6 +3,7 @@
 import { organizationSettingsKey } from "@/app/query-provider";
 import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import { OrgSendingDomainCard } from "@/components/settings/org-sending-domain-card";
+import { WorkerPayPeriodSettingsCard } from "@/components/settings/worker-pay-period-settings-card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,6 +89,7 @@ export default function SettingsPage() {
     default_exclusive_group_label: null,
     edit_window_minutes: 180,
     custom_email_domain_enabled: false,
+    worker_payment_cycle_config: null,
   });
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -155,6 +157,7 @@ export default function SettingsPage() {
           default_exclusive_group_label: data.settings.default_exclusive_group_label ?? null,
           edit_window_minutes: data.settings.edit_window_minutes ?? 180,
           custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
+          worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
 
@@ -191,6 +194,7 @@ export default function SettingsPage() {
           default_exclusive_group_label: data.settings.default_exclusive_group_label ?? null,
           edit_window_minutes: data.settings.edit_window_minutes ?? 180,
           custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
+          worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
         };
         setInitialSettings(initialSnapshot);
         setHasUnsavedChanges(false);
@@ -253,7 +257,7 @@ export default function SettingsPage() {
     return url;
   };
 
-  const handleBusinessModeChange = async (mode: BusinessMode) => {
+  const _handleBusinessModeChange = async (mode: BusinessMode) => {
     if (!organizationId) return;
 
     try {
@@ -1926,7 +1930,7 @@ export default function SettingsPage() {
               <RadioGroup
                 value={settings.business_mode}
                 onValueChange={(value) =>
-                  handleBusinessModeChange(value as BusinessMode)
+                  _handleBusinessModeChange(value as BusinessMode)
                 }
                 className="grid gap-4 md:grid-cols-2"
               >
@@ -1986,6 +1990,26 @@ export default function SettingsPage() {
         </TabsContent> */}
 
         <TabsContent value="payment" className="space-y-6">
+          {organizationId && (
+            <WorkerPayPeriodSettingsCard
+              organizationId={organizationId}
+              value={settings.worker_payment_cycle_config}
+              onApplied={(s) => {
+                setSettings((prev) => ({
+                  ...prev,
+                  worker_payment_cycle_config: s.worker_payment_cycle_config ?? null,
+                }));
+                setInitialSettings((init) =>
+                  init
+                    ? {
+                        ...init,
+                        worker_payment_cycle_config: s.worker_payment_cycle_config ?? null,
+                      }
+                    : init
+                );
+              }}
+            />
+          )}
           {/* Bank transfer – primary payment method until Stripe is enabled */}
           <Card>
             <CardHeader>

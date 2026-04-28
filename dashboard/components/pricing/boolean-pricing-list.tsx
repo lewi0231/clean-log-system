@@ -11,6 +11,7 @@ interface BooleanPricingListProps {
   effectiveAt?: string | null;
   refreshToken?: number;
   organizationId: string | null;
+  onNavigateToHistory?: () => void;
 }
 
 export default function BooleanPricingList(props: BooleanPricingListProps) {

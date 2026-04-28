@@ -27,6 +27,8 @@ interface WorkerSplit {
   final_payment: number;
   rate_card_id?: string;
   allocation_type: string;
+  /** Rate-card pool share weight (default 1.0). */
+  split_weight?: number;
 }
 
 interface SaveWorkerPaymentRequest {
@@ -253,6 +255,7 @@ serve(async (req: Request) => {
                 team_percentage_bonus: split.team_percentage_bonus,
                 allocation_type: split.allocation_type,
                 rate_card_id: split.rate_card_id,
+                split_weight: split.split_weight ?? 1.0,
               },
             },
           });
