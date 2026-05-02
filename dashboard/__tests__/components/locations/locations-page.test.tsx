@@ -68,16 +68,21 @@ describe("LocationsPage", () => {
   const mockUpdateLocation = vi.fn();
   const mockDeleteLocation = vi.fn();
 
+  const mockRefetchLocations = vi.fn();
+
   const defaultUseOrganization = {
     organizationId: "org-1",
+    organizationUserId: "ou-1",
+    userRole: "admin",
     loading: false,
-    error: null,
+    error: undefined as string | undefined,
   };
 
   const defaultUseLocations = {
     locations: [],
     loading: false,
     error: null,
+    refetch: mockRefetchLocations,
     createLocation: mockCreateLocation,
     updateLocation: mockUpdateLocation,
     deleteLocation: mockDeleteLocation,
@@ -123,8 +128,10 @@ describe("LocationsPage", () => {
     it("should render error state when organization ID is missing", () => {
       vi.mocked(useOrganization).mockReturnValue({
         organizationId: null,
+        organizationUserId: null,
+        userRole: null,
         loading: false,
-        error: null,
+        error: undefined,
       });
 
       render(<LocationsPage />, { wrapper: createWrapper() });

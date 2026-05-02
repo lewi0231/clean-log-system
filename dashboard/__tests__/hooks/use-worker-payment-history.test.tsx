@@ -2,11 +2,13 @@ import {
   useWorkerPaymentHistory,
   workerPaymentHistoryKey,
 } from "@/hooks/use-worker-payment-history";
+import type { Job } from "@/lib/types";
 import type {
   CalculateWorkerPaymentsResponse,
   PaymentRecord,
 } from "@/lib/services/worker-payment.service";
 import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+import { createMockJob } from "../lib/fixtures";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,12 +26,10 @@ vi.mock("@/lib/services/worker-payment.service", async () => {
     ...actual,
     WorkerPaymentService: {
       listPayments: vi.fn(),
-      filterByDateRange: (
-        actual as typeof import("@/lib/services/worker-payment.service")
-      ).WorkerPaymentService.filterByDateRange,
-      filterByWorker: (
-        actual as typeof import("@/lib/services/worker-payment.service")
-      ).WorkerPaymentService.filterByWorker,
+      filterByDateRange: (actual as typeof import("@/lib/services/worker-payment.service"))
+        .WorkerPaymentService.filterByDateRange,
+      filterByWorker: (actual as typeof import("@/lib/services/worker-payment.service"))
+        .WorkerPaymentService.filterByWorker,
     },
   };
 });
@@ -53,27 +53,43 @@ const createWrapper = () => {
   });
 
   return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 };
 
 describe("useWorkerPaymentHistory", () => {
-  const mockJobs = [
-    {
+  const confirmationWorker = (id: string, name: string): Job["workers"][number] => ({
+    id,
+    name,
+    email: `${id}@example.com`,
+    phone: null,
+    confirmation_status: "confirmed",
+    confirmed_at: null,
+    flagged_at: null,
+    flag_reason: null,
+  });
+
+  const mockJobs: Job[] = [
+    createMockJob({
       id: "job-1",
+      organization_id: "org-123",
+      location_id: null,
+      location: null,
+      submission_data: null,
+      workers: [confirmationWorker("worker-1", "John"), confirmationWorker("worker-2", "Jane")],
       completed_at: "2024-01-15T10:00:00Z",
-      workers: [
-        { id: "worker-1", name: "John" },
-        { id: "worker-2", name: "Jane" },
-      ],
-    },
-    {
+      created_at: "2024-01-15T10:00:00Z",
+    }),
+    createMockJob({
       id: "job-2",
+      organization_id: "org-123",
+      location_id: null,
+      location: null,
+      submission_data: null,
+      workers: [confirmationWorker("worker-1", "John")],
       completed_at: "2024-01-16T10:00:00Z",
-      workers: [{ id: "worker-1", name: "John" }],
-    },
+      created_at: "2024-01-16T10:00:00Z",
+    }),
   ];
 
   const mockPayments: PaymentRecord[] = [
@@ -161,9 +177,7 @@ describe("useWorkerPaymentHistory", () => {
     });
 
     it("should handle fetch error", async () => {
-      vi.mocked(WorkerPaymentService.listPayments).mockRejectedValue(
-        new Error("Network error")
-      );
+      vi.mocked(WorkerPaymentService.listPayments).mockRejectedValue(new Error("Network error"));
 
       const { result } = renderHook(() => useWorkerPaymentHistory(mockJobs), {
         wrapper: createWrapper(),
@@ -228,9 +242,7 @@ describe("useWorkerPaymentHistory", () => {
 
       // Check optimistic update - wait for React Query to apply the cache update
       await waitFor(() => {
-        const firstPayment = result.current.paymentHistory.find(
-          (p) => p.id === "batch-new"
-        );
+        const firstPayment = result.current.paymentHistory.find((p) => p.id === "batch-new");
         expect(firstPayment).toBeDefined();
         expect(firstPayment?.totalPayment).toBe(300);
         expect(firstPayment?.status).toBe("calculated");
@@ -255,18 +267,12 @@ describe("useWorkerPaymentHistory", () => {
       };
 
       act(() => {
-        result.current.addPayment(
-          newCalculation,
-          ["job-1", "job-2"],
-          "batch-test"
-        );
+        result.current.addPayment(newCalculation, ["job-1", "job-2"], "batch-test");
       });
 
       // Wait for React Query to apply the cache update
       await waitFor(() => {
-        const newPayment = result.current.paymentHistory.find(
-          (p) => p.id === "batch-test"
-        );
+        const newPayment = result.current.paymentHistory.find((p) => p.id === "batch-test");
         expect(newPayment).toBeDefined();
         // Dates from mocked jobs: job-1 is 2024-01-15, job-2 is 2024-01-16
         expect(newPayment?.dateRange.start).toContain("2024-01-15");
@@ -294,18 +300,12 @@ describe("useWorkerPaymentHistory", () => {
       act(() => {
         // job-1 has worker-1 and worker-2, job-2 has worker-1
         // Unique workers: worker-1, worker-2 = 2
-        result.current.addPayment(
-          newCalculation,
-          ["job-1", "job-2"],
-          "batch-test"
-        );
+        result.current.addPayment(newCalculation, ["job-1", "job-2"], "batch-test");
       });
 
       // Wait for React Query to apply the cache update
       await waitFor(() => {
-        const newPayment = result.current.paymentHistory.find(
-          (p) => p.id === "batch-test"
-        );
+        const newPayment = result.current.paymentHistory.find((p) => p.id === "batch-test");
         expect(newPayment).toBeDefined();
         expect(newPayment?.workerCount).toBe(2); // worker-1 appears in both, worker-2 in job-1 only
       });
@@ -322,10 +322,7 @@ describe("useWorkerPaymentHistory", () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const filtered = result.current.filterByDateRange(
-        "2024-01-01",
-        "2024-01-15"
-      );
+      const filtered = result.current.filterByDateRange("2024-01-01", "2024-01-15");
 
       // Should only include batch-1 which is within Jan 1-15
       expect(filtered).toHaveLength(1);

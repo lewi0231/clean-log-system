@@ -64,7 +64,8 @@ describe("Pricing Location Overrides - Integration", () => {
       expect(result1).toBe(requestLocationId);
 
       // If request doesn't have location_id, use filter
-      const result2 = undefined ?? targetLocationId;
+      const missingLocationId: string | undefined = undefined;
+      const result2 = missingLocationId ?? targetLocationId;
       expect(result2).toBe(targetLocationId);
     });
 

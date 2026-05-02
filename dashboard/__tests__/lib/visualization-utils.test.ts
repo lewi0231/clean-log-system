@@ -1,4 +1,4 @@
-import type { ChartConfig, Job } from "@/lib/types";
+import type { ChartConfig, Job, JobWorkerWithConfirmation } from "@/lib/types";
 import {
   extractFieldValue,
   extractGroupedBreakdown,
@@ -46,6 +46,19 @@ const createJob = (overrides: Partial<Job>): Job => ({
   workers: [],
   ...overrides,
 });
+
+function mockJobWorker(
+  partial: Partial<JobWorkerWithConfirmation> &
+    Pick<JobWorkerWithConfirmation, "id" | "name" | "email" | "phone">
+): JobWorkerWithConfirmation {
+  return {
+    confirmation_status: "confirmed",
+    confirmed_at: null,
+    flagged_at: null,
+    flag_reason: null,
+    ...partial,
+  };
+}
 
 describe("extractFieldValue", () => {
   it("should return null for null submission_data", () => {
@@ -328,12 +341,12 @@ describe("getGroupingKey", () => {
     it("should return worker name for single worker", () => {
       const job = createJob({
         workers: [
-          {
+          mockJobWorker({
             id: "w1",
             name: "John Doe",
             email: "john@example.com",
             phone: null,
-          },
+          }),
         ],
       });
       expect(getGroupingKey(job, "worker")).toBe("John Doe");
@@ -342,8 +355,18 @@ describe("getGroupingKey", () => {
     it("should join multiple worker names", () => {
       const job = createJob({
         workers: [
-          mockJobWorker({ id: "w1", name: "John", email: "john@example.com", phone: null }),
-          mockJobWorker({ id: "w2", name: "Jane", email: "jane@example.com", phone: null }),
+          mockJobWorker({
+            id: "w1",
+            name: "John",
+            email: "john@example.com",
+            phone: null,
+          }),
+          mockJobWorker({
+            id: "w2",
+            name: "Jane",
+            email: "jane@example.com",
+            phone: null,
+          }),
         ],
       });
       expect(getGroupingKey(job, "worker")).toBe("John, Jane");
@@ -489,11 +512,25 @@ describe("processJobDataForChart", () => {
     const jobs = [
       createJob({
         submission_data: { count: 10 },
-        workers: [{ id: "w1", name: "John", email: "john@example.com", phone: null }],
+        workers: [
+          mockJobWorker({
+            id: "w1",
+            name: "John",
+            email: "john@example.com",
+            phone: null,
+          }),
+        ],
       }),
       createJob({
         submission_data: { count: 20 },
-        workers: [{ id: "w1", name: "John", email: "john@example.com", phone: null }],
+        workers: [
+          mockJobWorker({
+            id: "w1",
+            name: "John",
+            email: "john@example.com",
+            phone: null,
+          }),
+        ],
       }),
     ];
     const chartConfig: ChartConfig = {

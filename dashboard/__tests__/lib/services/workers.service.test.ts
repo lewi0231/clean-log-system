@@ -160,7 +160,11 @@ describe("WorkersService", () => {
 
   describe("update", () => {
     it("should return updated worker on success", async () => {
-      const mockWorker = createMockWorker({ name: "Jane Doe" });
+      const mockWorker = createMockWorker({
+        first_name: "Jane",
+        last_name: "Doe",
+        name: "Jane Doe",
+      });
       vi.mocked(supabase.functions.invoke).mockResolvedValue({
         data: { worker: mockWorker },
         error: null,
@@ -168,14 +172,16 @@ describe("WorkersService", () => {
 
       const result = await WorkersService.update({
         id: "worker-1",
-        name: "Jane Doe",
+        first_name: "Jane",
+        last_name: "Doe",
       });
 
       expect(result).toEqual(mockWorker);
       expect(supabase.functions.invoke).toHaveBeenCalledWith("update-worker", {
         body: {
           id: "worker-1",
-          name: "Jane Doe",
+          first_name: "Jane",
+          last_name: "Doe",
         },
       });
     });
@@ -190,7 +196,8 @@ describe("WorkersService", () => {
       await expect(
         WorkersService.update({
           id: "worker-1",
-          name: "Jane Doe",
+          first_name: "Jane",
+          last_name: "Doe",
         })
       ).rejects.toMatchObject(mockError);
     });
@@ -204,7 +211,8 @@ describe("WorkersService", () => {
       await expect(
         WorkersService.update({
           id: "worker-1",
-          name: "Jane Doe",
+          first_name: "Jane",
+          last_name: "Doe",
         })
       ).rejects.toThrow("Failed to update worker");
     });

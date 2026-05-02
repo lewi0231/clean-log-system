@@ -1,4 +1,5 @@
 import { useWorkers } from "@/hooks/use-workers";
+import useOrganization from "@/hooks/useOrganization";
 import { WorkersService } from "@/lib/services";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -30,12 +31,18 @@ vi.mock("@/lib/services", () => ({
   },
 }));
 
+type UseOrganizationReturn = ReturnType<typeof useOrganization>;
+
 const mockUseOrganization = vi.hoisted(() =>
-  vi.fn(() => ({
-    organizationId: "org-1",
-    loading: false,
-    error: null,
-  }))
+  vi.fn(
+    (): UseOrganizationReturn => ({
+      organizationId: "org-1",
+      organizationUserId: "ou-1",
+      userRole: "admin",
+      loading: false,
+      error: undefined,
+    })
+  )
 );
 
 vi.mock("@/hooks/useOrganization", () => ({
@@ -161,7 +168,11 @@ describe("useWorkers", () => {
   });
 
   it("should update worker and refetch", async () => {
-    const mockWorker = createMockWorker({ name: "Jane Doe" });
+    const mockWorker = createMockWorker({
+      first_name: "Jane",
+      last_name: "Doe",
+      name: "Jane Doe",
+    });
     vi.mocked(WorkersService.listWorkersAndLocations).mockResolvedValue({
       success: true,
       workers: [createMockWorker()],
@@ -179,7 +190,8 @@ describe("useWorkers", () => {
 
     await result.current.updateWorker({
       id: "worker-1",
-      name: "Jane Doe",
+      first_name: "Jane",
+      last_name: "Doe",
     });
 
     expect(WorkersService.update).toHaveBeenCalled();
@@ -213,8 +225,10 @@ describe("useWorkers", () => {
   it("should not fetch when organizationId is null", async () => {
     mockUseOrganization.mockReturnValue({
       organizationId: null,
+      organizationUserId: null,
+      userRole: null,
       loading: false,
-      error: null,
+      error: undefined,
     });
 
     const { result } = renderHook(() => useWorkers(), {
@@ -231,8 +245,10 @@ describe("useWorkers", () => {
     // Reset for other tests
     mockUseOrganization.mockReturnValue({
       organizationId: "org-1",
+      organizationUserId: "ou-1",
+      userRole: "admin",
       loading: false,
-      error: null,
+      error: undefined,
     });
   });
 });

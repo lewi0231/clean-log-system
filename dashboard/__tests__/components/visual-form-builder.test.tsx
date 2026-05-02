@@ -65,9 +65,7 @@ vi.mock("@/components/ui/popover", () => ({
   ),
 }));
 
-const createMockSection = (
-  overrides?: Partial<FormSectionWithFields>
-): FormSectionWithFields => ({
+const createMockSection = (overrides?: Partial<FormSectionWithFields>): FormSectionWithFields => ({
   id: "section-1",
   organization_id: "org-1",
   title: "Test Section",
@@ -95,13 +93,12 @@ describe("VisualFormBuilder", () => {
   });
 
   it("should render fields and sections", () => {
-    const fields = [
-      createMockFieldConfig({ id: "field-1", label: "Test Field" }),
-    ];
+    const fields = [createMockFieldConfig({ id: "field-1", label: "Test Field" })];
     const sections = [createMockSection({ id: "section-1" })];
 
     render(
       <VisualFormBuilder
+        organizationId="org-1"
         fields={fields}
         sections={sections}
         onAddField={mockOnAddField}
@@ -125,12 +122,11 @@ describe("VisualFormBuilder", () => {
       createMockFieldConfig({ id: "field-1", label: "Field 1" }),
       createMockFieldConfig({ id: "field-2", label: "Field 2" }),
     ];
-    const sections = [
-      createMockSection({ id: "section-1", field_ids: ["field-1"] }),
-    ];
+    const sections = [createMockSection({ id: "section-1", field_ids: ["field-1"] })];
 
     render(
       <VisualFormBuilder
+        organizationId="org-1"
         fields={fields}
         sections={sections}
         onAddField={mockOnAddField}
@@ -155,6 +151,7 @@ describe("VisualFormBuilder", () => {
   it("should show empty state when no fields exist", () => {
     render(
       <VisualFormBuilder
+        organizationId="org-1"
         fields={[]}
         sections={[]}
         onAddField={mockOnAddField}
@@ -180,6 +177,7 @@ describe("VisualFormBuilder", () => {
 
     render(
       <VisualFormBuilder
+        organizationId="org-1"
         fields={fields}
         sections={[]}
         onAddField={mockOnAddField}
@@ -223,6 +221,7 @@ describe("VisualFormBuilder", () => {
 
     render(
       <VisualFormBuilder
+        organizationId="org-1"
         fields={fields}
         sections={[]}
         onAddField={mockOnAddField}
@@ -237,9 +236,7 @@ describe("VisualFormBuilder", () => {
       { wrapper: createWrapper() }
     );
 
-    expect(
-      screen.getByText("Choose one: Yard Tracking Method")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Choose one: Yard Tracking Method")).toBeInTheDocument();
     // Only Cluster badge is shown on relevant fields (not Exclusive badge)
     expect(screen.getByText("Cluster: simple_servicing")).toBeInTheDocument();
   });
@@ -252,6 +249,7 @@ describe("VisualFormBuilder", () => {
 
     render(
       <VisualFormBuilder
+        organizationId="org-1"
         fields={fields}
         sections={[]}
         onAddField={mockOnAddField}
