@@ -1,4 +1,4 @@
-import { GroupedBreakdownItem } from "@/components/group-breakdown-field";
+import type { GroupedBreakdownItem } from "@/components/group-breakdown-field";
 import { supabase } from "@/lib/supabase";
 import { createSchemaFromFieldConfig } from "@/lib/utils";
 import { FieldConfig } from "@clean-log/shared/types/field-config";

@@ -1,4 +1,4 @@
-import { GroupedBreakdownItem } from "@/components/group-breakdown-field";
+import type { GroupedBreakdownItem } from "@/components/group-breakdown-field";
 import { useMemo, useState } from "react";
 import z from "zod";
 import {

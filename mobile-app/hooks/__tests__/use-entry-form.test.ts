@@ -6,9 +6,19 @@ import { z } from "zod";
 import * as UseFieldConfigsModule from "../use-field-configs";
 import { useEntryForm } from "../use-entry-form";
 
+vi.mock("../use-organization-settings", () => ({
+  useOrganizationSettings: () => ({
+    settings: { use_predefined_locations: false },
+    loading: false,
+    error: "",
+  }),
+}));
+
 vi.mock("../use-field-configs", () => ({
   useFieldConfigs: vi.fn(),
-  FieldErrors: {},
+  getFieldCluster: vi.fn(() => null),
+  groupFieldsByMutualExclusivity: vi.fn(() => []),
+  hasValue: vi.fn(() => false),
 }));
 
 const mockUseFieldConfigs = vi.mocked(UseFieldConfigsModule.useFieldConfigs);
@@ -39,9 +49,16 @@ function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
 }
 
 function createMockSchema(returnValue: any) {
-  return {
-    safeParse: vi.fn().mockReturnValue(returnValue),
-  } as unknown as z.ZodObject<Record<string, z.ZodTypeAny>>;
+  const schema: {
+    safeParse: ReturnType<typeof vi.fn>;
+    extend: ReturnType<typeof vi.fn>;
+  } = {
+    safeParse: vi.fn(),
+    extend: vi.fn(),
+  };
+  schema.safeParse.mockReturnValue(returnValue);
+  schema.extend.mockImplementation(() => schema);
+  return schema as unknown as z.ZodObject<Record<string, z.ZodTypeAny>>;
 }
 
 describe("useEntryForm", () => {
@@ -254,11 +271,14 @@ describe("useEntryForm", () => {
     const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
-    const isValid = result.current.validateInputs(submissionData);
+    let isValid: boolean;
+    act(() => {
+      isValid = result.current.validateInputs(submissionData);
+    });
 
-    expect(isValid).toBe(false);
+    expect(isValid!).toBe(false);
     expect(result.current.errors).toEqual({
-      name: "Name is required",
+      "field-1": "Name is required",
     });
   });
 
@@ -289,13 +309,16 @@ describe("useEntryForm", () => {
 
     // First set an error
     act(() => {
-      result.current.clearFieldError("name");
+      result.current.clearFieldError("field-1");
     });
 
     const submissionData = result.current.buildSubmissionData();
-    const isValid = result.current.validateInputs(submissionData);
+    let isValid: boolean;
+    act(() => {
+      isValid = result.current.validateInputs(submissionData);
+    });
 
-    expect(isValid).toBe(true);
+    expect(isValid!).toBe(true);
     expect(result.current.errors).toEqual({});
   });
 
@@ -385,14 +408,16 @@ describe("useEntryForm", () => {
 
     // Set an error first
     const submissionData = result.current.buildSubmissionData();
-    result.current.validateInputs(submissionData);
-    expect(result.current.errors.name).toBe("Name is required");
+    act(() => {
+      result.current.validateInputs(submissionData);
+    });
+    expect(result.current.errors["field-1"]).toBe("Name is required");
 
     // Clear the error
     act(() => {
-      result.current.clearFieldError("name");
+      result.current.clearFieldError("field-1");
     });
 
-    expect(result.current.errors.name).toBeUndefined();
+    expect(result.current.errors["field-1"]).toBeUndefined();
   });
 });

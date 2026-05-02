@@ -20,6 +20,9 @@ env:
   # Next build + Vitest import graph evaluate Supabase client; real values come from hosting secrets.
   NEXT_PUBLIC_SUPABASE_URL: https://ci-build-placeholder.supabase.co
   NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder-anon-key
+  # mobile-app (Expo) reads EXPO_PUBLIC_* in lib/supabase.ts
+  EXPO_PUBLIC_SUPABASE_URL: https://ci-build-placeholder.supabase.co
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder-anon-key
 
 jobs:
   lint-and-build:
