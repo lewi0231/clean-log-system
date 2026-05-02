@@ -51,17 +51,13 @@ describe("MarkPaymentPaidDialog", () => {
       render(<MarkPaymentPaidDialog {...defaultProps} />);
 
       expect(screen.getByText("Mark Payment as Paid")).toBeInTheDocument();
-      expect(
-        screen.getByText(/Record payment details after processing/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Record that you completed payment/)).toBeInTheDocument();
     });
 
     it("should not render dialog when open is false", () => {
       render(<MarkPaymentPaidDialog {...defaultProps} open={false} />);
 
-      expect(
-        screen.queryByText("Mark Payment as Paid")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Mark Payment as Paid")).not.toBeInTheDocument();
     });
 
     it("should render payment method dropdown", () => {
@@ -85,12 +81,8 @@ describe("MarkPaymentPaidDialog", () => {
     it("should render cancel and submit buttons", () => {
       render(<MarkPaymentPaidDialog {...defaultProps} />);
 
-      expect(
-        screen.getByRole("button", { name: "Cancel" })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Mark as Paid" })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark as Paid" })).toBeInTheDocument();
     });
   });
 
@@ -103,9 +95,7 @@ describe("MarkPaymentPaidDialog", () => {
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          "Please select a payment method"
-        );
+        expect(toast.error).toHaveBeenCalledWith("Please select a payment method");
       });
       expect(WorkerPaymentService.updatePaymentStatus).not.toHaveBeenCalled();
     });

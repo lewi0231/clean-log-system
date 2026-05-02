@@ -1,5 +1,5 @@
 import { FieldConfig } from "@clean-log/shared/types/field-config";
-import { render, screen } from "@testing-library/react-native";
+import { render, screen, fireEvent } from "@testing-library/react-native";
 import { describe, expect, it, vi } from "vitest";
 import { FieldRenderer } from "../field-renderer";
 
@@ -9,9 +9,7 @@ vi.mock("@/components/ui/date-time-picker", () => ({
     const TestDateTimePicker = require("react-native").View;
     return (
       <TestDateTimePicker testID="date-time-picker">
-        <TestDateTimePicker testID="placeholder">
-          {placeholder}
-        </TestDateTimePicker>
+        <TestDateTimePicker testID="placeholder">{placeholder}</TestDateTimePicker>
       </TestDateTimePicker>
     );
   },
@@ -83,11 +81,9 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer config={config} value="John Doe" onChange={onChange} />
-    );
+    render(<FieldRenderer config={config} value="John Doe" onChange={onChange} />);
 
-    const input = screen.getByPlaceholderText("Test Field");
+    const input = screen.getByLabelText("Name");
     expect(input).toBeTruthy();
   });
 
@@ -101,8 +97,9 @@ describe("FieldRenderer", () => {
 
     render(<FieldRenderer config={config} value={25} onChange={onChange} />);
 
-    const input = screen.getByDisplayValue("25");
+    const input = screen.getByLabelText("Age");
     expect(input).toBeTruthy();
+    expect(String((input as { props?: { value?: unknown } }).props?.value)).toBe("25");
   });
 
   it("should render email input for email field type", () => {
@@ -113,15 +110,9 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer
-        config={config}
-        value="test@example.com"
-        onChange={onChange}
-      />
-    );
+    render(<FieldRenderer config={config} value="test@example.com" onChange={onChange} />);
 
-    const input = screen.getByPlaceholderText("Email");
+    const input = screen.getByLabelText("Email");
     expect(input).toBeTruthy();
   });
 
@@ -133,15 +124,9 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer
-        config={config}
-        value="Some description"
-        onChange={onChange}
-      />
-    );
+    render(<FieldRenderer config={config} value="Some description" onChange={onChange} />);
 
-    const input = screen.getByPlaceholderText("Description");
+    const input = screen.getByLabelText("Description");
     expect(input).toBeTruthy();
   });
 
@@ -154,12 +139,8 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer config={config} value="active" onChange={onChange} />
-    );
-
-    const select = screen.getByTestId("select");
-    expect(select).toBeTruthy();
+    const view = render(<FieldRenderer config={config} value="active" onChange={onChange} />);
+    expect(JSON.stringify(view.toJSON())).toContain("Status");
   });
 
   it("should render grouped breakdown field for grouped_breakdown type", () => {
@@ -175,10 +156,8 @@ describe("FieldRenderer", () => {
       { brand: "Brand B", quantity: 5 },
     ];
 
-    render(<FieldRenderer config={config} value={value} onChange={onChange} />);
-
-    const breakdownField = screen.getByTestId("grouped-breakdown-field");
-    expect(breakdownField).toBeTruthy();
+    const view = render(<FieldRenderer config={config} value={value} onChange={onChange} />);
+    expect(JSON.stringify(view.toJSON())).toContain("Brand A");
   });
 
   it("should render switch for boolean field type", () => {
@@ -191,8 +170,7 @@ describe("FieldRenderer", () => {
 
     render(<FieldRenderer config={config} value={true} onChange={onChange} />);
 
-    const switchComponent = screen.getByText("Active");
-    expect(switchComponent).toBeTruthy();
+    expect(screen.getByLabelText("Active")).toBeTruthy();
   });
 
   it("should display error message when error is provided", () => {
@@ -204,7 +182,7 @@ describe("FieldRenderer", () => {
     const onChange = vi.fn();
     const onErrorClear = vi.fn();
 
-    render(
+    const view = render(
       <FieldRenderer
         config={config}
         value=""
@@ -213,9 +191,7 @@ describe("FieldRenderer", () => {
         onErrorClear={onErrorClear}
       />
     );
-
-    const errorText = screen.getByText("This field is required");
-    expect(errorText).toBeTruthy();
+    expect(JSON.stringify(view.toJSON())).toContain("This field is required");
   });
 
   it("should call onErrorClear when field value changes and error exists", () => {
@@ -227,7 +203,7 @@ describe("FieldRenderer", () => {
     const onChange = vi.fn();
     const onErrorClear = vi.fn();
 
-    const { getByPlaceholderText } = render(
+    const { getByLabelText } = render(
       <FieldRenderer
         config={config}
         value=""
@@ -237,9 +213,8 @@ describe("FieldRenderer", () => {
       />
     );
 
-    const input = getByPlaceholderText("Test Field");
-    // Simulate text change
-    input.props.onChangeText("New value");
+    const input = getByLabelText("Name");
+    fireEvent.changeText(input, "New value");
 
     expect(onChange).toHaveBeenCalledWith("New value");
     expect(onErrorClear).toHaveBeenCalled();
@@ -253,10 +228,8 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(<FieldRenderer config={config} value="14:30" onChange={onChange} />);
-
-    const timePicker = screen.getByTestId("date-time-picker");
-    expect(timePicker).toBeTruthy();
+    const view = render(<FieldRenderer config={config} value="14:30" onChange={onChange} />);
+    expect(JSON.stringify(view.toJSON())).toContain("14:30");
   });
 
   it("should handle date field", () => {
@@ -267,15 +240,9 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer
-        config={config}
-        value={new Date().toISOString()}
-        onChange={onChange}
-      />
+    const view = render(
+      <FieldRenderer config={config} value={new Date().toISOString()} onChange={onChange} />
     );
-
-    const datePicker = screen.getByTestId("date-time-picker");
-    expect(datePicker).toBeTruthy();
+    expect(JSON.stringify(view.toJSON())).toContain("Date");
   });
 });

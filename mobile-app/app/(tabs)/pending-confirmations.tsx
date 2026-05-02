@@ -91,14 +91,8 @@ export default function PendingConfirmationsScreen() {
     fetchConfirmations();
   }, [fetchConfirmations]);
 
-  const pendingJobIds = useMemo(
-    () => confirmations.map((c) => c.job_id),
-    [confirmations],
-  );
-  const pendingJobIdsKey = useMemo(
-    () => [...pendingJobIds].sort().join(","),
-    [pendingJobIds],
-  );
+  const pendingJobIds = useMemo(() => confirmations.map((c) => c.job_id), [confirmations]);
+  const pendingJobIdsKey = useMemo(() => [...pendingJobIds].sort().join(","), [pendingJobIds]);
 
   // Refetch when a colleague confirms (job_worker) or job status changes (job) — same pattern as dashboard realtime
   useEffect(() => {
@@ -121,7 +115,7 @@ export default function PendingConfirmationsScreen() {
         },
         () => {
           fetchConfirmations();
-        },
+        }
       )
       .on(
         "postgres_changes",
@@ -133,7 +127,7 @@ export default function PendingConfirmationsScreen() {
         },
         () => {
           fetchConfirmations();
-        },
+        }
       )
       .subscribe();
 
@@ -168,9 +162,7 @@ export default function PendingConfirmationsScreen() {
       }
 
       // Remove from list
-      setConfirmations((prev) =>
-        prev.filter((c) => c.job_id !== jobId)
-      );
+      setConfirmations((prev) => prev.filter((c) => c.job_id !== jobId));
 
       const message = data?.job_approved
         ? "Job has been approved!"
@@ -200,15 +192,12 @@ export default function PendingConfirmationsScreen() {
 
     setIsSubmitting(true);
     try {
-      const { error: flagError } = await supabase.functions.invoke(
-        "flag-job",
-        {
-          body: { job_id: selectedJobId, reason: flagReason.trim() },
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const { error: flagError } = await supabase.functions.invoke("flag-job", {
+        body: { job_id: selectedJobId, reason: flagReason.trim() },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (flagError) {
         Alert.alert("Error", "Failed to flag job. Please try again.");
@@ -216,18 +205,13 @@ export default function PendingConfirmationsScreen() {
       }
 
       // Remove from list
-      setConfirmations((prev) =>
-        prev.filter((c) => c.job_id !== selectedJobId)
-      );
+      setConfirmations((prev) => prev.filter((c) => c.job_id !== selectedJobId));
 
       setFlagModalVisible(false);
       setSelectedJobId(null);
       setFlagReason("");
 
-      Alert.alert(
-        "Job Flagged",
-        "The job has been flagged for admin review."
-      );
+      Alert.alert("Job Flagged", "The job has been flagged for admin review.");
     } catch (err) {
       console.error("Flag error:", err);
       Alert.alert("Error", "Failed to flag job. Please try again.");
@@ -284,10 +268,7 @@ export default function PendingConfirmationsScreen() {
           {/* Content skeleton - card placeholders */}
           <View className="p-4 gap-4">
             {[1, 2, 3].map((i) => (
-              <View
-                key={i}
-                className="bg-card rounded-xl p-4 border border-border/50"
-              >
+              <View key={i} className="bg-card rounded-xl p-4 border border-border/50">
                 <View className="flex-row justify-between mb-3">
                   <Skeleton width="50%" height={18} />
                   <Skeleton width={60} height={24} rounded />
@@ -314,9 +295,7 @@ export default function PendingConfirmationsScreen() {
       <View className="flex-1">
         {/* Header */}
         <View className="bg-background px-4 pt-4 pb-3 border-b border-border/50">
-          <Text className="text-2xl font-bold text-foreground">
-            Pending Confirmations
-          </Text>
+          <Text className="text-2xl font-bold text-foreground">Pending Confirmations</Text>
           <Text className="text-sm text-muted-foreground mt-1">
             {confirmations.length === 0
               ? "No jobs need your confirmation"
@@ -329,28 +308,15 @@ export default function PendingConfirmationsScreen() {
         {/* Content */}
         {error ? (
           <View className="flex-1 items-center justify-center px-4">
-            <Ionicons
-              name="alert-circle-outline"
-              size={48}
-              color="rgb(220 38 38)"
-            />
+            <Ionicons name="alert-circle-outline" size={48} color="rgb(220 38 38)" />
             <Text className="text-destructive text-center mt-4">{error}</Text>
-            <Pressable
-              onPress={onRefresh}
-              className="mt-4 px-4 py-2 bg-primary rounded-lg"
-            >
-              <Text className="text-primary-foreground font-medium">
-                Try Again
-              </Text>
+            <Pressable onPress={onRefresh} className="mt-4 px-4 py-2 bg-primary rounded-lg">
+              <Text className="text-primary-foreground font-medium">Try Again</Text>
             </Pressable>
           </View>
         ) : confirmations.length === 0 ? (
           <View className="flex-1 items-center justify-center px-4">
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={64}
-              color="rgb(34 197 94)"
-            />
+            <Ionicons name="checkmark-circle-outline" size={64} color="rgb(34 197 94)" />
             <Text className="text-foreground text-center mt-4 text-lg font-medium">
               All caught up!
             </Text>
@@ -362,9 +328,7 @@ export default function PendingConfirmationsScreen() {
           <ScrollView
             className="flex-1"
             contentContainerStyle={{ padding: 16 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           >
             <View className="flex-col gap-4">
               {confirmations.map((confirmation) => (
@@ -391,11 +355,7 @@ export default function PendingConfirmationsScreen() {
 
                   {/* Submitted by */}
                   <View className="flex-row items-center gap-2 mb-3">
-                    <Ionicons
-                      name="person-outline"
-                      size={14}
-                      color="rgb(100 116 139)"
-                    />
+                    <Ionicons name="person-outline" size={14} color="rgb(100 116 139)" />
                     <Text className="text-sm text-muted-foreground">
                       Submitted by{" "}
                       <Text className="font-medium text-foreground">
@@ -413,8 +373,8 @@ export default function PendingConfirmationsScreen() {
                           w.confirmation_status === "confirmed"
                             ? "bg-green-100 dark:bg-green-900/30"
                             : w.confirmation_status === "flagged"
-                            ? "bg-red-100 dark:bg-red-900/30"
-                            : "bg-yellow-100 dark:bg-yellow-900/30"
+                              ? "bg-red-100 dark:bg-red-900/30"
+                              : "bg-yellow-100 dark:bg-yellow-900/30"
                         }`}
                       >
                         <Text
@@ -422,8 +382,8 @@ export default function PendingConfirmationsScreen() {
                             w.confirmation_status === "confirmed"
                               ? "text-green-700 dark:text-green-400"
                               : w.confirmation_status === "flagged"
-                              ? "text-red-700 dark:text-red-400"
-                              : "text-yellow-700 dark:text-yellow-400"
+                                ? "text-red-700 dark:text-red-400"
+                                : "text-yellow-700 dark:text-yellow-400"
                           }`}
                         >
                           {w.id === worker?.id ? "You" : w.name}
@@ -452,11 +412,7 @@ export default function PendingConfirmationsScreen() {
                       className="flex-1 bg-red-100 dark:bg-red-900/30 py-3 rounded-lg items-center active:opacity-80 disabled:opacity-50"
                     >
                       <View className="flex-row items-center gap-2">
-                        <Ionicons
-                          name="flag-outline"
-                          size={18}
-                          color="rgb(220 38 38)"
-                        />
+                        <Ionicons name="flag-outline" size={18} color="rgb(220 38 38)" />
                         <Text className="text-red-600 dark:text-red-400 font-semibold">
                           Flag Issue
                         </Text>
@@ -479,11 +435,9 @@ export default function PendingConfirmationsScreen() {
       >
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-background rounded-t-2xl p-6">
-            <Text className="text-xl font-bold text-foreground mb-2">
-              Flag This Job
-            </Text>
+            <Text className="text-xl font-bold text-foreground mb-2">Flag This Job</Text>
             <Text className="text-muted-foreground mb-4">
-              Please explain what's incorrect about this job submission.
+              Please explain what&apos;s incorrect about this job submission.
             </Text>
 
             <TextInput

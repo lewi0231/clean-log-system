@@ -11,3 +11,6 @@ test-results/
 
 # Track example env file (override global gitignore)
 !e2e/.env.example
+
+# Vitest / CI JUnit output
+**/junit.xml

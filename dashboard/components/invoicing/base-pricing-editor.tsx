@@ -14,8 +14,9 @@ import {
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { useBasePricing } from "@/hooks/use-base-pricing";
-import { log } from "@/lib/logger";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
+import useOrganization from "@/hooks/useOrganization";
+import { log } from "@/lib/logger";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -24,10 +25,12 @@ interface BasePricingEditorProps {
 }
 
 export default function BasePricingEditor({ locationId }: BasePricingEditorProps) {
+  const { organizationId } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
-  const { basePricing, loading, error, upsertPricing, deletePricing } = useBasePricing({
-    locationId,
-  });
+  const { basePricing, loading, error, upsertPricing, deletePricing } = useBasePricing(
+    organizationId,
+    { locationId }
+  );
 
   const [isFieldBased, setIsFieldBased] = useState(true);
   const [selectedFieldConfigId, setSelectedFieldConfigId] = useState<string | null>(null);

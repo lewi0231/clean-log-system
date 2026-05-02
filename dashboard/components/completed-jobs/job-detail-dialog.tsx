@@ -1,5 +1,6 @@
 "use client";
 
+import type { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

@@ -1,0 +1,84 @@
+# After the **CI** workflow succeeds on a PR targeting `staging`, merge it (squash).
+# Same queueing pattern as SCAINET (--auto --squash, then immediate --squash fallback).
+
+name: Feature → staging (auto-merge)
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - staging
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  pending-notice:
+    name: CI must pass before auto-merge
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Note
+        run: echo "Auto-merge runs after CI workflow completes successfully"
+
+  auto-merge-on-success:
+    name: Merge after CI passes
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
+
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Resolve PR from workflow run
+        id: get-pr
+        run: |
+          PR_NUMBER=$(gh api \
+            "/repos/${{ github.repository }}/commits/${{ github.event.workflow_run.head_sha }}/pulls" \
+            --jq '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "no PR for this commit — skipping auto-merge"
+            exit 0
+          fi
+
+          PR_BASE=$(gh pr view "$PR_NUMBER" --repo ${{ github.repository }} --json baseRefName --jq '.baseRefName')
+          if [ "$PR_BASE" != "staging" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "PR #$PR_NUMBER targets $PR_BASE — not merging"
+            exit 0
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+
+      - name: Merge PR (squash)
+        if: steps.get-pr.outputs.skip != 'true'
+        run: |
+          PR_NUM=${{ steps.get-pr.outputs.pr_number }}
+
+          STATE=$(gh pr view "$PR_NUM" --repo ${{ github.repository }} --json state --jq '.state')
+          if [ "$STATE" != "OPEN" ]; then
+            echo "PR #$PR_NUM is $STATE — nothing to merge"
+            exit 0
+          fi
+
+          if gh pr merge "$PR_NUM" --auto --squash --repo ${{ github.repository }} 2>&1; then
+            echo "Auto-merge queued for PR #$PR_NUM"
+          elif gh pr merge "$PR_NUM" --squash --repo ${{ github.repository }} 2>&1; then
+            echo "Merged PR #$PR_NUM immediately"
+          else
+            echo "Could not merge PR #$PR_NUM (conflicts, rules, or settings)"
+            exit 1
+          fi

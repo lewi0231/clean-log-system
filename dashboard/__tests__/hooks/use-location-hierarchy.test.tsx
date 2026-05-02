@@ -1,4 +1,5 @@
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
+import useOrganization from "@/hooks/useOrganization";
 import { LocationHierarchyService } from "@/lib/services";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
@@ -15,12 +16,18 @@ vi.mock("@/lib/services", () => ({
   },
 }));
 
+type UseOrganizationReturn = ReturnType<typeof useOrganization>;
+
 const mockUseOrganization = vi.hoisted(() =>
-  vi.fn(() => ({
-    organizationId: "org-1",
-    loading: false,
-    error: null,
-  }))
+  vi.fn(
+    (): UseOrganizationReturn => ({
+      organizationId: "org-1",
+      organizationUserId: null,
+      userRole: null,
+      loading: false,
+      error: undefined,
+    })
+  )
 );
 
 vi.mock("@/hooks/useOrganization", () => ({
@@ -202,8 +209,10 @@ describe("useLocationHierarchy", () => {
   it("should not fetch when organizationId is missing", () => {
     mockUseOrganization.mockReturnValue({
       organizationId: null,
+      organizationUserId: null,
+      userRole: null,
       loading: false,
-      error: null,
+      error: undefined,
     });
 
     renderHook(() => useLocationHierarchy(), {

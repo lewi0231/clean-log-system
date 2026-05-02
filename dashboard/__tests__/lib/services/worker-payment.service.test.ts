@@ -824,7 +824,9 @@ describe("WorkerPaymentService", () => {
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.error_code).toBe("duplicate_payments_needs_confirm");
-        expect(result.duplicates).toHaveLength(1);
+        if (result.error_code === "duplicate_payments_needs_confirm") {
+          expect(result.duplicates).toHaveLength(1);
+        }
       }
     });
 

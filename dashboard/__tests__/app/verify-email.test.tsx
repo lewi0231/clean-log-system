@@ -120,7 +120,7 @@ describe("VerifyEmail - EV-4: Admin Invite Type Handling", () => {
   });
 
   test("should identify non-admin invite correctly", () => {
-    const inviteType = "";
+    const inviteType: string = "";
     const isAdminInvite = inviteType === "admin_invite";
 
     expect(isAdminInvite).toBe(false);

@@ -3,22 +3,25 @@ import { renderHook } from "@testing-library/react-native";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import * as UseFieldConfigsModule from "../use-field-configs";
 import { useEntryForm } from "../use-entry-form";
 
-// Note: This test file requires @testing-library/react to be installed
-// Run: pnpm add -D @testing-library/react
-// For now, these are unit tests that can be run once the dependency is added
-
-// Mock the useFieldConfigs hook
-vi.mock("../use-field-configs", () => ({
-  useFieldConfigs: vi.fn(),
-  FieldErrors: {},
+vi.mock("../use-organization-settings", () => ({
+  useOrganizationSettings: () => ({
+    settings: { use_predefined_locations: false },
+    loading: false,
+    error: "",
+  }),
 }));
 
-// Mock the useFieldConfigs import
-const mockUseFieldConfigs = vi.mocked(
-  await import("../use-field-configs"),
-).useFieldConfigs;
+vi.mock("../use-field-configs", () => ({
+  useFieldConfigs: vi.fn(),
+  getFieldCluster: vi.fn(() => null),
+  groupFieldsByMutualExclusivity: vi.fn(() => []),
+  hasValue: vi.fn(() => false),
+}));
+
+const mockUseFieldConfigs = vi.mocked(UseFieldConfigsModule.useFieldConfigs);
 
 function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
   return {
@@ -46,9 +49,16 @@ function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
 }
 
 function createMockSchema(returnValue: any) {
-  return {
-    safeParse: vi.fn().mockReturnValue(returnValue),
-  } as unknown as z.ZodObject<Record<string, z.ZodTypeAny>>;
+  const schema: {
+    safeParse: ReturnType<typeof vi.fn>;
+    extend: ReturnType<typeof vi.fn>;
+  } = {
+    safeParse: vi.fn(),
+    extend: vi.fn(),
+  };
+  schema.safeParse.mockReturnValue(returnValue);
+  schema.extend.mockImplementation(() => schema);
+  return schema as unknown as z.ZodObject<Record<string, z.ZodTypeAny>>;
 }
 
 describe("useEntryForm", () => {
@@ -75,9 +85,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     expect(result.current.errors).toEqual({});
   });
@@ -102,9 +110,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -138,9 +144,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -169,9 +173,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -200,9 +202,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -230,9 +230,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -270,16 +268,17 @@ describe("useEntryForm", () => {
       }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
-    const isValid = result.current.validateInputs(submissionData);
+    let isValid: boolean;
+    act(() => {
+      isValid = result.current.validateInputs(submissionData);
+    });
 
-    expect(isValid).toBe(false);
+    expect(isValid!).toBe(false);
     expect(result.current.errors).toEqual({
-      name: "Name is required",
+      "field-1": "Name is required",
     });
   });
 
@@ -306,19 +305,20 @@ describe("useEntryForm", () => {
       }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     // First set an error
     act(() => {
-      result.current.clearFieldError("name");
+      result.current.clearFieldError("field-1");
     });
 
     const submissionData = result.current.buildSubmissionData();
-    const isValid = result.current.validateInputs(submissionData);
+    let isValid: boolean;
+    act(() => {
+      isValid = result.current.validateInputs(submissionData);
+    });
 
-    expect(isValid).toBe(true);
+    expect(isValid!).toBe(true);
     expect(result.current.errors).toEqual({});
   });
 
@@ -360,9 +360,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     act(() => {
       result.current.resetForm();
@@ -406,20 +404,20 @@ describe("useEntryForm", () => {
       }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     // Set an error first
     const submissionData = result.current.buildSubmissionData();
-    result.current.validateInputs(submissionData);
-    expect(result.current.errors.name).toBe("Name is required");
+    act(() => {
+      result.current.validateInputs(submissionData);
+    });
+    expect(result.current.errors["field-1"]).toBe("Name is required");
 
     // Clear the error
     act(() => {
-      result.current.clearFieldError("name");
+      result.current.clearFieldError("field-1");
     });
 
-    expect(result.current.errors.name).toBeUndefined();
+    expect(result.current.errors["field-1"]).toBeUndefined();
   });
 });

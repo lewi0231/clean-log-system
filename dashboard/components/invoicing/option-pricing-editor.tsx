@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useOptionPricing } from "@/hooks/use-option-pricing";
 import { log } from "@/lib/logger";
+import useOrganization from "@/hooks/useOrganization";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { DollarSign, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -17,7 +18,9 @@ interface OptionPricingEditorProps {
 }
 
 export default function OptionPricingEditor({ fieldConfig, locationId }: OptionPricingEditorProps) {
+  const { organizationId } = useOrganization();
   const { optionPricing, loading, error, upsertPricing, deletePricing } = useOptionPricing(
+    organizationId,
     fieldConfig.id,
     {
       locationId,
