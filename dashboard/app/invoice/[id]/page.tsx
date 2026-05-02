@@ -107,20 +107,26 @@ function InvoicePageContent() {
 
         const data = await invokeEdgeFunction<{
           success?: boolean;
-          invoice?: InvoiceWithJobs;
+          /** Row may include JSON/extra keys (e.g. calculation) not modeled on InvoiceWithJobs */
+          invoice?: InvoiceWithJobs & { calculation?: unknown };
           calculation?: CalculateInvoiceResponse["calculation"];
           template_config?: InvoiceData["template_config"];
           hierarchy_metadata?: InvoiceData["hierarchy_metadata"];
           organization?: Record<string, unknown>;
         }>("get-invoice-public", { invoice_id: invoiceId });
 
-        if (!data?.success || !data.invoice) {
+        if (!data?.success || !data.invoice || data.calculation == null) {
           throw new Error("Invoice not found");
         }
 
+        const invoicePayload = data.invoice as InvoiceWithJobs & { calculation?: unknown };
+        const { calculation: _unusedInvoiceCalculation, ...invoiceRow } = invoicePayload;
+
+        const calculation: InvoiceData["calculation"] = data.calculation;
+
         setInvoice({
-          ...data.invoice,
-          calculation: data.calculation as InvoiceData["calculation"],
+          ...invoiceRow,
+          calculation,
           template_config: (data.template_config ?? null) as InvoiceData["template_config"],
           hierarchy_metadata: data.hierarchy_metadata as
             | InvoiceData["hierarchy_metadata"]
