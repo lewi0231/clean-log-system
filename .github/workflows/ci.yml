@@ -34,7 +34,7 @@ jobs:
         uses: ./.github/actions/setup-pnpm-monorepo
 
       - name: Setup Deno
-        uses: denoland/setup-deno@e95548e56dfa6d5e83405bc09c84845d958c9174
+        uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
 
