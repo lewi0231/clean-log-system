@@ -3,7 +3,7 @@ import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { useFieldPricingCardState } from "@/hooks/use-field-pricing-card-state";
 import type { FieldPricing, PricingCondition, PricingRule } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
@@ -214,10 +214,13 @@ describe("FieldPricingCard", () => {
     expect(screen.getByText("Hours of service")).toBeInTheDocument();
   });
 
-  it("should display equation preview for number field", () => {
+  it("should show live formula preview for number field (prompt when customer price empty)", () => {
     render(<FieldPricingCard {...defaultProps} />);
 
-    expect(screen.getByText(/Total = price_per_unit × quantity/)).toBeInTheDocument();
+    expect(screen.getByText("Formula Preview")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Enter a customer price to see the formula preview/)
+    ).toBeInTheDocument();
   });
 
   it("should display equation preview for boolean field", () => {
@@ -271,9 +274,13 @@ describe("FieldPricingCard", () => {
       );
 
       expect(screen.getByText(/Customer:/)).toBeInTheDocument();
-      expect(screen.getByText("$100.00")).toBeInTheDocument();
       expect(screen.getByText(/Worker:/)).toBeInTheDocument();
-      expect(screen.getByText("$50.00")).toBeInTheDocument();
+      // Header shows customer/worker prices; FormulaPreview also repeats those amounts in the
+      // live line (and margin), so scope to the summary row spans to avoid duplicate matches.
+      const customerSummary = screen.getByText(/Customer:/).parentElement!;
+      const workerSummary = screen.getByText(/Worker:/).parentElement!;
+      expect(within(customerSummary).getByText("$100.00")).toBeInTheDocument();
+      expect(within(workerSummary).getByText("$50.00")).toBeInTheDocument();
     });
 
     it("should display 'No prices set' when neither price is set", () => {

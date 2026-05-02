@@ -68,9 +68,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     expect(result.current.errors).toEqual({});
   });
@@ -95,9 +93,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -131,9 +127,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -162,9 +156,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -193,9 +185,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -223,9 +213,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
 
@@ -263,9 +251,7 @@ describe("useEntryForm", () => {
       }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     const submissionData = result.current.buildSubmissionData();
     const isValid = result.current.validateInputs(submissionData);
@@ -299,9 +285,7 @@ describe("useEntryForm", () => {
       }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     // First set an error
     act(() => {
@@ -353,9 +337,7 @@ describe("useEntryForm", () => {
       FieldConfigSchema: createMockSchema({ success: true, data: {} }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     act(() => {
       result.current.resetForm();
@@ -399,9 +381,7 @@ describe("useEntryForm", () => {
       }),
     });
 
-    const { result } = renderHook(() =>
-      useEntryForm({ organizationId: "org-1" })
-    );
+    const { result } = renderHook(() => useEntryForm({ organizationId: "org-1" }));
 
     // Set an error first
     const submissionData = result.current.buildSubmissionData();

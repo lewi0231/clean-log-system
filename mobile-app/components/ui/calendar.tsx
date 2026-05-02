@@ -22,15 +22,7 @@ import {
 } from "date-fns";
 import { enUS } from "date-fns/locale";
 import * as React from "react";
-import {
-  Animated,
-  Dimensions,
-  Modal,
-  Platform,
-  Pressable,
-  Text,
-  View,
-} from "react-native";
+import { Animated, Dimensions, Modal, Platform, Pressable, Text, View } from "react-native";
 
 const MONTHS = [
   "January",
@@ -96,65 +88,61 @@ const isRangeEnd = (date: Date, range: DateRange) => {
   return isSameDay(date, range.to);
 };
 
-const CalendarHeader = React.memo(({
-  currentDate,
-  onPrevMonth,
-  onNextMonth,
-  onHeaderPress,
-  enableQuickMonthYear,
-}: {
-  currentDate: Date;
-  onPrevMonth: () => void;
-  onNextMonth: () => void;
-  onHeaderPress?: () => void;
-  enableQuickMonthYear?: boolean;
-}) => (
-  <View className="flex-row items-center justify-between mb-4">
-    <Pressable
-      onPress={onPrevMonth}
-      className="p-2 rounded-full bg-muted active:scale-90 transition-transform"
-    >
-      <Ionicons name="chevron-back" size={24} className="color-primary" />
-    </Pressable>
-
-    {enableQuickMonthYear ? (
+const CalendarHeader = React.memo(
+  ({
+    currentDate,
+    onPrevMonth,
+    onNextMonth,
+    onHeaderPress,
+    enableQuickMonthYear,
+  }: {
+    currentDate: Date;
+    onPrevMonth: () => void;
+    onNextMonth: () => void;
+    onHeaderPress?: () => void;
+    enableQuickMonthYear?: boolean;
+  }) => (
+    <View className="flex-row items-center justify-between mb-4">
       <Pressable
-        onPress={onHeaderPress}
-        className="flex-row items-center space-x-1 px-3 py-2 rounded-lg active:bg-muted"
+        onPress={onPrevMonth}
+        className="p-2 rounded-full bg-muted active:scale-90 transition-transform"
       >
+        <Ionicons name="chevron-back" size={24} className="color-primary" />
+      </Pressable>
+
+      {enableQuickMonthYear ? (
+        <Pressable
+          onPress={onHeaderPress}
+          className="flex-row items-center space-x-1 px-3 py-2 rounded-lg active:bg-muted"
+        >
+          <Text className="text-xl font-semibold text-foreground">
+            {format(currentDate, "MMMM yyyy", { locale: enUS })}
+          </Text>
+          <Ionicons name="chevron-down" size={20} className="color-primary" />
+        </Pressable>
+      ) : (
         <Text className="text-xl font-semibold text-foreground">
           {format(currentDate, "MMMM yyyy", { locale: enUS })}
         </Text>
-        <Ionicons name="chevron-down" size={20} className="color-primary" />
-      </Pressable>
-    ) : (
-      <Text className="text-xl font-semibold text-foreground">
-        {format(currentDate, "MMMM yyyy", { locale: enUS })}
-      </Text>
-    )}
+      )}
 
-    <Pressable
-      onPress={onNextMonth}
-      className="p-2 rounded-full bg-muted active:scale-90 transition-transform"
-    >
-      <Ionicons name="chevron-forward" size={24} className="color-primary" />
-    </Pressable>
-  </View>
-));
+      <Pressable
+        onPress={onNextMonth}
+        className="p-2 rounded-full bg-muted active:scale-90 transition-transform"
+      >
+        <Ionicons name="chevron-forward" size={24} className="color-primary" />
+      </Pressable>
+    </View>
+  )
+);
 
 CalendarHeader.displayName = "CalendarHeader";
 
 const WeekdaysRow = React.memo(({ orderedWeekdays }: { orderedWeekdays: string[] }) => (
   <View className="flex-row justify-between mb-2">
     {orderedWeekdays.map((day) => (
-      <View
-        key={day}
-        style={{ width: DAY_SIZE }}
-        className="items-center justify-center"
-      >
-        <Text className="text-sm font-medium text-muted-foreground">
-          {day}
-        </Text>
+      <View key={day} style={{ width: DAY_SIZE }} className="items-center justify-center">
+        <Text className="text-sm font-medium text-muted-foreground">{day}</Text>
       </View>
     ))}
   </View>
@@ -162,333 +150,333 @@ const WeekdaysRow = React.memo(({ orderedWeekdays }: { orderedWeekdays: string[]
 
 WeekdaysRow.displayName = "WeekdaysRow";
 
-const CalendarDay = React.memo(({
-  date,
-  currentDate,
-  mode,
-  selected,
-  isSelected,
-  isDisabled,
-  onPress,
-}: {
-  date: Date;
-  currentDate: Date;
-  mode: "single" | "range" | "datetime";
-  selected: Date | Date[] | DateRange | undefined;
-  isSelected: boolean;
-  isDisabled: boolean;
-  onPress: () => void;
-}) => {
-  const isCurrentMonth = isSameMonth(date, currentDate);
-  const isTodayDate = isToday(date);
+const CalendarDay = React.memo(
+  ({
+    date,
+    currentDate,
+    mode,
+    selected,
+    isSelected,
+    isDisabled,
+    onPress,
+  }: {
+    date: Date;
+    currentDate: Date;
+    mode: "single" | "range" | "datetime";
+    selected: Date | Date[] | DateRange | undefined;
+    isSelected: boolean;
+    isDisabled: boolean;
+    onPress: () => void;
+  }) => {
+    const isCurrentMonth = isSameMonth(date, currentDate);
+    const isTodayDate = isToday(date);
 
-  let rangeStyles = "";
-  if (mode === "range" && selected && isDateRange(selected)) {
-    const isInCurrentRange = isInRange(date, selected);
-    const isStart = isRangeStart(date, selected);
-    const isEnd = isRangeEnd(date, selected);
+    let rangeStyles = "";
+    if (mode === "range" && selected && isDateRange(selected)) {
+      const isInCurrentRange = isInRange(date, selected);
+      const isStart = isRangeStart(date, selected);
+      const isEnd = isRangeEnd(date, selected);
 
-    if (isInCurrentRange) {
-      rangeStyles = "bg-primary/20";
+      if (isInCurrentRange) {
+        rangeStyles = "bg-primary/20";
+      }
+      if (isStart) {
+        rangeStyles += " rounded-l-lg";
+      }
+      if (isEnd) {
+        rangeStyles += " rounded-r-lg";
+      }
+      if (isStart || isEnd) {
+        rangeStyles += " bg-primary";
+      }
     }
-    if (isStart) {
-      rangeStyles += " rounded-l-lg";
-    }
-    if (isEnd) {
-      rangeStyles += " rounded-r-lg";
-    }
-    if (isStart || isEnd) {
-      rangeStyles += " bg-primary";
-    }
-  }
 
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={isDisabled}
-      style={{ width: DAY_SIZE, height: DAY_SIZE }}
-      className={cn(
-        "items-center justify-center",
-        mode !== "range" && isSelected && "bg-primary rounded-lg",
-        mode !== "range" && isTodayDate && isSelected && "bg-accent rounded-lg",
-        isDisabled && "opacity-50",
-        rangeStyles
-      )}
-    >
-      <Text
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={isDisabled}
+        style={{ width: DAY_SIZE, height: DAY_SIZE }}
         className={cn(
-          "text-base",
-          (isSelected &&
-            mode === "range" &&
-            isDateRange(selected) &&
-            (isRangeStart(date, selected) || isRangeEnd(date, selected))) ||
-            (isSelected && mode !== "range")
-            ? "text-primary-foreground"
-            : !isCurrentMonth
-              ? "text-muted-foreground"
-              : "text-foreground",
-          isDisabled && "opacity-50"
+          "items-center justify-center",
+          mode !== "range" && isSelected && "bg-primary rounded-lg",
+          mode !== "range" && isTodayDate && isSelected && "bg-accent rounded-lg",
+          isDisabled && "opacity-50",
+          rangeStyles
         )}
       >
-        {format(date, "d")}
-      </Text>
-    </Pressable>
-  );
-});
+        <Text
+          className={cn(
+            "text-base",
+            (isSelected &&
+              mode === "range" &&
+              isDateRange(selected) &&
+              (isRangeStart(date, selected) || isRangeEnd(date, selected))) ||
+              (isSelected && mode !== "range")
+              ? "text-primary-foreground"
+              : !isCurrentMonth
+                ? "text-muted-foreground"
+                : "text-foreground",
+            isDisabled && "opacity-50"
+          )}
+        >
+          {format(date, "d")}
+        </Text>
+      </Pressable>
+    );
+  }
+);
 
 CalendarDay.displayName = "CalendarDay";
 
-const TimeSelector = React.memo(({
-  selectedDate,
-  showTimePicker,
-  onToggleTimePicker,
-}: {
-  selectedDate: Date;
-  showTimePicker: boolean;
-  onToggleTimePicker: () => void;
-}) => (
-  <View className="px-4 pb-4">
-    <Pressable
-      onPress={onToggleTimePicker}
-      className="flex-row items-center justify-between bg-muted/50 rounded-xl p-4"
-    >
-      <View className="flex-row items-center">
-        <View className="bg-primary/10 p-2 rounded-full mr-4">
-          <Ionicons name="time-outline" size={22} className="text-foreground" />
+const TimeSelector = React.memo(
+  ({
+    selectedDate,
+    showTimePicker,
+    onToggleTimePicker,
+  }: {
+    selectedDate: Date;
+    showTimePicker: boolean;
+    onToggleTimePicker: () => void;
+  }) => (
+    <View className="px-4 pb-4">
+      <Pressable
+        onPress={onToggleTimePicker}
+        className="flex-row items-center justify-between bg-muted/50 rounded-xl p-4"
+      >
+        <View className="flex-row items-center">
+          <View className="bg-primary/10 p-2 rounded-full mr-4">
+            <Ionicons name="time-outline" size={22} className="text-foreground" />
+          </View>
+          <Text className="text-base font-medium text-foreground">
+            {format(selectedDate, "HH:mm")}
+          </Text>
         </View>
-        <Text className="text-base font-medium text-foreground">
-          {format(selectedDate, "HH:mm")}
-        </Text>
-      </View>
-      <View className="flex-row items-center space-x-2">
-        <Text className="text-sm text-muted-foreground">
-          {showTimePicker ? "Tap to close" : "Tap to change"}
-        </Text>
-        <Ionicons
-          name={showTimePicker ? "chevron-down" : "chevron-forward"}
-          size={16}
-          className="text-muted-foreground"
-        />
-      </View>
-    </Pressable>
-  </View>
-));
+        <View className="flex-row items-center space-x-2">
+          <Text className="text-sm text-muted-foreground">
+            {showTimePicker ? "Tap to close" : "Tap to change"}
+          </Text>
+          <Ionicons
+            name={showTimePicker ? "chevron-down" : "chevron-forward"}
+            size={16}
+            className="text-muted-foreground"
+          />
+        </View>
+      </Pressable>
+    </View>
+  )
+);
 
 TimeSelector.displayName = "TimeSelector";
 
-const MonthYearPickerHeader = React.memo(({
-  activeTab,
-  onClose,
-}: {
-  activeTab: "month" | "year";
-  setActiveTab: (tab: "month" | "year") => void;
-  onClose: () => void;
-}) => (
-  <View className="border-b border-border">
-    <View className="flex-row justify-between items-center px-4 py-3">
-      <Pressable onPress={onClose} className="opacity-60 active:opacity-100">
-        <Text className="text-grey">Cancel</Text>
-      </Pressable>
-      <Text className="text-lg font-semibold text-black">
-        {activeTab === "month" ? "Select month" : "Select year"}
-      </Text>
-      <Pressable onPress={onClose} className="opacity-60 active:opacity-100">
-        <Text className="text-grey font-semibold">Done</Text>
-      </Pressable>
+const MonthYearPickerHeader = React.memo(
+  ({
+    activeTab,
+    onClose,
+  }: {
+    activeTab: "month" | "year";
+    setActiveTab: (tab: "month" | "year") => void;
+    onClose: () => void;
+  }) => (
+    <View className="border-b border-border">
+      <View className="flex-row justify-between items-center px-4 py-3">
+        <Pressable onPress={onClose} className="opacity-60 active:opacity-100">
+          <Text className="text-grey">Cancel</Text>
+        </Pressable>
+        <Text className="text-lg font-semibold text-black">
+          {activeTab === "month" ? "Select month" : "Select year"}
+        </Text>
+        <Pressable onPress={onClose} className="opacity-60 active:opacity-100">
+          <Text className="text-grey font-semibold">Done</Text>
+        </Pressable>
+      </View>
     </View>
-  </View>
-));
+  )
+);
 
 MonthYearPickerHeader.displayName = "MonthYearPickerHeader";
 
-const MonthPicker = React.memo(({
-  currentDate,
-  onMonthSelect,
-  onYearChange,
-  onTabChange,
-  fromDate,
-  toDate,
-}: {
-  currentDate: Date;
-  onMonthSelect: (month: number) => void;
-  onYearChange: (year: number) => void;
-  onTabChange: () => void;
-  fromDate?: Date;
-  toDate?: Date;
-}) => {
-  const currentYear = currentDate.getFullYear();
-  const isPrevYearDisabled = fromDate && currentYear <= fromDate.getFullYear();
-  const isNextYearDisabled = toDate && currentYear >= toDate.getFullYear();
+const MonthPicker = React.memo(
+  ({
+    currentDate,
+    onMonthSelect,
+    onYearChange,
+    onTabChange,
+    fromDate,
+    toDate,
+  }: {
+    currentDate: Date;
+    onMonthSelect: (month: number) => void;
+    onYearChange: (year: number) => void;
+    onTabChange: () => void;
+    fromDate?: Date;
+    toDate?: Date;
+  }) => {
+    const currentYear = currentDate.getFullYear();
+    const isPrevYearDisabled = fromDate && currentYear <= fromDate.getFullYear();
+    const isNextYearDisabled = toDate && currentYear >= toDate.getFullYear();
 
-  return (
-    <View className="py-4">
-      <View className="px-4 mb-6">
-        <View className="flex-row justify-between items-center mb-4">
-          <Pressable
-            onPress={() => onYearChange(currentYear - 1)}
-            disabled={isPrevYearDisabled}
-            className={cn(
-              "p-2 rounded-full active:scale-90 transition-transform",
-              isPrevYearDisabled && "opacity-50"
-            )}
-          >
-            <Ionicons name="chevron-back" size={24} className="text-black" />
-          </Pressable>
+    return (
+      <View className="py-4">
+        <View className="px-4 mb-6">
+          <View className="flex-row justify-between items-center mb-4">
+            <Pressable
+              onPress={() => onYearChange(currentYear - 1)}
+              disabled={isPrevYearDisabled}
+              className={cn(
+                "p-2 rounded-full active:scale-90 transition-transform",
+                isPrevYearDisabled && "opacity-50"
+              )}
+            >
+              <Ionicons name="chevron-back" size={24} className="text-black" />
+            </Pressable>
 
-          <Pressable
-            onPress={onTabChange}
-            className="flex-row items-center px-4 py-2 rounded-lg active:opacity-60"
-          >
-            <Text className="text-xl font-semibold text-black">
-              {currentYear}
-            </Text>
-            <View className="ml-2">
-              <Ionicons name="chevron-forward" size={20} className="text-black" />
-            </View>
-          </Pressable>
+            <Pressable
+              onPress={onTabChange}
+              className="flex-row items-center px-4 py-2 rounded-lg active:opacity-60"
+            >
+              <Text className="text-xl font-semibold text-black">{currentYear}</Text>
+              <View className="ml-2">
+                <Ionicons name="chevron-forward" size={20} className="text-black" />
+              </View>
+            </Pressable>
 
-          <Pressable
-            onPress={() => onYearChange(currentYear + 1)}
-            disabled={isNextYearDisabled}
-            className={cn(
-              "p-2 rounded-full active:scale-90 transition-transform",
-              isNextYearDisabled && "opacity-50"
-            )}
-          >
-            <Ionicons name="chevron-forward" size={24} className="text-black" />
-          </Pressable>
-        </View>
-        <View className="flex-row flex-wrap justify-between">
-          {MONTHS.map((month, index) => {
-            const isDisabled =
-              (fromDate && (
-                currentYear === fromDate.getFullYear() &&
-                index < fromDate.getMonth()
-              )) ||
-              (toDate && (
-                currentYear === toDate.getFullYear() &&
-                index > toDate.getMonth()
-              ));
+            <Pressable
+              onPress={() => onYearChange(currentYear + 1)}
+              disabled={isNextYearDisabled}
+              className={cn(
+                "p-2 rounded-full active:scale-90 transition-transform",
+                isNextYearDisabled && "opacity-50"
+              )}
+            >
+              <Ionicons name="chevron-forward" size={24} className="text-black" />
+            </Pressable>
+          </View>
+          <View className="flex-row flex-wrap justify-between">
+            {MONTHS.map((month, index) => {
+              const isDisabled =
+                (fromDate &&
+                  currentYear === fromDate.getFullYear() &&
+                  index < fromDate.getMonth()) ||
+                (toDate && currentYear === toDate.getFullYear() && index > toDate.getMonth());
 
-            return (
-              <Pressable
-                key={month}
-                onPress={() => onMonthSelect(index)}
-                disabled={isDisabled}
-                className={cn(
-                  "w-[30%] py-3 rounded-lg mb-3 active:scale-95 transition-transform",
-                  getMonth(currentDate) === index ? "bg-black" : "bg-grey",
-                  isDisabled && "opacity-50"
-                )}
-              >
-                <Text
+              return (
+                <Pressable
+                  key={month}
+                  onPress={() => onMonthSelect(index)}
+                  disabled={isDisabled}
                   className={cn(
-                    "text-base text-center",
-                    getMonth(currentDate) === index
-                      ? "text-white font-medium"
-                      : "text-black",
+                    "w-[30%] py-3 rounded-lg mb-3 active:scale-95 transition-transform",
+                    getMonth(currentDate) === index ? "bg-black" : "bg-grey",
                     isDisabled && "opacity-50"
                   )}
                 >
-                  {month}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text
+                    className={cn(
+                      "text-base text-center",
+                      getMonth(currentDate) === index ? "text-white font-medium" : "text-black",
+                      isDisabled && "opacity-50"
+                    )}
+                  >
+                    {month}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
-    </View>
-  );
-});
+    );
+  }
+);
 
 MonthPicker.displayName = "MonthPicker";
 
-const YearPicker = React.memo(({
-  currentDate,
-  onYearSelect,
-  onYearNavigate,
-  fromDate,
-  toDate,
-}: {
-  currentDate: Date;
-  onYearSelect: (year: number) => void;
-  onYearNavigate: (year: number) => void;
-  fromDate?: Date;
-  toDate?: Date;
-}) => {
-  const startYear = currentDate.getFullYear() - 10;
-  const years = Array.from({ length: 20 }, (_, i) => startYear + i);
+const YearPicker = React.memo(
+  ({
+    currentDate,
+    onYearSelect,
+    onYearNavigate,
+    fromDate,
+    toDate,
+  }: {
+    currentDate: Date;
+    onYearSelect: (year: number) => void;
+    onYearNavigate: (year: number) => void;
+    fromDate?: Date;
+    toDate?: Date;
+  }) => {
+    const startYear = currentDate.getFullYear() - 10;
+    const years = Array.from({ length: 20 }, (_, i) => startYear + i);
 
-  const minYear = fromDate ? fromDate.getFullYear() : undefined;
-  const maxYear = toDate ? toDate.getFullYear() : undefined;
-  const isPrevDisabled = minYear !== undefined && startYear - 20 < minYear;
-  const isNextDisabled = maxYear !== undefined && startYear + 20 > maxYear;
+    const minYear = fromDate ? fromDate.getFullYear() : undefined;
+    const maxYear = toDate ? toDate.getFullYear() : undefined;
+    const isPrevDisabled = minYear !== undefined && startYear - 20 < minYear;
+    const isNextDisabled = maxYear !== undefined && startYear + 20 > maxYear;
 
-  return (
-    <View className="py-4">
-      <View className="px-4">
-        <View className="flex-row justify-between items-center mb-4">
-          <Pressable
-            onPress={() => onYearNavigate(startYear - 20)}
-            disabled={isPrevDisabled}
-            className={cn(
-              "p-2 rounded-full active:scale-90 transition-transform",
-              isPrevDisabled && "opacity-50"
-            )}
-          >
-            <Ionicons name="chevron-back" size={24} className="text-black" />
-          </Pressable>
-          <Text className="text-xl font-semibold text-black">
-            {`${startYear} - ${startYear + 19}`}
-          </Text>
-          <Pressable
-            onPress={() => onYearNavigate(startYear + 20)}
-            disabled={isNextDisabled}
-            className={cn(
-              "p-2 rounded-full active:scale-90 transition-transform",
-              isNextDisabled && "opacity-50"
-            )}
-          >
-            <Ionicons name="chevron-forward" size={24} className="text-black" />
-          </Pressable>
-        </View>
+    return (
+      <View className="py-4">
+        <View className="px-4">
+          <View className="flex-row justify-between items-center mb-4">
+            <Pressable
+              onPress={() => onYearNavigate(startYear - 20)}
+              disabled={isPrevDisabled}
+              className={cn(
+                "p-2 rounded-full active:scale-90 transition-transform",
+                isPrevDisabled && "opacity-50"
+              )}
+            >
+              <Ionicons name="chevron-back" size={24} className="text-black" />
+            </Pressable>
+            <Text className="text-xl font-semibold text-black">
+              {`${startYear} - ${startYear + 19}`}
+            </Text>
+            <Pressable
+              onPress={() => onYearNavigate(startYear + 20)}
+              disabled={isNextDisabled}
+              className={cn(
+                "p-2 rounded-full active:scale-90 transition-transform",
+                isNextDisabled && "opacity-50"
+              )}
+            >
+              <Ionicons name="chevron-forward" size={24} className="text-black" />
+            </Pressable>
+          </View>
 
-        <View className="flex-row flex-wrap justify-between">
-          {years.map((year) => {
-            const isDisabled =
-              (minYear !== undefined && year < minYear) ||
-              (maxYear !== undefined && year > maxYear);
+          <View className="flex-row flex-wrap justify-between">
+            {years.map((year) => {
+              const isDisabled =
+                (minYear !== undefined && year < minYear) ||
+                (maxYear !== undefined && year > maxYear);
 
-            return (
-              <Pressable
-                key={year}
-                onPress={() => onYearSelect(year)}
-                disabled={isDisabled}
-                className={cn(
-                  "w-[23%] py-3 rounded-lg mb-3 active:scale-95 transition-transform",
-                  currentDate.getFullYear() === year ? "bg-black" : "bg-grey",
-                  isDisabled && "opacity-50"
-                )}
-              >
-                <Text
+              return (
+                <Pressable
+                  key={year}
+                  onPress={() => onYearSelect(year)}
+                  disabled={isDisabled}
                   className={cn(
-                    "text-base text-center",
-                    currentDate.getFullYear() === year
-                      ? "text-white font-medium"
-                      : "text-black",
+                    "w-[23%] py-3 rounded-lg mb-3 active:scale-95 transition-transform",
+                    currentDate.getFullYear() === year ? "bg-black" : "bg-grey",
                     isDisabled && "opacity-50"
                   )}
                 >
-                  {year}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text
+                    className={cn(
+                      "text-base text-center",
+                      currentDate.getFullYear() === year ? "text-white font-medium" : "text-black",
+                      isDisabled && "opacity-50"
+                    )}
+                  >
+                    {year}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
-    </View>
-  );
-});
+    );
+  }
+);
 
 YearPicker.displayName = "YearPicker";
 
@@ -524,58 +512,67 @@ export function Calendar({
     return [...days, ...firstDays];
   }, [firstDayOfWeek]);
 
-  const getDaysInMonth = React.useCallback((date: Date) => {
-    const start = startOfMonth(date);
-    const end = endOfMonth(date);
-    const days = eachDayOfInterval({ start, end });
+  const getDaysInMonth = React.useCallback(
+    (date: Date) => {
+      const start = startOfMonth(date);
+      const end = endOfMonth(date);
+      const days = eachDayOfInterval({ start, end });
 
-    // Add days from previous month to fill the first week
-    const firstDayOfMonth = (start.getDay() - firstDayOfWeek + 7) % 7;
-    if (showOutsideDays && firstDayOfMonth > 0) {
-      const prevMonthDays = eachDayOfInterval({
-        start: subMonths(start, 1),
-        end: subMonths(end, 1),
-      }).slice(-firstDayOfMonth);
-      days.unshift(...prevMonthDays);
-    }
+      // Add days from previous month to fill the first week
+      const firstDayOfMonth = (start.getDay() - firstDayOfWeek + 7) % 7;
+      if (showOutsideDays && firstDayOfMonth > 0) {
+        const prevMonthDays = eachDayOfInterval({
+          start: subMonths(start, 1),
+          end: subMonths(end, 1),
+        }).slice(-firstDayOfMonth);
+        days.unshift(...prevMonthDays);
+      }
 
-    // Add days from next month to fill the last week
-    if (showOutsideDays && days.length < 42) {
-      const remainingDays = 42 - days.length;
-      const nextMonthDays = eachDayOfInterval({
-        start: addMonths(start, 1),
-        end: addMonths(end, 1),
-      }).slice(0, remainingDays);
-      days.push(...nextMonthDays);
-    }
+      // Add days from next month to fill the last week
+      if (showOutsideDays && days.length < 42) {
+        const remainingDays = 42 - days.length;
+        const nextMonthDays = eachDayOfInterval({
+          start: addMonths(start, 1),
+          end: addMonths(end, 1),
+        }).slice(0, remainingDays);
+        days.push(...nextMonthDays);
+      }
 
-    return days;
-  }, [firstDayOfWeek, showOutsideDays]);
+      return days;
+    },
+    [firstDayOfWeek, showOutsideDays]
+  );
 
-  const isSelected = React.useCallback((date: Date) => {
-    if (!selected) return false;
-    if (selected instanceof Date) {
-      return isSameDay(selected, date);
-    }
-    if (Array.isArray(selected)) {
-      return selected.some((s) => isSameDay(s, date));
-    }
-    if (isDateRange(selected)) {
-      return (
-        isSameDay(selected.from, date) ||
-        isSameDay(selected.to, date) ||
-        isWithinInterval(date, { start: selected.from, end: selected.to })
-      );
-    }
-    return false;
-  }, [selected]);
+  const isSelected = React.useCallback(
+    (date: Date) => {
+      if (!selected) return false;
+      if (selected instanceof Date) {
+        return isSameDay(selected, date);
+      }
+      if (Array.isArray(selected)) {
+        return selected.some((s) => isSameDay(s, date));
+      }
+      if (isDateRange(selected)) {
+        return (
+          isSameDay(selected.from, date) ||
+          isSameDay(selected.to, date) ||
+          isWithinInterval(date, { start: selected.from, end: selected.to })
+        );
+      }
+      return false;
+    },
+    [selected]
+  );
 
-  const isDisabled = React.useCallback((date: Date) => {
-    if (fromDate && isBefore(date, startOfDay(fromDate))) return true;
-    if (toDate && isAfter(date, endOfDay(toDate))) return true;
-    if (typeof disabled === "function") return disabled(date);
-    return false;
-  }, [fromDate, toDate, disabled]);
+  const isDisabled = React.useCallback(
+    (date: Date) => {
+      if (fromDate && isBefore(date, startOfDay(fromDate))) return true;
+      if (toDate && isAfter(date, endOfDay(toDate))) return true;
+      if (typeof disabled === "function") return disabled(date);
+      return false;
+    },
+    [fromDate, toDate, disabled]
+  );
 
   const showPicker = React.useCallback(() => {
     setShowMonthYearPicker(true);
@@ -596,86 +593,101 @@ export function Calendar({
     });
   }, [fadeAnim]);
 
-  const handleMonthSelect = React.useCallback((month: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setMonth(month);
-    setCurrentDate(newDate);
-    setShowMonthYearPicker(false);
-  }, [currentDate]);
+  const handleMonthSelect = React.useCallback(
+    (month: number) => {
+      const newDate = new Date(currentDate);
+      newDate.setMonth(month);
+      setCurrentDate(newDate);
+      setShowMonthYearPicker(false);
+    },
+    [currentDate]
+  );
 
-  const handleYearChange = React.useCallback((year: number) => {
-    const newDate = new Date(currentDate);
-    newDate.setFullYear(year);
-    setCurrentDate(newDate);
-  }, [currentDate]);
+  const handleYearChange = React.useCallback(
+    (year: number) => {
+      const newDate = new Date(currentDate);
+      newDate.setFullYear(year);
+      setCurrentDate(newDate);
+    },
+    [currentDate]
+  );
 
-  const handleYearSelect = React.useCallback((year: number) => {
-    handleYearChange(year);
-    setActiveTab("month");
-  }, [handleYearChange]);
+  const handleYearSelect = React.useCallback(
+    (year: number) => {
+      handleYearChange(year);
+      setActiveTab("month");
+    },
+    [handleYearChange]
+  );
 
-  const handleYearNavigate = React.useCallback((year: number) => {
-    handleYearChange(year);
-    // Ne pas changer d'onglet, rester en mode année
-  }, [handleYearChange]);
+  const handleYearNavigate = React.useCallback(
+    (year: number) => {
+      handleYearChange(year);
+      // Ne pas changer d'onglet, rester en mode année
+    },
+    [handleYearChange]
+  );
 
-  const handleDateSelect = React.useCallback((date: Date) => {
-    if (isDisabled(date)) return;
+  const handleDateSelect = React.useCallback(
+    (date: Date) => {
+      if (isDisabled(date)) return;
 
-    let newSelected: Date | Date[] | DateRange | undefined;
+      let newSelected: Date | Date[] | DateRange | undefined;
 
-    switch (mode) {
-      case "single":
-        newSelected = date;
-        break;
-      case "range":
-        if (!selected || !isDateRange(selected)) {
-          newSelected = { from: date, to: date };
-        } else {
-          if (isSameDay(selected.from, selected.to)) {
-            if (isBefore(date, selected.from)) {
-              newSelected = { from: date, to: selected.from };
-            } else {
-              newSelected = { from: selected.from, to: date };
-            }
-          } else {
+      switch (mode) {
+        case "single":
+          newSelected = date;
+          break;
+        case "range":
+          if (!selected || !isDateRange(selected)) {
             newSelected = { from: date, to: date };
+          } else {
+            if (isSameDay(selected.from, selected.to)) {
+              if (isBefore(date, selected.from)) {
+                newSelected = { from: date, to: selected.from };
+              } else {
+                newSelected = { from: selected.from, to: date };
+              }
+            } else {
+              newSelected = { from: date, to: date };
+            }
           }
-        }
-        break;
-      case "datetime":
-        setTempSelectedDate(date);
-        if (selected instanceof Date) {
-          const newDate = setMinutes(
-            setHours(date, selected.getHours()),
-            selected.getMinutes()
-          );
-          onSelect?.(newDate);
-        } else {
-          onSelect?.(date);
-        }
-        return;
-      default:
-        newSelected = date;
-    }
+          break;
+        case "datetime":
+          setTempSelectedDate(date);
+          if (selected instanceof Date) {
+            const newDate = setMinutes(setHours(date, selected.getHours()), selected.getMinutes());
+            onSelect?.(newDate);
+          } else {
+            onSelect?.(date);
+          }
+          return;
+        default:
+          newSelected = date;
+      }
 
-    onSelect?.(newSelected);
-  }, [mode, selected, onSelect, isDisabled]);
+      onSelect?.(newSelected);
+    },
+    [mode, selected, onSelect, isDisabled]
+  );
 
-  const handleTimeChange = React.useCallback((event: any, selectedTime?: Date) => {
-    if (Platform.OS === "android") {
-      setShowTimePicker(false);
-      if (event.type === "dismissed") return;
-    }
+  const handleTimeChange = React.useCallback(
+    (event: any, selectedTime?: Date) => {
+      if (Platform.OS === "android") {
+        setShowTimePicker(false);
+        if (event.type === "dismissed") return;
+      }
 
-    if (selectedTime && selected instanceof Date) {
-      const newDate = setMinutes(
-        setHours(selected, selectedTime.getHours()),
-        selectedTime.getMinutes()
-      );
-      onSelect?.(newDate);
-    }
-  }, [selected, onSelect]);
+      if (selectedTime && selected instanceof Date) {
+        const newDate = setMinutes(
+          setHours(selected, selectedTime.getHours()),
+          selectedTime.getMinutes()
+        );
+        onSelect?.(newDate);
+      }
+    },
+    [selected, onSelect]
+  );
 
   const handlePrevMonth = React.useCallback(() => {
     setCurrentDate(subMonths(currentDate, 1));
