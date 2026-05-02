@@ -142,6 +142,8 @@ const CalendarHeader = React.memo(({
   </View>
 ));
 
+CalendarHeader.displayName = "CalendarHeader";
+
 const WeekdaysRow = React.memo(({ orderedWeekdays }: { orderedWeekdays: string[] }) => (
   <View className="flex-row justify-between mb-2">
     {orderedWeekdays.map((day) => (
@@ -157,6 +159,8 @@ const WeekdaysRow = React.memo(({ orderedWeekdays }: { orderedWeekdays: string[]
     ))}
   </View>
 ));
+
+WeekdaysRow.displayName = "WeekdaysRow";
 
 const CalendarDay = React.memo(({
   date,
@@ -232,6 +236,8 @@ const CalendarDay = React.memo(({
   );
 });
 
+CalendarDay.displayName = "CalendarDay";
+
 const TimeSelector = React.memo(({
   selectedDate,
   showTimePicker,
@@ -268,6 +274,8 @@ const TimeSelector = React.memo(({
   </View>
 ));
 
+TimeSelector.displayName = "TimeSelector";
+
 const MonthYearPickerHeader = React.memo(({
   activeTab,
   onClose,
@@ -290,6 +298,8 @@ const MonthYearPickerHeader = React.memo(({
     </View>
   </View>
 ));
+
+MonthYearPickerHeader.displayName = "MonthYearPickerHeader";
 
 const MonthPicker = React.memo(({
   currentDate,
@@ -391,6 +401,8 @@ const MonthPicker = React.memo(({
   );
 });
 
+MonthPicker.displayName = "MonthPicker";
+
 const YearPicker = React.memo(({
   currentDate,
   onYearSelect,
@@ -477,6 +489,8 @@ const YearPicker = React.memo(({
     </View>
   );
 });
+
+YearPicker.displayName = "YearPicker";
 
 export function Calendar({
   mode = "single",

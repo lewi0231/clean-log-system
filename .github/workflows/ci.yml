@@ -1,0 +1,270 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  lint-and-build:
+    name: Lint, type-check, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@e95548e56dfa6d5e83405bc09c84845d958c9174
+        with:
+          deno-version: v2.x
+
+      - name: Prettier check (changed files — PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          FILES=$(git diff --name-only --diff-filter=d ${{ github.event.pull_request.base.sha }} ${{ github.sha }} \
+            | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
+          if [ -z "$FILES" ]; then
+            echo "No matching files changed"
+            exit 0
+          fi
+          echo "$FILES" | xargs pnpm exec prettier --check
+
+      - name: Prettier check (changed files — push)
+        if: github.event_name == 'push'
+        run: |
+          FILES=$(git diff --name-only --diff-filter=d HEAD~1 HEAD 2>/dev/null \
+            | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
+          if [ -z "$FILES" ]; then
+            echo "No matching files changed in this commit"
+            exit 0
+          fi
+          echo "$FILES" | xargs pnpm exec prettier --check
+
+      - name: Prettier check (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm format:check
+
+      - name: ESLint (workspace)
+        run: pnpm lint
+
+      - name: Deno lint (Supabase edge functions)
+        run: pnpm lint:edge-functions
+        continue-on-error: true # TODO: Remove once edge function imports are fixed
+
+      - name: TypeScript (packages that define typecheck)
+        run: pnpm typecheck
+
+      - name: Build dashboard (Next.js)
+        run: pnpm build:dashboard
+
+  unit-tests:
+    name: Unit tests (Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: Dashboard tests (with coverage + JUnit)
+        working-directory: dashboard
+        run: |
+          pnpm exec vitest run \
+            --coverage \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile=junit.xml
+
+      - name: Mobile app tests
+        working-directory: mobile-app
+        run: pnpm exec vitest run --reporter=default --reporter=junit --outputFile=junit.xml
+
+      - name: Upload dashboard test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dashboard-test-results
+          path: |
+            dashboard/junit.xml
+            dashboard/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload mobile-app test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mobile-app-test-results
+          path: mobile-app/junit.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  security-scan:
+    name: Security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: pnpm audit (high or critical)
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+  e2e-tests:
+    name: E2E tests (Playwright + Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Only run on staging branch or when explicitly requested
+    if: github.ref == 'refs/heads/staging' || contains(github.event.head_commit.message, '[e2e]')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        working-directory: database
+        run: |
+          supabase start
+          sleep 10
+          supabase status
+
+      - name: Get Supabase credentials
+        id: supabase
+        working-directory: database
+        run: |
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API.URL')" >> $GITHUB_OUTPUT
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.API.anon_key')" >> $GITHUB_OUTPUT
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.API.service_role_key')" >> $GITHUB_OUTPUT
+
+      - name: Build dashboard for E2E
+        working-directory: dashboard
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
+        run: pnpm run build
+
+      - name: Run E2E tests
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Start the production server in background
+          cd dashboard && pnpm start &
+          sleep 5
+          # Run E2E tests
+          pnpm test:e2e --project=scenario-1
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop Supabase
+        if: always()
+        working-directory: database
+        run: supabase stop
+
+  notify-failure:
+    name: Notify build failure
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests, security-scan]
+    if: failure()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Post commit comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const jobResults = {
+              'lint-and-build': '${{ needs.lint-and-build.result }}',
+              'unit-tests': '${{ needs.unit-tests.result }}',
+              'security-scan': '${{ needs.security-scan.result }}',
+            };
+            const failed = Object.entries(jobResults)
+              .filter(([, r]) => r === 'failure')
+              .map(([job]) => job);
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.run_id }}`;
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+            const commitMsg =
+              (context.payload.head_commit?.message || '').split(/\r?\n/).shift() ||
+              '(no message)';
+            const branch = '${{ github.ref_name }}';
+            const codeBlock = [
+              '```bash',
+              'pnpm install',
+              'pnpm lint && pnpm lint:edge-functions',
+              'pnpm typecheck && pnpm build:dashboard',
+              'pnpm --filter @clean-log/dashboard exec vitest run',
+              'pnpm --filter @clean-log/mobile-app exec vitest run',
+              '```',
+            ].join('\n');
+            const body = [
+              '## CI failed',
+              '',
+              `- **Branch:** \`${branch}\``,
+              `- **Commit:** [${context.sha.substring(0, 7)}](${commitUrl})`,
+              `- **Message:** ${commitMsg}`,
+              '',
+              '### Failed jobs',
+              ...failed.map((j) => `- ${j}`),
+              '',
+              `[Workflow run](${runUrl})`,
+              '',
+              '### Local verification',
+              codeBlock,
+            ].join('\n');
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body,
+            });

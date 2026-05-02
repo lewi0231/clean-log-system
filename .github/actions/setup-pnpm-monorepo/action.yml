@@ -1,0 +1,33 @@
+# Composite action: Node + pnpm at repo root (--frozen-lockfile).
+# Mirrors SCAINET's setup-node-app pattern for this monorepo.
+name: Setup pnpm monorepo
+description: Install Node, enable pnpm, and install workspace dependencies from the repo root
+
+inputs:
+  node-version:
+    description: Node.js major version line
+    required: false
+    default: "20"
+  pnpm-version:
+    description: pnpm version (major line or exact)
+    required: false
+    default: "9"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

@@ -88,7 +88,7 @@ function AcceptInvitePage() {
         );
 
         if (data?.invitation) {
-          setWorkerEmail(data.invitation.worker_email);
+          setWorkerEmail(data.invitation.worker_email ?? null);
           // Never log PII (emails).
           log.debug("Accept Invite: Invitation loaded", { hasEmail: true });
         }

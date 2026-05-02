@@ -192,9 +192,7 @@ describe("extractGroupedBreakdown", () => {
   it("should return null for non-grouped_breakdown field", () => {
     const submissionData = { items: [] };
     const fieldConfig = createFieldConfig({ field_type: "number" });
-    expect(
-      extractGroupedBreakdown(submissionData, fieldConfig),
-    ).toBeNull();
+    expect(extractGroupedBreakdown(submissionData, fieldConfig)).toBeNull();
   });
 
   it("should extract valid breakdown array", () => {
@@ -241,9 +239,7 @@ describe("extractGroupedBreakdown", () => {
       name: "items",
       field_type: "grouped_breakdown",
     });
-    expect(
-      extractGroupedBreakdown(submissionData, fieldConfig),
-    ).toBeNull();
+    expect(extractGroupedBreakdown(submissionData, fieldConfig)).toBeNull();
   });
 
   it("should return empty array for empty array input", () => {
@@ -346,8 +342,8 @@ describe("getGroupingKey", () => {
     it("should join multiple worker names", () => {
       const job = createJob({
         workers: [
-          { id: "w1", name: "John", email: "john@example.com", phone: null },
-          { id: "w2", name: "Jane", email: "jane@example.com", phone: null },
+          mockJobWorker({ id: "w1", name: "John", email: "john@example.com", phone: null }),
+          mockJobWorker({ id: "w2", name: "Jane", email: "jane@example.com", phone: null }),
         ],
       });
       expect(getGroupingKey(job, "worker")).toBe("John, Jane");
@@ -452,9 +448,7 @@ describe("processJobDataForChart", () => {
       fieldConfigId: "non-existent",
       groupingDimension: "time",
     };
-    expect(
-      processJobDataForChart(jobs, chartConfig, [numericFieldConfig]),
-    ).toBeNull();
+    expect(processJobDataForChart(jobs, chartConfig, [numericFieldConfig])).toBeNull();
   });
 
   it("should return null for field dimension without groupingFieldConfigId", () => {
@@ -464,9 +458,7 @@ describe("processJobDataForChart", () => {
       fieldConfigId: "field-1",
       groupingDimension: "field",
     };
-    expect(
-      processJobDataForChart(jobs, chartConfig, [numericFieldConfig]),
-    ).toBeNull();
+    expect(processJobDataForChart(jobs, chartConfig, [numericFieldConfig])).toBeNull();
   });
 
   it("should process numeric field with time grouping", () => {
@@ -487,9 +479,7 @@ describe("processJobDataForChart", () => {
       timePeriod: "day",
       aggregationType: "sum",
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data).toHaveLength(1);
     expect(result?.data[0].value).toBe(30);
@@ -499,15 +489,11 @@ describe("processJobDataForChart", () => {
     const jobs = [
       createJob({
         submission_data: { count: 10 },
-        workers: [
-          { id: "w1", name: "John", email: "john@example.com", phone: null },
-        ],
+        workers: [{ id: "w1", name: "John", email: "john@example.com", phone: null }],
       }),
       createJob({
         submission_data: { count: 20 },
-        workers: [
-          { id: "w1", name: "John", email: "john@example.com", phone: null },
-        ],
+        workers: [{ id: "w1", name: "John", email: "john@example.com", phone: null }],
       }),
     ];
     const chartConfig: ChartConfig = {
@@ -516,9 +502,7 @@ describe("processJobDataForChart", () => {
       groupingDimension: "worker",
       aggregationType: "sum",
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data[0].name).toBe("John");
     expect(result?.data[0].value).toBe(30);
@@ -546,9 +530,7 @@ describe("processJobDataForChart", () => {
         end: new Date("2024-01-31"),
       },
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data).toHaveLength(1);
     expect(result?.data[0].value).toBe(10);
@@ -572,9 +554,7 @@ describe("processJobDataForChart", () => {
       timePeriod: "day",
       aggregationType: "average",
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data[0].value).toBe(15);
   });
@@ -597,9 +577,7 @@ describe("processJobDataForChart", () => {
       timePeriod: "day",
       aggregationType: "count",
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data[0].value).toBe(2);
   });
@@ -632,9 +610,7 @@ describe("processJobDataForChart", () => {
       groupingDimension: "time",
       groupedBreakdownMode: "brand",
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      breakdownFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [breakdownFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data.length).toBeGreaterThan(0);
     const brandA = result?.data.find((d) => d.name === "Brand A");
@@ -648,9 +624,7 @@ describe("processJobDataForChart", () => {
       groupingDimension: "time",
       aggregationType: "sum",
     };
-    const result = processJobDataForChart([], chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart([], chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     expect(result?.data).toHaveLength(0);
   });
@@ -666,9 +640,7 @@ describe("processJobDataForChart", () => {
       groupingDimension: "time",
       aggregationType: "sum",
     };
-    const result = processJobDataForChart(jobs, chartConfig, [
-      numericFieldConfig,
-    ]);
+    const result = processJobDataForChart(jobs, chartConfig, [numericFieldConfig]);
     expect(result).not.toBeNull();
     // Should only process the job with valid data
     expect(result?.data[0].value).toBe(10);
@@ -720,11 +692,7 @@ describe("getGroupingFields", () => {
     ];
     const result = getGroupingFields(fieldConfigs);
     expect(result).toHaveLength(3);
-    expect(result.map((f) => f.field_type)).toEqual([
-      "select",
-      "text",
-      "boolean",
-    ]);
+    expect(result.map((f) => f.field_type)).toEqual(["select", "text", "boolean"]);
   });
 
   it("should exclude non-grouping types", () => {

@@ -3,22 +3,15 @@ import { renderHook } from "@testing-library/react-native";
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import * as UseFieldConfigsModule from "../use-field-configs";
 import { useEntryForm } from "../use-entry-form";
 
-// Note: This test file requires @testing-library/react to be installed
-// Run: pnpm add -D @testing-library/react
-// For now, these are unit tests that can be run once the dependency is added
-
-// Mock the useFieldConfigs hook
 vi.mock("../use-field-configs", () => ({
   useFieldConfigs: vi.fn(),
   FieldErrors: {},
 }));
 
-// Mock the useFieldConfigs import
-const mockUseFieldConfigs = vi.mocked(
-  await import("../use-field-configs"),
-).useFieldConfigs;
+const mockUseFieldConfigs = vi.mocked(UseFieldConfigsModule.useFieldConfigs);
 
 function createTestFieldConfig(overrides: Partial<FieldConfig>): FieldConfig {
   return {

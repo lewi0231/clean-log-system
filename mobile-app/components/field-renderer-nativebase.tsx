@@ -26,6 +26,7 @@ import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { Pressable, Switch, Text, TextInput, View } from "react-native";
 import { TimePicker } from "./ui/time-picker";
 
@@ -72,6 +73,228 @@ const getFieldIcon = (fieldType: string): keyof typeof Ionicons.glyphMap => {
       return "text-outline";
   }
 };
+
+function parseManualAddress(addr: string | undefined): {
+  street: string;
+  city: string;
+  state: string;
+  postcode: string;
+} {
+  if (!addr) return { street: "", city: "", state: "", postcode: "" };
+
+  const parts = addr.split(",").map((p) => p.trim());
+  if (parts.length >= 2) {
+    const street = parts[0];
+    const lastPart = parts[parts.length - 1];
+    const statePostcodeMatch = lastPart.match(/^([A-Za-z]{2,3})\s*(\d{4})?$/);
+    if (statePostcodeMatch) {
+      const state = (statePostcodeMatch[1] || "").toUpperCase();
+      const postcode = statePostcodeMatch[2] || "";
+      const city =
+        parts.length > 2
+          ? parts.slice(1, -1).join(", ")
+          : parts[1].replace(/^[A-Za-z]{2,3}\s*\d{0,4}$/i, "").trim();
+      return { street, city, state, postcode };
+    }
+    return {
+      street: parts[0],
+      city: parts.slice(1).join(", "),
+      state: "",
+      postcode: "",
+    };
+  }
+  return { street: addr, city: "", state: "", postcode: "" };
+}
+
+/** Manual address sub-fields — isolated so hooks are not inside a switch branch */
+function ManualAddressFields({
+  config,
+  value,
+  error,
+  disabled,
+  isInvalid,
+  handleFieldChange,
+  onFocus,
+}: {
+  config: FieldConfig;
+  value: FieldRendererProps["value"];
+  error?: string;
+  disabled: boolean;
+  isInvalid: boolean;
+  handleFieldChange: (v: string) => void;
+  onFocus?: (opts?: { subFieldYOffset?: number }) => void;
+}) {
+  const initialValue = String(value || "");
+  const [addressParts, setAddressParts] = useState(() =>
+    parseManualAddress(initialValue),
+  );
+  const addressContainerRef = useRef<View>(null);
+  const streetInputRef = useRef<TextInput>(null);
+  const cityInputRef = useRef<TextInput>(null);
+  const stateInputRef = useRef<TextInput>(null);
+  const postcodeInputRef = useRef<TextInput>(null);
+  const lastSetAddressRef = useRef<string>(initialValue);
+
+  const measureSubFieldOffset = (
+    inputRef: RefObject<TextInput | null>,
+    callback: (offset: number) => void,
+  ) => {
+    if (inputRef.current && addressContainerRef.current) {
+      inputRef.current.measureLayout(
+        addressContainerRef.current as Parameters<
+          TextInput["measureLayout"]
+        >[0],
+        (_x, y) => callback(y),
+        () => callback(0),
+      );
+    } else {
+      callback(0);
+    }
+  };
+
+  useEffect(() => {
+    const currentValue = String(value || "");
+    if (currentValue !== lastSetAddressRef.current) {
+      setAddressParts(parseManualAddress(currentValue));
+    }
+  }, [value]);
+
+  const updateAddressPart = (
+    part: "street" | "city" | "state" | "postcode",
+    partValue: string,
+  ) => {
+    const updated = { ...addressParts, [part]: partValue };
+    setAddressParts(updated);
+    const fullAddress = [
+      updated.street,
+      updated.city,
+      updated.state && updated.postcode
+        ? `${updated.state} ${updated.postcode}`
+        : updated.state || updated.postcode,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    lastSetAddressRef.current = fullAddress;
+    handleFieldChange(fullAddress);
+  };
+
+  const getInputRef = (
+    part: "street" | "city" | "state" | "postcode",
+  ): RefObject<TextInput | null> => {
+    switch (part) {
+      case "street":
+        return streetInputRef;
+      case "city":
+        return cityInputRef;
+      case "state":
+        return stateInputRef;
+      case "postcode":
+        return postcodeInputRef;
+    }
+  };
+
+  const renderAddressField = (
+    label: string,
+    part: "street" | "city" | "state" | "postcode",
+    placeholder: string,
+    autoComplete?:
+      | "street-address"
+      | "address-line1"
+      | "address-line2"
+      | "postal-code",
+  ) => {
+    const inputRef = getInputRef(part);
+    return (
+      <View className="mb-3">
+        <Text className="text-xs font-medium text-muted-foreground mb-1.5">
+          {label}
+        </Text>
+        <View
+          className={`bg-card border rounded-xl overflow-hidden ${
+            isInvalid ? "border-destructive" : "border-border"
+          }`}
+        >
+          <View className="flex-row items-center">
+            <View className="ml-3">
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={disabled ? "#6b7280" : "#9ca3af"}
+              />
+            </View>
+            <TextInput
+              ref={inputRef}
+              className="flex-1 bg-transparent text-card-foreground px-4 py-3 text-base"
+              placeholder={placeholder}
+              placeholderTextColor="#6b7280"
+              value={addressParts[part]}
+              onChangeText={(text) => updateAddressPart(part, text)}
+              onFocus={() => {
+                measureSubFieldOffset(inputRef, (offset) => {
+                  onFocus?.({ subFieldYOffset: offset });
+                });
+              }}
+              editable={!disabled}
+              autoCapitalize={part === "state" ? "characters" : "words"}
+              autoComplete={autoComplete}
+              keyboardType={part === "postcode" ? "numeric" : "default"}
+              maxLength={
+                part === "state" ? 3 : part === "postcode" ? 4 : undefined
+              }
+              style={{ opacity: disabled ? 0.5 : 1 }}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View className="mb-4" ref={addressContainerRef}>
+      <View className="flex-row items-center mb-3">
+        <Text className="text-sm font-medium text-foreground">
+          {config.label}
+          {config.required && (
+            <Text className="text-destructive ml-1">*</Text>
+          )}
+        </Text>
+      </View>
+      {renderAddressField(
+        "Street Address",
+        "street",
+        "e.g., 123 Main Street",
+        "street-address",
+      )}
+      {renderAddressField("City", "city", "e.g., Sydney", "address-line2")}
+      <View className="flex-row gap-3">
+        <View className="flex-1">
+          {renderAddressField(
+            "State",
+            "state",
+            "e.g., NSW",
+            "address-line1",
+          )}
+        </View>
+        <View className="flex-1">
+          {renderAddressField(
+            "Postcode",
+            "postcode",
+            "e.g., 2000",
+            "postal-code",
+          )}
+        </View>
+      </View>
+      {config.description && (
+        <Text className="text-xs text-muted-foreground mt-1">
+          {config.description}
+        </Text>
+      )}
+      {error && (
+        <Text className="text-sm text-destructive mt-1">{error}</Text>
+      )}
+    </View>
+  );
+}
 
 export function FieldRendererNativeBase({
   config,
@@ -625,228 +848,16 @@ export function FieldRendererNativeBase({
         );
       }
 
-      // Separate fields for manual address entry (better mobile UX)
-      // Parse existing value to populate fields
-      const parseAddress = (
-        addr: string | undefined
-      ): {
-        street: string;
-        city: string;
-        state: string;
-        postcode: string;
-      } => {
-        if (!addr) return { street: "", city: "", state: "", postcode: "" };
-
-        // Try to parse common Australian address formats
-        // Format: "Street, City State Postcode" or "Street, City, State Postcode"
-        const parts = addr.split(",").map((p) => p.trim());
-        if (parts.length >= 2) {
-          const street = parts[0];
-          const lastPart = parts[parts.length - 1];
-          // Extract state and postcode from last part (e.g., "NSW 2000" or "NSW")
-          // Allow lowercase state codes (will be converted to uppercase)
-          const statePostcodeMatch = lastPart.match(
-            /^([A-Za-z]{2,3})\s*(\d{4})?$/
-          );
-          if (statePostcodeMatch) {
-            const state = (statePostcodeMatch[1] || "").toUpperCase();
-            const postcode = statePostcodeMatch[2] || "";
-            const city =
-              parts.length > 2
-                ? parts.slice(1, -1).join(", ")
-                : parts[1].replace(/^[A-Za-z]{2,3}\s*\d{0,4}$/i, "").trim();
-            return { street, city, state, postcode };
-          }
-          // Fallback: treat last part as city, no state/postcode
-          return {
-            street: parts[0],
-            city: parts.slice(1).join(", "),
-            state: "",
-            postcode: "",
-          };
-        }
-        // Single field - assume it's street
-        return { street: addr, city: "", state: "", postcode: "" };
-      };
-
-      const initialValue = String(value || "");
-      const [addressParts, setAddressParts] = useState(() =>
-        parseAddress(initialValue)
-      );
-      // Track refs to each sub-field's TextInput for measuring
-      const addressContainerRef = useRef<View>(null);
-      const streetInputRef = useRef<TextInput>(null);
-      const cityInputRef = useRef<TextInput>(null);
-      const stateInputRef = useRef<TextInput>(null);
-      const postcodeInputRef = useRef<TextInput>(null);
-      // Track the last address we set ourselves to avoid re-parsing our own updates
-      const lastSetAddressRef = useRef<string>(initialValue);
-
-      // Function to measure a sub-field's position relative to the address container
-      const measureSubFieldOffset = (
-        inputRef: React.RefObject<TextInput | null>,
-        callback: (offset: number) => void
-      ) => {
-        if (inputRef.current && addressContainerRef.current) {
-          inputRef.current.measureLayout(
-            addressContainerRef.current as any,
-            (_x, y) => callback(y),
-            () => callback(0) // Fallback to 0 on error
-          );
-        } else {
-          callback(0);
-        }
-      };
-
-      // Update local state when external value changes (but not if it's our own update)
-      useEffect(() => {
-        const currentValue = String(value || "");
-        // Only parse if the value is different from what we just set
-        // This prevents circular updates when user is typing
-        if (currentValue !== lastSetAddressRef.current) {
-          setAddressParts(parseAddress(currentValue));
-        }
-      }, [value]);
-
-      const updateAddressPart = (
-        part: "street" | "city" | "state" | "postcode",
-        partValue: string
-      ) => {
-        const updated = { ...addressParts, [part]: partValue };
-        setAddressParts(updated);
-
-        // Concatenate and update parent
-        const fullAddress = [
-          updated.street,
-          updated.city,
-          updated.state && updated.postcode
-            ? `${updated.state} ${updated.postcode}`
-            : updated.state || updated.postcode,
-        ]
-          .filter(Boolean)
-          .join(", ");
-
-        // Track that we set this value ourselves
-        lastSetAddressRef.current = fullAddress;
-        handleFieldChange(fullAddress);
-      };
-
-      // Get the ref for a specific part
-      const getInputRef = (part: "street" | "city" | "state" | "postcode") => {
-        switch (part) {
-          case "street":
-            return streetInputRef;
-          case "city":
-            return cityInputRef;
-          case "state":
-            return stateInputRef;
-          case "postcode":
-            return postcodeInputRef;
-        }
-      };
-
-      const renderAddressField = (
-        label: string,
-        part: "street" | "city" | "state" | "postcode",
-        placeholder: string,
-        autoComplete?:
-          | "street-address"
-          | "address-line1"
-          | "address-line2"
-          | "postal-code"
-      ) => {
-        const inputRef = getInputRef(part);
-
-        return (
-          <View className="mb-3">
-            <Text className="text-xs font-medium text-muted-foreground mb-1.5">
-              {label}
-            </Text>
-            <View
-              className={`bg-card border rounded-xl overflow-hidden ${
-                isInvalid ? "border-destructive" : "border-border"
-              }`}
-            >
-              <View className="flex-row items-center">
-                <View className="ml-3">
-                  <Ionicons
-                    name="location-outline"
-                    size={18}
-                    color={disabled ? "#6b7280" : "#9ca3af"}
-                  />
-                </View>
-                <TextInput
-                  ref={inputRef}
-                  className="flex-1 bg-transparent text-card-foreground px-4 py-3 text-base"
-                  placeholder={placeholder}
-                  placeholderTextColor="#6b7280"
-                  value={addressParts[part]}
-                  onChangeText={(text) => updateAddressPart(part, text)}
-                  onFocus={() => {
-                    // Measure the actual position relative to the address container
-                    measureSubFieldOffset(inputRef, (offset) => {
-                      onFocus?.({ subFieldYOffset: offset });
-                    });
-                  }}
-                  editable={!disabled}
-                  autoCapitalize={part === "state" ? "characters" : "words"}
-                  autoComplete={autoComplete}
-                  keyboardType={part === "postcode" ? "numeric" : "default"}
-                  maxLength={
-                    part === "state" ? 3 : part === "postcode" ? 4 : undefined
-                  }
-                  style={{ opacity: disabled ? 0.5 : 1 }}
-                />
-              </View>
-            </View>
-          </View>
-        );
-      };
-
       return (
-        <View className="mb-4" ref={addressContainerRef}>
-          <View className="flex-row items-center mb-3">
-            <Text className="text-sm font-medium text-foreground">
-              {config.label}
-              {config.required && (
-                <Text className="text-destructive ml-1">*</Text>
-              )}
-            </Text>
-          </View>
-          {renderAddressField(
-            "Street Address",
-            "street",
-            "e.g., 123 Main Street",
-            "street-address"
-          )}
-          {renderAddressField("City", "city", "e.g., Sydney", "address-line2")}
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              {renderAddressField(
-                "State",
-                "state",
-                "e.g., NSW",
-                "address-line1"
-              )}
-            </View>
-            <View className="flex-1">
-              {renderAddressField(
-                "Postcode",
-                "postcode",
-                "e.g., 2000",
-                "postal-code"
-              )}
-            </View>
-          </View>
-          {config.description && (
-            <Text className="text-xs text-muted-foreground mt-1">
-              {config.description}
-            </Text>
-          )}
-          {error && (
-            <Text className="text-sm text-destructive mt-1">{error}</Text>
-          )}
-        </View>
+        <ManualAddressFields
+          config={config}
+          value={value}
+          error={error}
+          disabled={disabled}
+          isInvalid={isInvalid}
+          handleFieldChange={(v) => handleFieldChange(v)}
+          onFocus={onFocus}
+        />
       );
 
     default:

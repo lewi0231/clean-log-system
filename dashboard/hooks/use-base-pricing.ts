@@ -39,17 +39,12 @@ interface UseBasePricingResult {
 function transformBaseRule(rule: PricingRule): BasePricing {
   const isWorkerContext = rule.pricing_context === "worker";
   const adjustmentType =
-    (typeof (rule.metadata as Record<string, unknown> | undefined)?.[
-        "adjustment_type"
-      ] === "string"
-      ? ((rule.metadata as Record<string, unknown>)["adjustment_type"] as
-        | "add"
-        | "multiply")
+    (typeof (rule.metadata as Record<string, unknown> | undefined)?.["adjustment_type"] === "string"
+      ? ((rule.metadata as Record<string, unknown>)["adjustment_type"] as "add" | "multiply")
       : undefined) || (rule.pricing_type === "percentage" ? "multiply" : "add");
 
-  const customerValue = adjustmentType === "multiply"
-    ? rule.percentage_rate ?? 0
-    : rule.base_price ?? 0;
+  const customerValue =
+    adjustmentType === "multiply" ? (rule.percentage_rate ?? 0) : (rule.base_price ?? 0);
 
   return {
     id: rule.id,
@@ -60,9 +55,7 @@ function transformBaseRule(rule: PricingRule): BasePricing {
     customer_base_price: customerValue,
     // For worker context rules, worker_base_payment comes from base_price
     // For customer context rules, it comes from worker_payment_value field
-    worker_base_payment: isWorkerContext
-      ? customerValue
-      : rule.worker_payment_value ?? null,
+    worker_base_payment: isWorkerContext ? customerValue : (rule.worker_payment_value ?? null),
     worker_payment_type: rule.worker_payment_type ?? null,
     location_id: rule.location_id,
     location_hierarchy_id: rule.location_hierarchy_id,
@@ -76,7 +69,7 @@ function transformBaseRule(rule: PricingRule): BasePricing {
 
 export function useBasePricing(
   organizationId: string | null,
-  filters?: UseBasePricingOptions,
+  filters?: UseBasePricingOptions
 ): UseBasePricingResult {
   const queryClient = useQueryClient();
 
@@ -127,9 +120,7 @@ export function useBasePricing(
       queryClient.setQueryData<BasePricing[]>(queryKey, (old) => {
         if (!old) return old;
         if (existingRule) {
-          return old.map((r) =>
-            r.id === existingRule.id ? optimisticBasePricing : r,
-          );
+          return old.map((r) => (r.id === existingRule.id ? optimisticBasePricing : r));
         }
         return [...old, optimisticBasePricing];
       });
@@ -161,7 +152,7 @@ export function useBasePricing(
       const previousData = queryClient.getQueryData<BasePricing[]>(queryKey);
 
       queryClient.setQueryData<BasePricing[]>(queryKey, (old) =>
-        old ? old.filter((r) => r.id !== id) : old,
+        old ? old.filter((r) => r.id !== id) : old
       );
 
       return { previousData };
@@ -205,8 +196,7 @@ export function useBasePricing(
     const targetLocationId = request.location_id ?? filters?.locationId ?? null;
 
     const isFieldBased = Boolean(request.job_type_field_config_id);
-    const targetPricingContext = request.pricingContext ||
-      filters?.pricingContext || "customer";
+    const targetPricingContext = request.pricingContext || filters?.pricingContext || "customer";
 
     let targetEffectiveAt: string;
     let targetEffectiveDate: string;
@@ -234,7 +224,8 @@ export function useBasePricing(
         (pricing.location_id || null) === targetLocationId;
 
       if (
-        !matchesLocation || ruleContext !== targetPricingContext ||
+        !matchesLocation ||
+        ruleContext !== targetPricingContext ||
         ruleEffectiveDate !== targetEffectiveDate
       ) {
         return false;
@@ -242,8 +233,7 @@ export function useBasePricing(
 
       if (isFieldBased) {
         return (
-          pricing.job_type_field_config_id ===
-            request.job_type_field_config_id &&
+          pricing.job_type_field_config_id === request.job_type_field_config_id &&
           pricing.job_type_value === request.job_type_value
         );
       }
@@ -263,9 +253,7 @@ export function useBasePricing(
       field_config_id: request.job_type_field_config_id || null,
       option_value: request.job_type_value || null,
       base_price: adjustmentType === "add" ? request.customer_base_price : null,
-      percentage_rate: adjustmentType === "multiply"
-        ? request.customer_base_price
-        : null,
+      percentage_rate: adjustmentType === "multiply" ? request.customer_base_price : null,
       metadata: {
         adjustment_type: adjustmentType,
       },
@@ -284,9 +272,8 @@ export function useBasePricing(
     }
 
     const tempId = existing?.id ?? `temp-${Date.now()}`;
-    const customerValue = adjustmentType === "multiply"
-      ? request.customer_base_price
-      : request.customer_base_price;
+    const customerValue =
+      adjustmentType === "multiply" ? request.customer_base_price : request.customer_base_price;
 
     const optimisticSourceRule: PricingRule = {
       id: tempId,
@@ -301,19 +288,17 @@ export function useBasePricing(
       location_id: targetLocationId,
       currency: request.currency || "USD",
       base_price: adjustmentType === "add" ? request.customer_base_price : null,
-      percentage_rate: adjustmentType === "multiply"
-        ? request.customer_base_price
-        : null,
+      percentage_rate: adjustmentType === "multiply" ? request.customer_base_price : null,
       minimum_quantity: null,
       maximum_quantity: null,
       tier_definition: null,
       metadata: { adjustment_type: adjustmentType },
-      worker_payment_type: request.worker_base_payment && targetPricingContext === "customer"
-        ? "fixed_rate"
-        : null,
-      worker_payment_value: request.worker_base_payment && targetPricingContext === "customer"
-        ? request.worker_base_payment
-        : null,
+      worker_payment_type:
+        request.worker_base_payment && targetPricingContext === "customer" ? "fixed_rate" : null,
+      worker_payment_value:
+        request.worker_base_payment && targetPricingContext === "customer"
+          ? request.worker_base_payment
+          : null,
       priority: 0,
       effective_at: targetEffectiveAt,
       expires_at: null,
@@ -323,7 +308,7 @@ export function useBasePricing(
       field_config: existing?.field_config ?? undefined,
       location: existing?.location ?? undefined,
       location_node: existing?.location_node ?? undefined,
-    } as PricingRule;
+    } as unknown as PricingRule;
 
     const optimisticBasePricing: BasePricing = {
       id: tempId,
@@ -332,12 +317,10 @@ export function useBasePricing(
       job_type_value: request.job_type_value || null,
       adjustment_type: adjustmentType,
       customer_base_price: customerValue,
-      worker_base_payment: targetPricingContext === "worker"
-        ? customerValue
-        : request.worker_base_payment ?? null,
-      worker_payment_type: request.worker_base_payment && targetPricingContext === "customer"
-        ? "fixed_rate"
-        : null,
+      worker_base_payment:
+        targetPricingContext === "worker" ? customerValue : (request.worker_base_payment ?? null),
+      worker_payment_type:
+        request.worker_base_payment && targetPricingContext === "customer" ? "fixed_rate" : null,
       location_id: targetLocationId,
       location_hierarchy_id: targetLocationHierarchyId,
       currency: request.currency || "USD",
@@ -365,11 +348,7 @@ export function useBasePricing(
   return {
     basePricing,
     loading: isLoading,
-    error: error
-      ? error instanceof Error
-        ? error.message
-        : "Failed to fetch base pricing"
-      : null,
+    error: error ? (error instanceof Error ? error.message : "Failed to fetch base pricing") : null,
     refetch,
     upsertPricing,
     deletePricing,

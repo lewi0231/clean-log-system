@@ -18,13 +18,11 @@ import { useSectionMutations } from "./use-section-mutations";
 
 function computeSectionsWithFieldIds(
   sections: FormSectionWithFields[],
-  fieldConfigs: FieldConfig[],
+  fieldConfigs: FieldConfig[]
 ): FormSectionWithFields[] {
   return sections.map((section) => ({
     ...section,
-    field_ids: fieldConfigs
-      .filter((fc) => fc.section_id === section.id)
-      .map((fc) => fc.id),
+    field_ids: fieldConfigs.filter((fc) => fc.section_id === section.id).map((fc) => fc.id),
   }));
 }
 
@@ -33,9 +31,7 @@ interface MobileConfigData {
   sections: FormSectionWithFields[];
 }
 
-async function fetchMobileConfig(
-  organizationId: string,
-): Promise<MobileConfigData> {
+async function fetchMobileConfig(organizationId: string): Promise<MobileConfigData> {
   log.debug("MobileConfig: Fetching field configs and sections");
 
   // Fetch both field configs and sections in parallel
@@ -57,23 +53,24 @@ async function fetchMobileConfig(
   }
 
   // Process field configs
-  const configsWithDefaults = (
-    fieldConfigsResponse.data?.field_configs || []
-  ).map((fc: FieldConfig) => ({
-    ...fc,
-    section_id: fc.section_id ?? null,
-    conditional_logic: fc.conditional_logic ?? null,
-  }));
+  const configsWithDefaults = (fieldConfigsResponse.data?.field_configs || []).map(
+    (fc: FieldConfig) => ({
+      ...fc,
+      section_id: fc.section_id ?? null,
+      conditional_logic: fc.conditional_logic ?? null,
+    })
+  );
 
   // Process sections
-  const sectionsWithFields: FormSectionWithFields[] = (
-    sectionsResponse.data?.sections || []
-  ).map((section: FormSectionWithFields) => ({
-    ...section,
-    field_ids: fieldConfigsResponse.data?.field_configs
-      ?.filter((fc: FieldConfig) => fc.section_id === section.id)
-      .map((fc: FieldConfig) => fc.id) || [],
-  }));
+  const sectionsWithFields: FormSectionWithFields[] = (sectionsResponse.data?.sections || []).map(
+    (section: FormSectionWithFields) => ({
+      ...section,
+      field_ids:
+        fieldConfigsResponse.data?.field_configs
+          ?.filter((fc: FieldConfig) => fc.section_id === section.id)
+          .map((fc: FieldConfig) => fc.id) || [],
+    })
+  );
 
   log.info("MobileConfig: Field configs and sections fetched successfully", {
     fieldConfigsCount: configsWithDefaults.length,
@@ -110,31 +107,26 @@ export interface UseMobileConfigResult {
   }) => Promise<void>;
   handleUpdateFieldConfig: (
     fieldConfigId: string,
-    fieldConfigData: Partial<FieldConfig>,
+    fieldConfigData: Partial<FieldConfig>
   ) => Promise<void>;
   handleDeleteFieldConfig: (fieldConfigId: string) => Promise<void>;
   handleReorderFieldConfigs: (fieldConfigIds: string[]) => Promise<void>;
   handleAddSection: (
-    section: Omit<
-      FormSectionWithFields,
-      "id" | "organization_id" | "created_at" | "updated_at"
-    >,
+    section: Omit<FormSectionWithFields, "id" | "organization_id" | "created_at" | "updated_at">
   ) => Promise<void>;
   handleUpdateSection: (
     sectionId: string,
-    updates: Partial<FormSectionWithFields>,
+    updates: Partial<FormSectionWithFields>
   ) => Promise<void>;
   handleDeleteSection: (sectionId: string) => Promise<void>;
   handleReorderSections: (sectionIds: string[]) => Promise<void>;
   handleApplyTemplate: (
     businessMode: "service_based" | "resource_tracking",
-    resetExisting?: boolean,
+    resetExisting?: boolean
   ) => Promise<void>;
 }
 
-export function useMobileConfig(
-  organizationId: string | null,
-): UseMobileConfigResult {
+export function useMobileConfig(organizationId: string | null): UseMobileConfigResult {
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -148,20 +140,18 @@ export function useMobileConfig(
   useEffect(() => {
     if (query.error) {
       log.error("MobileConfig: Failed to fetch field configs", {
-        error: query.error instanceof Error
-          ? query.error.message
-          : "Unknown error",
+        error: query.error instanceof Error ? query.error.message : "Unknown error",
       });
     }
   }, [query.error]);
 
   const fieldConfigs = useMemo(
     () => (query.data?.fieldConfigs ?? []) as FieldConfig[],
-    [query.data?.fieldConfigs],
+    [query.data?.fieldConfigs]
   );
   const sections = useMemo(
     () => (query.data?.sections ?? []) as FormSectionWithFields[],
-    [query.data?.sections],
+    [query.data?.sections]
   );
 
   const refetch = async () => {
@@ -171,10 +161,10 @@ export function useMobileConfig(
   // Field config mutations
   const {
     optimisticFieldConfigs,
-    handleAdd: handleAddFieldConfig,
-    handleUpdate: handleUpdateFieldConfig,
-    handleDelete: handleDeleteFieldConfig,
-    handleReorder: handleReorderFieldConfigs,
+    handleAdd: handleAddFieldConfigInner,
+    handleUpdate: handleUpdateFieldConfigInner,
+    handleDelete: handleDeleteFieldConfigInner,
+    handleReorder: handleReorderFieldConfigsInner,
   } = useFieldConfigMutations({
     organizationId,
     fieldConfigs,
@@ -184,10 +174,10 @@ export function useMobileConfig(
   // Section mutations (with useOptimistic)
   const {
     optimisticSections,
-    handleAdd: handleAddSection,
-    handleUpdate: handleUpdateSection,
-    handleDelete: handleDeleteSection,
-    handleReorder: handleReorderSections,
+    handleAdd: handleAddSectionInner,
+    handleUpdate: handleUpdateSectionInner,
+    handleDelete: handleDeleteSectionInner,
+    handleReorder: handleReorderSectionsInner,
   } = useSectionMutations({
     organizationId,
     sections,
@@ -197,12 +187,8 @@ export function useMobileConfig(
   // Derive sections with field_ids from optimistic field configs
   // so drag-to-section and field moves update the UI instantly
   const optimisticSectionsWithFieldIds = useMemo(
-    () =>
-      computeSectionsWithFieldIds(
-        optimisticSections,
-        optimisticFieldConfigs,
-      ),
-    [optimisticSections, optimisticFieldConfigs],
+    () => computeSectionsWithFieldIds(optimisticSections, optimisticFieldConfigs),
+    [optimisticSections, optimisticFieldConfigs]
   );
 
   const applyTemplateMutation = useMutation({
@@ -216,16 +202,13 @@ export function useMobileConfig(
       if (!organizationId) {
         throw new Error("Organization ID is required");
       }
-      const { data, error } = await supabase.functions.invoke(
-        "apply-field-config-template",
-        {
-          body: {
-            organization_id: organizationId,
-            business_mode: businessMode,
-            reset_existing: resetExisting,
-          },
+      const { data, error } = await supabase.functions.invoke("apply-field-config-template", {
+        body: {
+          organization_id: organizationId,
+          business_mode: businessMode,
+          reset_existing: resetExisting,
         },
-      );
+      });
       if (error) throw error;
       return data;
     },
@@ -238,8 +221,8 @@ export function useMobileConfig(
 
   const handleApplyTemplate = async (
     businessMode: "service_based" | "resource_tracking",
-    resetExisting = false,
-  ) => {
+    resetExisting = false
+  ): Promise<void> => {
     if (!organizationId) return;
 
     try {
@@ -276,14 +259,30 @@ export function useMobileConfig(
     error: query.error ? (query.error as Error).message : null,
     applyingTemplate: applyTemplateMutation.isPending,
     fetchFieldConfigs: () => query.refetch().then(() => undefined),
-    handleAddFieldConfig,
-    handleUpdateFieldConfig,
-    handleDeleteFieldConfig,
-    handleReorderFieldConfigs,
-    handleAddSection,
-    handleUpdateSection,
-    handleDeleteSection,
-    handleReorderSections,
+    handleAddFieldConfig: async (fieldConfigData) => {
+      handleAddFieldConfigInner(fieldConfigData);
+    },
+    handleUpdateFieldConfig: async (fieldConfigId, fieldConfigData) => {
+      handleUpdateFieldConfigInner(fieldConfigId, fieldConfigData);
+    },
+    handleDeleteFieldConfig: async (fieldConfigId) => {
+      handleDeleteFieldConfigInner(fieldConfigId);
+    },
+    handleReorderFieldConfigs: async (fieldConfigIds) => {
+      handleReorderFieldConfigsInner(fieldConfigIds);
+    },
+    handleAddSection: async (section) => {
+      handleAddSectionInner(section);
+    },
+    handleUpdateSection: async (sectionId, updates) => {
+      handleUpdateSectionInner(sectionId, updates);
+    },
+    handleDeleteSection: async (sectionId) => {
+      handleDeleteSectionInner(sectionId);
+    },
+    handleReorderSections: async (sectionIds) => {
+      handleReorderSectionsInner(sectionIds);
+    },
     handleApplyTemplate,
   };
 }

@@ -483,7 +483,7 @@ export default function PendingConfirmationsScreen() {
               Flag This Job
             </Text>
             <Text className="text-muted-foreground mb-4">
-              Please explain what's incorrect about this job submission.
+              Please explain what&apos;s incorrect about this job submission.
             </Text>
 
             <TextInput

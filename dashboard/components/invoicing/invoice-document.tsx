@@ -52,6 +52,11 @@ export interface InvoiceDocumentCalculation {
       pricing_type: string;
       amount: number;
     }>;
+    total: number;
+    subtotal?: number;
+    total_adjustments?: number;
+    worker_payment_total?: number;
+    margin?: number;
   }>;
   gst_registered?: boolean;
   gst_inclusive?: boolean;
@@ -161,9 +166,10 @@ export function InvoiceDocument({
       : "INVOICE";
 
   // Sorted jobs and primary location
+  const invoiceJobs = invoice.invoice_job ?? [];
   const sortedJobs =
-    invoice.invoice_job
-      ?.map((ij) => ij.job)
+    invoiceJobs
+      .map((ij) => ij.job)
       .filter(Boolean)
       .sort((a, b) => {
         const dateA = new Date(a.completed_at || a.created_at).getTime();
@@ -172,10 +178,9 @@ export function InvoiceDocument({
       }) || [];
   const firstJob = sortedJobs[0];
   const submissionData = firstJob?.submission_data;
-  const primaryLocation = (invoice.invoice_job?.[0]?.job?.location ??
-    (invoice.invoice_job?.length > 0 &&
-    invoice.invoice_job.some((ij) => ij.job?.location)
-      ? invoice.invoice_job.find((ij) => ij.job?.location)?.job.location
+  const primaryLocation = (invoiceJobs[0]?.job?.location ??
+    (invoiceJobs.length > 0 && invoiceJobs.some((ij) => ij.job?.location)
+      ? invoiceJobs.find((ij) => ij.job?.location)?.job.location
       : null)) as LocationWithHierarchy | null | undefined;
 
   const serviceAddressConfig = templateConfig?.service_address_config ?? {
@@ -189,31 +194,48 @@ export function InvoiceDocument({
 
   const serviceAddressLines: string[] = [];
   if (serviceAddressSource === "location" && primaryLocation) {
-    const fields = serviceAddressConfig.location_fields ?? ["name", "address", "contact_person", "email", "phone"];
+    const fields = serviceAddressConfig.location_fields ?? [
+      "name",
+      "address",
+      "contact_person",
+      "email",
+      "phone",
+    ];
     fields.forEach((f) => {
       const v = primaryLocation[f as keyof LocationWithHierarchy];
       if (v && String(v).trim() !== "") serviceAddressLines.push(String(v));
     });
-  } else if (serviceAddressSource === "form_fields" && submissionData && serviceAddressConfig.form_fields) {
+  } else if (
+    serviceAddressSource === "form_fields" &&
+    submissionData &&
+    serviceAddressConfig.form_fields
+  ) {
     serviceAddressConfig.form_fields.forEach((fn) => {
       const v = submissionData[fn];
       if (v != null && String(v).trim() !== "") serviceAddressLines.push(String(v));
     });
-  } else if (serviceAddressSource === "form_fields" && submissionData && (templateConfig?.bill_to_fields?.length ?? 0) > 0) {
+  } else if (
+    serviceAddressSource === "form_fields" &&
+    submissionData &&
+    (templateConfig?.bill_to_fields?.length ?? 0) > 0
+  ) {
     (templateConfig!.bill_to_fields ?? []).forEach((fn) => {
       const v = submissionData[fn];
       if (v != null && String(v).trim() !== "") serviceAddressLines.push(String(v));
     });
   }
 
-  const billingAddressConfig = templateConfig?.billing_address_config ?? { enabled: false, source: "auto" };
+  const billingAddressConfig = templateConfig?.billing_address_config ?? {
+    enabled: false,
+    source: "auto",
+  };
   const billingAddressLines: string[] = [];
   const hierarchyMetadata = invoice.hierarchy_metadata ?? {};
   const hierarchyParentId = primaryLocation?.hierarchy_parent_id;
   if (billingAddressConfig.enabled && hierarchyParentId && hierarchyMetadata[hierarchyParentId]) {
     const node = hierarchyMetadata[hierarchyParentId];
     if (node.type === "company") {
-      const billing = (node.metadata?.billing_address as Record<string, unknown> | undefined);
+      const billing = node.metadata?.billing_address as Record<string, unknown> | undefined;
       if (billing) {
         if (billing.name) billingAddressLines.push(String(billing.name));
         if (billing.address) billingAddressLines.push(String(billing.address));
@@ -228,17 +250,30 @@ export function InvoiceDocument({
 
   const getStatusBadge = (status: string) => {
     const v: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      draft: "outline", sent: "default", paid: "secondary", overdue: "destructive", cancelled: "outline",
+      draft: "outline",
+      sent: "default",
+      paid: "secondary",
+      overdue: "destructive",
+      cancelled: "outline",
     };
-    return <Badge variant={v[status] || "default"}>{status.charAt(0).toUpperCase() + status.slice(1)}</Badge>;
+    return (
+      <Badge variant={v[status] || "default"}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
   };
 
   const paymentMethodParts: string[] = [];
-  if (orgInfo.show_bank_transfer_on_invoices && orgInfo.bank_transfer_bsb && orgInfo.bank_transfer_account_number) {
+  if (
+    orgInfo.show_bank_transfer_on_invoices &&
+    orgInfo.bank_transfer_bsb &&
+    orgInfo.bank_transfer_account_number
+  ) {
     paymentMethodParts.push("Bank transfer");
   }
   if (orgInfo.stripe_account_id) paymentMethodParts.push("Credit/Debit card");
-  const paymentMethodsText = paymentMethodParts.length > 0 ? `Payment methods: ${paymentMethodParts.join(", ")}.` : null;
+  const paymentMethodsText =
+    paymentMethodParts.length > 0 ? `Payment methods: ${paymentMethodParts.join(", ")}.` : null;
 
   const showAmountDue = totalPaid > 0 && totalPaid < total;
   const amountDue = total - totalPaid;
@@ -264,7 +299,9 @@ export function InvoiceDocument({
           )}
           <h1 className="text-2xl font-bold">{orgInfo.name || "Company Name"}</h1>
           {orgInfo.business_address && (
-            <p className="text-sm text-muted-foreground whitespace-pre-line">{orgInfo.business_address}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-line">
+              {orgInfo.business_address}
+            </p>
           )}
           {orgInfo.abn && (
             <p className="text-sm text-muted-foreground">ABN: {formatAbn(orgInfo.abn)}</p>
@@ -292,17 +329,23 @@ export function InvoiceDocument({
             <h4 className="text-xs font-medium text-muted-foreground mb-2">Service Address:</h4>
             {serviceAddressLines.length > 0 ? (
               <div className="space-y-1 text-sm">
-                {serviceAddressLines.map((line, i) => <p key={`sa-${i}`}>{line}</p>)}
+                {serviceAddressLines.map((line, i) => (
+                  <p key={`sa-${i}`}>{line}</p>
+                ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No service address information available</p>
+              <p className="text-sm text-muted-foreground">
+                No service address information available
+              </p>
             )}
           </div>
           {billingAddressConfig.enabled && billingAddressLines.length > 0 && (
             <div>
               <h4 className="text-xs font-medium text-muted-foreground mb-2">Billing Address:</h4>
               <div className="space-y-1 text-sm">
-                {billingAddressLines.map((line, i) => <p key={`ba-${i}`}>{line}</p>)}
+                {billingAddressLines.map((line, i) => (
+                  <p key={`ba-${i}`}>{line}</p>
+                ))}
               </div>
             </div>
           )}
@@ -311,16 +354,22 @@ export function InvoiceDocument({
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Invoice Date:</span>
-              <span className="font-medium">{format(new Date(invoice.created_at), "MMM d, yyyy")}</span>
+              <span className="font-medium">
+                {format(new Date(invoice.created_at), "MMM d, yyyy")}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Due Date:</span>
-              <span className="font-medium">{format(new Date(invoice.due_date), "MMM d, yyyy")}</span>
+              <span className="font-medium">
+                {format(new Date(invoice.due_date), "MMM d, yyyy")}
+              </span>
             </div>
             {orgInfo.default_invoice_due_days != null && orgInfo.default_invoice_due_days > 0 && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Payment terms:</span>
-                <span className="font-medium">Payment due within {orgInfo.default_invoice_due_days} days of issue</span>
+                <span className="font-medium">
+                  Payment due within {orgInfo.default_invoice_due_days} days of issue
+                </span>
               </div>
             )}
             <div className="flex justify-between items-center">
@@ -360,43 +409,67 @@ export function InvoiceDocument({
                     <TableRow>
                       <TableCell>Base Price</TableCell>
                       <TableCell className="text-right">1</TableCell>
-                      <TableCell className="text-right">{formatCurrency(calc.base_price, currency)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(calc.base_price, currency)}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(calc.base_price, currency)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(calc.base_price, currency)}
+                      </TableCell>
                     </TableRow>
                   )}
                   {calc.line_items.map((item, i) => {
                     let desc = item.field_label;
-                    if (templateConfig?.line_item_display?.include_option_value && item.option_value) {
-                      const fmt = templateConfig.line_item_display.description_format ?? "{field_label}: {option_value}";
-                      desc = fmt.replace("{field_label}", item.field_label).replace("{option_value}", item.option_value!);
-                    } else if (item.option_value) desc = `${item.field_label}: ${item.option_value}`;
+                    if (
+                      templateConfig?.line_item_display?.include_option_value &&
+                      item.option_value
+                    ) {
+                      const fmt =
+                        templateConfig.line_item_display.description_format ??
+                        "{field_label}: {option_value}";
+                      desc = fmt
+                        .replace("{field_label}", item.field_label)
+                        .replace("{option_value}", item.option_value!);
+                    } else if (item.option_value)
+                      desc = `${item.field_label}: ${item.option_value}`;
                     return (
                       <TableRow key={`${job.id}-${item.field_config_id}-${i}`}>
                         <TableCell>{desc}</TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.unit_price, currency)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.total, currency)}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(item.unit_price, currency)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(item.total, currency)}
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                   {calc.applied_rules
-                    .filter((r) => (r.scope === "global" || r.pricing_type === "conditional") && r.amount !== 0)
+                    .filter(
+                      (r) =>
+                        (r.scope === "global" || r.pricing_type === "conditional") && r.amount !== 0
+                    )
                     .map((r, i) => (
                       <TableRow key={`${job.id}-rule-${i}`}>
                         <TableCell colSpan={3} className="text-sm text-muted-foreground">
                           {r.scope === "global" ? "Adjustment" : "Conditional Adjustment"}
                         </TableCell>
                         <TableCell className="text-right text-sm">
-                          {r.amount >= 0 ? "+" : ""}{formatCurrency(Math.abs(r.amount), currency)}
+                          {r.amount >= 0 ? "+" : ""}
+                          {formatCurrency(Math.abs(r.amount), currency)}
                         </TableCell>
                       </TableRow>
                     ))}
                   <TableRow className="font-medium">
                     <TableCell colSpan={3}>Job Total</TableCell>
-                    <TableCell className="text-right">{formatCurrency(calc.total, currency)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(calc.total, currency)}
+                    </TableCell>
                   </TableRow>
                   {jobIndex < sortedJobs.length - 1 && (
-                    <TableRow><TableCell colSpan={4} className="h-4 border-none" /></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={4} className="h-4 border-none" />
+                    </TableRow>
                   )}
                 </React.Fragment>
               );
@@ -412,7 +485,9 @@ export function InvoiceDocument({
             <>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal (ex. GST):</span>
-                <span className="font-medium">{formatCurrency(calculation.subtotal_ex_gst ?? total - gstAmount, currency)}</span>
+                <span className="font-medium">
+                  {formatCurrency(calculation.subtotal_ex_gst ?? total - gstAmount, currency)}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">GST:</span>
@@ -423,12 +498,16 @@ export function InvoiceDocument({
             <>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal:</span>
-                <span className="font-medium">{formatCurrency(calculation.total_subtotal, currency)}</span>
+                <span className="font-medium">
+                  {formatCurrency(calculation.total_subtotal, currency)}
+                </span>
               </div>
               {calculation.total_adjustments !== 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Adjustments:</span>
-                  <span className="font-medium">{formatCurrency(calculation.total_adjustments, currency)}</span>
+                  <span className="font-medium">
+                    {formatCurrency(calculation.total_adjustments, currency)}
+                  </span>
                 </div>
               )}
             </>
@@ -469,23 +548,35 @@ export function InvoiceDocument({
         </>
       )}
 
-      {orgInfo.show_bank_transfer_on_invoices && orgInfo.bank_transfer_bsb && orgInfo.bank_transfer_account_number && (
-        <>
-          <Separator />
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-muted-foreground">Payment via Bank Transfer</h3>
-            <div className="text-sm space-y-1">
-              {orgInfo.bank_transfer_account_name && <p className="font-medium">Account Name: {orgInfo.bank_transfer_account_name}</p>}
-              <p>BSB: <span className="font-mono">{orgInfo.bank_transfer_bsb}</span></p>
-              <p>Account Number: <span className="font-mono">{orgInfo.bank_transfer_account_number}</span></p>
-              <p className="font-medium mt-2">Reference: {invoice.invoice_number}</p>
-              <p className="text-xs text-muted-foreground mt-2 italic">
-                Note: Payments via bank transfer will not be automatically tracked. Please include the invoice number in your transfer reference.
-              </p>
+      {orgInfo.show_bank_transfer_on_invoices &&
+        orgInfo.bank_transfer_bsb &&
+        orgInfo.bank_transfer_account_number && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-muted-foreground">
+                Payment via Bank Transfer
+              </h3>
+              <div className="text-sm space-y-1">
+                {orgInfo.bank_transfer_account_name && (
+                  <p className="font-medium">Account Name: {orgInfo.bank_transfer_account_name}</p>
+                )}
+                <p>
+                  BSB: <span className="font-mono">{orgInfo.bank_transfer_bsb}</span>
+                </p>
+                <p>
+                  Account Number:{" "}
+                  <span className="font-mono">{orgInfo.bank_transfer_account_number}</span>
+                </p>
+                <p className="font-medium mt-2">Reference: {invoice.invoice_number}</p>
+                <p className="text-xs text-muted-foreground mt-2 italic">
+                  Note: Payments via bank transfer will not be automatically tracked. Please include
+                  the invoice number in your transfer reference.
+                </p>
+              </div>
             </div>
-          </div>
-        </>
-      )}
+          </>
+        )}
 
       <Separator />
       <div className="text-center text-xs text-muted-foreground">
