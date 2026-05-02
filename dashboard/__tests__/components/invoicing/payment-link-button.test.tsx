@@ -7,6 +7,7 @@ vi.mock("@/hooks/use-payment-link");
 vi.mock("@/lib/logger", () => ({
   log: {
     info: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
@@ -35,9 +36,7 @@ describe("PaymentLinkButton", () => {
 
     render(<PaymentLinkButton invoiceId="invoice-1" />);
 
-    expect(
-      screen.getByRole("button", { name: /create payment link/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /create payment link/i })).toBeInTheDocument();
   });
 
   it("should render open button when payment link exists and is open", () => {
@@ -55,9 +54,7 @@ describe("PaymentLinkButton", () => {
 
     render(<PaymentLinkButton invoiceId="invoice-1" />);
 
-    expect(
-      screen.getByRole("button", { name: /open payment link/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /open payment link/i })).toBeInTheDocument();
   });
 
   it("should show loading state when creating payment link", () => {
@@ -161,17 +158,13 @@ describe("PaymentLinkButton", () => {
       value: { origin: "http://localhost:3000" },
     });
 
-    render(
-      <PaymentLinkButton invoiceId="invoice-1" onLinkCreated={onLinkCreated} />
-    );
+    render(<PaymentLinkButton invoiceId="invoice-1" onLinkCreated={onLinkCreated} />);
 
     const button = screen.getByRole("button", { name: /create payment link/i });
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(onLinkCreated).toHaveBeenCalledWith(
-        "https://checkout.stripe.com/test"
-      );
+      expect(onLinkCreated).toHaveBeenCalledWith("https://checkout.stripe.com/test");
     });
   });
 
@@ -218,9 +211,7 @@ describe("PaymentLinkButton", () => {
 
     render(<PaymentLinkButton invoiceId="invoice-1" disabled />);
 
-    expect(
-      screen.getByRole("button", { name: /create payment link/i })
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /create payment link/i })).toBeDisabled();
   });
 
   it("should be disabled when loading", () => {
