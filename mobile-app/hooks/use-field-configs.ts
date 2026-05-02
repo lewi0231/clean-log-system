@@ -14,10 +14,7 @@ export function getFieldCluster(fieldConfig: FieldConfig): string | null {
 }
 
 // Helper: Check if two fields are in the same cluster
-export function areInSameCluster(
-  field1: FieldConfig,
-  field2: FieldConfig,
-): boolean {
+export function areInSameCluster(field1: FieldConfig, field2: FieldConfig): boolean {
   const cluster1 = getFieldCluster(field1);
   const cluster2 = getFieldCluster(field2);
   return cluster1 !== null && cluster1 === cluster2;
@@ -25,7 +22,7 @@ export function areInSameCluster(
 
 // Helper: Group fields by mutually_exclusive_group
 export function groupFieldsByMutualExclusivity(
-  fieldConfigs: FieldConfig[],
+  fieldConfigs: FieldConfig[]
 ): Map<string | null, FieldConfig[]> {
   const groups = new Map<string | null, FieldConfig[]>();
 
@@ -44,7 +41,7 @@ export function groupFieldsByMutualExclusivity(
 export function hasValue(
   value: unknown,
   fieldType: FieldType,
-  fieldConfig?: { validation_rules?: { allow_multiple?: boolean } | null },
+  fieldConfig?: { validation_rules?: { allow_multiple?: boolean } | null }
 ): boolean {
   if (value === null || value === undefined) return false;
 
@@ -83,9 +80,10 @@ export function hasValue(
 
       // Parse the address - empty parts are filtered out during concatenation
       // So a complete address should have: "Street, City, State Postcode" (3 comma-separated parts)
-      const addressParts = value.split(",").map((p) => p.trim()).filter((p) =>
-        p.length > 0
-      );
+      const addressParts = value
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
 
       // A complete address needs at least 3 parts: street, city, and "State Postcode"
       if (addressParts.length < 3) {
@@ -108,9 +106,7 @@ export function hasValue(
       const statePostcodeMatch = lastPart.match(/^([A-Za-z]{2,3})\s+(\d{4})$/);
 
       // Must have both state and postcode
-      if (
-        !statePostcodeMatch || !statePostcodeMatch[1] || !statePostcodeMatch[2]
-      ) {
+      if (!statePostcodeMatch || !statePostcodeMatch[1] || !statePostcodeMatch[2]) {
         return false;
       }
 
@@ -124,7 +120,7 @@ export function hasValue(
 export function isFieldDisabled(
   fieldConfig: FieldConfig,
   fieldConfigs: FieldConfig[],
-  fieldValues: Record<string, unknown>,
+  fieldValues: Record<string, unknown>
 ): boolean {
   const groupId = fieldConfig.mutually_exclusive_group;
   if (!groupId) return false; // No group = never disabled
@@ -132,9 +128,7 @@ export function isFieldDisabled(
   const fieldCluster = getFieldCluster(fieldConfig);
 
   // Find all fields in the same group
-  const groupFields = fieldConfigs.filter(
-    (fc) => fc.mutually_exclusive_group === groupId,
-  );
+  const groupFields = fieldConfigs.filter((fc) => fc.mutually_exclusive_group === groupId);
 
   // Find which clusters/fields currently have values
   const activeClusters = new Set<string | null>();
@@ -165,33 +159,24 @@ export function isFieldDisabled(
   return false; // No active clusters - field is enabled
 }
 
-export function useFieldConfigs(
-  organizationId: string | null,
-  locationId?: string | null,
-) {
+export function useFieldConfigs(organizationId: string | null, locationId?: string | null) {
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [sections, setSections] = useState<FormSectionWithFields[]>([]);
   const [loading, setLoading] = useState(true);
   // Dynamic field values: key is field config id, value is the field value
   const [fieldValues, setFieldValues] = useState<
-    Record<
-      string,
-      string | number | boolean | string[] | GroupedBreakdownItem[]
-    >
+    Record<string, string | number | boolean | string[] | GroupedBreakdownItem[]>
   >({});
 
   const resetFieldValues = (
-    values: Record<
-      string,
-      string | number | boolean | string[] | GroupedBreakdownItem[]
-    >,
+    values: Record<string, string | number | boolean | string[] | GroupedBreakdownItem[]>
   ) => {
     setFieldValues(values);
   };
 
   const updateFieldValue = (
     fieldId: string,
-    value: string | number | boolean | string[] | GroupedBreakdownItem[],
+    value: string | number | boolean | string[] | GroupedBreakdownItem[]
   ) => {
     setFieldValues((prev) => {
       const currentField = fieldConfigs.find((fc) => fc.id === fieldId);
@@ -201,17 +186,11 @@ export function useFieldConfigs(
 
       const groupId = currentField.mutually_exclusive_group;
       const currentCluster = getFieldCluster(currentField);
-      const hasNonEmptyValue = hasValue(
-        value,
-        currentField.field_type,
-        currentField,
-      );
+      const hasNonEmptyValue = hasValue(value, currentField.field_type, currentField);
 
       // If this field now has a value and is in a group, clear conflicting values
       if (hasNonEmptyValue && groupId) {
-        const groupFields = fieldConfigs.filter(
-          (fc) => fc.mutually_exclusive_group === groupId,
-        );
+        const groupFields = fieldConfigs.filter((fc) => fc.mutually_exclusive_group === groupId);
 
         // Find fields in OTHER clusters that have values
         const otherClusterFields = groupFields.filter((fc) => {
@@ -224,10 +203,8 @@ export function useFieldConfigs(
         });
 
         // Clear values from other clusters
-        const clearedValues: Record<
-          string,
-          string | number | boolean | GroupedBreakdownItem[]
-        > = {};
+        const clearedValues: Record<string, string | number | boolean | GroupedBreakdownItem[]> =
+          {};
         otherClusterFields.forEach((fc) => {
           switch (fc.field_type) {
             case "boolean":
@@ -310,29 +287,25 @@ export function useFieldConfigs(
         if (fieldConfigsResponse.data?.field_configs) {
           setFieldConfigs(fieldConfigsResponse.data.field_configs);
           // Initialize field values with default values
-          const initialValues: Record<
-            string,
-            string | number | boolean | GroupedBreakdownItem[]
-          > = {};
-          fieldConfigsResponse.data.field_configs.forEach(
-            (config: FieldConfig) => {
-              if (config.field_type === "number") {
-                initialValues[config.id] = 0;
-              } else if (config.field_type === "boolean") {
-                initialValues[config.id] = false;
-              } else if (config.field_type === "grouped_breakdown") {
-                initialValues[config.id] = [];
-              } else if (config.field_type === "time") {
-                // Initialize time fields with current time as HH:mm string
-                const now = new Date();
-                const hours = now.getHours().toString().padStart(2, "0");
-                const minutes = now.getMinutes().toString().padStart(2, "0");
-                initialValues[config.id] = `${hours}:${minutes}`;
-              } else {
-                initialValues[config.id] = "";
-              }
-            },
-          );
+          const initialValues: Record<string, string | number | boolean | GroupedBreakdownItem[]> =
+            {};
+          fieldConfigsResponse.data.field_configs.forEach((config: FieldConfig) => {
+            if (config.field_type === "number") {
+              initialValues[config.id] = 0;
+            } else if (config.field_type === "boolean") {
+              initialValues[config.id] = false;
+            } else if (config.field_type === "grouped_breakdown") {
+              initialValues[config.id] = [];
+            } else if (config.field_type === "time") {
+              // Initialize time fields with current time as HH:mm string
+              const now = new Date();
+              const hours = now.getHours().toString().padStart(2, "0");
+              const minutes = now.getMinutes().toString().padStart(2, "0");
+              initialValues[config.id] = `${hours}:${minutes}`;
+            } else {
+              initialValues[config.id] = "";
+            }
+          });
           setFieldValues(initialValues);
         } else {
           setFieldConfigs([]);
@@ -345,19 +318,17 @@ export function useFieldConfigs(
             sections: sectionsResponse.data?.sections,
           });
           // Convert to FormSectionWithFields by adding field_ids
-          const sectionsWithFields: FormSectionWithFields[] = sectionsResponse
-            .data.sections.map(
-              (section: FormSectionWithFields) => ({
-                ...section,
-                field_ids: fieldConfigsResponse.data?.field_configs
+          const sectionsWithFields: FormSectionWithFields[] = sectionsResponse.data.sections.map(
+            (section: FormSectionWithFields) => ({
+              ...section,
+              field_ids:
+                fieldConfigsResponse.data?.field_configs
                   ?.filter((fc: FieldConfig) => fc.section_id === section.id)
                   .map((fc: FieldConfig) => fc.id) || [],
-              }),
-            );
-          // Sort by order_position
-          sectionsWithFields.sort((a, b) =>
-            a.order_position - b.order_position
+            })
           );
+          // Sort by order_position
+          sectionsWithFields.sort((a, b) => a.order_position - b.order_position);
           setSections(sectionsWithFields);
         } else {
           setSections([]);

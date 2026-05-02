@@ -9,9 +9,7 @@ vi.mock("@/components/ui/date-time-picker", () => ({
     const TestDateTimePicker = require("react-native").View;
     return (
       <TestDateTimePicker testID="date-time-picker">
-        <TestDateTimePicker testID="placeholder">
-          {placeholder}
-        </TestDateTimePicker>
+        <TestDateTimePicker testID="placeholder">{placeholder}</TestDateTimePicker>
       </TestDateTimePicker>
     );
   },
@@ -83,9 +81,7 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer config={config} value="John Doe" onChange={onChange} />
-    );
+    render(<FieldRenderer config={config} value="John Doe" onChange={onChange} />);
 
     const input = screen.getByLabelText("Name");
     expect(input).toBeTruthy();
@@ -114,13 +110,7 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer
-        config={config}
-        value="test@example.com"
-        onChange={onChange}
-      />
-    );
+    render(<FieldRenderer config={config} value="test@example.com" onChange={onChange} />);
 
     const input = screen.getByLabelText("Email");
     expect(input).toBeTruthy();
@@ -134,13 +124,7 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    render(
-      <FieldRenderer
-        config={config}
-        value="Some description"
-        onChange={onChange}
-      />
-    );
+    render(<FieldRenderer config={config} value="Some description" onChange={onChange} />);
 
     const input = screen.getByLabelText("Description");
     expect(input).toBeTruthy();
@@ -155,9 +139,7 @@ describe("FieldRenderer", () => {
     });
     const onChange = vi.fn();
 
-    const view = render(
-      <FieldRenderer config={config} value="active" onChange={onChange} />
-    );
+    const view = render(<FieldRenderer config={config} value="active" onChange={onChange} />);
     expect(JSON.stringify(view.toJSON())).toContain("Status");
   });
 
@@ -259,11 +241,7 @@ describe("FieldRenderer", () => {
     const onChange = vi.fn();
 
     const view = render(
-      <FieldRenderer
-        config={config}
-        value={new Date().toISOString()}
-        onChange={onChange}
-      />
+      <FieldRenderer config={config} value={new Date().toISOString()} onChange={onChange} />
     );
     expect(JSON.stringify(view.toJSON())).toContain("Date");
   });

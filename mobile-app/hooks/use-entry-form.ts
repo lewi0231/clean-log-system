@@ -15,10 +15,7 @@ interface UseEntryFormProps {
   locationId?: string | null;
 }
 
-export function useEntryForm({
-  organizationId,
-  locationId,
-}: UseEntryFormProps) {
+export function useEntryForm({ organizationId, locationId }: UseEntryFormProps) {
   const {
     fieldConfigs,
     fieldValues,
@@ -60,10 +57,7 @@ export function useEntryForm({
       if (config.field_type === "grouped_breakdown") {
         // Ensure grouped_breakdown is always an array
         submissionData[config.name] = Array.isArray(value) ? value : [];
-      } else if (
-        config.field_type === "select" &&
-        config.validation_rules?.allow_multiple
-      ) {
+      } else if (config.field_type === "select" && config.validation_rules?.allow_multiple) {
         // Multi-select: ensure it's always an array
         submissionData[config.name] = Array.isArray(value) ? value : [];
       } else if (config.field_type === "time") {
@@ -85,9 +79,7 @@ export function useEntryForm({
     return submissionData;
   };
 
-  const validateMutuallyExclusiveGroups = (
-    submissionData: Record<string, any>,
-  ): FieldErrors => {
+  const validateMutuallyExclusiveGroups = (submissionData: Record<string, any>): FieldErrors => {
     const groups = groupFieldsByMutualExclusivity(fieldConfigs);
     const errors: FieldErrors = {};
 
@@ -125,8 +117,7 @@ export function useEntryForm({
       if (activeClusters.length > 1) {
         activeClusters.forEach(({ fields }) => {
           fields.forEach((config) => {
-            errors[config.id] =
-              "Multiple tracking methods selected. Please use only one method.";
+            errors[config.id] = "Multiple tracking methods selected. Please use only one method.";
           });
         });
       }
@@ -146,13 +137,9 @@ export function useEntryForm({
         // Check if any field in group is required
         const requiredInGroup = configs.find((c) => c.required);
         if (requiredInGroup) {
-          errors[
-            requiredInGroup.id
-          ] = `Please select one tracking method: ${
-            configs
-              .map((c) => c.label)
-              .join(", ")
-          }`;
+          errors[requiredInGroup.id] = `Please select one tracking method: ${configs
+            .map((c) => c.label)
+            .join(", ")}`;
         }
       }
     });
@@ -203,10 +190,7 @@ export function useEntryForm({
   };
 
   const resetForm = () => {
-    const resetValues: Record<
-      string,
-      string | number | boolean | GroupedBreakdownItem[]
-    > = {};
+    const resetValues: Record<string, string | number | boolean | GroupedBreakdownItem[]> = {};
     fieldConfigs.forEach((config) => {
       if (config.field_type === "number") {
         resetValues[config.id] = 0;
