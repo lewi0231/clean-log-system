@@ -11,8 +11,12 @@ import CalculatePaymentDialog from "@/components/worker-payments/calculate-payme
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
+import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
+import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import { useAuth } from "@/hooks/useAuth";
 import useOrganization from "@/hooks/useOrganization";
+import type { SaveWorkerPaymentResult } from "@/lib/services/worker-payment.service";
+import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 import { ArrowUpDown, Calculator, Calendar, MapPin, Plus, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -27,6 +31,8 @@ export default function CompletedJobsPage() {
     useJobs({
       includeTests: showTests,
     });
+  const { calculatePayments } = useWorkerPayments();
+  const { addPayment } = useWorkerPaymentHistory(jobs);
   const { user } = useAuth();
   const { organizationUsers } = useOrganizationUsers();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -204,8 +210,24 @@ export default function CompletedJobsPage() {
       <CalculatePaymentDialog
         open={isCalculatePaymentDialogOpen}
         onOpenChange={setIsCalculatePaymentDialogOpen}
-        onCalculate={async () => {
-          // Payment calculation completed
+        onCalculate={async (jobIds, options): Promise<SaveWorkerPaymentResult | undefined> => {
+          if (!organizationId) return undefined;
+          const result = await calculatePayments(jobIds);
+          if (!result?.calculation) return undefined;
+          try {
+            const outcome = await WorkerPaymentService.savePayment(
+              organizationId,
+              result,
+              jobIds,
+              options
+            );
+            if (outcome.ok) {
+              addPayment(result, jobIds);
+            }
+            return outcome;
+          } catch (error) {
+            throw error instanceof Error ? error : new Error("Failed to save payment");
+          }
         }}
         jobs={jobs}
       />

@@ -74,7 +74,7 @@ const industries = [
 
 export function IndustrySections() {
   return (
-    <section id="industries" className="py-20 sm:py-28 border-t bg-muted/20">
+    <section id="industries" className="scroll-mt-24 py-20 sm:py-28 border-t bg-muted/20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">

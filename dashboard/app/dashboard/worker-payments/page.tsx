@@ -17,13 +17,15 @@ import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
-import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+import {
+  WorkerPaymentService,
+  type SaveWorkerPaymentResult,
+} from "@/lib/services/worker-payment.service";
 import { Calculator } from "lucide-react";
 import Link from "next/link";
 import { organizationSettingsKey } from "@/app/query-provider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
 
 export default function WorkerPaymentsPage() {
   const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
@@ -76,25 +78,31 @@ function WorkerPaymentsPageContent({
   // Get jobs with workers
   const jobsWithWorkers = jobs.filter((job) => job.workers.length > 0);
 
-  const handleCalculatePayments = async (jobIds: string[]) => {
-    if (!organizationId) return;
+  const handleCalculatePayments = async (
+    jobIds: string[],
+    options?: { replaceExisting?: boolean }
+  ): Promise<SaveWorkerPaymentResult | undefined> => {
+    if (!organizationId) return undefined;
 
     const result = await calculatePayments(jobIds);
-    if (result?.calculation) {
-      // Save to database via service
-      try {
-        await WorkerPaymentService.savePayment(organizationId, result, jobIds);
-        addPayment(result, jobIds);
-      } catch (error) {
-        log.error("Failed to save payment:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to save payment. Showing results locally."
-        );
-        // Still add to local state for now
+    if (!result?.calculation) return undefined;
+
+    try {
+      const outcome = await WorkerPaymentService.savePayment(
+        organizationId,
+        result,
+        jobIds,
+        options
+      );
+
+      if (outcome.ok) {
         addPayment(result, jobIds);
       }
+
+      return outcome;
+    } catch (error) {
+      log.error("Failed to save payment:", error);
+      throw error;
     }
   };
 

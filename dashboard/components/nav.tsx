@@ -20,10 +20,18 @@ import { usePathname, useRouter } from "next/navigation";
 import Logo from "./logo";
 import { NotificationBell } from "./notifications";
 
+const HOME_NAV_ITEMS = [
+  { name: "Features", href: "#features" },
+  { name: "Pricing", href: "#pricing" },
+  { name: "Industries", href: "#industries" },
+  { name: "About", href: "/about" },
+] as const;
+
 function Nav() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const isHome = pathname === "/";
 
   // Don't show nav on public invoice pages (customer-facing) or worker routes
   const isPublicInvoicePage = pathname?.startsWith("/invoice/");
@@ -48,21 +56,16 @@ function Nav() {
       // We'll still clear local state and redirect
       if (error) {
         const errorMessage = error.message?.toLowerCase() || "";
-        const errorCode =
-          (error as { code?: string }).code?.toLowerCase() || "";
+        const errorCode = (error as { code?: string }).code?.toLowerCase() || "";
 
         // Check if it's a session_not_found error (which is acceptable when signing out)
         const isSessionNotFound =
           errorCode === "session_not_found" ||
           errorMessage.includes("session_not_found") ||
-          errorMessage.includes(
-            "session from session_id claim in jwt does not exist",
-          );
+          errorMessage.includes("session from session_id claim in jwt does not exist");
 
         if (isSessionNotFound) {
-          log.info(
-            "Nav: Session not found (already invalid), proceeding with sign out",
-          );
+          log.info("Nav: Session not found (already invalid), proceeding with sign out");
         } else {
           log.error("Nav: Sign out failed", {
             error: error.message,
@@ -88,16 +91,32 @@ function Nav() {
   return (
     <nav
       className={cn(
-        "fixed top-0 left-0 right-0 h-16 flex justify-between items-center px-4 sm:px-6 lg:px-8",
+        "fixed top-0 left-0 right-0 h-16 flex justify-between items-center gap-4 px-4 sm:px-6 lg:px-8",
         "bg-card/95 backdrop-blur-sm border-b border-border",
-        "card-shadow z-50",
+        "card-shadow z-50"
       )}
+      aria-label="Main navigation"
     >
-      <Link href="/" className="flex items-center">
-        <Logo />
-      </Link>
+      <div className="flex min-w-0 flex-1 items-center gap-6 lg:gap-10">
+        <Link href="/" className="flex shrink-0 items-center">
+          <Logo />
+        </Link>
+        {isHome ? (
+          <div className="hidden md:flex items-center gap-6 lg:gap-8 min-w-0">
+            {HOME_NAV_ITEMS.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
+        ) : null}
+      </div>
       {!user ? (
-        <div className={cn("flex gap-3", loading ? "hidden" : "")}>
+        <div className={cn("flex shrink-0 gap-3", loading ? "hidden" : "")}>
           <Button asChild variant="outline" size="sm">
             <Link href="/login">Log in</Link>
           </Button>
@@ -106,7 +125,7 @@ function Nav() {
           </Button>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <NotificationBell />
           <NavigationMenu viewport={false}>
             <NavigationMenuList>

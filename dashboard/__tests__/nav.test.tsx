@@ -1,7 +1,9 @@
 import Nav from "@/components/nav";
 import { render, screen } from "@testing-library/react";
 
-import { beforeEach, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+const mockUsePathname = vi.hoisted(() => vi.fn(() => "/"));
 
 // Mock Next.js router
 vi.mock("next/navigation", () => ({
@@ -13,7 +15,7 @@ vi.mock("next/navigation", () => ({
     forward: vi.fn(),
     refresh: vi.fn(),
   })),
-  usePathname: vi.fn(() => "/"),
+  usePathname: mockUsePathname,
 }));
 
 // Mock supabase entirely
@@ -51,6 +53,7 @@ const mockUseAuth = vi.mocked(useAuth);
 beforeEach(() => {
   vi.clearAllMocks();
 
+  mockUsePathname.mockReturnValue("/");
   mockUseIsScrollTop.mockReturnValue({ isTop: true });
   mockUseAuth.mockReturnValue({
     user: null,
@@ -72,4 +75,38 @@ test("Displays Log in and Sign up button's when no auth", () => {
   // Assert
   expect(screen.getByText("Create account")).toBeDefined();
   expect(screen.getByText("Log in")).toBeDefined();
+});
+
+describe("Home marketing links", () => {
+  test("shows section links when pathname is home", () => {
+    mockUsePathname.mockReturnValue("/");
+    mockUseAuth.mockReturnValue({ user: null, loading: false });
+
+    render(<Nav />);
+
+    const opts = { hidden: true } as const;
+    expect(screen.getByRole("link", { name: "Features", ...opts })).toHaveAttribute(
+      "href",
+      "#features"
+    );
+    expect(screen.getByRole("link", { name: "Pricing", ...opts })).toHaveAttribute(
+      "href",
+      "#pricing"
+    );
+    expect(screen.getByRole("link", { name: "Industries", ...opts })).toHaveAttribute(
+      "href",
+      "#industries"
+    );
+    expect(screen.getByRole("link", { name: "About", ...opts })).toHaveAttribute("href", "/about");
+  });
+
+  test("hides section links when not on home", () => {
+    mockUsePathname.mockReturnValue("/dashboard");
+    mockUseAuth.mockReturnValue({ user: null, loading: false });
+
+    render(<Nav />);
+
+    expect(screen.queryByRole("link", { name: "Features" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Pricing" })).toBeNull();
+  });
 });
