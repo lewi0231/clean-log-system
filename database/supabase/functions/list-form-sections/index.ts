@@ -1,3 +1,7 @@
+/**
+ * Lists form sections for an org. Future (multi–line of business): optional `line_of_business_id`
+ * in the request body should filter `form_section` the same way as field configs.
+ */
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";

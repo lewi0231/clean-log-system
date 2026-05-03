@@ -1,3 +1,10 @@
+/**
+ * Field catalog for an org, optionally narrowed by `location_field_config` when `location_id` is set.
+ *
+ * Future (multi–line of business): accept optional `line_of_business_id` in the body and filter
+ * `organization_field_configs` by that column (plus existing location restrictions). Call sites can
+ * start threading a LOB id without a breaking API change.
+ */
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";

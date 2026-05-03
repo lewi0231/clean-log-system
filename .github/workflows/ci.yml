@@ -80,7 +80,13 @@ jobs:
       - name: TypeScript (packages that define typecheck)
         run: pnpm typecheck
 
+      # Dashboard is only deployed to Vercel from `main` (no preview/staging deploy for cost).
+      # Still run the Next build on PRs targeting `main` so broken builds are caught before merge.
       - name: Build dashboard (Next.js)
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         run: pnpm build:dashboard
 
   unit-tests:
@@ -148,8 +154,9 @@ jobs:
     name: E2E tests (Playwright + Supabase)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Only run on staging branch or when explicitly requested
-    if: github.ref == 'refs/heads/staging' || contains(github.event.head_commit.message, '[e2e]')
+    # Disabled: no staging/preview Vercel deploy for now — re-enable when a live non-prod URL is available
+    # or when running E2E against CI-built localhost only (no deploy dependency).
+    if: false
 
     steps:
       - name: Checkout repository
