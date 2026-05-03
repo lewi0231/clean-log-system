@@ -2,11 +2,7 @@ import ManualPaymentDialog from "@/components/invoicing/manual-payment-dialog";
 import { usePayments } from "@/hooks/use-payments";
 import { PaymentService } from "@/lib/services/payment.service";
 import type { Payment } from "@/lib/types/payment";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,9 +17,8 @@ vi.mock("@/hooks/use-payments", () => ({
 }));
 
 vi.mock("@tanstack/react-query", async () => {
-  const actual = await vi.importActual<typeof import("@tanstack/react-query")>(
-    "@tanstack/react-query"
-  );
+  const actual =
+    await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");
   return {
     ...actual,
     useQueryClient: vi.fn(),
@@ -39,9 +34,7 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
@@ -59,6 +52,8 @@ describe("ManualPaymentDialog", () => {
       loading: false,
       error: null,
       refetch: mockRefetch,
+      totalPaid: 0,
+      remainingBalance: 0,
     });
 
     vi.mocked(useQueryClient).mockReturnValue({
@@ -97,9 +92,7 @@ describe("ManualPaymentDialog", () => {
       { wrapper: createWrapper() }
     );
 
-    expect(
-      screen.queryByText(/record manual payment/i)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/record manual payment/i)).not.toBeInTheDocument();
   });
 
   it("should display remaining balance", () => {
@@ -156,9 +149,7 @@ describe("ManualPaymentDialog", () => {
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(/please enter a valid amount greater than 0/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/please enter a valid amount greater than 0/i)).toBeInTheDocument();
     });
   });
 
@@ -189,9 +180,7 @@ describe("ManualPaymentDialog", () => {
       metadata: {},
     };
 
-    vi.mocked(PaymentService.createManualPayment).mockResolvedValue(
-      mockPayment
-    );
+    vi.mocked(PaymentService.createManualPayment).mockResolvedValue(mockPayment);
 
     render(
       <ManualPaymentDialog
@@ -328,9 +317,7 @@ describe("ManualPaymentDialog", () => {
         expect(amountInput).toBeInTheDocument();
         // Check if value is empty string or null/undefined (form reset)
         const value = (amountInput as HTMLInputElement).value;
-        expect(value === "" || value === null || value === undefined).toBe(
-          true
-        );
+        expect(value === "" || value === null || value === undefined).toBe(true);
       },
       { timeout: 2000 }
     );

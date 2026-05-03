@@ -27,7 +27,6 @@ interface WorkerSplit {
   final_payment: number;
   rate_card_id?: string;
   allocation_type: string;
-  /** Rate-card pool share weight (default 1.0). */
   split_weight?: number;
 }
 
@@ -46,6 +45,30 @@ interface SaveWorkerPaymentRequest {
     }>;
   };
   job_ids: string[];
+  /** When true and open batches exist for these jobs, remove old calculated rows before save (after inserting new batch). */
+  replace_existing?: boolean;
+}
+
+const OPEN_BATCH_STATUSES = new Set(["calculated", "approved", "processing"]);
+
+interface WpEmbedRow {
+  job_id: string;
+  batch_id: string | null;
+  worker_payment_batch: { status?: string | null; calculated_at?: string | null } | null;
+}
+
+function batchStatusFromEmbed(
+  embed: WpEmbedRow["worker_payment_batch"],
+): string | undefined {
+  if (!embed || Array.isArray(embed)) return undefined;
+  return embed.status ?? undefined;
+}
+
+function batchCalculatedAtFromEmbed(
+  embed: WpEmbedRow["worker_payment_batch"],
+): string {
+  if (!embed || Array.isArray(embed)) return "";
+  return embed.calculated_at ?? "";
 }
 
 serve(async (req: Request) => {
@@ -69,6 +92,7 @@ serve(async (req: Request) => {
     }
 
     const { organization_id, calculation, job_ids } = body;
+    const replace_existing = Boolean(body.replace_existing);
 
     if (!Array.isArray(job_ids) || job_ids.length === 0) {
       return errorResponse("job_ids must be a non-empty array", 400);
@@ -81,7 +105,6 @@ serve(async (req: Request) => {
       return errorResponse("calculation.job_calculations is required", 400);
     }
 
-    // Get authenticated user for created_by and membership verification
     let authUserId: string | null = null;
     let userEmail: string | null = null;
     const token = extractAuthToken(req);
@@ -95,7 +118,6 @@ serve(async (req: Request) => {
 
     const supabase = createServiceRoleClient();
 
-    // Verify organization exists
     const { data: org, error: orgError } = await supabase
       .from("organization")
       .select("id")
@@ -106,7 +128,6 @@ serve(async (req: Request) => {
       return errorResponse("Organization not found", 404);
     }
 
-    // Verify user belongs to this organization and get organization_user.id
     let organizationUserId: string | null = null;
     if (authUserId || userEmail) {
       const isMember = await verifyOrganizationMembership(
@@ -122,7 +143,6 @@ serve(async (req: Request) => {
         );
       }
 
-      // Get the organization_user.id for calculated_by FK
       const { data: orgUser } = await supabase
         .from("organization_user")
         .select("id")
@@ -135,7 +155,6 @@ serve(async (req: Request) => {
       }
     }
 
-    // Verify jobs exist
     const { data: jobs, error: jobsError } = await supabase
       .from("job")
       .select("id")
@@ -147,7 +166,6 @@ serve(async (req: Request) => {
       return errorResponse("No jobs found", 404);
     }
 
-    // Fetch job_worker relationships separately (same pattern as list-jobs)
     const { data: jobWorkersData, error: jobWorkersError } = await supabase
       .from("job_worker")
       .select(
@@ -162,7 +180,6 @@ serve(async (req: Request) => {
 
     if (jobWorkersError) throw jobWorkersError;
 
-    // Create a map of job_id to worker_ids
     interface JobWorkerQueryResult {
       job_id: string;
       worker: { id: string } | Array<{ id: string }> | null;
@@ -181,13 +198,11 @@ serve(async (req: Request) => {
       }
     });
 
-    // Count unique workers
     const uniqueWorkers = new Set<string>();
     jobWorkersMap.forEach((workerIds) => {
       workerIds.forEach((id) => uniqueWorkers.add(id));
     });
 
-    // Get organization currency
     const { data: organization, error: orgCurrencyError } = await supabase
       .from("organization")
       .select("currency")
@@ -203,12 +218,88 @@ serve(async (req: Request) => {
 
     const currency = organization?.currency || "AUD";
 
-    // Create payment batch
+    // ── Duplicate / paid detection ─────────────────────────────────────
+    const { data: existingRows, error: existingErr } = await supabase
+      .from("worker_payment")
+      .select(`
+        job_id,
+        batch_id,
+        worker_payment_batch(status, calculated_at)
+      `)
+      .eq("organization_id", organization_id)
+      .in("job_id", job_ids);
+
+    if (existingErr) throw existingErr;
+
+    const wpRows = (existingRows ?? []) as WpEmbedRow[];
+
+    const blockedMap = new Map<
+      string,
+      { batch_id: string; batch_status: string; calculated_at: string }
+    >();
+    for (const row of wpRows) {
+      if (!row.batch_id) continue;
+      const stat = batchStatusFromEmbed(row.worker_payment_batch);
+      if (stat === "completed") {
+        blockedMap.set(row.job_id, {
+          batch_id: row.batch_id,
+          batch_status: "completed",
+          calculated_at: batchCalculatedAtFromEmbed(row.worker_payment_batch),
+        });
+      }
+    }
+
+    if (blockedMap.size > 0) {
+      const blocked_jobs = [...blockedMap.entries()].map(
+        ([job_id, meta]) => ({
+          job_id,
+          ...meta,
+        }),
+      );
+      return jsonResponse({
+        success: false,
+        error_code: "jobs_already_paid",
+        blocked_jobs,
+      });
+    }
+
+    const dupKeySeen = new Set<string>();
+    const duplicatePayload: Array<{
+      job_id: string;
+      batch_id: string;
+      batch_status: string;
+      calculated_at: string;
+    }> = [];
+
+    for (const row of wpRows) {
+      if (!row.batch_id) continue;
+      const stat = batchStatusFromEmbed(row.worker_payment_batch);
+      if (!(stat && OPEN_BATCH_STATUSES.has(stat))) continue;
+      const dk = `${row.job_id}:${row.batch_id}`;
+      if (dupKeySeen.has(dk)) continue;
+      dupKeySeen.add(dk);
+      const bs = batchStatusFromEmbed(row.worker_payment_batch) ?? "";
+      duplicatePayload.push({
+        job_id: row.job_id,
+        batch_id: row.batch_id,
+        batch_status: bs,
+        calculated_at: batchCalculatedAtFromEmbed(row.worker_payment_batch),
+      });
+    }
+
+    if (duplicatePayload.length > 0 && !replace_existing) {
+      return jsonResponse({
+        success: false,
+        error_code: "duplicate_payments_needs_confirm",
+        duplicates: duplicatePayload,
+      });
+    }
+
     const { data: batch, error: batchError } = await supabase
       .from("worker_payment_batch")
       .insert({
         organization_id,
-        calculated_by: organizationUserId, // Use organization_user.id, not auth.user.id
+        calculated_by: organizationUserId,
         total_payment: calculation.total_worker_payment,
         currency,
         job_count: job_ids.length,
@@ -221,15 +312,8 @@ serve(async (req: Request) => {
 
     if (batchError) throw batchError;
 
-    // Create individual worker payment records
-    // For each job calculation, create a payment record for each worker on that job
-    //
-    // Uses worker_splits from calculation if available (time-based + bonuses)
-    // Falls back to equal split if worker_splits not present
-    //
     const workerPayments = [];
     for (const jobCalc of calculation.job_calculations) {
-      // Use worker_splits from calculation if available
       if (jobCalc.worker_splits && jobCalc.worker_splits.length > 0) {
         for (const split of jobCalc.worker_splits) {
           workerPayments.push({
@@ -261,17 +345,11 @@ serve(async (req: Request) => {
           });
         }
       } else {
-        // Fallback: equal split among workers (legacy behavior)
         const workerIds = jobWorkersMap.get(jobCalc.job_id) || [];
-
         if (workerIds.length === 0) {
-          // No workers assigned, skip
           continue;
         }
-
-        // Split payment equally among workers
         const paymentPerWorker = jobCalc.total_worker_payment / workerIds.length;
-
         for (const workerId of workerIds) {
           workerPayments.push({
             organization_id,
@@ -294,14 +372,16 @@ serve(async (req: Request) => {
       }
     }
 
+    let replaced:
+      | { jobs_replaced: number; batches_cancelled: number }
+      | undefined;
+
     if (workerPayments.length > 0) {
       const { error: paymentsError } = await supabase
         .from("worker_payment")
         .insert(workerPayments);
 
       if (paymentsError) {
-        // Rollback: Delete the batch if payment inserts fail
-        // This prevents orphaned batch records without associated payments
         logger.error(
           "Failed to insert worker payments, rolling back batch",
           paymentsError,
@@ -318,6 +398,31 @@ serve(async (req: Request) => {
       }
     }
 
+    if (replace_existing) {
+      const { data: cleanup, error: cleanupErr } = await supabase.rpc(
+        "worker_payment_remove_open_rows_for_jobs",
+        {
+          p_organization_id: organization_id,
+          p_job_ids: job_ids,
+          p_exclude_batch_id: batch.id,
+        },
+      );
+
+      if (cleanupErr) {
+        logger.error("Cleanup after replace failed", cleanupErr, {
+          batch_id: batch.id,
+        });
+        throw cleanupErr;
+      }
+
+      const c =
+        cleanup as { deleted_row_count?: number; batches_cancelled?: number } | null;
+      replaced = {
+        jobs_replaced: new Set(duplicatePayload.map((d) => d.job_id)).size,
+        batches_cancelled: c?.batches_cancelled ?? 0,
+      };
+    }
+
     logger.info("Worker payment saved successfully", {
       batch_id: batch.id,
       organization_id,
@@ -326,12 +431,14 @@ serve(async (req: Request) => {
       worker_count: uniqueWorkers.size,
       total_payment: calculation.total_worker_payment,
       currency,
+      replace_existing,
     });
 
     return jsonResponse({
       success: true,
       batch_id: batch.id,
       payment_count: workerPayments.length,
+      replaced,
     });
   } catch (error) {
     logger.error("Save worker payment error", error);

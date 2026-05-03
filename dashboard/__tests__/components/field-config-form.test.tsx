@@ -54,6 +54,7 @@ describe("FieldConfigForm", () => {
     render(
       <FieldConfigForm
         open
+        organizationId="org-1"
         onOpenChange={vi.fn()}
         onSuccess={vi.fn()}
         fieldConfig={null}
@@ -65,18 +66,10 @@ describe("FieldConfigForm", () => {
     fireEvent.click(presetLabel);
 
     await waitFor(() => {
-      const nameInput = screen.getByLabelText(
-        "Name (Internal)"
-      ) as HTMLInputElement;
-      const groupInput = screen.getByPlaceholderText(
-        "yard_tracking_method"
-      ) as HTMLInputElement;
-      const clusterInput = screen.getByPlaceholderText(
-        "soap_and_wipe_pair"
-      ) as HTMLInputElement;
-      const optionsInput = screen.getByLabelText(
-        "Groups (Comma-separated)"
-      ) as HTMLInputElement;
+      const nameInput = screen.getByLabelText("Name (Internal)") as HTMLInputElement;
+      const groupInput = screen.getByPlaceholderText("yard_tracking_method") as HTMLInputElement;
+      const clusterInput = screen.getByPlaceholderText("soap_and_wipe_pair") as HTMLInputElement;
+      const optionsInput = screen.getByLabelText("Groups (Comma-separated)") as HTMLInputElement;
 
       expect(nameInput.value).toBe("cars_wiped_breakdown");
       expect(groupInput.value).toBe("yard_tracking_method");
@@ -88,9 +81,7 @@ describe("FieldConfigForm", () => {
     fireEvent.click(customLabel);
 
     await waitFor(() => {
-      const groupInput = screen.getByPlaceholderText(
-        "yard_tracking_method"
-      ) as HTMLInputElement;
+      const groupInput = screen.getByPlaceholderText("yard_tracking_method") as HTMLInputElement;
       expect(groupInput.value).toBe("");
     });
   });

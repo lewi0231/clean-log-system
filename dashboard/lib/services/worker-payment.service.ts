@@ -74,6 +74,36 @@ export interface CalculateWorkerPaymentsResponse {
   };
 }
 
+/** Hint when a job already has an open (unpaid) payment row — user may confirm replace. */
+export interface SaveWorkerPaymentDuplicateHint {
+  job_id: string;
+  batch_id: string;
+  batch_status: string;
+  calculated_at: string;
+}
+
+/** Hint when a job is tied to a completed (paid) batch — save is blocked until adjustment workflow ships. */
+export interface SaveWorkerPaymentBlockedHint {
+  job_id: string;
+  batch_id: string;
+  batch_status: string;
+  calculated_at: string;
+}
+
+export type SaveWorkerPaymentResult =
+  | {
+      ok: true;
+      batch_id: string;
+      payment_count?: number;
+      replaced?: { jobs_replaced: number; batches_cancelled: number };
+    }
+  | {
+      ok: false;
+      error_code: "duplicate_payments_needs_confirm";
+      duplicates: SaveWorkerPaymentDuplicateHint[];
+    }
+  | { ok: false; error_code: "jobs_already_paid"; blocked_jobs: SaveWorkerPaymentBlockedHint[] };
+
 export type { BatchWorkerPaymentRow } from "@/lib/worker-payments/export-batch-worker-csv";
 
 /**
@@ -429,35 +459,67 @@ export class WorkerPaymentService {
   }
 
   /**
-   * Save worker payment calculation to database
+   * Save worker payment calculation to database.
+   * When unpaid duplicates exist for the same jobs, first call returns `{ ok: false, error_code: duplicate_payments_needs_confirm }`; retry with `{ replaceExisting: true }`.
    */
   static async savePayment(
     organizationId: string,
     calculation: CalculateWorkerPaymentsResponse,
-    jobIds: string[]
-  ): Promise<{ success: boolean; batch_id: string }> {
+    jobIds: string[],
+    options?: { replaceExisting?: boolean }
+  ): Promise<SaveWorkerPaymentResult> {
     try {
       log.debug("WorkerPaymentService: Saving worker payment", {
         organizationId,
         jobCount: jobIds.length,
+        replaceExisting: Boolean(options?.replaceExisting),
       });
 
       const data = await invokeEdgeFunction<{
         success?: boolean;
         batch_id?: string;
+        payment_count?: number;
+        error_code?: string;
+        duplicates?: SaveWorkerPaymentDuplicateHint[];
+        blocked_jobs?: SaveWorkerPaymentBlockedHint[];
+        replaced?: { jobs_replaced: number; batches_cancelled: number };
       }>("save-worker-payment", {
         organization_id: organizationId,
         calculation: calculation.calculation,
         job_ids: jobIds,
+        replace_existing: options?.replaceExisting === true ? true : undefined,
       });
 
-      if (!data || !data.success) {
+      if (!data) {
+        throw new Error("Failed to save worker payment");
+      }
+
+      if (data.success === false) {
+        if (
+          data.error_code === "duplicate_payments_needs_confirm" &&
+          Array.isArray(data.duplicates)
+        ) {
+          return {
+            ok: false,
+            error_code: "duplicate_payments_needs_confirm",
+            duplicates: data.duplicates,
+          };
+        }
+        if (data.error_code === "jobs_already_paid" && Array.isArray(data.blocked_jobs)) {
+          return {
+            ok: false,
+            error_code: "jobs_already_paid",
+            blocked_jobs: data.blocked_jobs,
+          };
+        }
         throw new Error("Failed to save worker payment");
       }
 
       return {
-        success: true,
+        ok: true,
         batch_id: data.batch_id as string,
+        payment_count: data.payment_count,
+        replaced: data.replaced,
       };
     } catch (err) {
       log.error("WorkerPaymentService: Failed to save worker payment", {

@@ -770,17 +770,102 @@ describe("WorkerPaymentService", () => {
 
       const result = await WorkerPaymentService.savePayment("org-1", calculation, ["job-1"]);
 
-      expect(result.success).toBe(true);
-      expect(result.batch_id).toBe("batch-123");
-      expect(supabase.functions.invoke).toHaveBeenCalledWith("save-worker-payment", {
-        body: {
-          organization_id: "org-1",
-          calculation: calculation.calculation,
-          job_ids: ["job-1"],
-        },
-      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.batch_id).toBe("batch-123");
+      }
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "save-worker-payment",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            organization_id: "org-1",
+            calculation: calculation.calculation,
+            job_ids: ["job-1"],
+          }),
+        })
+      );
     });
 
+    it("should return duplicate_payments_needs_confirm when duplicate rows exist", async () => {
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
+        data: {
+          success: false,
+          error_code: "duplicate_payments_needs_confirm",
+          duplicates: [
+            {
+              job_id: "job-1",
+              batch_id: "old-batch",
+              batch_status: "calculated",
+              calculated_at: "2026-01-01T00:00:00Z",
+            },
+          ],
+        },
+        error: null,
+      });
+
+      const calculation: CalculateWorkerPaymentsResponse = {
+        success: true,
+        calculation: {
+          total_worker_payment: 100,
+          job_calculations: [
+            {
+              job_id: "job-1",
+              line_items: [],
+              applied_rules: [],
+              subtotal: 100,
+              total_adjustments: 0,
+              total_worker_payment: 100,
+            },
+          ],
+        },
+      };
+
+      const result = await WorkerPaymentService.savePayment("org-1", calculation, ["job-1"]);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error_code).toBe("duplicate_payments_needs_confirm");
+        if (result.error_code === "duplicate_payments_needs_confirm") {
+          expect(result.duplicates).toHaveLength(1);
+        }
+      }
+    });
+
+    it("should pass replaceExisting to edge function when saving", async () => {
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
+        data: { success: true, batch_id: "batch-999" },
+        error: null,
+      });
+
+      const calculation: CalculateWorkerPaymentsResponse = {
+        success: true,
+        calculation: {
+          total_worker_payment: 100,
+          job_calculations: [
+            {
+              job_id: "job-1",
+              line_items: [],
+              applied_rules: [],
+              subtotal: 100,
+              total_adjustments: 0,
+              total_worker_payment: 100,
+            },
+          ],
+        },
+      };
+
+      await WorkerPaymentService.savePayment("org-1", calculation, ["job-1"], {
+        replaceExisting: true,
+      });
+
+      expect(supabase.functions.invoke).toHaveBeenCalledWith(
+        "save-worker-payment",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            replace_existing: true,
+          }),
+        })
+      );
+    });
     it("should throw error when save fails", async () => {
       vi.mocked(supabase.functions.invoke).mockResolvedValue({
         data: null,

@@ -1,6 +1,16 @@
 "use client";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,9 +53,12 @@ import {
 } from "@/lib/worker-payments/date-presets";
 import type {
   CalculateWorkerPaymentsResponse,
+  SaveWorkerPaymentBlockedHint,
+  SaveWorkerPaymentDuplicateHint,
+  SaveWorkerPaymentResult,
   WorkerPaymentCalculation,
 } from "@/lib/services/worker-payment.service";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import {
   AlertCircle,
   CheckCircle2,
@@ -62,6 +75,15 @@ function setsEqual(a: Set<string>, b: Set<string>): boolean {
   if (a.size !== b.size) return false;
   for (const x of a) if (!b.has(x)) return false;
   return true;
+}
+
+function formatBatchTimestamp(iso: string): string {
+  if (!iso?.trim()) return "—";
+  try {
+    return format(parseISO(iso), "MMM d, yyyy h:mm a");
+  } catch {
+    return iso;
+  }
 }
 
 function parseInputDate(s: string): Date | null {
@@ -146,7 +168,10 @@ function JobWorkerSplitPreviewTable({
 interface CalculatePaymentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCalculate: (jobIds: string[]) => Promise<void>;
+  onCalculate: (
+    jobIds: string[],
+    options?: { replaceExisting?: boolean }
+  ) => Promise<SaveWorkerPaymentResult | undefined>;
   preselectedJobIds?: string[];
   jobs: Job[];
 }
@@ -172,6 +197,10 @@ export default function CalculatePaymentDialog({
   const [dateToStr, setDateToStr] = useState("");
   const [activePreset, setActivePreset] = useState<DatePreset | null>(null);
   const [previewWorkerDetail, setPreviewWorkerDetail] = useState<WorkerPreviewRow | null>(null);
+  const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
+  const [pendingDuplicates, setPendingDuplicates] = useState<SaveWorkerPaymentDuplicateHint[]>([]);
+  const [blockedDialogOpen, setBlockedDialogOpen] = useState(false);
+  const [blockedJobs, setBlockedJobs] = useState<SaveWorkerPaymentBlockedHint[]>([]);
 
   React.useEffect(() => {
     if (preselectedJobIds.length > 0 && open) {
@@ -288,6 +317,21 @@ export default function CalculatePaymentDialog({
     }
   };
 
+  const resetFormAfterSuccessfulSave = useCallback(() => {
+    setSelectedJobIds(new Set());
+    setPreview(null);
+    setLastPreviewedJobIds(null);
+    setExpandedJobs(new Set());
+    setDateFromStr("");
+    setDateToStr("");
+    setActivePreset(null);
+    setReplaceDialogOpen(false);
+    setPendingDuplicates([]);
+    setBlockedDialogOpen(false);
+    setBlockedJobs([]);
+    setPreviewWorkerDetail(null);
+  }, []);
+
   const handleConfirm = async () => {
     if (selectedJobIds.size === 0 || !preview) return;
     if (lastPreviewedJobIds && !setsEqual(selectedJobIds, lastPreviewedJobIds)) {
@@ -298,16 +342,86 @@ export default function CalculatePaymentDialog({
     setSaving(true);
     setError(null);
     try {
-      await onCalculate(Array.from(selectedJobIds));
-      toast.success("Payment calculation saved successfully");
+      const ids = Array.from(selectedJobIds);
+      const outcome = await onCalculate(ids, { replaceExisting: false });
+
+      if (outcome === undefined) {
+        toast.error("Could not calculate or save payments. Try Preview again.");
+        return;
+      }
+
+      if (!outcome.ok) {
+        if (outcome.error_code === "duplicate_payments_needs_confirm") {
+          setPendingDuplicates(outcome.duplicates);
+          setReplaceDialogOpen(true);
+          return;
+        }
+        if (outcome.error_code === "jobs_already_paid") {
+          setBlockedJobs(outcome.blocked_jobs);
+          setBlockedDialogOpen(true);
+          return;
+        }
+        toast.error("Failed to save payment.");
+        return;
+      }
+
+      if (outcome.replaced && outcome.replaced.jobs_replaced > 0) {
+        toast.success(
+          `Payment saved. Replaced previous calculation for ${outcome.replaced.jobs_replaced} job(s).`
+        );
+      } else {
+        toast.success("Payment calculation saved successfully");
+      }
       onOpenChange(false);
-      setSelectedJobIds(new Set());
-      setPreview(null);
-      setLastPreviewedJobIds(null);
-      setExpandedJobs(new Set());
-      setDateFromStr("");
-      setDateToStr("");
-      setActivePreset(null);
+      resetFormAfterSuccessfulSave();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to save payment";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReplaceAndSaveConfirmed = async () => {
+    if (selectedJobIds.size === 0 || !preview) return;
+    if (lastPreviewedJobIds && !setsEqual(selectedJobIds, lastPreviewedJobIds)) {
+      toast.error("Run Preview again before saving—your job selection changed.");
+      setReplaceDialogOpen(false);
+      return;
+    }
+
+    setReplaceDialogOpen(false);
+    setSaving(true);
+    setError(null);
+    try {
+      const ids = Array.from(selectedJobIds);
+      const outcome = await onCalculate(ids, { replaceExisting: true });
+
+      if (outcome === undefined) {
+        toast.error("Could not save payments.");
+        return;
+      }
+
+      if (!outcome.ok) {
+        if (outcome.error_code === "jobs_already_paid") {
+          setBlockedJobs(outcome.blocked_jobs);
+          setBlockedDialogOpen(true);
+          return;
+        }
+        toast.error("Failed to save payment.");
+        return;
+      }
+
+      if (outcome.replaced && outcome.replaced.jobs_replaced > 0) {
+        toast.success(
+          `Payment saved. Replaced previous calculation for ${outcome.replaced.jobs_replaced} job(s).`
+        );
+      } else {
+        toast.success("Payment calculation saved successfully");
+      }
+      onOpenChange(false);
+      resetFormAfterSuccessfulSave();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save payment";
       setError(errorMessage);
@@ -328,6 +442,10 @@ export default function CalculatePaymentDialog({
     setActivePreset(null);
     setLastPreviewedJobIds(null);
     setPreviewWorkerDetail(null);
+    setReplaceDialogOpen(false);
+    setPendingDuplicates([]);
+    setBlockedDialogOpen(false);
+    setBlockedJobs([]);
   };
 
   const toggleJobExpanded = (jobId: string) => {
@@ -350,6 +468,17 @@ export default function CalculatePaymentDialog({
   const selectionStaleForSave = Boolean(
     preview && lastPreviewedJobIds && !setsEqual(selectedJobIds, lastPreviewedJobIds)
   );
+
+  const duplicateSummaryLines = useMemo(() => {
+    return pendingDuplicates.map((d) => {
+      const job = jobs.find((j) => j.id === d.job_id);
+      const when = job?.completed_at
+        ? format(new Date(job.completed_at), "MMM d, yyyy")
+        : "Unknown date";
+      const loc = job?.location?.name || "Unknown location";
+      return `${when} — ${loc} · prior run ${formatBatchTimestamp(d.calculated_at)}`;
+    });
+  }, [pendingDuplicates, jobs]);
 
   return (
     <>
@@ -879,8 +1008,84 @@ export default function CalculatePaymentDialog({
         </DialogContent>
       </Dialog>
 
+      <AlertDialog open={replaceDialogOpen} onOpenChange={setReplaceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Replace existing calculations?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Some selected jobs already have unpaid payment runs. Saving will replace those
+                  calculations with this run.
+                </p>
+                {duplicateSummaryLines.length > 0 && (
+                  <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                    {duplicateSummaryLines.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleReplaceAndSaveConfirmed();
+              }}
+            >
+              Replace and save
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={blockedDialogOpen} onOpenChange={setBlockedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cannot recalculate paid jobs</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  At least one selected job appears in a pay run already marked paid. Creating a new
+                  calculation would duplicate amounts. Adjustments for paid runs will follow in a
+                  later update.
+                </p>
+                {blockedJobs.length > 0 && (
+                  <ul className="list-disc pl-4 text-sm text-muted-foreground space-y-1">
+                    {blockedJobs.map((d) => {
+                      const job = jobs.find((j) => j.id === d.job_id);
+                      const when = job?.completed_at
+                        ? format(new Date(job.completed_at), "MMM d, yyyy")
+                        : "";
+                      const loc = job?.location?.name || "";
+                      return (
+                        <li key={`${d.job_id}-${d.batch_id}`}>
+                          {[when, loc].filter(Boolean).join(" — ") || d.job_id} · marked paid{" "}
+                          {formatBatchTimestamp(d.calculated_at)}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              className="cursor-pointer"
+              onClick={() => setBlockedDialogOpen(false)}
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog
-        open={!!previewWorkerDetail}
         onOpenChange={(next) => {
           if (!next) setPreviewWorkerDetail(null);
         }}

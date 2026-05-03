@@ -1,13 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
 import Link from "next/link";
@@ -67,15 +61,15 @@ export function PricingSection() {
   const analytics = useAnalytics();
 
   const handlePricingCTA = (planName: string) => {
-    analytics.ctaClick(`Start Free Trial - ${planName}`, 'pricing_section', '/signup');
+    analytics.ctaClick(`Start Free Trial - ${planName}`, "pricing_section", "/signup");
   };
 
   const handleContactSales = () => {
-    analytics.ctaClick('Contact Sales - Business Plan', 'pricing_section', '/contact');
+    analytics.ctaClick("Contact Sales - Business Plan", "pricing_section", "/contact");
   };
 
   return (
-    <section id="pricing" className="py-20 sm:py-28 border-t bg-muted/20">
+    <section id="pricing" className="scroll-mt-24 py-20 sm:py-28 border-t bg-muted/20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -88,7 +82,10 @@ export function PricingSection() {
 
         <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-3">
           {pricingPlans.map((plan) => (
-            <Card key={plan.name} className={`relative ${plan.popular ? 'border-primary shadow-lg' : ''}`}>
+            <Card
+              key={plan.name}
+              className={`relative ${plan.popular ? "border-primary shadow-lg" : ""}`}
+            >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge className="bg-primary">Most Popular</Badge>
@@ -115,7 +112,11 @@ export function PricingSection() {
                   asChild
                   className="w-full mt-6"
                   variant={plan.popular ? "default" : "outline"}
-                  onClick={plan.cta === "Contact Sales" ? handleContactSales : () => handlePricingCTA(plan.name)}
+                  onClick={
+                    plan.cta === "Contact Sales"
+                      ? handleContactSales
+                      : () => handlePricingCTA(plan.name)
+                  }
                 >
                   <Link href={plan.cta === "Contact Sales" ? "/contact" : "/signup"}>
                     {plan.cta}

@@ -24,13 +24,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => {
-  function MockLink({
-    children,
-    href,
-  }: {
-    children: React.ReactNode;
-    href: string;
-  }) {
+  function MockLink({ children, href }: { children: React.ReactNode; href: string }) {
     return <a href={href}>{children}</a>;
   }
   MockLink.displayName = "MockLink";
@@ -38,9 +32,7 @@ vi.mock("next/link", () => {
 });
 
 vi.mock("next/image", () => ({
-  default: ({ src, alt }: { src: string; alt: string }) => (
-    <img src={src} alt={alt} />
-  ),
+  default: ({ src, alt }: { src: string; alt: string }) => <img src={src} alt={alt} />,
 }));
 
 vi.mock("@/hooks/useOrganization", () => ({ default: vi.fn() }));
@@ -90,9 +82,7 @@ function createWrapper() {
     },
   });
   return function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   };
 }
 
@@ -101,8 +91,10 @@ describe("Ratings settings", () => {
     vi.clearAllMocks();
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-1",
+      organizationUserId: "ou-1",
+      userRole: "admin",
       loading: false,
-      error: null,
+      error: undefined,
     });
     vi.mocked(useFieldConfigs).mockReturnValue({
       fieldConfigs: [],
@@ -170,9 +162,7 @@ describe("Ratings settings", () => {
     const featuresTab = screen.getByRole("tab", { name: /features/i });
     fireEvent.click(featuresTab);
     await waitFor(() => {
-      expect(
-        screen.getByText("Send Feedback Requests Immediately"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Send Feedback Requests Immediately")).toBeInTheDocument();
     });
   }
 
@@ -185,13 +175,9 @@ describe("Ratings settings", () => {
       });
       await openFeaturesTab();
 
-      expect(
-        screen.getByText("Send Feedback Requests Immediately"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Send Feedback Requests Immediately")).toBeInTheDocument();
       expect(screen.getByText("Rating Configuration")).toBeInTheDocument();
-      expect(
-        screen.getByRole("radio", { name: /Single Overall Rating/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /Single Overall Rating/i })).toBeInTheDocument();
     });
 
     it("should call update-organization-settings when toggling Send Feedback Requests Immediately", async () => {
@@ -214,7 +200,7 @@ describe("Ratings settings", () => {
               organization_id: "org-1",
               feedback_email_send_immediately: true,
             }),
-          }),
+          })
         );
       });
     });
@@ -235,8 +221,7 @@ describe("Ratings settings", () => {
         const ratingCalls = mockInvoke.mock.calls.filter(
           (call: unknown[]) =>
             call[0] === "update-organization-settings" &&
-            (call[1] as { body?: { rating_config?: unknown } })?.body
-              ?.rating_config,
+            (call[1] as { body?: { rating_config?: unknown } })?.body?.rating_config
         );
         expect(ratingCalls.length).toBeGreaterThanOrEqual(1);
         const lastRatingCall = ratingCalls[ratingCalls.length - 1] as [
@@ -269,8 +254,7 @@ describe("Ratings settings", () => {
         const ratingCalls = mockInvoke.mock.calls.filter(
           (call: unknown[]) =>
             call[0] === "update-organization-settings" &&
-            (call[1] as { body?: { rating_config?: unknown } })?.body
-              ?.rating_config,
+            (call[1] as { body?: { rating_config?: unknown } })?.body?.rating_config
         );
         expect(ratingCalls.length).toBeGreaterThanOrEqual(1);
         const lastRatingCall = ratingCalls[ratingCalls.length - 1] as [
@@ -281,13 +265,7 @@ describe("Ratings settings", () => {
           organization_id: "org-1",
           rating_config: {
             type: "rater",
-            dimensions: [
-              "reliability",
-              "assurance",
-              "tangibles",
-              "empathy",
-              "responsiveness",
-            ],
+            dimensions: ["reliability", "assurance", "tangibles", "empathy", "responsiveness"],
           },
         });
       });

@@ -9,17 +9,19 @@ import type { FieldConfig } from "@clean-log/shared/types";
 export const createMockWorker = (overrides?: Partial<Worker>): Worker => ({
   id: "worker-1",
   name: "John Doe",
+  first_name: "John",
+  last_name: "Doe",
   email: "john@example.com",
   phone: "1234567890",
+  address: null,
+  abn: null,
   auth_user_id: null,
   active: true,
   created_at: "2024-01-01T00:00:00Z",
   ...overrides,
 });
 
-export const createMockLocation = (
-  overrides?: Partial<Location>,
-): Location => ({
+export const createMockLocation = (overrides?: Partial<Location>): Location => ({
   id: "location-1",
   name: "Main Office",
   email: "office@example.com",
@@ -154,9 +156,7 @@ export const createMockFlaggedJob = (overrides?: Partial<Job>): Job => ({
   ...overrides,
 });
 
-export const createMockFieldConfig = (
-  overrides?: Partial<FieldConfig>,
-): FieldConfig => ({
+export const createMockFieldConfig = (overrides?: Partial<FieldConfig>): FieldConfig => ({
   id: "field-1",
   organization_id: "org-1",
   name: "test_field",
@@ -205,9 +205,7 @@ export const createMockPayment = (overrides?: Partial<Payment>): Payment => ({
   ...overrides,
 });
 
-export const createMockPaymentLink = (
-  overrides?: Partial<PaymentLink>,
-): PaymentLink => ({
+export const createMockPaymentLink = (overrides?: Partial<PaymentLink>): PaymentLink => ({
   id: "plink-1",
   organization_id: "org-1",
   invoice_id: "invoice-1",
@@ -226,7 +224,7 @@ export const createMockPaymentLink = (
 });
 
 export const createMockLocationHierarchyNode = (
-  overrides?: Partial<import("@/lib/types").LocationHierarchyNode>,
+  overrides?: Partial<import("@/lib/types").LocationHierarchyNode>
 ): import("@/lib/types").LocationHierarchyNode => ({
   id: "node-1",
   organization_id: "org-1",

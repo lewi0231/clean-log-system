@@ -1,6 +1,6 @@
 import { JobApprovalService } from "@/lib/services/job-approval.service";
 import { supabase } from "@/lib/supabase";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 import { createMockFlaggedJob, createMockJob, createMockPendingJob } from "../fixtures";
 import { EdgeFunctionError } from "@/lib/supabase/invoke-edge-function";
 
@@ -49,12 +49,9 @@ describe("JobApprovalService", () => {
 
       expect(result.success).toBe(true);
       expect(result.job_status).toBe("approved");
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "resolve-flagged-job",
-        {
-          body: { job_id: "job-1", action: "approve" },
-        }
-      );
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("resolve-flagged-job", {
+        body: { job_id: "job-1", action: "approve" },
+      });
     });
 
     it("should resolve flagged job with cancel action", async () => {
@@ -92,16 +89,13 @@ describe("JobApprovalService", () => {
         admin_notes: "Verified with worker directly",
       });
 
-      expect(supabase.functions.invoke).toHaveBeenCalledWith(
-        "resolve-flagged-job",
-        {
-          body: {
-            job_id: "job-1",
-            action: "approve",
-            admin_notes: "Verified with worker directly",
-          },
-        }
-      );
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("resolve-flagged-job", {
+        body: {
+          job_id: "job-1",
+          action: "approve",
+          admin_notes: "Verified with worker directly",
+        },
+      });
     });
 
     it("should throw error on failure", async () => {
@@ -135,10 +129,7 @@ describe("JobApprovalService", () => {
     });
 
     it("should return 0 when no flagged jobs", () => {
-      const jobs = [
-        createMockJob({ id: "job-1" }),
-        createMockPendingJob({ id: "job-2" }),
-      ];
+      const jobs = [createMockJob({ id: "job-1" }), createMockPendingJob({ id: "job-2" })];
 
       const count = JobApprovalService.getFlaggedJobsFromList(jobs);
 
@@ -167,10 +158,7 @@ describe("JobApprovalService", () => {
     });
 
     it("should return 0 when no pending jobs", () => {
-      const jobs = [
-        createMockJob({ id: "job-1" }),
-        createMockFlaggedJob({ id: "job-2" }),
-      ];
+      const jobs = [createMockJob({ id: "job-1" }), createMockFlaggedJob({ id: "job-2" })];
 
       const count = JobApprovalService.getPendingJobsFromList(jobs);
 
@@ -282,8 +270,7 @@ describe("JobApprovalService", () => {
     it("should return hours and minutes until window expires", () => {
       const editWindowExpiresAt = "2024-01-15T13:45:00Z"; // 1h 45m from now
 
-      const result =
-        JobApprovalService.getTimeUntilEditWindowExpires(editWindowExpiresAt);
+      const result = JobApprovalService.getTimeUntilEditWindowExpires(editWindowExpiresAt);
 
       expect(result).toEqual({ hours: 1, minutes: 45, expired: false });
     });
@@ -291,8 +278,7 @@ describe("JobApprovalService", () => {
     it("should return expired when window has passed", () => {
       const editWindowExpiresAt = "2024-01-15T11:00:00Z"; // 1 hour ago
 
-      const result =
-        JobApprovalService.getTimeUntilEditWindowExpires(editWindowExpiresAt);
+      const result = JobApprovalService.getTimeUntilEditWindowExpires(editWindowExpiresAt);
 
       expect(result).toEqual({ hours: 0, minutes: 0, expired: true });
     });

@@ -3,7 +3,7 @@ import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { useFieldPricingCardState } from "@/hooks/use-field-pricing-card-state";
 import type { FieldPricing, PricingCondition, PricingRule } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
@@ -57,25 +57,17 @@ vi.mock("@/components/pricing/location-overrides-matrix", () => ({
 
 vi.mock("@/components/pricing/conditional-rule-chips", () => ({
   ConditionalRuleChips: ({ conditions }: { conditions: Array<unknown> }) => (
-    <div data-testid="conditional-rule-chips">
-      {conditions.length} conditions
-    </div>
+    <div data-testid="conditional-rule-chips">{conditions.length} conditions</div>
   ),
 }));
 
 vi.mock("@/lib/utils", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/utils")>(
-    "@/lib/utils"
-  );
+  const actual = await vi.importActual<typeof import("@/lib/utils")>("@/lib/utils");
   return {
     ...actual,
     isPricingRulesEnabled: () => true,
   };
 });
-
-vi.mock("@/hooks/use-field-pricing-card-state", () => ({
-  useFieldPricingCardState: vi.fn(),
-}));
 
 vi.mock("@/hooks/use-field-pricing-card-state", () => ({
   useFieldPricingCardState: vi.fn(),
@@ -104,10 +96,7 @@ describe("FieldPricingCard", () => {
     updated_at: "2024-01-01T00:00:00Z",
   };
 
-  const createMockPricing = (
-    price: number,
-    workerPayment: number | null = null
-  ): FieldPricing => ({
+  const createMockPricing = (price: number, workerPayment: number | null = null): FieldPricing => ({
     id: "pricing-1",
     organization_id: "org-1",
     field_config_id: "field-1",
@@ -225,11 +214,12 @@ describe("FieldPricingCard", () => {
     expect(screen.getByText("Hours of service")).toBeInTheDocument();
   });
 
-  it("should display equation preview for number field", () => {
+  it("should show live formula preview for number field (prompt when customer price empty)", () => {
     render(<FieldPricingCard {...defaultProps} />);
 
+    expect(screen.getByText("Formula Preview")).toBeInTheDocument();
     expect(
-      screen.getByText(/Total = price_per_unit × quantity/)
+      screen.getByText(/Enter a customer price to see the formula preview/)
     ).toBeInTheDocument();
   });
 
@@ -238,13 +228,9 @@ describe("FieldPricingCard", () => {
       ...mockFieldConfig,
       field_type: "boolean" as const,
     };
-    render(
-      <FieldPricingCard {...defaultProps} fieldConfig={booleanFieldConfig} />
-    );
+    render(<FieldPricingCard {...defaultProps} fieldConfig={booleanFieldConfig} />);
 
-    expect(
-      screen.getByText(/Total = base_price \(when field is true\)/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Total = base_price \(when field is true\)/)).toBeInTheDocument();
   });
 
   describe("showBothContexts mode", () => {
@@ -288,9 +274,13 @@ describe("FieldPricingCard", () => {
       );
 
       expect(screen.getByText(/Customer:/)).toBeInTheDocument();
-      expect(screen.getByText("$100.00")).toBeInTheDocument();
       expect(screen.getByText(/Worker:/)).toBeInTheDocument();
-      expect(screen.getByText("$50.00")).toBeInTheDocument();
+      // Header shows customer/worker prices; FormulaPreview also repeats those amounts in the
+      // live line (and margin), so scope to the summary row spans to avoid duplicate matches.
+      const customerSummary = screen.getByText(/Customer:/).parentElement!;
+      const workerSummary = screen.getByText(/Worker:/).parentElement!;
+      expect(within(customerSummary).getByText("$100.00")).toBeInTheDocument();
+      expect(within(workerSummary).getByText("$50.00")).toBeInTheDocument();
     });
 
     it("should display 'No prices set' when neither price is set", () => {
@@ -352,11 +342,7 @@ describe("FieldPricingCard", () => {
 
       const pricing = createMockPricing(100);
       render(
-        <FieldPricingCard
-          {...defaultProps}
-          scopedPricing={pricing}
-          currentCustomerPrice="100"
-        />
+        <FieldPricingCard {...defaultProps} scopedPricing={pricing} currentCustomerPrice="100" />
       );
 
       expect(screen.getByText("$100.00")).toBeInTheDocument();
@@ -386,11 +372,7 @@ describe("FieldPricingCard", () => {
 
       const pricing = createMockPricing(100, 50);
       render(
-        <FieldPricingCard
-          {...defaultProps}
-          scopedPricing={pricing}
-          currentWorkerPrice="50"
-        />
+        <FieldPricingCard {...defaultProps} scopedPricing={pricing} currentWorkerPrice="50" />
       );
 
       expect(screen.getByText("$50.00")).toBeInTheDocument();
@@ -418,12 +400,7 @@ describe("FieldPricingCard", () => {
         fieldLabelLookup: { "field-1": "Service Hours" },
       });
 
-      render(
-        <FieldPricingCard
-          {...defaultProps}
-          scopedPricing={null}
-        />
-      );
+      render(<FieldPricingCard {...defaultProps} scopedPricing={null} />);
 
       expect(screen.getByText("No price set")).toBeInTheDocument();
     });
@@ -439,18 +416,12 @@ describe("FieldPricingCard", () => {
     });
 
     it("should call onExpandedChange when toggled", async () => {
-      render(
-        <FieldPricingCard
-          {...defaultProps}
-        />
-      );
+      render(<FieldPricingCard {...defaultProps} />);
 
       // Find any button (the collapsible trigger should be one of them)
       const buttons = screen.getAllByRole("button");
       const trigger = buttons.find(
-        (btn) =>
-          btn.getAttribute("aria-expanded") === "true" ||
-          btn.getAttribute("aria-controls")
+        (btn) => btn.getAttribute("aria-expanded") === "true" || btn.getAttribute("aria-controls")
       );
 
       if (trigger) {
@@ -474,13 +445,7 @@ describe("FieldPricingCard", () => {
     });
 
     it("should be enabled when changes are made and price is valid", () => {
-      render(
-        <FieldPricingCard
-          {...defaultProps}
-          hasChanges={true}
-          currentCustomerPrice="100"
-        />
-      );
+      render(<FieldPricingCard {...defaultProps} hasChanges={true} currentCustomerPrice="100" />);
 
       const saveButton = screen.getByRole("button", { name: /save|update/i });
       expect(saveButton).not.toBeDisabled();
@@ -497,26 +462,16 @@ describe("FieldPricingCard", () => {
         setIsDeleting: vi.fn(),
       });
 
-      render(
-        <FieldPricingCard {...defaultProps} hasChanges={true} />
-      );
+      render(<FieldPricingCard {...defaultProps} hasChanges={true} />);
 
       const saveButton = screen.getByRole("button", { name: /saving/i });
       expect(saveButton).toBeDisabled();
     });
 
     it("should display 'Update' when hasScopedValue is true", () => {
-      render(
-        <FieldPricingCard
-          {...defaultProps}
-          hasChanges={true}
-          hasScopedValue={true}
-        />
-      );
+      render(<FieldPricingCard {...defaultProps} hasChanges={true} hasScopedValue={true} />);
 
-      expect(
-        screen.getByRole("button", { name: /update/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /update/i })).toBeInTheDocument();
     });
 
     it("should call onSave when save button is clicked", () => {
@@ -555,9 +510,7 @@ describe("FieldPricingCard", () => {
         />
       );
 
-      expect(
-        screen.queryByTestId("location-overrides-matrix")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("location-overrides-matrix")).not.toBeInTheDocument();
     });
 
     it("should display location overrides when no location is selected", () => {
@@ -578,9 +531,7 @@ describe("FieldPricingCard", () => {
         />
       );
 
-      expect(
-        screen.getByTestId("location-overrides-matrix")
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("location-overrides-matrix")).toBeInTheDocument();
       expect(screen.getByTestId("override-override-1")).toBeInTheDocument();
     });
 
@@ -629,13 +580,27 @@ describe("FieldPricingCard", () => {
         },
       ];
 
-      render(
-        <FieldPricingCard
-          {...defaultProps}
-          conditions={conditions}
-          fieldLabelLookup={{ "field-2": "Quantity" }}
-        />
-      );
+      vi.mocked(usePricingScope).mockReturnValue({
+        selectedFieldId: null,
+        setSelectedFieldId: vi.fn(),
+        locationNodeId: null,
+        setLocationNodeId: vi.fn(),
+        locationId: null,
+        setLocationId: vi.fn(),
+        effectiveDate: null,
+        setEffectiveDate: vi.fn(),
+        expirationDate: null,
+        setExpirationDate: vi.fn(),
+        pricingHistoryRefreshToken: 0,
+        refreshPricingHistory: vi.fn(),
+        pricingContext: "customer",
+        setPricingContext: vi.fn(),
+        showBothContexts: false,
+        setShowBothContexts: vi.fn(),
+        fieldLabelLookup: { "field-1": "Service Hours", "field-2": "Quantity" },
+      });
+
+      render(<FieldPricingCard {...defaultProps} conditions={conditions} />);
 
       expect(screen.getByTestId("conditional-rule-chips")).toBeInTheDocument();
       expect(screen.getByText("1 conditions")).toBeInTheDocument();
@@ -644,9 +609,7 @@ describe("FieldPricingCard", () => {
     it("should not display conditional rule chips when no conditions exist", () => {
       render(<FieldPricingCard {...defaultProps} conditions={[]} />);
 
-      expect(
-        screen.queryByTestId("conditional-rule-chips")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("conditional-rule-chips")).not.toBeInTheDocument();
     });
   });
 

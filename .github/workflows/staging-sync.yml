@@ -1,0 +1,124 @@
+# When main moves ahead of staging, open (or refresh) a PR from main → staging
+# so staging stays aligned. Commit-based detection (same idea as SCAINET).
+
+name: Sync staging with main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-staging:
+    name: Sync staging branch with main
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Check if staging needs sync
+        id: check
+        run: |
+          git fetch origin staging main
+
+          AHEAD_COUNT=$(git rev-list --count origin/staging..origin/main)
+          echo "ahead_count=$AHEAD_COUNT" >> $GITHUB_OUTPUT
+
+          if [ "$AHEAD_COUNT" -eq "0" ]; then
+            echo "needs_sync=false" >> $GITHUB_OUTPUT
+            echo "staging is already up to date with main"
+          else
+            echo "needs_sync=true" >> $GITHUB_OUTPUT
+            echo "main is $AHEAD_COUNT commit(s) ahead of staging"
+            COMMIT_LOG=$(git log --oneline origin/staging..origin/main | head -20)
+            {
+              echo "COMMIT_LOG<<EOF"
+              echo "$COMMIT_LOG"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Check for existing sync PR
+        if: steps.check.outputs.needs_sync == 'true'
+        id: existing_pr
+        run: |
+          EXISTING=$(gh pr list \
+            --base staging \
+            --head main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING" >> $GITHUB_OUTPUT
+            echo "open sync PR already exists (#$EXISTING)"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create sync PR
+        if: steps.check.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'false'
+        run: |
+          AHEAD_COUNT=${{ steps.check.outputs.ahead_count }}
+
+          gh pr create \
+            --base staging \
+            --head main \
+            --title "Sync staging with main ($AHEAD_COUNT commit(s))" \
+            --body "$(cat <<EOF
+          ## Auto-sync: main → staging
+
+          \`main\` is **$AHEAD_COUNT commit(s) ahead** of \`staging\`.
+
+          ### Commits
+          \`\`\`
+          $COMMIT_LOG
+          \`\`\`
+
+          Merge after review when you want staging to match production history.
+
+          ---
+          *Workflow: \`.github/workflows/staging-sync.yml\`*
+          EOF
+          )"
+
+          PR_URL=$(gh pr list --base staging --head main --state open --json url --jq '.[0].url')
+          PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$' || true)
+
+          if [ -n "$PR_NUM" ]; then
+            if gh pr merge "$PR_NUM" --auto --merge 2>&1; then
+              echo "auto-merge enrolled on sync PR #$PR_NUM"
+            elif gh pr merge "$PR_NUM" --merge 2>&1; then
+              echo "sync PR #$PR_NUM merged immediately (already mergeable)"
+            else
+              echo "sync PR created; merge manually if auto-merge is unavailable"
+            fi
+          fi
+
+      - name: Update existing sync PR
+        if: steps.check.outputs.needs_sync == 'true' && steps.existing_pr.outputs.exists == 'true'
+        run: |
+          PR_NUM=${{ steps.existing_pr.outputs.pr_number }}
+          AHEAD_COUNT=${{ steps.check.outputs.ahead_count }}
+
+          gh pr comment "$PR_NUM" \
+            --body "**Updated:** \`main\` is **$AHEAD_COUNT commit(s) ahead** of \`staging\`."
+
+          if gh pr merge "$PR_NUM" --auto --merge 2>&1; then
+            echo "auto-merge re-confirmed on sync PR #$PR_NUM"
+          elif gh pr merge "$PR_NUM" --merge 2>&1; then
+            echo "sync PR #$PR_NUM merged immediately"
+          else
+            echo "commented PR #$PR_NUM; manual merge may be required"
+          fi

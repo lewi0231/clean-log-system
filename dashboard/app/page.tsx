@@ -1,21 +1,19 @@
 import {
-    FAQSection,
-    FeaturesSection,
-    FinalCTASection,
-    Footer,
-    HeroSection,
-    IndustrySections,
-    MobileAppSection,
-    NavigationHeader,
-    PricingSection,
-    SocialProofSection,
-    WorkflowSection,
+  FAQSection,
+  FeaturesSection,
+  FinalCTASection,
+  Footer,
+  HeroSection,
+  IndustrySections,
+  MobileAppSection,
+  PricingSection,
+  SocialProofSection,
+  WorkflowSection,
 } from "@/components/landing-page";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <NavigationHeader />
+    <div className="flex min-h-screen flex-col pt-16">
       <main>
         <HeroSection />
         <WorkflowSection />

@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { log } from "@/lib/logger";
+import type { InvoiceWithJobs } from "@/lib/types";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-import type { InvoiceWithJobs } from "@/lib/types";
 import { AlertCircle, CheckCircle2, CreditCard, Download, Loader2 } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -107,39 +107,55 @@ function InvoicePageContent() {
 
         const data = await invokeEdgeFunction<{
           success?: boolean;
-          invoice?: Record<string, unknown>;
-          calculation?: unknown;
-          template_config?: unknown;
-          hierarchy_metadata?: unknown;
+          /** Row may include JSON/extra keys (e.g. calculation) not modeled on InvoiceWithJobs */
+          invoice?: InvoiceWithJobs & { calculation?: unknown };
+          calculation?: CalculateInvoiceResponse["calculation"];
+          template_config?: InvoiceData["template_config"];
+          hierarchy_metadata?: InvoiceData["hierarchy_metadata"];
           organization?: Record<string, unknown>;
         }>("get-invoice-public", { invoice_id: invoiceId });
 
-        if (!data?.success || !data.invoice) {
+        if (!data?.success || !data.invoice || data.calculation == null) {
           throw new Error("Invoice not found");
         }
 
+        const invoicePayload = data.invoice as InvoiceWithJobs & { calculation?: unknown };
+        const { calculation: _unusedInvoiceCalculation, ...invoiceRow } = invoicePayload;
+
+        const calculation: InvoiceData["calculation"] = data.calculation;
+
         setInvoice({
-          ...data.invoice,
-          calculation: data.calculation,
-          template_config: data.template_config,
-          hierarchy_metadata: data.hierarchy_metadata,
+          ...invoiceRow,
+          calculation,
+          template_config: (data.template_config ?? null) as InvoiceData["template_config"],
+          hierarchy_metadata: data.hierarchy_metadata as
+            | InvoiceData["hierarchy_metadata"]
+            | undefined,
         });
 
-        // Build orgInfo from organization (flattened with org_settings from get-invoice-public)
         const org = data.organization;
+        const strField = (k: string): string | null => {
+          const v = org?.[k];
+          return typeof v === "string" ? v : null;
+        };
+
         setOrgInfo({
-          name: org?.name ?? "Company",
-          abn: org?.abn ?? null,
-          logo_url: org?.logo_url ?? null,
-          business_address: org?.business_address ?? null,
-          primary_contact_email: org?.primary_contact_email ?? null,
-          primary_contact_phone: org?.primary_contact_phone ?? null,
-          default_invoice_due_days: org?.default_invoice_due_days ?? 30,
-          show_bank_transfer_on_invoices: org?.show_bank_transfer_on_invoices ?? true,
-          bank_transfer_bsb: org?.bank_transfer_bsb ?? null,
-          bank_transfer_account_number: org?.bank_transfer_account_number ?? null,
-          bank_transfer_account_name: org?.bank_transfer_account_name ?? null,
-          stripe_account_id: org?.stripe_account_id ?? null,
+          name: typeof org?.name === "string" ? org.name : "Company",
+          abn: strField("abn"),
+          logo_url: strField("logo_url"),
+          business_address: strField("business_address"),
+          primary_contact_email: strField("primary_contact_email"),
+          primary_contact_phone: strField("primary_contact_phone"),
+          default_invoice_due_days:
+            typeof org?.default_invoice_due_days === "number" ? org.default_invoice_due_days : 30,
+          show_bank_transfer_on_invoices:
+            typeof org?.show_bank_transfer_on_invoices === "boolean"
+              ? org.show_bank_transfer_on_invoices
+              : true,
+          bank_transfer_bsb: strField("bank_transfer_bsb"),
+          bank_transfer_account_number: strField("bank_transfer_account_number"),
+          bank_transfer_account_name: strField("bank_transfer_account_name"),
+          stripe_account_id: strField("stripe_account_id"),
         });
       } catch (err) {
         const message =

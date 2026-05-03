@@ -2500,6 +2500,10 @@ CREATE INDEX "idx_worker_payment_org" ON "public"."worker_payment" USING "btree"
 
 
 
+CREATE INDEX "idx_worker_payment_org_job" ON "public"."worker_payment" USING "btree" ("organization_id", "job_id");
+
+
+
 CREATE INDEX "idx_worker_payment_org_status" ON "public"."worker_payment" USING "btree" ("organization_id", "status", "created_at" DESC);
 
 

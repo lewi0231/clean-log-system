@@ -1,0 +1,454 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Next build + Vitest import graph evaluate Supabase client; real values come from hosting secrets.
+  NEXT_PUBLIC_SUPABASE_URL: https://ci-build-placeholder.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder-anon-key
+  # mobile-app (Expo) reads EXPO_PUBLIC_* in lib/supabase.ts
+  EXPO_PUBLIC_SUPABASE_URL: https://ci-build-placeholder.supabase.co
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: ci-build-placeholder-anon-key
+
+jobs:
+  lint-and-build:
+    name: Lint, type-check, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Prettier check (changed files — PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          FILES=$(git diff --name-only --diff-filter=d ${{ github.event.pull_request.base.sha }} ${{ github.sha }} \
+            | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
+          if [ -z "$FILES" ]; then
+            echo "No matching files changed"
+            exit 0
+          fi
+          echo "$FILES" | xargs pnpm exec prettier --check
+
+      - name: Prettier check (changed files — push)
+        if: github.event_name == 'push'
+        run: |
+          FILES=$(git diff --name-only --diff-filter=d HEAD~1 HEAD 2>/dev/null \
+            | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
+          if [ -z "$FILES" ]; then
+            echo "No matching files changed in this commit"
+            exit 0
+          fi
+          echo "$FILES" | xargs pnpm exec prettier --check
+
+      - name: Prettier check (manual run)
+        if: github.event_name == 'workflow_dispatch'
+        run: pnpm format:check
+
+      - name: ESLint (workspace)
+        run: pnpm lint
+
+      - name: Deno lint (Supabase edge functions)
+        run: pnpm lint:edge-functions
+        continue-on-error: true # TODO: Remove once edge function imports are fixed
+
+      - name: TypeScript (packages that define typecheck)
+        run: pnpm typecheck
+
+      # Dashboard is only deployed to Vercel from `main` (no preview/staging deploy for cost).
+      # Still run the Next build on PRs targeting `main` so broken builds are caught before merge.
+      - name: Build dashboard (Next.js)
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+        run: pnpm build:dashboard
+
+  unit-tests:
+    name: Unit tests (Vitest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: Dashboard tests (with coverage + JUnit)
+        working-directory: dashboard
+        run: |
+          pnpm exec vitest run \
+            --coverage \
+            --reporter=default \
+            --reporter=junit \
+            --outputFile=junit.xml
+
+      - name: Mobile app tests
+        working-directory: mobile-app
+        run: pnpm exec vitest run --reporter=default --reporter=junit --outputFile=junit.xml
+
+      - name: Upload dashboard test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dashboard-test-results
+          path: |
+            dashboard/junit.xml
+            dashboard/coverage/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload mobile-app test results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: mobile-app-test-results
+          path: mobile-app/junit.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  security-scan:
+    name: Security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: pnpm audit (high or critical)
+        run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+  e2e-tests:
+    name: E2E tests (Playwright + Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Disabled: no staging/preview Vercel deploy for now — re-enable when a live non-prod URL is available
+    # or when running E2E against CI-built localhost only (no deploy dependency).
+    if: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Setup pnpm monorepo
+        uses: ./.github/actions/setup-pnpm-monorepo
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        working-directory: database
+        run: |
+          supabase start
+          sleep 10
+          supabase status
+
+      - name: Get Supabase credentials
+        id: supabase
+        working-directory: database
+        run: |
+          echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API.URL')" >> $GITHUB_OUTPUT
+          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.API.anon_key')" >> $GITHUB_OUTPUT
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.API.service_role_key')" >> $GITHUB_OUTPUT
+
+      - name: Build dashboard for E2E
+        working-directory: dashboard
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
+        run: pnpm run build
+
+      - name: Run E2E tests
+        env:
+          E2E_BASE_URL: http://localhost:3000
+          SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Start the production server in background
+          cd dashboard && pnpm start &
+          sleep 5
+          # Run E2E tests
+          pnpm test:e2e --project=scenario-1
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop Supabase
+        if: always()
+        working-directory: database
+        run: supabase stop
+
+  # Merge after CI passes for PRs targeting `staging`.
+  # We do this inside CI instead of a separate workflow_run workflow because:
+  # - workflow_run only uses the workflow file from the default branch, so fixes on
+  #   feature branches do not apply until merged to default.
+  # - Resolving the PR from workflow_run.head_sha via the commits API is unreliable.
+  auto-merge-staging-pr:
+    name: Auto-merge (PR → staging)
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests, security-scan]
+    if: >
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'staging' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Queue or perform squash merge
+        run: |
+          PR_NUM=${{ github.event.pull_request.number }}
+          STATE=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json state --jq '.state')
+          if [ "$STATE" != "OPEN" ]; then
+            echo "PR #$PR_NUM is $STATE — nothing to merge"
+            exit 0
+          fi
+          if gh pr merge "$PR_NUM" --auto --squash --repo "${{ github.repository }}" 2>&1; then
+            echo "Auto-merge queued for PR #$PR_NUM (merges when required checks pass)"
+          elif gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
+            echo "Merged PR #$PR_NUM immediately (--auto unavailable or not needed)"
+          else
+            echo "::error::Could not merge PR #$PR_NUM — verify repo Settings → General → Allow auto-merge,"
+            echo "::error::branch protection (required checks, review rules), and that squash merge is enabled."
+            exit 1
+          fi
+
+  # When staging moves forward (e.g. after a PR merge), open or refresh staging → main.
+  # Implemented here instead of workflow_run so the logic runs from the branch that was
+  # pushed and does not depend on the completing workflow metadata (event/head_branch).
+  promote-staging-to-main:
+    name: Staging → main (promotion PR)
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Deep checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Check for existing promotion PR
+        id: existing_pr
+        run: |
+          EXISTING=$(gh pr list \
+            --base main \
+            --head staging \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING" >> $GITHUB_OUTPUT
+            echo "open promotion PR #$EXISTING exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Gather diff (main..staging)
+        id: details
+        if: steps.existing_pr.outputs.exists == 'false'
+        run: |
+          git fetch origin main staging
+
+          FILE_COUNT=$(git diff --name-only origin/main..origin/staging | wc -l | tr -d ' ')
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+          if [ "$FILE_COUNT" -eq "0" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "staging and main are aligned"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            CHANGED_FILES=$(git diff --name-only origin/main..origin/staging | head -40)
+            {
+              echo "CHANGED_FILES<<EOF"
+              echo "$CHANGED_FILES"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+
+            DIFF_SUMMARY=$(git diff --stat origin/main..origin/staging | tail -1)
+            {
+              echo "DIFF_SUMMARY<<EOF2"
+              echo "$DIFF_SUMMARY"
+              echo "EOF2"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Create promotion PR
+        id: create_pr
+        if: steps.existing_pr.outputs.exists == 'false' && steps.details.outputs.has_changes == 'true'
+        run: |
+          FILE_COUNT=${{ steps.details.outputs.file_count }}
+          CI_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          PR_URL=$(gh pr create \
+            --base main \
+            --head staging \
+            --title "Staging → main ($FILE_COUNT files)" \
+            --body "$(cat <<EOF
+          ## Promotion to main
+
+          **CI succeeded** on staging: [workflow run]($CI_RUN_URL)
+
+          **Scope:** ~$FILE_COUNT file(s).
+
+          ### Files (first segment)
+          \`\`\`
+          $CHANGED_FILES
+          \`\`\`
+
+          ### Stat
+          $DIFF_SUMMARY
+
+          ---
+          *Job: \`promote-staging-to-main\` in \`.github/workflows/ci.yml\`*
+          EOF
+          )")
+
+          echo "promotion PR: $PR_URL"
+          PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge on new promotion PR (--merge)
+        if: steps.existing_pr.outputs.exists == 'false' && steps.details.outputs.has_changes == 'true'
+        run: |
+          PR_NUM=${{ steps.create_pr.outputs.pr_number }}
+          if gh pr merge "$PR_NUM" --auto --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "auto-merge enabled on PR #$PR_NUM"
+          elif gh pr merge "$PR_NUM" --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "merged PR #$PR_NUM immediately"
+          else
+            echo "PR created — enable Allow auto-merge or adjust branch protection if merge failed"
+          fi
+
+      - name: Re-enable auto-merge on existing promotion PR
+        if: steps.existing_pr.outputs.exists == 'true'
+        run: |
+          PR_NUM=${{ steps.existing_pr.outputs.pr_number }}
+          if gh pr merge "$PR_NUM" --auto --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "auto-merge on PR #$PR_NUM"
+          elif gh pr merge "$PR_NUM" --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "merged PR #$PR_NUM immediately"
+          else
+            echo "could not change merge state on PR #$PR_NUM"
+          fi
+
+      - name: Comment on existing promotion PR
+        if: steps.existing_pr.outputs.exists == 'true'
+        run: |
+          PR_NUM=${{ steps.existing_pr.outputs.pr_number }}
+          CI_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh pr comment "$PR_NUM" --repo "${{ github.repository }}" \
+            --body "**CI passed again on staging:** [workflow run]($CI_RUN_URL)."
+
+  notify-failure:
+    name: Notify build failure
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests, security-scan]
+    if: failure()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Post commit comment
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        with:
+          script: |
+            const jobResults = {
+              'lint-and-build': '${{ needs.lint-and-build.result }}',
+              'unit-tests': '${{ needs.unit-tests.result }}',
+              'security-scan': '${{ needs.security-scan.result }}',
+            };
+            const failed = Object.entries(jobResults)
+              .filter(([, r]) => r === 'failure')
+              .map(([job]) => job);
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.run_id }}`;
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+            const commitMsg =
+              (context.payload.head_commit?.message || '').split(/\r?\n/).shift() ||
+              '(no message)';
+            const branch = '${{ github.ref_name }}';
+            const codeBlock = [
+              '```bash',
+              'pnpm install',
+              'pnpm lint && pnpm lint:edge-functions',
+              'pnpm typecheck && pnpm build:dashboard',
+              'pnpm --filter @clean-log/dashboard exec vitest run',
+              'pnpm --filter @clean-log/mobile-app exec vitest run',
+              '```',
+            ].join('\n');
+            const body = [
+              '## CI failed',
+              '',
+              `- **Branch:** \`${branch}\``,
+              `- **Commit:** [${context.sha.substring(0, 7)}](${commitUrl})`,
+              `- **Message:** ${commitMsg}`,
+              '',
+              '### Failed jobs',
+              ...failed.map((j) => `- ${j}`),
+              '',
+              `[Workflow run](${runUrl})`,
+              '',
+              '### Local verification',
+              codeBlock,
+            ].join('\n');
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body,
+            });

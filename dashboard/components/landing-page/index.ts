@@ -7,5 +7,4 @@ export { MobileAppSection } from "./mobile-app-section";
 export { IndustrySections } from "./industry-sections";
 export { FAQSection } from "./faq-section";
 export { FinalCTASection } from "./final-cta-section";
-export { NavigationHeader } from "./navigation-header";
 export { Footer } from "./footer";

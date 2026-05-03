@@ -51,9 +51,7 @@ function createWrapper() {
   return Wrapper;
 }
 
-const createMockSection = (
-  overrides?: Partial<FormSectionWithFields>
-): FormSectionWithFields => ({
+const createMockSection = (overrides?: Partial<FormSectionWithFields>): FormSectionWithFields => ({
   id: "section-1",
   organization_id: "org-1",
   title: "Test Section",
@@ -79,9 +77,7 @@ describe("SectionEditor", () => {
   });
 
   it("should render sections with field counts", () => {
-    const sections = [
-      createMockSection({ id: "section-1", field_ids: ["field-1", "field-2"] }),
-    ];
+    const sections = [createMockSection({ id: "section-1", field_ids: ["field-1", "field-2"] })];
     const fields = [
       createMockFieldConfig({ id: "field-1", label: "Field 1" }),
       createMockFieldConfig({ id: "field-2", label: "Field 2" }),
@@ -89,6 +85,7 @@ describe("SectionEditor", () => {
 
     render(
       <SectionEditor
+        organizationId="org-1"
         sections={sections}
         fields={fields}
         onAddSection={mockOnAddSection}
@@ -104,15 +101,12 @@ describe("SectionEditor", () => {
   });
 
   it("should display fields within sections when expanded", () => {
-    const sections = [
-      createMockSection({ id: "section-1", field_ids: ["field-1"] }),
-    ];
-    const fields = [
-      createMockFieldConfig({ id: "field-1", label: "Test Field" }),
-    ];
+    const sections = [createMockSection({ id: "section-1", field_ids: ["field-1"] })];
+    const fields = [createMockFieldConfig({ id: "field-1", label: "Test Field" })];
 
     render(
       <SectionEditor
+        organizationId="org-1"
         sections={sections}
         fields={fields}
         onAddSection={mockOnAddSection}
@@ -128,15 +122,12 @@ describe("SectionEditor", () => {
   });
 
   it("should call onRemoveFieldFromSection when remove button is clicked", async () => {
-    const sections = [
-      createMockSection({ id: "section-1", field_ids: ["field-1"] }),
-    ];
-    const fields = [
-      createMockFieldConfig({ id: "field-1", label: "Test Field" }),
-    ];
+    const sections = [createMockSection({ id: "section-1", field_ids: ["field-1"] })];
+    const fields = [createMockFieldConfig({ id: "field-1", label: "Test Field" })];
 
     render(
       <SectionEditor
+        organizationId="org-1"
         sections={sections}
         fields={fields}
         onAddSection={mockOnAddSection}
@@ -185,6 +176,7 @@ describe("SectionEditor", () => {
 
     render(
       <SectionEditor
+        organizationId="org-1"
         sections={sections}
         fields={fields}
         onAddSection={mockOnAddSection}
@@ -197,22 +189,18 @@ describe("SectionEditor", () => {
       { wrapper: createWrapper() }
     );
 
-    const dropZone = screen.getByText(
-      "Drag fields here to add to this section"
-    );
+    const dropZone = screen.getByText("Drag fields here to add to this section");
 
     fireEvent.dragOver(dropZone, { preventDefault: vi.fn() });
     fireEvent.drop(dropZone, { preventDefault: vi.fn() });
 
-    expect(mockOnDropFieldToSection).toHaveBeenCalledWith(
-      "section-1",
-      "field-1"
-    );
+    expect(mockOnDropFieldToSection).toHaveBeenCalledWith("section-1", "field-1");
   });
 
   it("should show empty state when no sections exist", () => {
     render(
       <SectionEditor
+        organizationId="org-1"
         sections={[]}
         fields={[]}
         onAddSection={mockOnAddSection}
@@ -227,9 +215,7 @@ describe("SectionEditor", () => {
   });
 
   it("shows mutually exclusive metadata for section fields", () => {
-    const sections = [
-      createMockSection({ id: "section-1", field_ids: ["field-1"] }),
-    ];
+    const sections = [createMockSection({ id: "section-1", field_ids: ["field-1"] })];
     const fields = [
       createMockFieldConfig({
         id: "field-1",
@@ -241,6 +227,7 @@ describe("SectionEditor", () => {
 
     render(
       <SectionEditor
+        organizationId="org-1"
         sections={sections}
         fields={fields}
         onAddSection={mockOnAddSection}

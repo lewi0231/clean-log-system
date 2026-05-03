@@ -1,5 +1,6 @@
 "use client";
 
+import type { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +15,10 @@ import { Separator } from "@/components/ui/separator";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
-import type { FieldConfig } from "@clean-log/shared/types";
+import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
+import type { SaveWorkerPaymentResult } from "@/lib/services/worker-payment.service";
+import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
+
 import { log } from "@/lib/logger";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
 import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
@@ -65,9 +69,9 @@ export default function JobDetailDialog({
 }: JobDetailDialogProps) {
   const { fieldConfigs, sections } = useMobileConfig(organizationId);
   const { calculatePayments } = useWorkerPayments();
+  const { addPayment } = useWorkerPaymentHistory(jobs);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isCalculatePaymentDialogOpen, setIsCalculatePaymentDialogOpen] =
-    useState(false);
+  const [isCalculatePaymentDialogOpen, setIsCalculatePaymentDialogOpen] = useState(false);
   const [editHistory, setEditHistory] = useState<JobEdit[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sendingFeedback, setSendingFeedback] = useState(false);
@@ -187,9 +191,7 @@ export default function JobDetailDialog({
     });
 
     // Sort sections by order_position
-    const sortedSections = [...sections].sort(
-      (a, b) => a.order_position - b.order_position
-    );
+    const sortedSections = [...sections].sort((a, b) => a.order_position - b.order_position);
 
     // Process fields in section order
     sortedSections.forEach((section) => {
@@ -198,9 +200,7 @@ export default function JobDetailDialog({
         if (
           fieldConfig &&
           submissionDataKeys.includes(fieldConfig.name) &&
-          !STANDARD_FIELDS.includes(
-            fieldConfig.name as (typeof STANDARD_FIELDS)[number]
-          )
+          !STANDARD_FIELDS.includes(fieldConfig.name as (typeof STANDARD_FIELDS)[number])
         ) {
           sectioned.push(fieldConfig.name);
         }
@@ -253,10 +253,7 @@ export default function JobDetailDialog({
     }
   };
 
-  const formatValue = (
-    value: unknown,
-    fieldName?: string
-  ): string | React.ReactNode => {
+  const formatValue = (value: unknown, fieldName?: string): string | React.ReactNode => {
     if (value === null || value === undefined) {
       return <span className="text-muted-foreground italic">Not provided</span>;
     }
@@ -304,13 +301,9 @@ export default function JobDetailDialog({
                 },
                 idx: number
               ) => {
-                const workerName =
-                  workerNameMap.get(item.worker_id) || "Unknown Worker";
+                const workerName = workerNameMap.get(item.worker_id) || "Unknown Worker";
                 return (
-                  <div
-                    key={idx}
-                    className="text-sm border-l-2 border-muted pl-2"
-                  >
+                  <div key={idx} className="text-sm border-l-2 border-muted pl-2">
                     <div className="font-medium">{workerName}</div>
                     {item.start_time && (
                       <div className="text-muted-foreground">
@@ -334,30 +327,22 @@ export default function JobDetailDialog({
       if (
         value.every(
           (item) =>
-            typeof item === "object" &&
-            item !== null &&
-            "brand" in item &&
-            "quantity" in item
+            typeof item === "object" && item !== null && "brand" in item && "quantity" in item
         )
       ) {
         return (
           <div className="space-y-1">
-            {value.map(
-              (item: { brand: string; quantity: number }, idx: number) => (
-                <div key={idx} className="text-sm">
-                  <span className="font-medium">{item.brand}:</span>{" "}
-                  {item.quantity}
-                </div>
-              )
-            )}
+            {value.map((item: { brand: string; quantity: number }, idx: number) => (
+              <div key={idx} className="text-sm">
+                <span className="font-medium">{item.brand}:</span> {item.quantity}
+              </div>
+            ))}
           </div>
         );
       }
       return value.map((item, idx) => (
         <div key={idx} className="text-sm">
-          {typeof item === "object" && item !== null
-            ? JSON.stringify(item, null, 2)
-            : String(item)}
+          {typeof item === "object" && item !== null ? JSON.stringify(item, null, 2) : String(item)}
         </div>
       ));
     }
@@ -461,8 +446,7 @@ export default function JobDetailDialog({
                         try {
                           await sendFeedbackEmail(job.id);
                           toast.success("Feedback email sent successfully", {
-                            description:
-                              "The feedback request has been emailed to the customer.",
+                            description: "The feedback request has been emailed to the customer.",
                           });
                           onEditSuccess?.();
                         } catch (err) {
@@ -471,10 +455,7 @@ export default function JobDetailDialog({
                             jobId: job.id,
                           });
                           toast.error("Failed to send feedback email", {
-                            description:
-                              err instanceof Error
-                                ? err.message
-                                : "Please try again.",
+                            description: err instanceof Error ? err.message : "Please try again.",
                           });
                         } finally {
                           setSendingFeedback(false);
@@ -511,8 +492,8 @@ export default function JobDetailDialog({
                       This job is included in an invoice
                     </h4>
                     <p className="text-sm text-warning/80">
-                      Invoice <strong>{invoiceInfo.invoice_number}</strong>{" "}
-                      (Status: {invoiceInfo.status})
+                      Invoice <strong>{invoiceInfo.invoice_number}</strong> (Status:{" "}
+                      {invoiceInfo.status})
                     </p>
                   </div>
                 </div>
@@ -532,9 +513,7 @@ export default function JobDetailDialog({
                     {job.location ? (
                       job.location.name
                     ) : (
-                      <span className="text-muted-foreground italic">
-                        Not specified
-                      </span>
+                      <span className="text-muted-foreground italic">Not specified</span>
                     )}
                   </div>
                 </div>
@@ -552,9 +531,7 @@ export default function JobDetailDialog({
                         ))}
                       </div>
                     ) : (
-                      <span className="text-muted-foreground italic">
-                        No workers assigned
-                      </span>
+                      <span className="text-muted-foreground italic">No workers assigned</span>
                     )}
                   </div>
                 </div>
@@ -564,9 +541,7 @@ export default function JobDetailDialog({
                     <Calendar className="h-4 w-4" />
                     Completed At
                   </div>
-                  <div className="text-base">
-                    {new Date(job.completed_at).toLocaleString()}
-                  </div>
+                  <div className="text-base">{new Date(job.completed_at).toLocaleString()}</div>
                 </div>
 
                 <div className="space-y-1">
@@ -580,10 +555,7 @@ export default function JobDetailDialog({
                         <Badge variant="secondary">Feedback Email Sent</Badge>
                         {job.feedback_email_sent_at && (
                           <span className="text-xs text-muted-foreground">
-                            Sent on{" "}
-                            {new Date(
-                              job.feedback_email_sent_at
-                            ).toLocaleString()}
+                            Sent on {new Date(job.feedback_email_sent_at).toLocaleString()}
                           </span>
                         )}
                       </div>
@@ -613,9 +585,7 @@ export default function JobDetailDialog({
                         <div className="text-sm font-medium text-muted-foreground">
                           {formatFieldLabel(key)}
                         </div>
-                        <div className="text-base">
-                          {formatValue(value, key)}
-                        </div>
+                        <div className="text-base">{formatValue(value, key)}</div>
                       </div>
                     );
                   })}
@@ -624,9 +594,7 @@ export default function JobDetailDialog({
             )}
 
             {orderedFields.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No job data available
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No job data available</div>
             )}
           </div>
 
@@ -644,21 +612,14 @@ export default function JobDetailDialog({
                     Loading edit history...
                   </div>
                 ) : editHistory.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground">
-                    No edits recorded
-                  </div>
+                  <div className="text-center py-4 text-muted-foreground">No edits recorded</div>
                 ) : (
                   <div className="space-y-3">
                     {editHistory.map((edit) => (
-                      <div
-                        key={edit.id}
-                        className="rounded-md border p-4 space-y-2"
-                      >
+                      <div key={edit.id} className="rounded-md border p-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">
-                              {edit.edited_by_email}
-                            </span>
+                            <span className="text-sm font-medium">{edit.edited_by_email}</span>
                             <Badge variant="outline" className="text-xs">
                               {edit.action}
                             </Badge>
@@ -713,8 +674,23 @@ export default function JobDetailDialog({
             <CalculatePaymentDialog
               open={isCalculatePaymentDialogOpen}
               onOpenChange={setIsCalculatePaymentDialogOpen}
-              onCalculate={async (jobIds) => {
-                await calculatePayments(jobIds);
+              onCalculate={async (
+                jobIds,
+                options
+              ): Promise<SaveWorkerPaymentResult | undefined> => {
+                if (!organizationId) return undefined;
+                const result = await calculatePayments(jobIds);
+                if (!result?.calculation) return undefined;
+                const outcome = await WorkerPaymentService.savePayment(
+                  organizationId,
+                  result,
+                  jobIds,
+                  options
+                );
+                if (outcome.ok) {
+                  addPayment(result, jobIds);
+                }
+                return outcome;
               }}
               preselectedJobIds={[job.id]}
               jobs={jobs}

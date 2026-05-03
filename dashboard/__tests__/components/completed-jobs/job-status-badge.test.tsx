@@ -1,6 +1,6 @@
 import JobStatusBadge from "@/components/completed-jobs/job-status-badge";
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
 
 describe("JobStatusBadge", () => {
   beforeEach(() => {
@@ -37,9 +37,7 @@ describe("JobStatusBadge", () => {
     it("should render with tooltip trigger when autoApproveAt is provided", () => {
       const autoApproveAt = "2024-01-16T12:00:00Z"; // 24 hours from now
 
-      render(
-        <JobStatusBadge status="pending" autoApproveAt={autoApproveAt} />
-      );
+      render(<JobStatusBadge status="pending" autoApproveAt={autoApproveAt} />);
 
       // Badge should be wrapped in tooltip trigger (has data-state attribute)
       const badge = screen.getByText("Pending").closest("div");
@@ -96,9 +94,7 @@ describe("JobStatusBadge", () => {
 
   describe("custom className", () => {
     it("should apply custom className", () => {
-      render(
-        <JobStatusBadge status="pending" className="my-custom-class" />
-      );
+      render(<JobStatusBadge status="pending" className="my-custom-class" />);
 
       const badge = screen.getByText("Pending").closest("div");
       expect(badge).toHaveClass("my-custom-class");
