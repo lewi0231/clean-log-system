@@ -28,19 +28,19 @@ interface AuthResult {
 /**
  * Extract and verify the user from the request JWT
  */
-async function verifyUser(
-  req: Request,
-  supabase: SupabaseClient
-): Promise<AuthResult> {
+async function verifyUser(req: Request, supabase: SupabaseClient): Promise<AuthResult> {
   const authHeader = req.headers.get("Authorization");
-  
+
   if (!authHeader?.startsWith("Bearer ")) {
     return { success: false, error: "Missing authorization header" };
   }
 
   const token = authHeader.replace("Bearer ", "");
 
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
 
   if (error || !user) {
     return { success: false, error: "Invalid or expired token" };
@@ -88,13 +88,23 @@ export async function verifyOrganizationMembershipFromRequest(
   }
 
   // 2. Verify organization membership
-  return verifyOrganizationMembership(
-    authResult.userId,
-    organizationId,
-    supabase
-  );
+  return verifyOrganizationMembership(authResult.userId, organizationId, supabase);
 }
 ```
+
+---
+
+## JWT + organization gate (`gateOrganizationRequest`)
+
+For handlers that must prove **JWT-present membership** in an organization before touching tenant data (Tier 3 invoice flows and similar), use the shared wrapper instead of calling `verifyOrganizationMembershipFromRequest` directly:
+
+- **Module:** `database/supabase/functions/_utils/gate-organization-request.ts`
+- **Behavior:** builds a service-role client, runs `requireAuthenticatedOrgMember(req, organizationId, supabase)`, returns `{ ok: false, response }` on failure (401/403), otherwise `{ ok: true, ctx }` with `ctx.supabase`, `ctx.userId`, `ctx.userEmail`.
+- **Logging:** logs `Unauthorized organization access attempt` when membership fails with 403.
+
+After validation (including `organization_id` in the body where applicable), gate **before** any query that reads or mutates org-scoped rows. Keep queries constrained with `.eq("organization_id", organization_id)` even after the gate so accidental drift cannot widen scope.
+
+When adding a **new** Edge Function directory with `index.ts`, register it in **`database/supabase/functions/functions-inventory.yaml`** (`secured` unless it matches §2.3–§2.5 in S1). CI runs **`pnpm validate:functions-inventory`** — missing rows fail the build.
 
 ---
 
@@ -143,7 +153,6 @@ serve(async (req) => {
     if (error) throw error;
 
     return jsonResponse({ success: true, worker: data });
-
   } catch (error) {
     logger.error("Request failed", error);
     return errorResponse(error);
@@ -167,10 +176,10 @@ serve(async (req) => {
 
   try {
     const { org_code } = await req.json();
-    
+
     // No auth check - anyone can validate an org code
     const supabase = createServiceRoleClient();
-    
+
     const { data } = await supabase
       .from("organization")
       .select("id, name")
@@ -182,7 +191,6 @@ serve(async (req) => {
       valid: data !== null,
       organization: data ? { id: data.id, name: data.name } : null,
     });
-
   } catch (error) {
     return errorResponse(error);
   }
@@ -241,7 +249,6 @@ serve(async (req) => {
     }
 
     return jsonResponse({ received: true });
-
   } catch (error) {
     return errorResponse(error);
   }
@@ -268,7 +275,7 @@ async function verifyAdminRole(
     .single();
 
   if (error || !data) return false;
-  
+
   return data.role === "admin" || data.role === "owner";
 }
 
@@ -303,10 +310,11 @@ return errorResponse("Invalid signature", 400);
 
 ## Rules Summary
 
-| Rule | Description |
-|------|-------------|
-| Always verify org membership | For any organization-scoped operation |
-| Service role client | For database queries in auth |
-| 401 vs 403 | 401 = no auth, 403 = auth but no access |
-| Webhook signatures | Always verify external webhooks |
-| Log auth failures | For security auditing |
+| Rule                         | Description                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Always verify org membership | For any organization-scoped operation                                                                   |
+| Service role client          | For database queries in auth                                                                            |
+| 401 vs 403                   | 401 = no auth, 403 = auth but no access                                                                 |
+| Webhook signatures           | Always verify external webhooks                                                                         |
+| Log auth failures            | For security auditing                                                                                   |
+| Handler pipeline             | Prefer **`serveJsonHandler`** for `secured` / `public` JSON — [handler-pipeline](./handler-pipeline.md) |

@@ -4,6 +4,11 @@
     "jsr:@std/assert@1": "1.0.16",
     "jsr:@std/dotenv@*": "0.225.5",
     "jsr:@std/internal@^1.0.12": "1.0.12",
+    "jsr:@std/path@1": "1.1.3",
+    "jsr:@std/path@1.1.3": "1.1.3",
+    "jsr:@std/yaml@*": "1.1.0",
+    "jsr:@std/yaml@1": "1.1.0",
+    "jsr:@std/yaml@1.1.0": "1.1.0",
     "npm:@types/node@*": "24.2.0",
     "npm:stripe@18": "18.5.0_@types+node@24.2.0"
   },
@@ -19,6 +24,15 @@
     },
     "@std/internal@1.0.12": {
       "integrity": "972a634fd5bc34b242024402972cd5143eac68d8dffaca5eaa4dba30ce17b027"
+    },
+    "@std/path@1.1.3": {
+      "integrity": "b015962d82a5e6daea980c32b82d2c40142149639968549c649031a230b1afb3",
+      "dependencies": [
+        "jsr:@std/internal"
+      ]
+    },
+    "@std/yaml@1.1.0": {
+      "integrity": "fc1c5c63e05c4c5eb6118355f557958035d41940d6c29d35b306ef7155d6edb0"
     }
   },
   "npm": {
@@ -186,12 +200,16 @@
     "https://esm.sh/@supabase/supabase-js@2.89.0/denonext/supabase-js.mjs": "0fd755a0eb58d38459cf3bfc839539eb4f93871c6662409e7e1ea922cd442159",
     "https://esm.sh/iceberg-js@0.8.1/denonext/iceberg-js.mjs": "d839d81a2e3966500ca2cdd0c1cb458e9608bacfc91f7bb67a69b2e878dcdb4f",
     "https://esm.sh/iceberg-js@0.8.1?target=denonext": "58c849d7fe2bf4eca4a84eb501e83c161a7d8c34ca1bec15a962b3bec3062633",
-    "https://esm.sh/tslib@2.8.1/denonext/tslib.mjs": "c38da5dd6da6281964435002ce204cd586634fe3bdfb24a0ee116f48cf3292e9"
+    "https://esm.sh/tslib@2.8.1/denonext/tslib.mjs": "c38da5dd6da6281964435002ce204cd586634fe3bdfb24a0ee116f48cf3292e9",
+    "https://esm.sh/zod@3.23.8": "15e60c792ac21d4818f181671c7c74bf33bf7526d487dc524911e42785d8b5c2",
+    "https://esm.sh/zod@3.23.8/denonext/zod.mjs": "6ee0474ec5a765b112eca12525d7e30c8e77eedbe2f2ac5e19f2af468b759517"
   },
   "workspace": {
     "dependencies": [
       "jsr:@std/assert@1",
       "jsr:@std/dotenv@*",
+      "jsr:@std/path@1",
+      "jsr:@std/yaml@1",
       "jsr:@supabase/functions-js@2",
       "npm:stripe@18"
     ]
