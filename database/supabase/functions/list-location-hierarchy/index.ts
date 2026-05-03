@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -21,6 +22,16 @@ serve(async (req) => {
     const { organization_id } = body;
     const supabase = createServiceRoleClient();
 
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
+
     const { data: nodes, error: hierarchyError } = await supabase
       .from("location_hierarchy")
       .select(
@@ -31,7 +42,7 @@ serve(async (req) => {
           name,
           type
         )
-      `,
+      `
       )
       .eq("organization_id", organization_id)
       .order("sort_order", { ascending: true })
@@ -50,7 +61,7 @@ serve(async (req) => {
         address,
         email,
         hierarchy_parent_id
-      `,
+      `
       )
       .eq("organization_id", organization_id)
       .not("hierarchy_parent_id", "is", null);
@@ -65,8 +76,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List location hierarchy error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list location hierarchy",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list location hierarchy");
   }
 });

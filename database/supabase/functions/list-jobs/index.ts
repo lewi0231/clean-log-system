@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { listJobsSchema, validateRequest } from "../_utils/zod-schemas.ts";
 import type { Worker } from "../types.ts";
@@ -23,10 +24,7 @@ interface JobWorkerQueryResultWithConfirmation {
   confirmed_at: string | null;
   flagged_at: string | null;
   flag_reason: string | null;
-  worker:
-    | Worker
-    | Worker[]
-    | null;
+  worker: Worker | Worker[] | null;
 }
 
 interface WorkerWithConfirmation extends Worker {
@@ -54,6 +52,16 @@ serve(async (req) => {
     };
 
     const supabase = createServiceRoleClient();
+
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
 
     // Fetch jobs with location info, invoice data, and approval status
     let query = supabase
@@ -93,7 +101,7 @@ serve(async (req) => {
             paid_at
           )
         )
-      `,
+      `
       )
       .eq("organization_id", organization_id);
 
@@ -129,7 +137,7 @@ serve(async (req) => {
             email,
             phone
           )
-        `,
+        `
         )
         .in("job_id", jobIds);
 
@@ -178,9 +186,7 @@ serve(async (req) => {
       // Don't fail the entire request if feedback fetch fails
     }
 
-    const jobsWithFeedback = new Set(
-      feedbackData?.map((f) => f.job_id) || [],
-    );
+    const jobsWithFeedback = new Set(feedbackData?.map((f) => f.job_id) || []);
 
     // Combine jobs with their workers and feedback status
     const jobsWithWorkers = jobs?.map((job) => ({
@@ -195,8 +201,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List jobs error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list jobs",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list jobs");
   }
 });

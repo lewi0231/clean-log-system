@@ -9,12 +9,9 @@ import {
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createNotification } from "../_utils/notifications.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import {
-  nonNegativeNumberSchema,
-  uuidSchema,
-  validateRequest,
-} from "../_utils/zod-schemas.ts";
+import { nonNegativeNumberSchema, uuidSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 // Use fully qualified URL to avoid import map resolution issues
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -73,6 +70,18 @@ serve(async (req: Request) => {
       notes,
     } = validation.data;
 
+    const supabase = createServiceRoleClient();
+
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
+
     logger.info("Recording manual payment", {
       invoice_id,
       organization_id,
@@ -80,13 +89,12 @@ serve(async (req: Request) => {
       payment_method,
     });
 
-    const supabase = createServiceRoleClient();
     const now = new Date();
 
     // Get the invoice to verify it exists and get the total
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoice")
-      .select("id, total, total_paid, status, organization_id")
+      .select("id, total, total_paid, status, organization_id, payment_count")
       .eq("id", invoice_id)
       .eq("organization_id", organization_id)
       .single();
@@ -220,10 +228,7 @@ serve(async (req: Request) => {
     });
   } catch (error) {
     logger.error("Record manual payment error", error);
-    const errorMessage = extractErrorMessage(
-      error,
-      "Failed to record payment"
-    );
+    const errorMessage = extractErrorMessage(error, "Failed to record payment");
     const statusCode = getErrorStatusCode(error);
     return errorResponse(errorMessage, statusCode);
   }

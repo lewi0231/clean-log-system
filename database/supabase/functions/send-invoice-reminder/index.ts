@@ -8,8 +8,8 @@ import {
   handleCors,
   jsonResponse,
 } from "../_utils/http.ts";
+import { gateOrganizationRequest } from "../_utils/gate-organization-request.ts";
 import { createLogger } from "../_utils/logger.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { uuidSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 // Use fully qualified URL to avoid import map resolution issues
@@ -59,18 +59,20 @@ serve(async (req: Request) => {
 
     const { invoice_id, organization_id } = validation.data;
 
+    const gated = await gateOrganizationRequest(req, organization_id, logger);
+    if (!gated.ok) return gated.response;
+    const supabase = gated.ctx.supabase;
+    const now = new Date();
+
     logger.info("Sending invoice reminder", {
       invoice_id,
       organization_id,
     });
 
-    const supabase = createServiceRoleClient();
-    const now = new Date();
-
-    // Get the invoice with its details
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoice")
-      .select(`
+      .select(
+        `
         id,
         invoice_number,
         status,
@@ -81,7 +83,8 @@ serve(async (req: Request) => {
         reminder_count,
         last_reminder_sent_at,
         organization_id
-      `)
+      `
+      )
       .eq("id", invoice_id)
       .eq("organization_id", organization_id)
       .single();
@@ -139,13 +142,15 @@ serve(async (req: Request) => {
     // First, try to get from invoice_job -> job -> location
     const { data: invoiceJobs, error: jobsError } = await supabase
       .from("invoice_job")
-      .select(`
+      .select(
+        `
         job:job_id (
           location:location_id (
             email
           )
         )
-      `)
+      `
+      )
       .eq("invoice_id", invoice_id)
       .limit(1);
 
@@ -203,10 +208,7 @@ serve(async (req: Request) => {
         invoice_id,
         error: emailResult.error,
       });
-      return errorResponse(
-        emailResult.error || "Failed to send reminder email",
-        500
-      );
+      return errorResponse(emailResult.error || "Failed to send reminder email", 500);
     }
 
     // Update invoice with reminder tracking
@@ -246,10 +248,7 @@ serve(async (req: Request) => {
     });
   } catch (error) {
     logger.error("Send invoice reminder error", error);
-    const errorMessage = extractErrorMessage(
-      error,
-      "Failed to send invoice reminder"
-    );
+    const errorMessage = extractErrorMessage(error, "Failed to send invoice reminder");
     const statusCode = getErrorStatusCode(error);
     return errorResponse(errorMessage, statusCode);
   }

@@ -236,16 +236,22 @@ export class InvoiceService {
    */
   static async updateStatus(
     invoiceId: string,
+    organizationId: string,
     status: "draft" | "pending_review" | "sent" | "paid" | "overdue" | "cancelled",
     options?: { senderDisplayName?: string }
   ): Promise<InvoiceWithJobs> {
     try {
       log.debug("InvoiceService: Updating invoice status", {
         invoiceId,
+        organizationId,
         status,
       });
 
-      const body: Record<string, unknown> = { invoice_id: invoiceId, status };
+      const body: Record<string, unknown> = {
+        invoice_id: invoiceId,
+        organization_id: organizationId,
+        status,
+      };
       if (options?.senderDisplayName?.trim()) {
         body.sender_display_name = options.senderDisplayName.trim();
       }
@@ -290,15 +296,18 @@ export class InvoiceService {
    */
   static async resendInvoice(
     invoiceId: string,
+    organizationId: string,
     options?: { senderDisplayName?: string }
   ): Promise<InvoiceWithJobs> {
     try {
       log.debug("InvoiceService: Resending invoice", {
         invoiceId,
+        organizationId,
       });
 
       const body: Record<string, unknown> = {
         invoice_id: invoiceId,
+        organization_id: organizationId,
         status: "sent",
         resend: true,
       };

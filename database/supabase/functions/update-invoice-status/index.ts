@@ -1,9 +1,6 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { serve } from "server";
-import {
-  getOrganizationName,
-  type InvoiceEmailData,
-  sendInvoiceEmail,
-} from "../_utils/email.ts";
+import { getOrganizationName, type InvoiceEmailData, sendInvoiceEmail } from "../_utils/email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
 import {
   errorResponse,
@@ -18,14 +15,11 @@ import {
   type InvoiceEmailRecipientConfig,
   type JobContext,
 } from "../_utils/invoice-email.ts";
+import { gateOrganizationRequest } from "../_utils/gate-organization-request.ts";
 import { generateInvoicePdfBase64 } from "../_utils/invoice-pdf.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createStripeClient } from "../_utils/stripe.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
-import {
-  updateInvoiceStatusSchema,
-  validateRequest,
-} from "../_utils/zod-schemas.ts";
+import { updateInvoiceStatusSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 /**
  * Create or get existing payment link for an invoice
@@ -33,7 +27,7 @@ import {
  * @param logger - Optional logger for structured logging
  */
 async function getOrCreatePaymentLink(
-  supabase: ReturnType<typeof createServiceRoleClient>,
+  supabase: SupabaseClient,
   invoice: {
     id: string;
     invoice_number: string;
@@ -43,7 +37,7 @@ async function getOrCreatePaymentLink(
     payment_link_id?: string | null;
   },
   forceNew = false,
-  logger?: ReturnType<typeof createLogger>,
+  logger?: ReturnType<typeof createLogger>
 ): Promise<string | null> {
   try {
     // Check if invoice already has a valid payment link (unless forcing new)
@@ -70,8 +64,7 @@ async function getOrCreatePaymentLink(
 
     // Create new payment link via Stripe
     const stripe = createStripeClient();
-    const baseUrl = Deno.env.get("NEXT_PUBLIC_APP_URL") ||
-      "http://localhost:3000";
+    const baseUrl = Deno.env.get("NEXT_PUBLIC_APP_URL") || "http://localhost:3000";
 
     // Note: Stripe Checkout Sessions expire after 24 hours maximum
     // For longer-lived payment options, a new session is created when needed
@@ -99,7 +92,7 @@ async function getOrCreatePaymentLink(
         organization_id: invoice.organization_id,
       },
       // Stripe Checkout Sessions max expiry is 24 hours
-      expires_at: Math.floor(Date.now() / 1000) + (24 * 60 * 60), // 24 hours
+      expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
     });
 
     // Store payment link in database
@@ -126,10 +119,7 @@ async function getOrCreatePaymentLink(
     }
 
     // Update invoice with payment link reference
-    await supabase
-      .from("invoice")
-      .update({ payment_link_id: paymentLink.id })
-      .eq("id", invoice.id);
+    await supabase.from("invoice").update({ payment_link_id: paymentLink.id }).eq("id", invoice.id);
 
     logger?.info("Created new payment link", {
       invoice_id: invoice.id,
@@ -172,19 +162,16 @@ serve(async (req: Request) => {
 
     const body = validation.data as {
       invoice_id: string;
-      status:
-        | "draft"
-        | "pending_review"
-        | "sent"
-        | "paid"
-        | "overdue"
-        | "cancelled";
+      organization_id: string;
+      status: "draft" | "pending_review" | "sent" | "paid" | "overdue" | "cancelled";
       resend?: boolean;
       sender_display_name?: string;
     };
-    const { invoice_id, status, resend = false, sender_display_name } = body;
+    const { invoice_id, organization_id, status, resend = false, sender_display_name } = body;
 
-    const supabase = createServiceRoleClient();
+    const gated = await gateOrganizationRequest(req, organization_id, logger);
+    if (!gated.ok) return gated.response;
+    const supabase = gated.ctx.supabase;
     const now = new Date();
 
     // If changing status to "sent" (or resending), we need to send the invoice email
@@ -216,9 +203,10 @@ serve(async (req: Request) => {
               )
             )
           )
-        `,
+        `
         )
         .eq("id", invoice_id)
+        .eq("organization_id", organization_id)
         .single();
 
       if (invoiceError) throw invoiceError;
@@ -229,10 +217,7 @@ serve(async (req: Request) => {
 
       // Never allow sending/resending test invoices
       if (invoice.is_test === true) {
-        return errorResponse(
-          "This is a test invoice and cannot be sent to customers.",
-          400,
-        );
+        return errorResponse("This is a test invoice and cannot be sent to customers.", 400);
       }
 
       // Create outbox record (audit + retry support)
@@ -272,9 +257,8 @@ serve(async (req: Request) => {
         .eq("organization_id", invoice.organization_id)
         .single();
 
-      const emailConfig: InvoiceEmailRecipientConfig = (templateConfig
-        ?.email_recipient_config as InvoiceEmailRecipientConfig) ||
-        {
+      const emailConfig: InvoiceEmailRecipientConfig =
+        (templateConfig?.email_recipient_config as InvoiceEmailRecipientConfig) || {
           location_email_source: "location_email",
           form_field_email: null,
           default_email: null,
@@ -288,9 +272,7 @@ serve(async (req: Request) => {
         .eq("active", true);
 
       const fieldConfigMap = new Map<string, { name: string }>(
-        (fieldConfigs || []).map(
-          (fc: { id: string; name: string }) => [fc.id, { name: fc.name }],
-        ),
+        (fieldConfigs || []).map((fc: { id: string; name: string }) => [fc.id, { name: fc.name }])
       );
 
       // Build job contexts for email recipient determination
@@ -308,36 +290,35 @@ serve(async (req: Request) => {
               submission_data?: Record<string, unknown> | null;
               location?:
                 | {
-                  id?: string;
-                  email?: string | null;
-                  contact_person?: string | null;
-                  hierarchy_parent_id?: string | null;
-                }
+                    id?: string;
+                    email?: string | null;
+                    contact_person?: string | null;
+                    hierarchy_parent_id?: string | null;
+                  }
                 | null
                 | Array<{
-                  id?: string;
-                  email?: string | null;
-                  contact_person?: string | null;
-                  hierarchy_parent_id?: string | null;
-                }>;
+                    id?: string;
+                    email?: string | null;
+                    contact_person?: string | null;
+                    hierarchy_parent_id?: string | null;
+                  }>;
             };
 
             // Handle location - might be array or object
             const locationRaw = jobObj.location;
-            const location = Array.isArray(locationRaw)
-              ? locationRaw[0]
-              : locationRaw;
+            const location = Array.isArray(locationRaw) ? locationRaw[0] : locationRaw;
 
             jobContexts.push({
               location_id: jobObj.location_id || null,
-              location: location && typeof location === "object"
-                ? {
-                  id: location.id || "",
-                  email: location.email || null,
-                  contact_person: location.contact_person || null,
-                  hierarchy_parent_id: location.hierarchy_parent_id || null,
-                }
-                : null,
+              location:
+                location && typeof location === "object"
+                  ? {
+                      id: location.id || "",
+                      email: location.email || null,
+                      contact_person: location.contact_person || null,
+                      hierarchy_parent_id: location.hierarchy_parent_id || null,
+                    }
+                  : null,
               submission_data: jobObj.submission_data || null,
             });
           }
@@ -349,24 +330,21 @@ serve(async (req: Request) => {
         supabase,
         jobContexts,
         emailConfig,
-        fieldConfigMap,
+        fieldConfigMap
       );
 
       // If no valid email recipients, return error
       if (emailRecipients.length === 0) {
         return errorResponse(
           "Cannot send invoice: no valid email recipients found. Please configure email recipients in invoice settings or ensure the location has an email address.",
-          400,
+          400
         );
       }
 
       // Get organization name for email
       let organizationName: string;
       try {
-        organizationName = await getOrganizationName(
-          supabase,
-          invoice.organization_id,
-        );
+        organizationName = await getOrganizationName(supabase, invoice.organization_id);
       } catch (err) {
         logger.error("Failed to get organization name", err, {
           organization_id: invoice.organization_id,
@@ -387,16 +365,12 @@ serve(async (req: Request) => {
           payment_link_id: invoice.payment_link_id,
         },
         resend, // Force new payment link if resending
-        logger,
+        logger
       );
 
       let pdfAttachment: { base64: string; filename: string };
       try {
-        const pdf = await generateInvoicePdfBase64(
-          supabase,
-          invoice_id,
-          invoice.organization_id,
-        );
+        const pdf = await generateInvoicePdfBase64(supabase, invoice_id, invoice.organization_id);
         pdfAttachment = { base64: pdf.base64, filename: pdf.filename };
       } catch (pdfErr) {
         logger.error("Failed to generate invoice PDF", pdfErr, {
@@ -404,7 +378,7 @@ serve(async (req: Request) => {
         });
         return errorResponse(
           "Failed to generate invoice PDF for attachment. Please try again.",
-          500,
+          500
         );
       }
 
@@ -450,16 +424,12 @@ serve(async (req: Request) => {
               status: "failed",
               last_error: emailResult.error || "Unknown email error",
               updated_at: now.toISOString(),
-              next_retry_at: new Date(now.getTime() + 5 * 60 * 1000)
-                .toISOString(),
+              next_retry_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
             })
             .eq("id", outbox.id);
         }
 
-        return errorResponse(
-          `Failed to send invoice email: ${emailResult.error}`,
-          500,
-        );
+        return errorResponse(`Failed to send invoice email: ${emailResult.error}`, 500);
       }
 
       logger.info("Invoice email sent successfully", {
@@ -478,6 +448,7 @@ serve(async (req: Request) => {
           updated_at: now.toISOString(),
         })
         .eq("id", invoice_id)
+        .eq("organization_id", organization_id)
         .select()
         .single();
 
@@ -488,24 +459,24 @@ serve(async (req: Request) => {
       // `invoice` and InvoiceService would throw. Refetch or fail explicitly.
       let invoiceAfterSend = updatedInvoice;
       if (!invoiceAfterSend) {
-        logger.warn(
-          "update-invoice-status: update returned no row without error; refetching",
-          { invoice_id },
-        );
+        logger.warn("update-invoice-status: update returned no row without error; refetching", {
+          invoice_id,
+        });
         const { data: refetched, error: refetchError } = await supabase
           .from("invoice")
           .select("*")
           .eq("id", invoice_id)
+          .eq("organization_id", organization_id)
           .single();
         if (refetchError || !refetched) {
           logger.error(
             "update-invoice-status: could not load invoice after send",
             refetchError ?? new Error("no row"),
-            { invoice_id },
+            { invoice_id }
           );
           return errorResponse(
             "Invoice email was sent but the invoice record could not be reloaded. Please refresh the page.",
-            500,
+            500
           );
         }
         invoiceAfterSend = refetched;
@@ -544,6 +515,7 @@ serve(async (req: Request) => {
         updated_at: now.toISOString(),
       })
       .eq("id", invoice_id)
+      .eq("organization_id", organization_id)
       .select()
       .single();
 
@@ -559,10 +531,7 @@ serve(async (req: Request) => {
     });
   } catch (error) {
     logger.error("Update invoice status error", error);
-    const errorMessage = extractErrorMessage(
-      error,
-      "Failed to update invoice status",
-    );
+    const errorMessage = extractErrorMessage(error, "Failed to update invoice status");
     const statusCode = getErrorStatusCode(error);
     return errorResponse(errorMessage, statusCode);
   }

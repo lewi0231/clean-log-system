@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { listInvoicesSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
@@ -37,6 +38,16 @@ serve(async (req) => {
     };
 
     const supabase = createServiceRoleClient();
+
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
 
     // Default pagination values
     const currentPage = page || 1;
@@ -97,10 +108,11 @@ serve(async (req) => {
     query = query.range(offset, offset + pageSize - 1);
 
     // Order by created_at descending (most recent first)
-    const { data: invoices, error: invoicesError, count } = await query.order(
-      "created_at",
-      { ascending: false },
-    );
+    const {
+      data: invoices,
+      error: invoicesError,
+      count,
+    } = await query.order("created_at", { ascending: false });
 
     if (invoicesError) throw invoicesError;
 
@@ -116,8 +128,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List invoices error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list invoices",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list invoices");
   }
 });

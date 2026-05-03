@@ -7,8 +7,8 @@ import {
   handleCors,
   jsonResponse,
 } from "../_utils/http.ts";
+import { gateOrganizationRequest } from "../_utils/gate-organization-request.ts";
 import { createLogger } from "../_utils/logger.ts";
-import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { uuidSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 // Use fully qualified URL to avoid import map resolution issues
@@ -381,14 +381,15 @@ serve(async (req: Request) => {
 
     const { invoice_id, organization_id } = validation.data;
 
+    const gated = await gateOrganizationRequest(req, organization_id, logger);
+    if (!gated.ok) return gated.response;
+    const supabase = gated.ctx.supabase;
+
     logger.info("Generating invoice PDF", {
       invoice_id,
       organization_id,
     });
 
-    const supabase = createServiceRoleClient();
-
-    // Get the invoice with organization details
     const { data: invoice, error: invoiceError } = await supabase
       .from("invoice")
       .select(
@@ -460,10 +461,7 @@ serve(async (req: Request) => {
     });
   } catch (error) {
     logger.error("Generate invoice PDF error", error);
-    const errorMessage = extractErrorMessage(
-      error,
-      "Failed to generate invoice PDF"
-    );
+    const errorMessage = extractErrorMessage(error, "Failed to generate invoice PDF");
     const statusCode = getErrorStatusCode(error);
     return errorResponse(errorMessage, statusCode);
   }

@@ -1,3 +1,8 @@
+/**
+ * Worker invitation preview for the accept-invite flow.
+ * Body is the invitation row UUID (see dashboard accept-invite page); callers are typically unauthenticated.
+ * Org membership via JWT does not apply here — capability is the invitation id + expiry.
+ */
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
@@ -71,8 +76,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("Get worker invitation error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to fetch invitation"
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to fetch invitation");
   }
 });

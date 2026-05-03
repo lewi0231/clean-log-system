@@ -1,0 +1,117 @@
+# S1 Phase 4 — machine-checked reconciliation of Edge Function entrypoints.
+# Every directory under database/supabase/functions/ that contains index.ts MUST appear exactly once.
+#
+# Classes (see docs/stages/S1-edge-function-org-authorization-enforcement.md §2.6):
+#   public           — intentional anonymous / token-public surface (§2.3)
+#   identity         — JWT-scoped identity helpers (§2.4)
+#   privileged_batch — cron/batch HTTP; org-membership track deferred (§2.5 / G8)
+#   alternate_auth   — authenticated but not body organization_id + shared helper pattern (§2.1)
+#   secured          — MUST import a shared org gate (validated by scripts/validate-functions-inventory.ts)
+#   secured_custom   — manual/resource-bound auth; exempt from import heuristic (human-maintained)
+#
+version: 1
+
+functions:
+  accept-admin-invitation: public
+  accept-worker-invitation: public
+  admin-create-job: secured_custom
+  apply-field-config-template: secured
+  auto-approve-jobs: privileged_batch
+  auto-generate-invoices: privileged_batch
+  auto-send-invoices: privileged_batch
+  calculate-invoice: secured
+  calculate-worker-payment: secured
+  complete-onboarding: secured
+  confirm-job-participation: secured_custom
+  convert-admin-to-worker: secured
+  create-field-config: secured
+  create-form-section: secured
+  create-invoice: secured
+  create-job: identity
+  create-location: secured
+  create-location-hierarchy: secured
+  create-organization-user: secured
+  create-payment-link: secured
+  create-pricing-rule: secured
+  create-worker: secured
+  delete-base-pricing: secured
+  delete-field-config: secured
+  delete-field-pricing: secured
+  delete-form-section: secured
+  delete-location: secured
+  delete-location-hierarchy: secured
+  delete-option-pricing: secured
+  delete-organization-user: secured
+  delete-pricing-rule: secured
+  delete-service-pricing-mode: secured
+  delete-test-data: secured
+  delete-worker: secured
+  flag-job: secured_custom
+  generate-invoice-pdf: secured
+  get-invoice-details: secured
+  get-invoice-public: public
+  get-invoice-template-config: secured
+  get-job-by-token: public
+  get-job-edits: alternate_auth
+  get-onboarding-data: identity
+  get-organization-id: identity
+  get-organization-settings: secured
+  get-user-role: identity
+  get-worker: public
+  list-base-pricing: secured
+  list-feedback: secured
+  list-field-configs: secured
+  list-field-pricing: secured
+  list-form-sections: secured
+  list-invoices: secured
+  list-jobs: secured
+  list-location-hierarchy: secured
+  list-locations: secured
+  list-option-pricing: secured
+  list-organization-users: secured
+  list-payments: secured
+  list-pending-confirmations: alternate_auth
+  list-pricing-history: secured
+  list-pricing-rules: secured
+  list-service-pricing-modes: secured
+  list-worker-payments: secured
+  list-workers: secured
+  list-workers-and-locations: secured
+  manage-worker-rate-card: secured
+  mark-overdue-invoices: privileged_batch
+  record-manual-payment: secured
+  refresh-org-sending-domain-status: secured
+  register-org-sending-domain: secured
+  register-organization: public
+  remove-org-sending-domain: secured
+  reorder-field-configs: secured
+  resend-activation-link: public
+  resend-admin-invitation: secured
+  resend-worker-invitation: secured
+  resolve-flagged-job: secured_custom
+  save-worker-payment: secured
+  send-feedback-email: secured_custom
+  send-invoice-reminder: secured
+  send-worker-remittance-email: secured
+  stripe-webhook: public
+  submit-beta-feedback: secured
+  submit-feedback: public
+  update-field-config: secured
+  update-field-config-locations: secured
+  update-form-section: secured
+  update-invoice-status: secured
+  update-invoice-template-config: secured
+  update-job: secured_custom
+  update-location: secured
+  update-location-hierarchy: secured
+  update-organization-settings: secured
+  update-organization-user: secured
+  update-pricing-rule: secured
+  update-worker: secured
+  update-worker-payment-status: secured
+  upload-organization-logo: secured_custom
+  upsert-base-pricing: secured
+  upsert-field-pricing: secured
+  upsert-option-pricing: secured
+  upsert-service-pricing-mode: secured
+  withdraw-job: secured_custom

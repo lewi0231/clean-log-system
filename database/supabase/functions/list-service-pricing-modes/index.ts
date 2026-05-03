@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -18,14 +19,19 @@ serve(async (req) => {
       return errorResponse("Organization ID is required", 400);
     }
 
-    const {
-      organization_id,
-      location_id,
-      service_type_field_config_id,
-      service_type_value,
-    } = body;
+    const { organization_id, location_id, service_type_field_config_id, service_type_value } = body;
 
     const supabase = createServiceRoleClient();
+
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
 
     // Build query
     let query = supabase
@@ -43,15 +49,12 @@ serve(async (req) => {
           id,
           name
         )
-      `,
+      `
       )
       .eq("organization_id", organization_id);
 
     if (service_type_field_config_id) {
-      query = query.eq(
-        "service_type_field_config_id",
-        service_type_field_config_id,
-      );
+      query = query.eq("service_type_field_config_id", service_type_field_config_id);
     }
 
     if (service_type_value) {
@@ -66,11 +69,10 @@ serve(async (req) => {
       }
     }
 
-    const { data: servicePricingModes, error: pricingError } = await query
-      .order(
-        "service_type_value",
-        { ascending: true },
-      );
+    const { data: servicePricingModes, error: pricingError } = await query.order(
+      "service_type_value",
+      { ascending: true }
+    );
 
     if (pricingError) throw pricingError;
 
@@ -80,8 +82,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List service pricing modes error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list service pricing modes",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list service pricing modes");
   }
 });

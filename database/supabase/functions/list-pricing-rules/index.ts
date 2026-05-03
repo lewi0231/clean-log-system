@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -45,13 +46,22 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
-    const { data: hierarchyNodes, error: hierarchyError } =
-      location_hierarchy_id
-        ? await supabase
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
+
+    const { data: hierarchyNodes, error: hierarchyError } = location_hierarchy_id
+      ? await supabase
           .from("location_hierarchy")
           .select("id,parent_id")
           .eq("organization_id", organization_id)
-        : { data: null, error: null };
+      : { data: null, error: null };
 
     if (hierarchyError) throw hierarchyError;
 
@@ -87,7 +97,7 @@ serve(async (req) => {
           metadata,
           priority
         )
-      `,
+      `
       )
       .eq("organization_id", organization_id)
       .order("priority", { ascending: true })
@@ -160,10 +170,11 @@ serve(async (req) => {
       }
 
       filteredRules = filteredRules.filter((rule) => {
-        const matchesLocation = !location_id || !rule.location_id ||
-          rule.location_id === location_id;
+        const matchesLocation =
+          !location_id || !rule.location_id || rule.location_id === location_id;
 
-        const matchesHierarchy = !location_hierarchy_id ||
+        const matchesHierarchy =
+          !location_hierarchy_id ||
           !rule.location_hierarchy_id ||
           allowedHierarchyIds.has(rule.location_hierarchy_id);
 
@@ -177,8 +188,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List pricing rules error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list pricing rules",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list pricing rules");
   }
 });

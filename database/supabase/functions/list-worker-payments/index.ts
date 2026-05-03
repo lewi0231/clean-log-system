@@ -1,11 +1,7 @@
 import { serve } from "server";
-import {
-  extractAuthToken,
-  getAuthUser,
-  verifyOrganizationMembership,
-} from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -22,10 +18,9 @@ serve(async (req: Request) => {
 
   try {
     const body = (await req.json()) as ListWorkerPaymentsRequest;
-    const validation = validateRequiredFields(
-      body as unknown as Record<string, unknown>,
-      ["organization_id"],
-    );
+    const validation = validateRequiredFields(body as unknown as Record<string, unknown>, [
+      "organization_id",
+    ]);
 
     if (!validation.valid) {
       return errorResponse("Organization ID is required", 400);
@@ -33,40 +28,22 @@ serve(async (req: Request) => {
 
     const { organization_id, page = 1, limit = 50 } = body;
 
+    const supabase = createServiceRoleClient();
+
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
+
     // Validate pagination params
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(100, Math.max(1, Number(limit) || 50)); // Cap at 100
     const offset = (pageNum - 1) * limitNum;
-
-    // Get authenticated user for membership verification
-    let userId: string | null = null;
-    let userEmail: string | null = null;
-    const token = extractAuthToken(req);
-    if (token) {
-      const authUser = await getAuthUser(token);
-      if (authUser?.id) {
-        userId = authUser.id;
-        userEmail = authUser.email ?? null;
-      }
-    }
-
-    const supabase = createServiceRoleClient();
-
-    // Verify user belongs to this organization
-    if (userId || userEmail) {
-      const isMember = await verifyOrganizationMembership(
-        supabase,
-        organization_id,
-        userEmail,
-        userId,
-      );
-      if (!isMember) {
-        return errorResponse(
-          "You do not have permission to access this organization",
-          403,
-        );
-      }
-    }
 
     // Get total count for pagination
     const { count: totalCount, error: countError } = await supabase
@@ -112,7 +89,7 @@ serve(async (req: Request) => {
           created_at,
           updated_at
         )
-      `,
+      `
       )
       .eq("organization_id", organization_id)
       .order("calculated_at", { ascending: false })
@@ -150,9 +127,7 @@ serve(async (req: Request) => {
 
     const formattedBatches = (batches || []).map((batch: BatchWithPayments) => {
       const payments = batch.worker_payments || [];
-      const jobIds = [
-        ...new Set(payments.map((p) => p.job_id).filter(Boolean)),
-      ];
+      const jobIds = [...new Set(payments.map((p) => p.job_id).filter(Boolean))];
 
       // Get date range from jobs (would need to fetch jobs, but for now use calculated_at)
       // In a full implementation, you'd fetch jobs to get actual date range
@@ -208,8 +183,6 @@ serve(async (req: Request) => {
     });
   } catch (error) {
     logger.error("List worker payments error", error);
-    return errorResponse(
-      error instanceof Error ? error.message : "Failed to list worker payments",
-    );
+    return errorResponse(error instanceof Error ? error.message : "Failed to list worker payments");
   }
 });

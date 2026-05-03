@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -21,10 +22,20 @@ serve(async (req) => {
 
     const supabase = createServiceRoleClient();
 
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
+
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, custom_email_domain_enabled",
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, custom_email_domain_enabled"
       )
       .eq("id", organization_id)
       .single();
@@ -35,7 +46,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes, worker_payment_cycle_config",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes, worker_payment_cycle_config"
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -55,13 +66,11 @@ serve(async (req) => {
     };
     if (organization?.rating_config) {
       try {
-        const parsed = typeof organization.rating_config === "string"
-          ? JSON.parse(organization.rating_config)
-          : organization.rating_config;
-        if (
-          parsed && typeof parsed === "object" && "type" in parsed &&
-          "dimensions" in parsed
-        ) {
+        const parsed =
+          typeof organization.rating_config === "string"
+            ? JSON.parse(organization.rating_config)
+            : organization.rating_config;
+        if (parsed && typeof parsed === "object" && "type" in parsed && "dimensions" in parsed) {
           ratingConfig = parsed;
         }
       } catch {
@@ -73,49 +82,38 @@ serve(async (req) => {
       success: true,
       settings: {
         name: organization?.name ?? "",
-        use_predefined_locations: organization?.use_predefined_locations ??
-          true,
+        use_predefined_locations: organization?.use_predefined_locations ?? true,
         business_mode: organization?.business_mode ?? "service_based",
         abn: organization?.abn ?? null,
         logo_url: organization?.logo_url ?? null,
         primary_contact_email: organization?.primary_contact_email ?? null,
         primary_contact_phone: organization?.primary_contact_phone ?? null,
         business_address: organization?.business_address ?? null,
-        invoice_send_immediately: organization?.invoice_send_immediately ??
-          false,
-        feedback_email_send_immediately:
-          organization?.feedback_email_send_immediately ?? false,
+        invoice_send_immediately: organization?.invoice_send_immediately ?? false,
+        feedback_email_send_immediately: organization?.feedback_email_send_immediately ?? false,
         rating_config: ratingConfig,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",
         locale: organization?.locale ?? "en-AU",
-        default_exclusive_group_label:
-          organization?.default_exclusive_group_label ?? null,
-        custom_email_domain_enabled:
-          organization?.custom_email_domain_enabled ?? false,
+        default_exclusive_group_label: organization?.default_exclusive_group_label ?? null,
+        custom_email_domain_enabled: organization?.custom_email_domain_enabled ?? false,
         auto_generate_invoices_immediately:
           orgSettings?.auto_generate_invoices_immediately ?? false,
         bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
-        bank_transfer_account_number:
-          orgSettings?.bank_transfer_account_number ?? null,
-        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ??
-          null,
-        show_bank_transfer_on_invoices:
-          orgSettings?.show_bank_transfer_on_invoices ?? true,
+        bank_transfer_account_number: orgSettings?.bank_transfer_account_number ?? null,
+        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ?? null,
+        show_bank_transfer_on_invoices: orgSettings?.show_bank_transfer_on_invoices ?? true,
         default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
         gst_registered: orgSettings?.gst_registered ?? false,
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
         edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
-        worker_payment_cycle_config:
-          orgSettings?.worker_payment_cycle_config ?? null,
+        worker_payment_cycle_config: orgSettings?.worker_payment_cycle_config ?? null,
       },
     });
   } catch (error) {
     logger.error("Get organization settings error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to get organization settings",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to get organization settings");
   }
 });
