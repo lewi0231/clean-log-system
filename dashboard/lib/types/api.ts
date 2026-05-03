@@ -179,9 +179,15 @@ export interface ListFeedbackResponse {
 }
 
 // Field Configs API
+/**
+ * Request for `list-field-configs`. `line_of_business_id` is reserved for future service-line
+ * filtering; it is ignored by the edge function until LOB is implemented (safe to omit).
+ */
 export interface ListFieldConfigsRequest {
   organization_id: string;
   location_id?: string | null;
+  /** Reserved: filter field catalog by line of business (not applied yet). */
+  line_of_business_id?: string | null;
 }
 
 export interface ListFieldConfigsResponse {

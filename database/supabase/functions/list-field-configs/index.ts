@@ -1,3 +1,10 @@
+/**
+ * Field catalog for an org, optionally narrowed by `location_field_config` when `location_id` is set.
+ *
+ * Future (multi–line of business): accept optional `line_of_business_id` in the body and filter
+ * `organization_field_configs` by that column (plus existing location restrictions). Call sites can
+ * start threading a LOB id without a breaking API change.
+ */
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
@@ -17,8 +24,7 @@ serve(async (req) => {
       return errorResponse("Organization ID is required", 400);
     }
 
-    const { organization_id, location_id, include_location_restrictions } =
-      body;
+    const { organization_id, location_id, include_location_restrictions } = body;
 
     const supabase = createServiceRoleClient();
 
@@ -40,13 +46,12 @@ serve(async (req) => {
     if (normalizedLocationId) {
       // Fetch all location restrictions for these field configs
       const fieldConfigIds = (fieldConfigs || []).map((fc) => fc.id);
-      
+
       if (fieldConfigIds.length > 0) {
-        const { data: locationRestrictions, error: restrictionsError } =
-          await supabase
-            .from("location_field_config")
-            .select("field_config_id, location_id")
-            .in("field_config_id", fieldConfigIds);
+        const { data: locationRestrictions, error: restrictionsError } = await supabase
+          .from("location_field_config")
+          .select("field_config_id, location_id")
+          .in("field_config_id", fieldConfigIds);
 
         if (restrictionsError) throw restrictionsError;
 
@@ -77,13 +82,12 @@ serve(async (req) => {
     let sanitized = filtered;
     if (include_location_restrictions) {
       const filteredConfigIds = filtered.map((fc) => fc.id);
-      
+
       if (filteredConfigIds.length > 0) {
-        const { data: locationRestrictions, error: restrictionsError } =
-          await supabase
-            .from("location_field_config")
-            .select("field_config_id, location_id")
-            .in("field_config_id", filteredConfigIds);
+        const { data: locationRestrictions, error: restrictionsError } = await supabase
+          .from("location_field_config")
+          .select("field_config_id, location_id")
+          .in("field_config_id", filteredConfigIds);
 
         if (restrictionsError) throw restrictionsError;
 
@@ -114,8 +118,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List field configs error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list field configs",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list field configs");
   }
 });

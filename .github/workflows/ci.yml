@@ -80,7 +80,13 @@ jobs:
       - name: TypeScript (packages that define typecheck)
         run: pnpm typecheck
 
+      # Dashboard is only deployed to Vercel from `main` (no preview/staging deploy for cost).
+      # Still run the Next build on PRs targeting `main` so broken builds are caught before merge.
       - name: Build dashboard (Next.js)
+        if: |
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         run: pnpm build:dashboard
 
   unit-tests:
@@ -148,8 +154,9 @@ jobs:
     name: E2E tests (Playwright + Supabase)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Only run on staging branch or when explicitly requested
-    if: github.ref == 'refs/heads/staging' || contains(github.event.head_commit.message, '[e2e]')
+    # Disabled: no staging/preview Vercel deploy for now — re-enable when a live non-prod URL is available
+    # or when running E2E against CI-built localhost only (no deploy dependency).
+    if: false
 
     steps:
       - name: Checkout repository
@@ -216,6 +223,44 @@ jobs:
         if: always()
         working-directory: database
         run: supabase stop
+
+  # Merge after CI passes for PRs targeting `staging`.
+  # We do this inside CI instead of a separate workflow_run workflow because:
+  # - workflow_run only uses the workflow file from the default branch, so fixes on
+  #   feature branches do not apply until merged to default.
+  # - Resolving the PR from workflow_run.head_sha via the commits API is unreliable.
+  auto-merge-staging-pr:
+    name: Auto-merge (PR → staging)
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests, security-scan]
+    if: >
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'staging' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Queue or perform squash merge
+        run: |
+          PR_NUM=${{ github.event.pull_request.number }}
+          STATE=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json state --jq '.state')
+          if [ "$STATE" != "OPEN" ]; then
+            echo "PR #$PR_NUM is $STATE — nothing to merge"
+            exit 0
+          fi
+          if gh pr merge "$PR_NUM" --auto --squash --repo "${{ github.repository }}" 2>&1; then
+            echo "Auto-merge queued for PR #$PR_NUM (merges when required checks pass)"
+          elif gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
+            echo "Merged PR #$PR_NUM immediately (--auto unavailable or not needed)"
+          else
+            echo "::error::Could not merge PR #$PR_NUM — verify repo Settings → General → Allow auto-merge,"
+            echo "::error::branch protection (required checks, review rules), and that squash merge is enabled."
+            exit 1
+          fi
 
   notify-failure:
     name: Notify build failure
