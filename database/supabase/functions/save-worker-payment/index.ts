@@ -1,9 +1,5 @@
 import { serve } from "server";
-import {
-  extractAuthToken,
-  getAuthUser,
-  verifyOrganizationMembership,
-} from "../_utils/auth.ts";
+import { extractAuthToken, getAuthUser, verifyOrganizationMembership } from "../_utils/auth.ts";
 import {
   errorResponse,
   extractErrorMessage,
@@ -57,16 +53,12 @@ interface WpEmbedRow {
   worker_payment_batch: { status?: string | null; calculated_at?: string | null } | null;
 }
 
-function batchStatusFromEmbed(
-  embed: WpEmbedRow["worker_payment_batch"],
-): string | undefined {
+function batchStatusFromEmbed(embed: WpEmbedRow["worker_payment_batch"]): string | undefined {
   if (!embed || Array.isArray(embed)) return undefined;
   return embed.status ?? undefined;
 }
 
-function batchCalculatedAtFromEmbed(
-  embed: WpEmbedRow["worker_payment_batch"],
-): string {
+function batchCalculatedAtFromEmbed(embed: WpEmbedRow["worker_payment_batch"]): string {
   if (!embed || Array.isArray(embed)) return "";
   return embed.calculated_at ?? "";
 }
@@ -79,10 +71,11 @@ serve(async (req: Request) => {
 
   try {
     const body = (await req.json()) as SaveWorkerPaymentRequest;
-    const validation = validateRequiredFields(
-      body as unknown as Record<string, unknown>,
-      ["organization_id", "calculation", "job_ids"],
-    );
+    const validation = validateRequiredFields(body as unknown as Record<string, unknown>, [
+      "organization_id",
+      "calculation",
+      "job_ids",
+    ]);
 
     if (!validation.valid) {
       logger.warn("Missing required fields for worker payment save", {
@@ -98,10 +91,7 @@ serve(async (req: Request) => {
       return errorResponse("job_ids must be a non-empty array", 400);
     }
 
-    if (
-      !calculation.job_calculations ||
-      calculation.job_calculations.length === 0
-    ) {
+    if (!calculation.job_calculations || calculation.job_calculations.length === 0) {
       return errorResponse("calculation.job_calculations is required", 400);
     }
 
@@ -134,13 +124,10 @@ serve(async (req: Request) => {
         supabase,
         organization_id,
         userEmail,
-        authUserId,
+        authUserId
       );
       if (!isMember) {
-        return errorResponse(
-          "You do not have permission to access this organization",
-          403,
-        );
+        return errorResponse("You do not have permission to access this organization", 403);
       }
 
       const { data: orgUser } = await supabase
@@ -174,7 +161,7 @@ serve(async (req: Request) => {
         worker:worker_id (
           id
         )
-      `,
+      `
       )
       .in("job_id", job_ids);
 
@@ -221,11 +208,13 @@ serve(async (req: Request) => {
     // ── Duplicate / paid detection ─────────────────────────────────────
     const { data: existingRows, error: existingErr } = await supabase
       .from("worker_payment")
-      .select(`
+      .select(
+        `
         job_id,
         batch_id,
         worker_payment_batch(status, calculated_at)
-      `)
+      `
+      )
       .eq("organization_id", organization_id)
       .in("job_id", job_ids);
 
@@ -250,12 +239,10 @@ serve(async (req: Request) => {
     }
 
     if (blockedMap.size > 0) {
-      const blocked_jobs = [...blockedMap.entries()].map(
-        ([job_id, meta]) => ({
-          job_id,
-          ...meta,
-        }),
-      );
+      const blocked_jobs = [...blockedMap.entries()].map(([job_id, meta]) => ({
+        job_id,
+        ...meta,
+      }));
       return jsonResponse({
         success: false,
         error_code: "jobs_already_paid",
@@ -372,28 +359,17 @@ serve(async (req: Request) => {
       }
     }
 
-    let replaced:
-      | { jobs_replaced: number; batches_cancelled: number }
-      | undefined;
+    let replaced: { jobs_replaced: number; batches_cancelled: number } | undefined;
 
     if (workerPayments.length > 0) {
-      const { error: paymentsError } = await supabase
-        .from("worker_payment")
-        .insert(workerPayments);
+      const { error: paymentsError } = await supabase.from("worker_payment").insert(workerPayments);
 
       if (paymentsError) {
-        logger.error(
-          "Failed to insert worker payments, rolling back batch",
-          paymentsError,
-          {
-            batch_id: batch.id,
-            payment_count: workerPayments.length,
-          },
-        );
-        await supabase
-          .from("worker_payment_batch")
-          .delete()
-          .eq("id", batch.id);
+        logger.error("Failed to insert worker payments, rolling back batch", paymentsError, {
+          batch_id: batch.id,
+          payment_count: workerPayments.length,
+        });
+        await supabase.from("worker_payment_batch").delete().eq("id", batch.id);
         throw paymentsError;
       }
     }
@@ -405,7 +381,7 @@ serve(async (req: Request) => {
           p_organization_id: organization_id,
           p_job_ids: job_ids,
           p_exclude_batch_id: batch.id,
-        },
+        }
       );
 
       if (cleanupErr) {
@@ -415,8 +391,7 @@ serve(async (req: Request) => {
         throw cleanupErr;
       }
 
-      const c =
-        cleanup as { deleted_row_count?: number; batches_cancelled?: number } | null;
+      const c = cleanup as { deleted_row_count?: number; batches_cancelled?: number } | null;
       replaced = {
         jobs_replaced: new Set(duplicatePayload.map((d) => d.job_id)).size,
         batches_cancelled: c?.batches_cancelled ?? 0,
@@ -444,7 +419,7 @@ serve(async (req: Request) => {
     logger.error("Save worker payment error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to save worker payment"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

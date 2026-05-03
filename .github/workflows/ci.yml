@@ -64,10 +64,22 @@ jobs:
       - name: Prettier check (changed files — push)
         if: github.event_name == 'push'
         run: |
-          FILES=$(git diff --name-only --diff-filter=d HEAD~1 HEAD 2>/dev/null \
+          # Diff the whole push (all commits), not only HEAD~1..HEAD. Otherwise a batch push
+          # can leave earlier commits' files unchecked; Prettier failures surface on the next
+          # unrelated one-file commit (looks like "staging formatter is flaky").
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            RANGE_SPEC="single-commit fallback HEAD~1 HEAD"
+            RANGE_ARGS=(HEAD~1 HEAD)
+          else
+            RANGE_SPEC="push range $BEFORE..${{ github.sha }}"
+            RANGE_ARGS=("$BEFORE" "${{ github.sha }}")
+          fi
+          echo "Prettier file list: $RANGE_SPEC"
+          FILES=$(git diff --name-only --diff-filter=d "${RANGE_ARGS[@]}" 2>/dev/null \
             | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
           if [ -z "$FILES" ]; then
-            echo "No matching files changed in this commit"
+            echo "No matching files changed in this push"
             exit 0
           fi
           echo "$FILES" | xargs pnpm exec prettier --check
