@@ -40,8 +40,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("List form sections error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to list form sections"
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to list form sections");
   }
 });
