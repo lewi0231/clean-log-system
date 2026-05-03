@@ -262,6 +262,139 @@ jobs:
             exit 1
           fi
 
+  # When staging moves forward (e.g. after a PR merge), open or refresh staging → main.
+  # Implemented here instead of workflow_run so the logic runs from the branch that was
+  # pushed and does not depend on the completing workflow metadata (event/head_branch).
+  promote-staging-to-main:
+    name: Staging → main (promotion PR)
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Deep checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - name: Check for existing promotion PR
+        id: existing_pr
+        run: |
+          EXISTING=$(gh pr list \
+            --base main \
+            --head staging \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING" >> $GITHUB_OUTPUT
+            echo "open promotion PR #$EXISTING exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Gather diff (main..staging)
+        id: details
+        if: steps.existing_pr.outputs.exists == 'false'
+        run: |
+          git fetch origin main staging
+
+          FILE_COUNT=$(git diff --name-only origin/main..origin/staging | wc -l | tr -d ' ')
+          echo "file_count=$FILE_COUNT" >> $GITHUB_OUTPUT
+
+          if [ "$FILE_COUNT" -eq "0" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "staging and main are aligned"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            CHANGED_FILES=$(git diff --name-only origin/main..origin/staging | head -40)
+            {
+              echo "CHANGED_FILES<<EOF"
+              echo "$CHANGED_FILES"
+              echo "EOF"
+            } >> "$GITHUB_ENV"
+
+            DIFF_SUMMARY=$(git diff --stat origin/main..origin/staging | tail -1)
+            {
+              echo "DIFF_SUMMARY<<EOF2"
+              echo "$DIFF_SUMMARY"
+              echo "EOF2"
+            } >> "$GITHUB_ENV"
+          fi
+
+      - name: Create promotion PR
+        id: create_pr
+        if: steps.existing_pr.outputs.exists == 'false' && steps.details.outputs.has_changes == 'true'
+        run: |
+          FILE_COUNT=${{ steps.details.outputs.file_count }}
+          CI_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          PR_URL=$(gh pr create \
+            --base main \
+            --head staging \
+            --title "Staging → main ($FILE_COUNT files)" \
+            --body "$(cat <<EOF
+          ## Promotion to main
+
+          **CI succeeded** on staging: [workflow run]($CI_RUN_URL)
+
+          **Scope:** ~$FILE_COUNT file(s).
+
+          ### Files (first segment)
+          \`\`\`
+          $CHANGED_FILES
+          \`\`\`
+
+          ### Stat
+          $DIFF_SUMMARY
+
+          ---
+          *Job: \`promote-staging-to-main\` in \`.github/workflows/ci.yml\`*
+          EOF
+          )")
+
+          echo "promotion PR: $PR_URL"
+          PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
+
+      - name: Enable auto-merge on new promotion PR (--merge)
+        if: steps.existing_pr.outputs.exists == 'false' && steps.details.outputs.has_changes == 'true'
+        run: |
+          PR_NUM=${{ steps.create_pr.outputs.pr_number }}
+          if gh pr merge "$PR_NUM" --auto --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "auto-merge enabled on PR #$PR_NUM"
+          elif gh pr merge "$PR_NUM" --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "merged PR #$PR_NUM immediately"
+          else
+            echo "PR created — enable Allow auto-merge or adjust branch protection if merge failed"
+          fi
+
+      - name: Re-enable auto-merge on existing promotion PR
+        if: steps.existing_pr.outputs.exists == 'true'
+        run: |
+          PR_NUM=${{ steps.existing_pr.outputs.pr_number }}
+          if gh pr merge "$PR_NUM" --auto --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "auto-merge on PR #$PR_NUM"
+          elif gh pr merge "$PR_NUM" --merge --repo "${{ github.repository }}" 2>&1; then
+            echo "merged PR #$PR_NUM immediately"
+          else
+            echo "could not change merge state on PR #$PR_NUM"
+          fi
+
+      - name: Comment on existing promotion PR
+        if: steps.existing_pr.outputs.exists == 'true'
+        run: |
+          PR_NUM=${{ steps.existing_pr.outputs.pr_number }}
+          CI_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          gh pr comment "$PR_NUM" --repo "${{ github.repository }}" \
+            --body "**CI passed again on staging:** [workflow run]($CI_RUN_URL)."
+
   notify-failure:
     name: Notify build failure
     runs-on: ubuntu-latest
