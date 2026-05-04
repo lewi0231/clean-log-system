@@ -24,6 +24,25 @@ const ALLOWED_CLASSES = new Set([
 const SECURED_IMPORT_PATTERN =
   /(?:verifyOrganizationMembership(?:FromRequest)?|requireAuthenticatedOrgMember|gateOrganizationRequest|requireOrgAdminFromRequest|serveJsonHandler)/;
 
+async function securedFunctionUsesOrgGate(functionName: string): Promise<boolean> {
+  const indexPath = join(FUNCTIONS_ROOT, functionName, "index.ts");
+  const indexSrc = await Deno.readTextFile(indexPath);
+  if (SECURED_IMPORT_PATTERN.test(indexSrc)) return true;
+
+  const handlersDir = join(FUNCTIONS_ROOT, functionName, "handlers");
+  try {
+    for await (const entry of Deno.readDir(handlersDir)) {
+      if (!entry.isFile || !entry.name.endsWith(".ts")) continue;
+      const handlerSrc = await Deno.readTextFile(join(handlersDir, entry.name));
+      if (SECURED_IMPORT_PATTERN.test(handlerSrc)) return true;
+    }
+  } catch {
+    // No handlers/ directory — index-only function
+  }
+
+  return false;
+}
+
 interface InventoryFile {
   version?: number;
   functions?: Record<string, string>;
@@ -102,20 +121,19 @@ async function main(): Promise<void> {
     throw new ValidationError(`Invalid classification(s):\n${wrongClass.join("\n")}`);
   }
 
-  // Verify `secured` entries import a shared org gate
+  // Verify `secured` entries import a shared org gate (index.ts and/or handlers/*.ts)
   const missingPattern: string[] = [];
   for (const [fn, cls] of Object.entries(map)) {
     if (cls !== "secured") continue;
-    const path = join(FUNCTIONS_ROOT, fn, "index.ts");
-    const src = await Deno.readTextFile(path);
-    if (!SECURED_IMPORT_PATTERN.test(src)) {
+    if (!(await securedFunctionUsesOrgGate(fn))) {
       missingPattern.push(fn);
     }
   }
   if (missingPattern.length > 0) {
     throw new ValidationError(
       `Functions classified "secured" must import a shared org gate ` +
-        `(verifyOrganizationMembership*, requireAuthenticatedOrgMember, gateOrganizationRequest, requireOrgAdminFromRequest, serveJsonHandler):\n` +
+        `(verifyOrganizationMembership*, requireAuthenticatedOrgMember, gateOrganizationRequest, requireOrgAdminFromRequest, serveJsonHandler) ` +
+        `in index.ts or handlers/*.ts:\n` +
         missingPattern.map((n) => `  - ${n}`).join("\n")
     );
   }
