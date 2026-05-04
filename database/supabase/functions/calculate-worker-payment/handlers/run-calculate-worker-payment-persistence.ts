@@ -62,7 +62,7 @@ export async function runCalculateWorkerPaymentPersistence(
     return errorResponse("No jobs found", 404);
   }
 
-  const jobs = jobsRaw.map((job) => {
+  const jobs = jobsRaw.map((job: (typeof jobsRaw)[number]) => {
     const locationData = job.location as unknown as {
       id: string;
       hierarchy_parent_id: string | null;
@@ -125,7 +125,7 @@ export async function runCalculateWorkerPaymentPersistence(
 
   const pricingConditionsMap = new Map<string, PricingConditionRow[]>();
   if (pricingRules && pricingRules.length > 0) {
-    const pricingRuleIds = pricingRules.map((rule) => rule.id);
+    const pricingRuleIds = pricingRules.map((rule: { id: string }) => rule.id);
     const { data: pricingConditions, error: conditionsError } = await supabase
       .from("pricing_condition")
       .select(
@@ -137,7 +137,7 @@ export async function runCalculateWorkerPaymentPersistence(
     if (conditionsError) throw conditionsError;
 
     if (pricingConditions) {
-      pricingConditions.forEach((condition) => {
+      pricingConditions.forEach((condition: (typeof pricingConditions)[number]) => {
         if (!pricingConditionsMap.has(condition.pricing_rule_id)) {
           pricingConditionsMap.set(condition.pricing_rule_id, []);
         }
@@ -155,13 +155,18 @@ export async function runCalculateWorkerPaymentPersistence(
     }
   }
 
-  const pricingRulesWithConditions = (pricingRules || []).map((rule) => ({
-    ...rule,
-    conditions: pricingConditionsMap.get(rule.id) || [],
-  }));
+  const pricingRulesWithConditions = (pricingRules || []).map(
+    (rule: NonNullable<typeof pricingRules>[number]) => ({
+      ...rule,
+      conditions: pricingConditionsMap.get(rule.id) || [],
+    })
+  );
 
   const fieldConfigMap = new Map<string, FieldConfig>(
-    (fieldConfigs || []).map((config) => [config.id, config as FieldConfig])
+    (fieldConfigs || []).map((config: NonNullable<typeof fieldConfigs>[number]) => [
+      config.id,
+      config as FieldConfig,
+    ])
   );
 
   const todayDate = new Date().toISOString().split("T")[0];
@@ -200,7 +205,7 @@ export async function runCalculateWorkerPaymentPersistence(
   }
 
   const workersByJob = new Map<string, JobWorker[]>();
-  (jobWorkers || []).forEach((jw) => {
+  (jobWorkers || []).forEach((jw: NonNullable<typeof jobWorkers>[number]) => {
     const workers = workersByJob.get(jw.job_id) || [];
     workers.push(jw as unknown as JobWorker);
     workersByJob.set(jw.job_id, workers);

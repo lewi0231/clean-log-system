@@ -9,7 +9,7 @@ import { createLogger } from "../_utils/logger.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 import { runCalculateWorkerPaymentPersistence } from "./handlers/run-calculate-worker-payment-persistence.ts";
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
