@@ -11,7 +11,9 @@ export function useOrganizationSettings(organizationId: string | null) {
     if (!organizationId) return;
 
     const fetchSettings = async () => {
-      console.log("Organization Settings: Fetching...", { organizationId });
+      if (__DEV__) {
+        console.log("Organization Settings: Fetching...", { organizationId });
+      }
 
       try {
         const { data, error: fetchError } = await supabase.functions.invoke(
@@ -27,7 +29,9 @@ export function useOrganizationSettings(organizationId: string | null) {
         }
 
         if (data?.settings) {
-          console.info("Organization Settings: Success!", data.settings);
+          if (__DEV__) {
+            console.info("Organization Settings: Success!", data.settings);
+          }
           setSettings(data.settings);
         } else {
           console.warn("🏢 Organization Settings: None found");

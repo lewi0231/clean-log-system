@@ -35,7 +35,9 @@ export function useEntryForm({ organizationId, locationId }: UseEntryFormProps) 
   const extendedSchema = useMemo(() => {
     if (!settings) return FieldConfigSchema;
 
-    console.debug("Entry: Settings:", settings);
+    if (__DEV__) {
+      console.debug("Entry: Settings:", settings);
+    }
 
     const baseShape = FieldConfigSchema.shape;
 

@@ -10,10 +10,12 @@ export function useColleagues(organizationId: string | null) {
 
     async function fetchColleagues() {
       try {
-        console.log(
-          "Workers: Fetching workers for organization",
-          organizationId
-        );
+        if (__DEV__) {
+          console.log(
+            "Workers: Fetching workers for organization",
+            organizationId
+          );
+        }
 
         const { data, error } = await supabase.functions.invoke(
           "list-workers",
@@ -27,10 +29,12 @@ export function useColleagues(organizationId: string | null) {
           return;
         }
 
-        console.log("Fetch Workers: Response received", {
-          success: data?.success,
-          workers: data?.workers,
-        });
+        if (__DEV__) {
+          console.log("Fetch Workers: Response received", {
+            success: data?.success,
+            workers: data?.workers,
+          });
+        }
 
         if (data?.workers) {
           // Only active workers should appear as colleagues on jobs (defense in depth)

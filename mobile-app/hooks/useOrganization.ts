@@ -43,10 +43,12 @@ export function useOrganization() {
       isFetchingRef.current = true;
 
       try {
-        console.log("🏢 Organization: Fetching organization for user", {
-          userId: user.id,
-          email: user.email,
-        });
+        if (__DEV__) {
+          console.log("🏢 Organization: Fetching organization for user", {
+            userId: user.id,
+            email: user.email,
+          });
+        }
 
         // Call Edge Function to get organization_id
         // For workers: auth token is automatically included in headers
@@ -67,9 +69,11 @@ export function useOrganization() {
         }
 
         if (data?.organization_id) {
-          console.log("🏢 Organization: Found", {
-            organizationId: data.organization_id,
-          });
+          if (__DEV__) {
+            console.log("🏢 Organization: Found", {
+              organizationId: data.organization_id,
+            });
+          }
           setOrganizationId(data.organization_id);
           fetchedUserIdRef.current = user.id;
         } else {

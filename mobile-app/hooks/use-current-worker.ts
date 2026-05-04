@@ -34,10 +34,12 @@ export function useCurrentWorker() {
                 );
 
                 if (error) {
-                    console.log("Current Worker: Error fetching workers", {
-                        userId: user.id,
-                        error: error.message,
-                    });
+                    if (__DEV__) {
+                        console.log("Current Worker: Error fetching workers", {
+                            userId: user.id,
+                            error: error.message,
+                        });
+                    }
                     setWorker(null);
                 } else if (data?.workers) {
                     // Find the worker with matching auth_user_id
@@ -46,18 +48,22 @@ export function useCurrentWorker() {
                     );
 
                     if (currentWorker) {
-                        console.log("Current Worker: Found", {
-                            workerId: currentWorker.id,
-                            name: currentWorker.name,
-                        });
+                        if (__DEV__) {
+                            console.log("Current Worker: Found", {
+                                workerId: currentWorker.id,
+                                name: currentWorker.name,
+                            });
+                        }
                         setWorker(currentWorker);
                     } else {
-                        console.log(
-                            "Current Worker: No worker found for user",
-                            {
-                                userId: user.id,
-                            },
-                        );
+                        if (__DEV__) {
+                            console.log(
+                                "Current Worker: No worker found for user",
+                                {
+                                    userId: user.id,
+                                },
+                            );
+                        }
                         setWorker(null);
                     }
                 } else {

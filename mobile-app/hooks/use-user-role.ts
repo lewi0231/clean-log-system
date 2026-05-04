@@ -46,11 +46,13 @@ export function useUserRole() {
                     const mappedRole = roleData.user_type === "admin"
                         ? "admin"
                         : roleData.role;
-                    console.log("User Role: Found", {
-                        role: mappedRole,
-                        user_type: roleData.user_type,
-                        email: user.email,
-                    });
+                    if (__DEV__) {
+                        console.log("User Role: Found", {
+                            role: mappedRole,
+                            user_type: roleData.user_type,
+                            email: user.email,
+                        });
+                    }
                     setRole(mappedRole as UserRole);
                 } else {
                     console.warn("User Role: No role found for user", {
