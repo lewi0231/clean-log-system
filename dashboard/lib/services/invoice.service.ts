@@ -1,92 +1,30 @@
 import { log } from "@/lib/logger";
-import { getInvokeErrorMessage, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import {
+  getInvokeErrorMessage,
+  invokeEdgeFunction,
+  invokeTypedEdge,
+} from "@/lib/supabase/invoke-edge-function";
 import type {
   CreateInvoiceRequest,
   InvoiceTemplateConfig,
   InvoiceWithJobs,
   ListInvoicesRequest,
 } from "@/lib/types";
+import type {
+  CalculateInvoiceRequest,
+  CalculateInvoiceResponse,
+  GetInvoiceDetailsResponse,
+  ListInvoicesResponse,
+} from "@/lib/types/invoice-edge";
 
-export interface CalculateInvoiceRequest {
-  organization_id: string;
-  job_ids: string[];
-}
-
-export interface CalculateInvoiceResponse {
-  success: boolean;
-  calculation: {
-    total_subtotal: number;
-    total_adjustments: number;
-    total: number;
-    total_worker_payment: number;
-    total_margin: number;
-    /** GST fields from calculate-invoice (Australian tax). */
-    gst_registered?: boolean;
-    gst_inclusive?: boolean;
-    gst_amount?: number;
-    subtotal_ex_gst?: number;
-    currency?: string;
-    job_calculations: Array<{
-      job_id: string;
-      base_price: number;
-      line_items: Array<{
-        field_config_id: string;
-        field_name: string;
-        field_label: string;
-        option_value?: string;
-        quantity: number;
-        unit_price: number;
-        total: number;
-      }>;
-      applied_rules: Array<{
-        pricing_rule_id: string;
-        scope: string;
-        pricing_type: string;
-        field_config_id: string | null;
-        option_value: string | null;
-        location_hierarchy_id: string | null;
-        location_id: string | null;
-        amount: number;
-        worker_payment: number;
-        metadata: Record<string, unknown>;
-        snapshot_data?: Record<string, unknown>;
-        line_item_key?: string;
-      }>;
-      subtotal: number;
-      total_adjustments: number;
-      total: number;
-      worker_payment_total: number;
-      margin: number;
-    }>;
-  };
-}
-
-export interface CreateInvoiceResponse {
-  success: boolean;
-  invoice: InvoiceWithJobs;
-}
-
-export interface ListInvoicesResponse {
-  success: boolean;
-  invoices: InvoiceWithJobs[];
-  pagination?: {
-    page: number;
-    page_size: number;
-    total_count: number;
-    total_pages: number;
-  };
-}
-
-export interface GetInvoiceDetailsRequest {
-  invoice_id: string;
-}
-
-export interface GetInvoiceDetailsResponse {
-  success: boolean;
-  invoice: InvoiceWithJobs;
-  calculation: CalculateInvoiceResponse["calculation"];
-  template_config?: InvoiceTemplateConfig | null;
-}
+export type {
+  CalculateInvoiceRequest,
+  CalculateInvoiceResponse,
+  CreateInvoiceResponse,
+  GetInvoiceDetailsRequest,
+  GetInvoiceDetailsResponse,
+  ListInvoicesResponse,
+} from "@/lib/types/invoice-edge";
 
 export class InvoiceService {
   /**
@@ -101,10 +39,7 @@ export class InvoiceService {
         jobCount: request.job_ids.length,
       });
 
-      const data = await invokeEdgeFunction<CalculateInvoiceResponse>(
-        "calculate-invoice",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("calculate-invoice", request);
 
       if (!data || !data.success || !data.calculation) {
         throw new Error("Failed to calculate invoice");
@@ -130,10 +65,7 @@ export class InvoiceService {
         jobCount: request.job_ids.length,
       });
 
-      const data = await invokeEdgeFunction<CreateInvoiceResponse>(
-        "create-invoice",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("create-invoice", request);
 
       if (!data || !data.success || !data.invoice) {
         // Check if there's a more specific error message in the response
@@ -168,10 +100,7 @@ export class InvoiceService {
         page: request.page,
       });
 
-      const data = await invokeEdgeFunction<ListInvoicesResponse>(
-        "list-invoices",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("list-invoices", request);
 
       if (!data || !data.success || !data.invoices) {
         throw new Error("Failed to list invoices");
@@ -206,7 +135,7 @@ export class InvoiceService {
         invoiceId,
       });
 
-      const data = await invokeEdgeFunction<GetInvoiceDetailsResponse>("get-invoice-details", {
+      const data = await invokeTypedEdge("get-invoice-details", {
         invoice_id: invoiceId,
       });
 

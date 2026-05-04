@@ -359,17 +359,128 @@ export interface DeleteFieldPricingResponse {
   success: boolean;
 }
 
+// Job approval API (Edge)
+export interface ResolveFlaggedJobRequest {
+  job_id: string;
+  action: "approve" | "cancel";
+  admin_notes?: string;
+}
+
+export interface ResolveFlaggedJobResponse {
+  success: boolean;
+  message: string;
+  job_status: "approved" | "cancelled";
+}
+
+// Service pricing modes API (Edge)
+export interface ListServicePricingModesRequest {
+  organization_id: string;
+  location_id?: string | null;
+  service_type_field_config_id?: string;
+  service_type_value?: string;
+}
+
+export interface ListServicePricingModesResponse {
+  success?: boolean;
+  error?: string;
+  service_pricing_modes?: ServicePricingMode[];
+}
+
+export interface UpsertServicePricingModeRequest {
+  organization_id: string;
+  service_type_field_config_id: string;
+  service_type_value: string;
+  pricing_mode: "field_based" | "fixed_price";
+  fixed_customer_price?: number | null;
+  fixed_worker_payment?: number | null;
+  fixed_price_currency?: string;
+  location_id?: string | null;
+}
+
+export interface UpsertServicePricingModeResponse {
+  success?: boolean;
+  error?: string;
+  service_pricing_mode?: ServicePricingMode;
+}
+
+export interface DeleteServicePricingModeRequest {
+  id: string;
+}
+
+export interface DeleteServicePricingModeResponse {
+  success?: boolean;
+  error?: string;
+}
+
+// Invoice template API (Edge)
+export interface GetInvoiceTemplateConfigRequest {
+  organization_id: string;
+}
+
+export interface GetInvoiceTemplateConfigResponse {
+  success: boolean;
+  config: InvoiceTemplateConfig;
+}
+
+export interface UpdateInvoiceTemplateConfigRequest {
+  organization_id: string;
+  invoice_title?: string;
+  show_logo?: boolean;
+  show_abn?: boolean;
+  bill_to_fields?: string[];
+  service_address_config?: ServiceAddressConfig;
+  billing_address_config?: BillingAddressConfig;
+  email_recipient_config?: InvoiceEmailRecipientConfig;
+  line_item_display?: Partial<LineItemDisplayConfig>;
+}
+
+export interface UpdateInvoiceTemplateConfigResponse {
+  success: boolean;
+  config: InvoiceTemplateConfig;
+}
+
+// Onboarding + signup (Edge)
+export interface CompleteOnboardingRequest {
+  industry_type: string;
+  employee_count: "none" | "1-5" | "6-20" | "21-50" | "50+";
+  abn: string;
+  has_locations: boolean;
+  has_workers: boolean;
+  worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
+  worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
+  invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
+  invoice_weekly_day: number | null;
+  invoice_monthly_day: number | null;
+  auto_generate_invoices: boolean;
+}
+
+export interface CompleteOnboardingResponse {
+  success: boolean;
+  organizationId: string;
+}
+
+export interface RegisterOrganizationResponse {
+  organization?: { id?: string; org_code?: string };
+  error?: string;
+}
+
 // Common types (re-exported from lib/types.ts for convenience)
 import type { FieldConfig } from "@clean-log/shared/types";
 import type {
+  BillingAddressConfig,
   BusinessMode,
   Feedback,
   FieldPricing,
+  InvoiceEmailRecipientConfig,
+  InvoiceTemplateConfig,
   Job,
+  LineItemDisplayConfig,
   Location,
   LocationHierarchyNode,
   OrganizationSettings,
   OrganizationUser,
+  ServiceAddressConfig,
+  ServicePricingMode,
   Worker,
 } from "../types";
 

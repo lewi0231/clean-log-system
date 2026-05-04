@@ -22,32 +22,14 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { log } from "@/lib/logger";
-import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { EdgeFunctionError, invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
+import type { CompleteOnboardingRequest } from "@/lib/types/api";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-interface OnboardingData {
-  // Step 1: Business Basics
-  industry_type: string;
-  employee_count: "none" | "1-5" | "6-20" | "21-50" | "50+";
-
-  // Step 2: Business Details
-  abn: string;
-  has_locations: boolean;
-
-  // Step 3: Worker Payment (conditional)
-  has_workers: boolean;
-  worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
-  worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
-
-  // Step 4: Invoicing
-  invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
-  invoice_weekly_day: number | null; // 0-6, Sunday-Saturday
-  invoice_monthly_day: number | null; // 1-31
-  auto_generate_invoices: boolean; // Whether to auto-generate invoices from completed jobs
-}
+type OnboardingData = CompleteOnboardingRequest;
 
 const TOTAL_STEPS = 4;
 
@@ -134,10 +116,7 @@ export function OnboardingWizard() {
         has_abn: !!data.abn,
       });
 
-      await invokeEdgeFunction<{ success: boolean; organizationId: string }>(
-        "complete-onboarding",
-        data as unknown as Record<string, unknown>
-      );
+      await invokeTypedEdge("complete-onboarding", data);
 
       log.info("Onboarding: Completed successfully");
       toast.success("Welcome! Let's get you set up.");

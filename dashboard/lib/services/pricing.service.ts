@@ -1,57 +1,18 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-import type { PricingCondition, PricingRule, PricingScope, PricingType } from "@/lib/types";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
+import type { PricingRule } from "@/lib/types";
+import type {
+  ListPricingHistoryRequest,
+  ListPricingRulesRequest,
+  PricingHistoryEntry,
+  UpsertPricingRuleRequest,
+} from "@/lib/types/pricing-api";
 
-export interface ListPricingRulesRequest {
-  organization_id: string;
-  scopes?: PricingScope[];
-  include_inactive?: boolean;
-  effective_at?: string;
-  location_hierarchy_id?: string | null;
-  location_id?: string | null;
-  field_config_id?: string;
-  option_value?: string;
-  pricing_context?: "customer" | "worker";
-}
-
-export interface UpsertPricingRuleRequest {
-  id?: string;
-  organization_id: string;
-  scope: PricingScope;
-  pricing_type: PricingType;
-  pricing_context?: "customer" | "worker"; // Defaults to 'customer' for backward compatibility
-  field_config_id?: string | null;
-  option_value?: string | null;
-  applies_to_field_type?: string | null;
-  location_hierarchy_id?: string | null;
-  location_id?: string | null;
-  currency?: string;
-  base_price?: number | null;
-  percentage_rate?: number | null;
-  minimum_quantity?: number | null;
-  maximum_quantity?: number | null;
-  tier_definition?: unknown;
-  metadata?: Record<string, unknown>;
-  worker_payment_type?: "same_structure" | "percentage" | "fixed_rate" | null;
-  worker_payment_value?: number | null;
-  priority?: number;
-  active?: boolean;
-  effective_at?: string;
-  expires_at?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  conditions?: Array<
-    Omit<
-      PricingCondition,
-      "id" | "pricing_rule_id" | "metadata" | "priority" | "condition_value" | "action_value"
-    > & {
-      condition_value: string | number;
-      action_value: number;
-      metadata?: Record<string, unknown>;
-      priority?: number;
-    }
-  >;
-}
+export type {
+  ListPricingRulesRequest,
+  UpsertPricingRuleRequest,
+  PricingHistoryEntry,
+} from "@/lib/types/pricing-api";
 
 export class PricingService {
   static async listRules(request: ListPricingRulesRequest): Promise<PricingRule[]> {
@@ -61,17 +22,13 @@ export class PricingService {
         scopes: request.scopes,
       });
 
-      const data = await invokeEdgeFunction<{
-        success: boolean;
-        pricing_rules?: PricingRule[];
-        error?: string;
-      }>("list-pricing-rules", request as unknown as Record<string, unknown>);
+      const data = await invokeTypedEdge("list-pricing-rules", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to list pricing rules");
       }
 
-      return (data.pricing_rules || []) as PricingRule[];
+      return data.pricing_rules || [];
     } catch (err) {
       log.error("PricingService: Failed to list pricing rules", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -81,8 +38,6 @@ export class PricingService {
   }
 
   static async upsertRule(request: UpsertPricingRuleRequest): Promise<PricingRule> {
-    const functionName = request.id ? "update-pricing-rule" : "create-pricing-rule";
-
     try {
       log.debug("PricingService: upserting pricing rule", {
         organizationId: request.organization_id,
@@ -91,11 +46,9 @@ export class PricingService {
         hasId: Boolean(request.id),
       });
 
-      const data = await invokeEdgeFunction<{
-        success?: boolean;
-        pricing_rule?: PricingRule;
-        error?: string;
-      }>(functionName, request as unknown as Record<string, unknown>);
+      const data = request.id
+        ? await invokeTypedEdge("update-pricing-rule", request)
+        : await invokeTypedEdge("create-pricing-rule", request);
 
       // Check for error in response data (edge functions return errors in data.error)
       if (data && typeof data === "object" && "error" in data) {
@@ -144,10 +97,7 @@ export class PricingService {
     try {
       log.debug("PricingService: deleting pricing rule", { id });
 
-      const data = await invokeEdgeFunction<{ success: boolean; error?: string }>(
-        "delete-pricing-rule",
-        { id }
-      );
+      const data = await invokeTypedEdge("delete-pricing-rule", { id });
       if (!data || !data.success) {
         throw new Error("Failed to delete pricing rule");
       }
@@ -175,16 +125,14 @@ export class PricingService {
         pricingContext: options?.pricingContext,
       });
 
-      const data = await invokeEdgeFunction<{
-        success: boolean;
-        pricing_history?: PricingHistoryEntry[];
-        error?: string;
-      }>("list-pricing-history", {
+      const body: ListPricingHistoryRequest = {
         organization_id: organizationId,
         date_from: options?.dateFrom,
         date_to: options?.dateTo,
         pricing_context: options?.pricingContext,
-      });
+      };
+
+      const data = await invokeTypedEdge("list-pricing-history", body);
 
       if (!data) {
         throw new Error("No data returned from edge function");
@@ -216,24 +164,4 @@ export class PricingService {
       throw err instanceof Error ? err : new Error(errorMessage);
     }
   }
-}
-
-export interface PricingHistoryEntry {
-  id: string;
-  field_name: string;
-  option_value?: string;
-  /** Display label for a location or hierarchy node; empty when the rule is org-wide (default). */
-  location_name?: string;
-  /** Set when the rule applies to a specific site; null means not location-scoped. */
-  location_id?: string | null;
-  /** Set when the rule applies to a region/company node; null means not node-scoped. */
-  location_hierarchy_id?: string | null;
-  old_price?: number;
-  new_price: number;
-  effective_at: string;
-  changed_at?: string; // When the change was actually made (audit timestamp)
-  expires_at?: string;
-  changed_by?: string;
-  change_type: "created" | "updated" | "expired";
-  pricing_context?: "customer" | "worker";
 }
