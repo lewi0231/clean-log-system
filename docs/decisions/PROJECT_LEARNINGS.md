@@ -7,7 +7,7 @@ This document captures project-specific learnings that complement the universal 
 | **Framework Version** | 4.8.1      |
 | **Project**           | JobFlow    |
 | **Created**           | 2026-01-31 |
-| **Last Updated**      | 2026-05-05 |
+| **Last Updated**      | 2026-05-06 |
 
 ---
 
@@ -21,7 +21,7 @@ This document captures project-specific learnings that complement the universal 
 | 4   | Deno TypeScript Strict Literal Type Narrowing                                       | typescript  | 2026-02-14 |
 | 5   | Testing React Components with Tooltips in Vitest                                    | testing     | 2026-02-14 |
 | 6   | Don't mix useOptimistic with React Query                                            | react       | 2026-02-15 |
-| 7   | Dashboard logging: use `log` / `createLogger`, not `console.*`                      | engineering | 2026-04-11 |
+| 7   | Logging: dashboard `log` / Edge `createLogger` — not `console.*`                    | engineering | 2026-05-06 |
 | 8   | In-app notifications: end-to-end checklist (worker_active, bell, RLS, Realtime)     | real-time   | 2026-04-11 |
 | 9   | Supplementary help: prefer `ContextualHelp` over hover `Tooltip` when a click is OK | ui          | 2026-04-12 |
 | 10  | Dashboard ↔ Edge typing: `edge-contracts` registry + `invokeTypedEdge`              | typescript  | 2026-05-05 |
@@ -343,20 +343,29 @@ const handleAdd = (data) => {
 
 ---
 
-### 7. Dashboard logging: use `log` / `createLogger`, not `console.*`
+### 7. Logging: dashboard `log` / Edge `createLogger` — not `console.*`
 
-**Date:** 2026-04-11  
+**Date:** 2026-04-11 (Edge + mobile clarification **2026-05-06**)  
 **Tag:** `engineering`
 
 **Context:**  
-Ad-hoc `console.log` / `console.error` is hard to tune per environment, clutters production, and bypasses a single place for future hooks (e.g. Sentry breadcrumbs).
+Ad-hoc `console.log` / `console.error` is hard to tune per environment, clutters production, and bypasses structured logging (correlation IDs, levels, future sinks).
 
-**Learning:**  
-Use the shared module `dashboard/lib/logger.ts` (`loglevel`-based):
+**Learning:**
+
+**Dashboard (Next.js)** — use `dashboard/lib/logger.ts` (`loglevel`-based):
 
 - Import `log` or `createLogger("ScopeName")` from `@/lib/logger`.
 - Adjust verbosity with `LOG_LEVEL` or `NEXT_PUBLIC_LOG_LEVEL` (`trace` | `debug` | `info` | `warn` | `error` | `silent`). Default: `debug` in development, `warn` in production.
-- **Do not** add new `console.*` calls in application code; tests and Vitest setup may still use `console` where useful.
+- **Do not** add new `console.*` in application code; tests / Vitest setup may still use `console` where useful.
+
+**Supabase Edge Functions** — use `database/supabase/functions/_utils/logger.ts`:
+
+- **`const logger = createLogger(req, { functionName: "<fn-name>" });`** at the start of the handler (after CORS where applicable).
+- Use **`logger.info`**, **`logger.warn`**, **`logger.error`**, **`logger.debug`** with **structured objects** as the second argument when helpful.
+- **Never** use **`console.*`** in Edge handler or **`handlers/*.ts`** code — it bypasses request-scoped metadata and is inconsistent with the rest of the fleet.
+
+**Expo / React Native** — there is no Edge `logger` on device. Until a shared RN logger exists, avoid noisy production traces: gate **`console.log` / `console.debug` / `console.info` / `console.warn`** behind **`__DEV__`**, or remove. Prefer **`console.error`** only for unexpected failures you truly need in release (consider reducing over time).
 
 **See also:** `docs/code-quality-alignment.md` (Prettier, Husky, ESLint `no-console` on the dashboard).
 

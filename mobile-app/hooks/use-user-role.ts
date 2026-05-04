@@ -55,10 +55,12 @@ export function useUserRole() {
                     }
                     setRole(mappedRole as UserRole);
                 } else {
-                    console.warn("User Role: No role found for user", {
-                        userId: user.id,
-                        email: user.email,
-                    });
+                    if (__DEV__) {
+                        console.warn("User Role: No role found for user", {
+                            userId: user.id,
+                            email: user.email,
+                        });
+                    }
                     setRole(null);
                 }
                 setLoading(false);

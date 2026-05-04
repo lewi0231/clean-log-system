@@ -34,7 +34,9 @@ export function useOrganizationSettings(organizationId: string | null) {
           }
           setSettings(data.settings);
         } else {
-          console.warn("🏢 Organization Settings: None found");
+          if (__DEV__) {
+            console.warn("🏢 Organization Settings: None found");
+          }
           setError("No organization settings found");
         }
       } catch (err) {

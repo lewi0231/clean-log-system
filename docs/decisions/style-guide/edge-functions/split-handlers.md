@@ -103,3 +103,15 @@ Financial core: keep **`index.ts`** limited to **CORS**, **`req.json()`** valida
 - `handlers/run-calculate-worker-payment-persistence.ts` — org gate, Supabase reads (**jobs**, field configs, hierarchy, rules, rate cards, **`job_worker`**), per-job loop, **`jsonResponse`**.
 
 Shared split math remains in **`_utils/worker-payment-split.ts`** ([worker-payment-split tests](../../../../database/supabase/functions/_utils/__tests__/worker-payment-split.test.ts)).
+
+---
+
+## Reference layout — `auto-send-invoices` (Rank 3 milestone **3**, privileged batch)
+
+**Privileged cron-style sender:** thin **`index.ts`** (**`handleCors`**, **`createLogger`**, **`createServiceRoleClient`**, outer **`catch`** → **`errorResponse`**); orchestration + Supabase loops live in **`handlers/run-auto-send-invoices-persistence.ts`**.
+
+- `handlers/types.ts` — **`DraftInvoice`**, **`InvoiceWithDetails`**, **`AutoSendConfig`**, hierarchy/location shapes.
+- `handlers/auto-send-scheduling.ts` — **`shouldRunAutoSend`**, **`getAutoSendConfig`**, **`getOrgAutoSendConfig`** (pure; covered by [`auto-send-invoices.test.ts`](../../../../database/supabase/functions/__tests__/auto-send-invoices.test.ts)).
+- `handlers/run-auto-send-invoices-persistence.ts` — org iteration, draft invoices, hierarchy vs org-level precedence, bulk fetch, **`sendInvoiceEmail`**, status updates.
+
+Logging must use **`createLogger`** / **`logger.*`** — never **`console.*`** in handler code ([PROJECT_LEARNINGS §7](../../PROJECT_LEARNINGS.md)).

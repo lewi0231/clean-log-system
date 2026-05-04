@@ -87,11 +87,11 @@ _Order auth before any trust of body; preserve existing call order._
 
 ## 3. Post-pilot lanes (ordering — [S1 §8](./S1-split-large-edge-handlers.md))
 
-| Milestone | Candidate                                                                                         | Notes                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| **2a**    | [`stripe-webhook`](../../database/supabase/functions/stripe-webhook/index.ts)                     | Thin router + `handlers/<event>.ts` ([S1 G5](./S1-split-large-edge-handlers.md)) |
-| **2b**    | [`calculate-worker-payment`](../../database/supabase/functions/calculate-worker-payment/index.ts) | Financial core — smaller PRs; types → fetch → compute → persist                  |
-| **3**     | Batch (`auto-send-invoices`, …)                                                                   | Same principles; optional separate rollout lane                                  |
+| Milestone | Candidate                                                                                         | Notes                                                                                                                                                                                            |
+| --------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **2a**    | [`stripe-webhook`](../../database/supabase/functions/stripe-webhook/index.ts)                     | Thin router + `handlers/<event>.ts` ([S1 G5](./S1-split-large-edge-handlers.md))                                                                                                                 |
+| **2b**    | [`calculate-worker-payment`](../../database/supabase/functions/calculate-worker-payment/index.ts) | Financial core — smaller PRs; types → fetch → compute → persist                                                                                                                                  |
+| **3**     | Batch (`auto-send-invoices`, **`auto-generate-invoices`**, …)                                     | **`auto-send-invoices`** → **`handlers/`** + scheduling module ([`split-handlers.md`](../decisions/style-guide/edge-functions/split-handlers.md)); same principles for remaining batch functions |
 
 **Webhook lane (2a — Diamond):** [`stripe-webhook`](../../database/supabase/functions/stripe-webhook/index.ts) consumes a **raw** payload; keep **exactly one** `req.text()` / parse boundary in **`index.ts`** (or one dedicated **`handlers/parse-body.ts`**) and pass **serialized context** into event modules — **never** re-read the [`Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request). Aligns with unified **`raw`** / stripe guidance ([preset matrix §2](./S2-unified-edge-handler-pipeline.md#2-preset-matrix)).
 
@@ -259,14 +259,14 @@ Before starting PR 1, confirm:
 
 ## 15. Summary
 
-| Item          | Outcome                                                                                                         |
-| ------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Pilot**     | **`create-job`** — **`identity`**, extraction-only first                                                        |
-| **Diamond**   | **Gate clear** — **`identity`** heterogeneity, **`catch`** parity, CORS, webhook raw-body, merge order captured |
-| **Tests**     | §4 — edge-unit + **T6/T7** (catch mapping + CORS) + targeted unit modules                                       |
-| **Docs**      | **`split-handlers.md`** style guide                                                                             |
-| **Pre-impl**  | §12.1 gate — confirm no conflicting PRs, staging healthy, seams validated                                       |
-| **Next work** | **`S2`§inventory** — next largest unsecured monolith **or** batch “thin entrypoint” pass                        |
+| Item          | Outcome                                                                                                                                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pilot**     | **`create-job`** — **`identity`**, extraction-only first                                                                                                                                                         |
+| **Diamond**   | **Gate clear** — **`identity`** heterogeneity, **`catch`** parity, CORS, webhook raw-body, merge order captured                                                                                                  |
+| **Tests**     | §4 — edge-unit + **T6/T7** (catch mapping + CORS) + targeted unit modules                                                                                                                                        |
+| **Docs**      | **`split-handlers.md`** style guide                                                                                                                                                                              |
+| **Pre-impl**  | §12.1 gate — confirm no conflicting PRs, staging healthy, seams validated                                                                                                                                        |
+| **Next work** | **`calculate-invoice`** / **`auto-generate-invoices`** (largest remaining **`index.ts`** monoliths); optional thin **`index`** sweep elsewhere; **`auto-send-invoices`** (**§3**) — **`handlers/`** split landed |
 
 ---
 

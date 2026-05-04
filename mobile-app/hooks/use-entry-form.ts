@@ -168,12 +168,15 @@ export function useEntryForm({ organizationId, locationId }: UseEntryFormProps) 
           // But if we want to show it, we'd need a special error key
           // For now, skip it since location validation is handled in the UI
         } else {
-          // Log unknown field errors for debugging
-          console.warn("Entry: validation error for unknown field:", path);
+          if (__DEV__) {
+            console.warn("Entry: validation error for unknown field:", path);
+          }
         }
       });
 
-      console.warn("Entry: form validation failed", { errors: fieldErrors });
+      if (__DEV__) {
+        console.warn("Entry: form validation failed", { errors: fieldErrors });
+      }
       setErrors(fieldErrors);
       return false;
     }
@@ -181,12 +184,16 @@ export function useEntryForm({ organizationId, locationId }: UseEntryFormProps) 
     // Then validate mutually exclusive groups
     const groupErrors = validateMutuallyExclusiveGroups(submissionData);
     if (Object.keys(groupErrors).length > 0) {
-      console.warn("Entry: group validation failed", { errors: groupErrors });
+      if (__DEV__) {
+        console.warn("Entry: group validation failed", { errors: groupErrors });
+      }
       setErrors(groupErrors);
       return false;
     }
 
-    console.warn("Entry: form validation success", validation.data);
+    if (__DEV__) {
+      console.warn("Entry: form validation success", validation.data);
+    }
     setErrors({}); // Clear errors on success
     return true;
   };

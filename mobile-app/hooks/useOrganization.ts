@@ -77,7 +77,9 @@ export function useOrganization() {
           setOrganizationId(data.organization_id);
           fetchedUserIdRef.current = user.id;
         } else {
-          console.warn("🏢 Organization: No organization found for user");
+          if (__DEV__) {
+            console.warn("🏢 Organization: No organization found for user");
+          }
           setError("No organization found");
           fetchedUserIdRef.current = user.id; // Mark as fetched even if no org found
         }
