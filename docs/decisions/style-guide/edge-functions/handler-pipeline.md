@@ -14,6 +14,8 @@ Do **not** use **`preset: "identity"`** in production yet (returns **501** until
 
 Legacy **`alternate_auth`**, **`secured_custom`**, most **`identity`** handlers stay manual `serve` until triaged.
 
+Large **`identity`** handlers (**e.g.** [`create-job`](../../../../database/supabase/functions/create-job/index.ts)): prefer **extract-first** into **`handlers/*.ts`** ([`split-handlers.md`](./split-handlers.md)) **before** migrating the HTTP shell — reduces review surface and preserves **`handleCors`** / parity tests.
+
 ---
 
 ## Usage (`secured`)

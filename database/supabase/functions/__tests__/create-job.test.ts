@@ -8,116 +8,90 @@
  */
 
 import { assertEquals } from "@std/assert";
+import {
+  normalizeLocationId,
+  requiresLocationId,
+  stripSubmissionForInsert,
+} from "../create-job/handlers/submission-parsing.ts";
 
 /**
- * Test location ID normalization logic
+ * Test location ID normalization logic (implementation: submission-parsing.ts)
  */
 Deno.test("create-job: should normalize empty string location_id to null", () => {
-  const locationId: string | undefined = "";
-  const normalized = locationId && locationId.trim() !== "" ? locationId : null;
-  assertEquals(normalized, null);
+  assertEquals(normalizeLocationId(""), null);
 });
 
 Deno.test("create-job: should normalize whitespace-only location_id to null", () => {
-  const locationId: string | undefined = "   ";
-  const normalized = locationId && locationId.trim() !== "" ? locationId : null;
-  assertEquals(normalized, null);
+  assertEquals(normalizeLocationId("   "), null);
 });
 
 Deno.test("create-job: should preserve valid location_id", () => {
-  const locationId: string | undefined = "location-123";
-  const normalized = locationId && locationId.trim() !== "" ? locationId : null;
-  assertEquals(normalized, "location-123");
+  assertEquals(normalizeLocationId("location-123"), "location-123");
 });
 
 /**
  * Test location requirement validation
  */
 Deno.test("create-job: should require location when use_predefined_locations is true", () => {
-  const usePredefinedLocations = true;
-  const normalizedLocationId = null;
-  const shouldRequireLocation = usePredefinedLocations && !normalizedLocationId;
-  assertEquals(shouldRequireLocation, true);
+  assertEquals(requiresLocationId(true, null), true);
 });
 
 Deno.test("create-job: should not require location when use_predefined_locations is false", () => {
-  const usePredefinedLocations = false;
-  const normalizedLocationId = null;
-  const shouldRequireLocation = usePredefinedLocations && !normalizedLocationId;
-  assertEquals(shouldRequireLocation, false);
+  assertEquals(requiresLocationId(false, null), false);
 });
 
 Deno.test("create-job: should not require location when location_id is provided", () => {
-  const usePredefinedLocations = true;
-  const normalizedLocationId = "location-123";
-  const shouldRequireLocation = usePredefinedLocations && !normalizedLocationId;
-  assertEquals(shouldRequireLocation, false);
+  assertEquals(requiresLocationId(true, "location-123"), false);
 });
 
 /**
- * Test submission data processing
+ * Test submission data processing (implementation: submission-parsing.ts)
  */
 Deno.test("create-job: should extract colleague_ids and location_id from submissionData", () => {
-  const submissionData: {
-    colleague_ids?: string[];
-    location_id?: string;
-    field1: string;
-    field2: string;
-  } = {
+  const submissionData = {
     colleague_ids: ["worker-1", "worker-2"],
     location_id: "location-123",
     field1: "value1",
     field2: "value2",
   };
 
-  const colleagueIds = submissionData.colleague_ids;
-  const locationId = submissionData.location_id;
-  const {
-    colleague_ids: _colleague_ids,
-    location_id: _location_id,
-    ...fieldData
-  } = submissionData;
+  const stripped = stripSubmissionForInsert(submissionData);
 
-  assertEquals(colleagueIds, ["worker-1", "worker-2"]);
-  assertEquals(locationId, "location-123");
-  assertEquals(fieldData, { field1: "value1", field2: "value2" });
+  assertEquals(stripped.colleagueIds, ["worker-1", "worker-2"]);
+  assertEquals(stripped.rawLocationId, "location-123");
+  assertEquals(stripped.fieldData, { field1: "value1", field2: "value2" });
+  assertEquals(stripped.submissionDataJsonb, {
+    field1: "value1",
+    field2: "value2",
+  });
 });
 
 Deno.test("create-job: should handle submissionData without colleague_ids", () => {
-  const submissionData: {
-    colleague_ids?: string[];
-    location_id?: string;
-    field1: string;
-  } = {
+  const submissionData = {
     location_id: "location-123",
     field1: "value1",
   };
 
-  const colleagueIds = submissionData.colleague_ids;
-  const {
-    colleague_ids: _colleague_ids,
-    location_id: _location_id,
-    ...fieldData
-  } = submissionData;
+  const stripped = stripSubmissionForInsert(submissionData);
 
-  assertEquals(colleagueIds, undefined);
-  assertEquals(fieldData, { field1: "value1" });
+  assertEquals(stripped.colleagueIds, undefined);
+  assertEquals(stripped.fieldData, { field1: "value1" });
 });
 
 Deno.test("create-job: should convert empty fieldData to null", () => {
-  const fieldData: Record<string, unknown> = {};
-  const submissionDataJsonb = Object.keys(fieldData).length > 0
-    ? fieldData
-    : null;
-  assertEquals(submissionDataJsonb, null);
+  const stripped = stripSubmissionForInsert({
+    colleague_ids: [],
+    location_id: "loc",
+  });
+  assertEquals(Object.keys(stripped.fieldData).length === 0, true);
+  assertEquals(stripped.submissionDataJsonb, null);
 });
 
 Deno.test("create-job: should preserve non-empty fieldData", () => {
-  const fieldData = { field1: "value1" };
-  const submissionDataJsonb = Object.keys(fieldData).length > 0
-    ? fieldData
-    : null;
-  assertEquals(submissionDataJsonb, { field1: "value1" });
+  const stripped = stripSubmissionForInsert({
+    field1: "value1",
+  });
+  assertEquals(stripped.submissionDataJsonb, { field1: "value1" });
 });
 
 /**
@@ -146,24 +120,21 @@ Deno.test("create-job: should reject string submissionData", () => {
  */
 Deno.test("create-job: should validate colleague_ids is an array", () => {
   const colleagueIds = ["worker-1", "worker-2"];
-  const isValid = colleagueIds &&
-    Array.isArray(colleagueIds) &&
-    colleagueIds.length > 0;
+  const isValid = colleagueIds && Array.isArray(colleagueIds) && colleagueIds.length > 0;
   assertEquals(isValid, true);
 });
 
 Deno.test("create-job: should reject empty colleague_ids array", () => {
   const colleagueIds: string[] = [];
-  const isValid = colleagueIds &&
-    Array.isArray(colleagueIds) &&
-    colleagueIds.length > 0;
+  const isValid = colleagueIds && Array.isArray(colleagueIds) && colleagueIds.length > 0;
   assertEquals(isValid, false);
 });
 
 Deno.test("create-job: should handle undefined colleague_ids", () => {
   const colleagueIds: string[] | undefined = undefined;
   // When colleague_ids is undefined, validation should fail
-  const isValid = colleagueIds !== undefined &&
+  const isValid =
+    colleagueIds !== undefined &&
     Array.isArray(colleagueIds) &&
     (colleagueIds as string[]).length > 0;
   assertEquals(isValid, false);
@@ -211,8 +182,7 @@ Deno.test("create-job: should set pending status for multi-worker jobs submitted
   const hasColleagues = true;
   const isWorkerSubmission = true;
 
-  const approvalStatus =
-    hasColleagues && isWorkerSubmission ? "pending" : "approved";
+  const approvalStatus = hasColleagues && isWorkerSubmission ? "pending" : "approved";
   assertEquals(approvalStatus, "pending");
 });
 
@@ -220,8 +190,7 @@ Deno.test("create-job: should set approved status for single-worker jobs", () =>
   const hasColleagues = false;
   const isWorkerSubmission = true;
 
-  const approvalStatus =
-    hasColleagues && isWorkerSubmission ? "pending" : "approved";
+  const approvalStatus = hasColleagues && isWorkerSubmission ? "pending" : "approved";
   assertEquals(approvalStatus, "approved");
 });
 
@@ -229,8 +198,7 @@ Deno.test("create-job: should set approved status for admin-created jobs", () =>
   const hasColleagues = true;
   const isWorkerSubmission = false; // Admin created
 
-  const approvalStatus =
-    hasColleagues && isWorkerSubmission ? "pending" : "approved";
+  const approvalStatus = hasColleagues && isWorkerSubmission ? "pending" : "approved";
   assertEquals(approvalStatus, "approved");
 });
 
@@ -241,9 +209,7 @@ Deno.test("create-job: should calculate auto_approve_at from org timeout", () =>
   const submissionTime = new Date("2026-02-14T10:00:00Z");
   const timeoutHours = 24; // Default org setting
 
-  const autoApproveAt = new Date(
-    submissionTime.getTime() + timeoutHours * 60 * 60 * 1000
-  );
+  const autoApproveAt = new Date(submissionTime.getTime() + timeoutHours * 60 * 60 * 1000);
 
   assertEquals(autoApproveAt.toISOString(), "2026-02-15T10:00:00.000Z");
 });
@@ -275,9 +241,7 @@ Deno.test("create-job: should calculate edit_window_expires_at (3 hours)", () =>
   const submissionTime = new Date("2026-02-14T10:00:00Z");
   const editWindowHours = 3;
 
-  const editWindowExpiresAt = new Date(
-    submissionTime.getTime() + editWindowHours * 60 * 60 * 1000
-  );
+  const editWindowExpiresAt = new Date(submissionTime.getTime() + editWindowHours * 60 * 60 * 1000);
 
   assertEquals(editWindowExpiresAt.toISOString(), "2026-02-14T13:00:00.000Z");
 });
@@ -315,8 +279,7 @@ Deno.test("create-job: should set submitter confirmation_status to confirmed", (
   const submitterId = "worker-1";
   const workerId = "worker-1";
 
-  const confirmationStatus =
-    workerId === submitterId ? "confirmed" : "pending";
+  const confirmationStatus = workerId === submitterId ? "confirmed" : "pending";
   assertEquals(confirmationStatus, "confirmed");
 });
 
@@ -324,8 +287,7 @@ Deno.test("create-job: should set colleague confirmation_status to pending", () 
   const submitterId: string = "worker-1";
   const workerId: string = "worker-2";
 
-  const confirmationStatus =
-    workerId === submitterId ? "confirmed" : "pending";
+  const confirmationStatus = workerId === submitterId ? "confirmed" : "pending";
   assertEquals(confirmationStatus, "pending");
 });
 
@@ -348,12 +310,8 @@ Deno.test("create-job: should create correct job_worker entries for multi-worker
 
   const jobWorkerEntries = allWorkerIds.map((workerId) => ({
     worker_id: workerId,
-    confirmation_status:
-      isWorkerSubmission && workerId === submitterId ? "confirmed" : "pending",
-    confirmed_at:
-      isWorkerSubmission && workerId === submitterId
-        ? new Date().toISOString()
-        : null,
+    confirmation_status: isWorkerSubmission && workerId === submitterId ? "confirmed" : "pending",
+    confirmed_at: isWorkerSubmission && workerId === submitterId ? new Date().toISOString() : null,
   }));
 
   assertEquals(jobWorkerEntries.length, 3);

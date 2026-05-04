@@ -310,11 +310,12 @@ return errorResponse("Invalid signature", 400);
 
 ## Rules Summary
 
-| Rule                         | Description                                                                                             |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Always verify org membership | For any organization-scoped operation                                                                   |
-| Service role client          | For database queries in auth                                                                            |
-| 401 vs 403                   | 401 = no auth, 403 = auth but no access                                                                 |
-| Webhook signatures           | Always verify external webhooks                                                                         |
-| Log auth failures            | For security auditing                                                                                   |
-| Handler pipeline             | Prefer **`serveJsonHandler`** for `secured` / `public` JSON — [handler-pipeline](./handler-pipeline.md) |
+| Rule                         | Description                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Always verify org membership | For any organization-scoped operation                                                                        |
+| Service role client          | For database queries in auth                                                                                 |
+| 401 vs 403                   | 401 = no auth, 403 = auth but no access                                                                      |
+| Webhook signatures           | Always verify external webhooks                                                                              |
+| Log auth failures            | For security auditing                                                                                        |
+| Handler pipeline             | Prefer **`serveJsonHandler`** for `secured` / `public` JSON — [handler-pipeline](./handler-pipeline.md)      |
+| Split large handlers         | Extract **`handlers/`** before pipeline on huge **`identity`** flows — [split-handlers](./split-handlers.md) |
