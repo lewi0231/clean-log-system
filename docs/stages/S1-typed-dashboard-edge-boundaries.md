@@ -5,7 +5,7 @@
 | **Stage**       | S1 — Triage (feasibility, risk, scope lock, phased delivery outline)                                                                                                                                                                                                         |
 | **From**        | [S0 — Typed dashboard ↔ Edge boundaries](./S0-typed-dashboard-edge-boundaries.md) — promoted **2026-05-06**                                                                                                                                                                  |
 | **Triaged**     | 2026-05-06                                                                                                                                                                                                                                                                   |
-| **Reviewed**    | 2026-05-05 — inventory updated, approach recommended, pilot sketch added                                                                                                                                                                                                     |
+| **Reviewed**    | 2026-05-05 — **implemented**: all 36 service casts removed, registry contains 41 functions                                                                                                                                                                                   |
 | **Depends on**  | Stable Edge JSON contracts ([org authorization](../stages/S1-edge-function-org-authorization-enforcement.md) gates unchanged); optional alignment with [unified handler pipeline](../stages/S2-unified-edge-handler-pipeline.md) Zod schemas **without** blocking this track |
 | **Product**     | Tally Runner — **dashboard** (`dashboard/`) invoking Supabase Edge Functions                                                                                                                                                                                                 |
 | **Risk/reward** | **Low–medium risk** (TypeScript-only at call sites if done incrementally); **high DX reward** — fewer silent shape mismatches, clearer refactors                                                                                                                             |
@@ -148,28 +148,52 @@ const data = await invokeTypedEdge("admin-create-job", request);
 
 ---
 
-## 8. Inventory snapshot (updated 2026-05-05)
+## 8. Implementation summary (completed 2026-05-05)
 
-**Command:** `rg 'as unknown as Record<string, unknown>' dashboard/ --count-matches`
+### 8.1 Service migration — complete
 
-| File                              | Casts  | Notes               |
-| --------------------------------- | ------ | ------------------- |
-| `organization-users.service.ts`   | 5      |                     |
-| `workers.service.ts`              | 5      |                     |
-| `jobs.service.ts`                 | 4      | **Pilot candidate** |
-| `locations.service.ts`            | 4      |                     |
-| `location-hierarchy.service.ts`   | 4      |                     |
-| `invoice.service.ts`              | 3      |                     |
-| `service-pricing-mode.service.ts` | 2      |                     |
-| `pricing.service.ts`              | 2      |                     |
-| `worker-payment.service.ts`       | 1      |                     |
-| `feedback.service.ts`             | 1      |                     |
-| `invoice-template.service.ts`     | 1      |                     |
-| `job-approval.service.ts`         | 1      |                     |
-| `field-configs.service.ts`        | 1      |                     |
-| `onboarding-wizard.tsx`           | 1      |                     |
-| `signup/page.tsx`                 | 1      |                     |
-| **Total**                         | **36** |                     |
+All 36 `as unknown as Record<string, unknown>` casts in dashboard services have been replaced with `invokeTypedEdge`. Verification:
+
+```bash
+rg 'as unknown as Record<string, unknown>' dashboard/lib/services  # 0 matches
+```
+
+**Files migrated (15 services + 2 UI):**
+
+| File                              | Original casts | Status   |
+| --------------------------------- | -------------- | -------- |
+| `organization-users.service.ts`   | 5              | Migrated |
+| `workers.service.ts`              | 5              | Migrated |
+| `jobs.service.ts`                 | 4              | Migrated |
+| `locations.service.ts`            | 4              | Migrated |
+| `location-hierarchy.service.ts`   | 4              | Migrated |
+| `invoice.service.ts`              | 3              | Migrated |
+| `service-pricing-mode.service.ts` | 2              | Migrated |
+| `pricing.service.ts`              | 2              | Migrated |
+| `worker-payment.service.ts`       | 1              | Migrated |
+| `feedback.service.ts`             | 1              | Migrated |
+| `invoice-template.service.ts`     | 1              | Migrated |
+| `job-approval.service.ts`         | 1              | Migrated |
+| `field-configs.service.ts`        | 1              | Migrated |
+| `onboarding-wizard.tsx`           | 1              | Migrated |
+| `signup/page.tsx`                 | 1              | Migrated |
+
+### 8.2 Registry population
+
+`EdgeContracts` now contains **41 entries** covering all migrated call-sites.
+
+### 8.3 New type files
+
+| File                                         | Purpose                              |
+| -------------------------------------------- | ------------------------------------ |
+| `dashboard/lib/types/edge-contracts.ts`      | Registry mapping Edge names → shapes |
+| `dashboard/lib/types/invoice-edge.ts`        | Invoice calculate/details types      |
+| `dashboard/lib/types/pricing-api.ts`         | Pricing rule CRUD types              |
+| `dashboard/lib/types/worker-payment-edge.ts` | Worker payment calculation types     |
+
+### 8.4 Optional extension (done 2026-05)
+
+Settings / sending-domain UI calls are registered: **`get-organization-settings`**, **`update-organization-settings`**, **`register-org-sending-domain`**, **`refresh-org-sending-domain-status`**, **`remove-org-sending-domain`** (see `edge-contracts.ts`).
 
 ---
 
@@ -182,11 +206,24 @@ const data = await invokeTypedEdge("admin-create-job", request);
 
 ---
 
-## 10. S2 decision
+## 10. S2 decision — superseded
 
-**Scope is small enough** (one registry file, one wrapper function, one service migration) to **implement pilot directly** without a formal S2 — same discretion as [split-handlers S2 §14](./S2-split-large-edge-handlers.md#14-s3-decision).
+**Implemented directly** (2026-05-05) without formal S2 — scope was small enough, same discretion as [split-handlers S2 §14](./S2-split-large-edge-handlers.md#14-s3-decision).
 
-If pilot succeeds, subsequent services can be migrated incrementally via **G1** (thin PRs).
+All pilot scope and full service migration completed in commits `732108d` through `97241ec`.
+
+---
+
+## 11. Outcome
+
+| Criterion                         | Result                                                           |
+| --------------------------------- | ---------------------------------------------------------------- |
+| SC1 — Pilot merged                | ✓ `jobs.service.ts` plus **all** 15 services                     |
+| SC2 — Pattern documented          | ✓ See [PROJECT_LEARNINGS #10](../decisions/PROJECT_LEARNINGS.md) |
+| SC3 — `typecheck` passes          | ✓ `pnpm --filter @clean-log/dashboard typecheck` clean           |
+| SC4 — No runtime contract changes | ✓ Typing-only PRs; Edge handlers unchanged                       |
+
+**Next (optional — G1):** Type **`invokeEdgeFunction`** call sites outside `dashboard/` (e.g. future packages), or add **`eslint`** guard against raw **`invokeEdgeFunction`** where a registry key exists.
 
 ---
 

@@ -35,7 +35,7 @@ import { useFieldConfigs } from "@/hooks/use-field-configs";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import { isSendInvoicesImmediatelyEnabled } from "@/lib/utils";
 import { getRatingConfigPreset, RATING_DIMENSION_LABELS } from "@/lib/constants/rating-config";
 import { BusinessMode, OrganizationSettings, SupportedCurrency } from "@/lib/types";
@@ -112,10 +112,9 @@ export default function SettingsPage() {
     try {
       log.debug("Settings: Fetching organization settings");
 
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "get-organization-settings",
-        { organization_id: organizationId }
-      );
+      const data = await invokeTypedEdge("get-organization-settings", {
+        organization_id: organizationId,
+      });
 
       if (data?.settings) {
         // Parse business_address if it exists (format: "Street, City, State Postcode")
@@ -263,13 +262,10 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Updating business mode", { mode });
 
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          business_mode: mode,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        business_mode: mode,
+      });
 
       const updated = data.settings;
       if (updated) {
@@ -294,13 +290,10 @@ export default function SettingsPage() {
 
     log.info("Settings: Updating organization name", { hasName: !!name.trim() });
 
-    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-      "update-organization-settings",
-      {
-        organization_id: organizationId,
-        name,
-      }
-    );
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      name,
+    });
 
     const updated = data.settings;
     if (updated) {
@@ -320,13 +313,10 @@ export default function SettingsPage() {
 
     log.info("Settings: Updating ABN", { hasAbn: !!abn.trim() });
 
-    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-      "update-organization-settings",
-      {
-        organization_id: organizationId,
-        abn: abn || null,
-      }
-    );
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      abn: abn || null,
+    });
 
     const updated = data.settings;
     if (updated) {
@@ -477,13 +467,10 @@ export default function SettingsPage() {
       // Update organization to remove logo_url
       // Note: The old logo file will remain in storage but won't be referenced
       // You may want to create a cleanup function later to remove orphaned files
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          logo_url: null,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        logo_url: null,
+      });
 
       // Update local state
       if (data?.settings) {
@@ -516,13 +503,10 @@ export default function SettingsPage() {
       hasEmail: !!email.trim(),
     });
 
-    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-      "update-organization-settings",
-      {
-        organization_id: organizationId,
-        primary_contact_email: email || null,
-      }
-    );
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      primary_contact_email: email || null,
+    });
 
     const updated = data.settings;
     if (updated) {
@@ -548,13 +532,10 @@ export default function SettingsPage() {
       hasPhone: !!phone.trim(),
     });
 
-    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-      "update-organization-settings",
-      {
-        organization_id: organizationId,
-        primary_contact_phone: phone || null,
-      }
-    );
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      primary_contact_phone: phone || null,
+    });
 
     const updated = data.settings;
     if (updated) {
@@ -577,13 +558,10 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Updating predefined locations setting", { checked });
 
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          use_predefined_locations: checked,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        use_predefined_locations: checked,
+      });
 
       const updated = data.settings;
       if (updated) {
@@ -614,13 +592,10 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating invoice send immediately", { checked });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          invoice_send_immediately: checked,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        invoice_send_immediately: checked,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -648,13 +623,10 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating auto-generate invoices", { checked });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          auto_generate_invoices_immediately: checked,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        auto_generate_invoices_immediately: checked,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -684,13 +656,10 @@ export default function SettingsPage() {
       log.info("Settings: Updating feedback email send immediately", {
         checked,
       });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          feedback_email_send_immediately: checked,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        feedback_email_send_immediately: checked,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -723,13 +692,10 @@ export default function SettingsPage() {
         type: newType,
         dimensions: newConfig.dimensions,
       });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          rating_config: newConfig,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        rating_config: newConfig,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -761,13 +727,10 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating GST registered", { checked });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          gst_registered: checked,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        gst_registered: checked,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -801,13 +764,10 @@ export default function SettingsPage() {
     if (!organizationId) return;
     try {
       log.info("Settings: Updating GST inclusive", { checked });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          gst_inclusive: checked,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        gst_inclusive: checked,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -849,13 +809,10 @@ export default function SettingsPage() {
     }
     try {
       log.info("Settings: Updating GST rate", { rate });
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          gst_rate_percent: rate,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        gst_rate_percent: rate,
+      });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
@@ -998,13 +955,10 @@ export default function SettingsPage() {
       hasPostcode: !!businessAddressFields.postcode.trim(),
     });
 
-    const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-      "update-organization-settings",
-      {
-        organization_id: organizationId,
-        business_address: formattedAddress || null,
-      }
-    );
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      business_address: formattedAddress || null,
+    });
 
     const updated = data.settings;
     if (updated) {
@@ -1040,14 +994,11 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Disconnecting Stripe account");
 
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          stripe_account_id: null,
-          payment_provider: null,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        stripe_account_id: null,
+        payment_provider: null,
+      });
 
       if (data?.settings) {
         setSettings((prev) => ({
@@ -1088,14 +1039,11 @@ export default function SettingsPage() {
     try {
       log.info("Settings: Updating currency", { currency, locale });
 
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          currency,
-          locale,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        currency,
+        locale,
+      });
 
       const updated = data.settings;
       if (updated) {
@@ -1171,16 +1119,13 @@ export default function SettingsPage() {
         showOnInvoices: settings.show_bank_transfer_on_invoices,
       });
 
-      const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-        "update-organization-settings",
-        {
-          organization_id: organizationId,
-          bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
-          bank_transfer_account_number: settings.bank_transfer_account_number?.trim() || null,
-          bank_transfer_account_name: settings.bank_transfer_account_name?.trim() || null,
-          show_bank_transfer_on_invoices: settings.show_bank_transfer_on_invoices,
-        }
-      );
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
+        bank_transfer_account_number: settings.bank_transfer_account_number?.trim() || null,
+        bank_transfer_account_name: settings.bank_transfer_account_name?.trim() || null,
+        show_bank_transfer_on_invoices: settings.show_bank_transfer_on_invoices,
+      });
 
       const updated = data.settings;
       if (updated) {
@@ -1591,7 +1536,7 @@ export default function SettingsPage() {
                       const value = parseInt(e.target.value, 10);
                       if (isNaN(value) || value < 1 || value > 365) return;
                       try {
-                        await invokeEdgeFunction("update-organization-settings", {
+                        await invokeTypedEdge("update-organization-settings", {
                           organization_id: organizationId,
                           default_invoice_due_days: value,
                         });
@@ -1805,7 +1750,7 @@ export default function SettingsPage() {
                         edit_window_minutes: minutes,
                       }));
                       try {
-                        await invokeEdgeFunction("update-organization-settings", {
+                        await invokeTypedEdge("update-organization-settings", {
                           organization_id: organizationId,
                           edit_window_minutes: minutes,
                         });

@@ -38,6 +38,8 @@ import type {
   GetInvoiceTemplateConfigResponse,
   GetJobEditsRequest,
   GetJobEditsResponse,
+  GetOrganizationSettingsRequest,
+  GetOrganizationSettingsResponse,
   ListFeedbackRequest,
   ListFeedbackResponse,
   ListFieldConfigsRequest,
@@ -52,7 +54,13 @@ import type {
   ListServicePricingModesResponse,
   ListWorkersAndLocationsRequest,
   ListWorkersAndLocationsResponse,
+  RefreshOrgSendingDomainStatusRequest,
+  RefreshOrgSendingDomainStatusResponse,
+  RegisterOrgSendingDomainRequest,
+  RegisterOrgSendingDomainResponse,
   RegisterOrganizationResponse,
+  RemoveOrgSendingDomainRequest,
+  RemoveOrgSendingDomainResponse,
   ResendAdminInvitationRequest,
   ResendAdminInvitationResponse,
   ResendWorkerInvitationRequest,
@@ -65,6 +73,8 @@ import type {
   UpdateInvoiceTemplateConfigResponse,
   UpdateJobRequest,
   UpdateJobResponse,
+  UpdateOrganizationSettingsRequest,
+  UpdateOrganizationSettingsResponse,
   UpdateLocationHierarchyRequest,
   UpdateLocationHierarchyResponse,
   UpdateLocationRequest,
@@ -168,6 +178,10 @@ export interface EdgeContracts {
     response: GetInvoiceTemplateConfigResponse;
   };
   "get-job-edits": { body: GetJobEditsRequest; response: GetJobEditsResponse };
+  "get-organization-settings": {
+    body: GetOrganizationSettingsRequest;
+    response: GetOrganizationSettingsResponse;
+  };
   "list-feedback": {
     body: ListFeedbackRequest;
     response: ListFeedbackResponse;
@@ -205,9 +219,21 @@ export interface EdgeContracts {
     body: ListWorkersAndLocationsRequest;
     response: ListWorkersAndLocationsResponse;
   };
+  "refresh-org-sending-domain-status": {
+    body: RefreshOrgSendingDomainStatusRequest;
+    response: RefreshOrgSendingDomainStatusResponse;
+  };
+  "register-org-sending-domain": {
+    body: RegisterOrgSendingDomainRequest;
+    response: RegisterOrgSendingDomainResponse;
+  };
   "register-organization": {
     body: SignUpFormData;
     response: RegisterOrganizationResponse;
+  };
+  "remove-org-sending-domain": {
+    body: RemoveOrgSendingDomainRequest;
+    response: RemoveOrgSendingDomainResponse;
   };
   "resend-admin-invitation": {
     body: ResendAdminInvitationRequest;
@@ -237,6 +263,10 @@ export interface EdgeContracts {
   "update-location-hierarchy": {
     body: UpdateLocationHierarchyRequest;
     response: UpdateLocationHierarchyResponse;
+  };
+  "update-organization-settings": {
+    body: UpdateOrganizationSettingsRequest;
+    response: UpdateOrganizationSettingsResponse;
   };
   "update-organization-user": {
     body: UpdateOrganizationUserRequest;

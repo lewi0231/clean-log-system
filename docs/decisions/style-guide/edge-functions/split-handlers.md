@@ -63,3 +63,29 @@ Run after deploy to staging (S2 **SC4** — parity). Automated suite cannot subs
 6. **Side paths** (if configurable on staging): colleague confirmation pending flow; optional **`feedback_email_send_immediately`** / auto-invoice org flags — observe logs only unless regressions appear.
 
 Record correlation IDs from responses when investigating anomalies.
+
+---
+
+## Reference layout — `stripe-webhook` (Rank 3 milestone 2a)
+
+Same rules as above: **one** read of the raw body ([§ Raw body / webhooks](#raw-body--webhooks)); **`index.ts`** stays orchestration-only.
+
+- `database/supabase/functions/stripe-webhook/index.ts` — **CORS**, **`loadEnvIfLocal`**, **`verifyStripeWebhookRequest`** → **`ensureWebhookEventRecord`** → **`dispatchStripeEvent`** → **`markWebhookEventProcessed`**, outer **`catch`** / failed-row update.
+- `handlers/verify-stripe-webhook-request.ts` — **POST**, **`req.text()`**, signature verification.
+- `handlers/ensure-webhook-event-record.ts` — idempotency check + **`webhook_event`** insert.
+- `handlers/dispatch-stripe-event.ts` — **`switch (event.type)`** (Stripe event handlers).
+- `handlers/mark-webhook-event-processed.ts` — success **`processed_at`** update.
+
+### Staging smoke (`stripe-webhook`)
+
+Run against **staging** Stripe webhook endpoint (or **`stripe listen`** → local Edge) after deploy. Confirm **`200`** JSON `{ received: true }` and DB side-effects unchanged vs pre-split.
+
+| #   | Scenario                                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **`checkout.session.completed`** with valid **`invoice_id`** metadata → **`payment_link`** updated; **`payment`** row; **`invoice`** totals; optional email path — match prior behaviour. |
+| 2   | Duplicate **`event.id`** → **`200`** with **`Event already processed`** body (idempotency).                                                                                               |
+| 3   | Invalid signature → **400** (message unchanged).                                                                                                                                          |
+| 4   | **`payment_intent.succeeded`** / **`payment_failed`** / **`charge.refunded`** / **`charge.dispute.created`** — spot-check DB updates on staging test data.                                |
+| 5   | **OPTIONS** — CORS preflight succeeds.                                                                                                                                                    |
+
+Correlate **`event.id`** with **`webhook_event`** rows when debugging.

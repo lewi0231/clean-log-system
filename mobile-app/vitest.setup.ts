@@ -1,5 +1,7 @@
 import { vi } from "vitest";
 
+(globalThis as typeof globalThis & { __DEV__: boolean }).__DEV__ = true;
+
 const NullIcon = () => null;
 
 vi.mock("@expo/vector-icons", () => ({

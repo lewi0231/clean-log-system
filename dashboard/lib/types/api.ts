@@ -323,10 +323,51 @@ export interface GetOrganizationSettingsResponse {
   settings: OrganizationSettings;
 }
 
-export interface UpdateOrganizationSettingsRequest {
+export interface UpdateOrganizationSettingsResponse {
+  success: boolean;
+  settings: OrganizationSettings;
+}
+
+export type UpdateOrganizationSettingsRequest = {
   organization_id: string;
-  use_predefined_locations?: boolean;
-  business_mode?: BusinessMode;
+} & Partial<OrganizationSettings>;
+
+/** `refresh-org-sending-domain-status` */
+export interface RefreshOrgSendingDomainStatusRequest {
+  organization_id: string;
+}
+
+export interface RefreshOrgSendingDomainStatusResponse {
+  success: boolean;
+  resend_status: string;
+  display_status: string;
+  dns_records: unknown;
+  domain_name: string;
+}
+
+/** `remove-org-sending-domain` */
+export interface RemoveOrgSendingDomainRequest {
+  organization_id: string;
+}
+
+export interface RemoveOrgSendingDomainResponse {
+  success: boolean;
+}
+
+/** `register-org-sending-domain` */
+export interface RegisterOrgSendingDomainRequest {
+  organization_id: string;
+  domain_name: string;
+}
+
+export interface RegisterOrgSendingDomainResponse {
+  success: boolean;
+  resend_domain_id?: string;
+  domain_name: string;
+  resend_status: string;
+  display_status: string;
+  dns_records: unknown;
+  reusedExisting?: boolean;
 }
 
 // Field Pricing API
@@ -468,7 +509,6 @@ export interface RegisterOrganizationResponse {
 import type { FieldConfig } from "@clean-log/shared/types";
 import type {
   BillingAddressConfig,
-  BusinessMode,
   Feedback,
   FieldPricing,
   InvoiceEmailRecipientConfig,

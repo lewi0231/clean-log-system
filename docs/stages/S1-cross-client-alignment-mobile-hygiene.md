@@ -71,9 +71,9 @@
 
 ## 6. Snapshot (2026-05 — refresh before work)
 
-| Package                 | `dashboard`                                         | `mobile-app`                                         | Notes                                  |
-| ----------------------- | --------------------------------------------------- | ---------------------------------------------------- | -------------------------------------- |
-| `@supabase/supabase-js` | **`^2.95.3`** ([pkg](../../dashboard/package.json)) | **`^2.84.0`** ([pkg](../../mobile-app/package.json)) | **Skew** — primary alignment candidate |
+| Package                 | `dashboard`                                         | `mobile-app`                                         | Notes                       |
+| ----------------------- | --------------------------------------------------- | ---------------------------------------------------- | --------------------------- |
+| `@supabase/supabase-js` | **`^2.95.3`** ([pkg](../../dashboard/package.json)) | **`^2.95.3`** ([pkg](../../mobile-app/package.json)) | **Aligned** (2026-05 bump). |
 
 ---
 

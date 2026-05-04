@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { APP_DISPLAY_NAME } from "@/lib/brand";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import { CheckCircle2, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -164,7 +164,7 @@ export function OrgSendingDomainCard({
     setActionError(null);
     setBusy("register");
     try {
-      await invokeEdgeFunction<Record<string, unknown>>("register-org-sending-domain", {
+      await invokeTypedEdge("register-org-sending-domain", {
         organization_id: organizationId,
         domain_name: name,
       });
@@ -182,7 +182,7 @@ export function OrgSendingDomainCard({
     setActionError(null);
     setBusy("refresh");
     try {
-      await invokeEdgeFunction("refresh-org-sending-domain-status", {
+      await invokeTypedEdge("refresh-org-sending-domain-status", {
         organization_id: organizationId,
       });
       await load();
@@ -200,7 +200,7 @@ export function OrgSendingDomainCard({
     setActionError(null);
     setBusy("remove");
     try {
-      await invokeEdgeFunction("remove-org-sending-domain", {
+      await invokeTypedEdge("remove-org-sending-domain", {
         organization_id: organizationId,
       });
       await load();

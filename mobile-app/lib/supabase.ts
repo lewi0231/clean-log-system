@@ -6,14 +6,16 @@ import "react-native-url-polyfill/auto";
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
 
-// Add this temporarily for debugging
-console.log("🔧 Supabase Config:", {
-  hasUrl: !!supabaseUrl,
-  urlLength: supabaseUrl.length,
-  urlPreview: supabaseUrl.substring(0, 20) + "...",
-  hasKey: !!supabaseAnonKey,
-  keyLength: supabaseAnonKey.length,
-});
+// Debug-only: avoid logging config in production builds
+if (__DEV__) {
+  console.log("🔧 Supabase Config:", {
+    hasUrl: !!supabaseUrl,
+    urlLength: supabaseUrl.length,
+    urlPreview: supabaseUrl.substring(0, 20) + "...",
+    hasKey: !!supabaseAnonKey,
+    keyLength: supabaseAnonKey.length,
+  });
+}
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
