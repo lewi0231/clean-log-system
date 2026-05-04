@@ -82,6 +82,39 @@ export interface ResendAdminInvitationRequest {
   organization_id: string;
 }
 
+export interface CreateOrganizationUserResponse {
+  organization_user?: OrganizationUser;
+  invitation_sent?: boolean;
+  existing_user?: boolean;
+  message?: string;
+}
+
+export interface UpdateOrganizationUserResponse {
+  organization_user?: OrganizationUser;
+}
+
+export interface DeleteOrganizationUserResponse {
+  success?: boolean;
+}
+
+export interface ResendAdminInvitationResponse {
+  success?: boolean;
+  message?: string;
+}
+
+export interface ConvertAdminToWorkerRequest {
+  organization_user_id: string;
+  organization_id: string;
+}
+
+export interface ConvertAdminToWorkerResponse {
+  success?: boolean;
+  message?: string;
+  worker?: { id?: string };
+  worker_id?: string;
+  already_worker?: boolean;
+}
+
 // Locations API
 export interface CreateLocationRequest {
   organization_id: string;
