@@ -54,14 +54,11 @@ export function useOrganization() {
         // For workers: auth token is automatically included in headers
         // For admin users: we can optionally pass email, but the function
         // will also check auth token (for workers)
-        const { data, error: fetchError } = await supabase.functions.invoke(
-          "get-organization-id",
-          {
-            // Pass email if available (for admin users), but function will
-            // also check auth token (for workers)
-            body: user.email ? { email: user.email } : {},
-          },
-        );
+        const { data, error: fetchError } = await supabase.functions.invoke("get-organization-id", {
+          // Pass email if available (for admin users), but function will
+          // also check auth token (for workers)
+          body: user.email ? { email: user.email } : {},
+        });
 
         if (fetchError) {
           console.error("🏢 Organization: Error fetching", fetchError);
@@ -87,9 +84,7 @@ export function useOrganization() {
         console.error("🏢 Organization: Failed to fetch", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch organization",
-        );
+        setError(err instanceof Error ? err.message : "Failed to fetch organization");
         fetchedUserIdRef.current = user.id; // Mark as fetched even on error
       } finally {
         setLoading(false);

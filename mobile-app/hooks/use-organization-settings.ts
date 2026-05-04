@@ -20,7 +20,7 @@ export function useOrganizationSettings(organizationId: string | null) {
           "get-organization-settings",
           {
             body: { organization_id: organizationId },
-          },
+          }
         );
 
         if (fetchError) {
@@ -43,11 +43,7 @@ export function useOrganizationSettings(organizationId: string | null) {
         console.error("🏢 Organization Settings: Failed to fetch", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Organization Settings: Failed to fetch",
-        );
+        setError(err instanceof Error ? err.message : "Organization Settings: Failed to fetch");
       } finally {
         setLoading(false);
       }

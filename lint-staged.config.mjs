@@ -19,6 +19,10 @@ export default {
     if (filenames.length === 0) return [];
     return `pnpm exec prettier --write ${filenames.map((f) => JSON.stringify(f)).join(" ")}`;
   },
+  "mobile-app/**/*.{ts,tsx}": (filenames) => {
+    if (filenames.length === 0) return [];
+    return `pnpm exec prettier --write ${filenames.map((f) => JSON.stringify(f)).join(" ")}`;
+  },
   "*.{json,md,yml,yaml}": (filenames) => {
     if (filenames.length === 0) return [];
     return `pnpm exec prettier --write ${filenames.map((f) => JSON.stringify(f)).join(" ")}`;

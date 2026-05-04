@@ -11,18 +11,12 @@ export function useLocations(organizationId: string | null) {
     async function fetchLocations() {
       try {
         if (__DEV__) {
-          console.log(
-            "Locations: Fetching locations for organization",
-            organizationId
-          );
+          console.log("Locations: Fetching locations for organization", organizationId);
         }
 
-        const { data, error } = await supabase.functions.invoke(
-          "list-locations",
-          {
-            body: { organization_id: organizationId },
-          }
-        );
+        const { data, error } = await supabase.functions.invoke("list-locations", {
+          body: { organization_id: organizationId },
+        });
 
         if (error) {
           console.error("Fetch Locations Error", error);

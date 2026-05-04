@@ -11,18 +11,12 @@ export function useColleagues(organizationId: string | null) {
     async function fetchColleagues() {
       try {
         if (__DEV__) {
-          console.log(
-            "Workers: Fetching workers for organization",
-            organizationId
-          );
+          console.log("Workers: Fetching workers for organization", organizationId);
         }
 
-        const { data, error } = await supabase.functions.invoke(
-          "list-workers",
-          {
-            body: { organization_id: organizationId },
-          }
-        );
+        const { data, error } = await supabase.functions.invoke("list-workers", {
+          body: { organization_id: organizationId },
+        });
 
         if (error) {
           console.error("Fetch Workers Error", error);
@@ -38,9 +32,7 @@ export function useColleagues(organizationId: string | null) {
 
         if (data?.workers) {
           // Only active workers should appear as colleagues on jobs (defense in depth)
-          setColleagues(
-            (data.workers as Worker[]).filter((w) => w.active === true),
-          );
+          setColleagues((data.workers as Worker[]).filter((w) => w.active === true));
         }
       } catch (err) {
         console.error("Workers: Failed to fetch", {
