@@ -168,6 +168,17 @@ export interface GetJobEditsResponse {
   edits: JobEdit[];
 }
 
+/** Edge function `send-feedback-email` */
+export interface SendFeedbackEmailRequest {
+  job_id: string;
+}
+
+export interface SendFeedbackEmailResponse {
+  success?: boolean;
+  error?: string;
+  emailId?: string;
+}
+
 // Feedback API
 export interface ListFeedbackRequest {
   organization_id: string;

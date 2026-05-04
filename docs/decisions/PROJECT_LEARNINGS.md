@@ -7,7 +7,7 @@ This document captures project-specific learnings that complement the universal 
 | **Framework Version** | 4.8.1      |
 | **Project**           | JobFlow    |
 | **Created**           | 2026-01-31 |
-| **Last Updated**      | 2026-04-12 |
+| **Last Updated**      | 2026-05-05 |
 
 ---
 
@@ -24,6 +24,7 @@ This document captures project-specific learnings that complement the universal 
 | 7   | Dashboard logging: use `log` / `createLogger`, not `console.*`                      | engineering | 2026-04-11 |
 | 8   | In-app notifications: end-to-end checklist (worker_active, bell, RLS, Realtime)     | real-time   | 2026-04-11 |
 | 9   | Supplementary help: prefer `ContextualHelp` over hover `Tooltip` when a click is OK | ui          | 2026-04-12 |
+| 10  | Dashboard ↔ Edge typing: `edge-contracts` registry + `invokeTypedEdge`              | typescript  | 2026-05-05 |
 
 ---
 
@@ -416,6 +417,53 @@ For **supplementary** explanations (how a field works, a paragraph of context), 
 **Do not** replace `Tooltip` on components that are **only** a hover affordance and have no room for a button (e.g. some data-dense custom widgets) without checking design — the rule is: **when a click is possible, default to `ContextualHelp` for this project.**
 
 **See:** `dashboard/components/ui/contextual-help.tsx` (component docstring cites progressive disclosure and touch).
+
+---
+
+### 10. Dashboard ↔ Edge typing: `edge-contracts` registry + `invokeTypedEdge`
+
+**Date:** 2026-05-05  
+**Tag:** `typescript`
+
+**Context:**  
+Many dashboard services called `invokeEdgeFunction<TResponse>(name, body)` with `body?: unknown`, so call sites used `request as unknown as Record<string, unknown>` and did not get compile-time checks on outbound payloads. Meanwhile, request/response interfaces already lived in `dashboard/lib/types/api.ts`.
+
+**Learning:**  
+Organize the boundary in two layers:
+
+1. **`dashboard/lib/types/api.ts`** — domain-oriented **request/response interfaces** (reuse across hooks/UI).
+2. **`dashboard/lib/types/edge-contracts.ts`** — **`EdgeContracts`**: maps each **deployed Edge Function name** (string literal key) to `{ body; response }` using those interfaces.
+
+Call registered functions via **`invokeTypedEdge`** in `dashboard/lib/supabase/invoke-edge-function.ts`:
+
+```typescript
+const data = await invokeTypedEdge("list-jobs", request);
+// `request` must match EdgeContracts['list-jobs']['body']
+// `data` is EdgeContracts['list-jobs']['response']
+```
+
+**Rules:**
+
+- **Add a registry row** when migrating a service off the `unknown` cast — grow `EdgeContracts` incrementally; do not require a mega-PR.
+- Keep **`invokeEdgeFunction`** for functions **not** yet in the registry (legacy escape hatch).
+- Edge remains the **runtime** source of truth (auth, parsing, Zod); dashboard types **follow** the contract — typing-only PRs must not change Edge JSON semantics ([maintainability doc](../improvements/code-quality-and-maintainability-working-document.md), [S1 triage](../stages/S1-typed-dashboard-edge-boundaries.md)).
+
+**Don't:**
+
+```typescript
+await invokeEdgeFunction<ListJobsResponse>(
+  "list-jobs",
+  request as unknown as Record<string, unknown>
+);
+```
+
+**Do:**
+
+```typescript
+await invokeTypedEdge("list-jobs", request);
+```
+
+**Key files:** `dashboard/lib/types/edge-contracts.ts`, `dashboard/lib/supabase/invoke-edge-function.ts`, pilot: `dashboard/lib/services/jobs.service.ts`.
 
 ---
 
