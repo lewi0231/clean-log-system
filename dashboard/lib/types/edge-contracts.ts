@@ -12,10 +12,18 @@ import type {
   ConvertAdminToWorkerResponse,
   CreateJobRequest,
   CreateJobResponse,
+  CreateLocationHierarchyRequest,
+  CreateLocationHierarchyResponse,
+  CreateLocationRequest,
+  CreateLocationResponse,
   CreateOrganizationUserRequest,
   CreateOrganizationUserResponse,
   CreateWorkerRequest,
   CreateWorkerResponse,
+  DeleteLocationHierarchyRequest,
+  DeleteLocationHierarchyResponse,
+  DeleteLocationRequest,
+  DeleteLocationResponse,
   DeleteOrganizationUserRequest,
   DeleteOrganizationUserResponse,
   DeleteWorkerRequest,
@@ -24,6 +32,8 @@ import type {
   GetJobEditsResponse,
   ListJobsRequest,
   ListJobsResponse,
+  ListLocationHierarchyEdgeResponse,
+  ListLocationHierarchyRequest,
   ListOrganizationUsersRequest,
   ListOrganizationUsersResponse,
   ListWorkersAndLocationsRequest,
@@ -36,6 +46,10 @@ import type {
   SendFeedbackEmailResponse,
   UpdateJobRequest,
   UpdateJobResponse,
+  UpdateLocationHierarchyRequest,
+  UpdateLocationHierarchyResponse,
+  UpdateLocationRequest,
+  UpdateLocationResponse,
   UpdateOrganizationUserRequest,
   UpdateOrganizationUserResponse,
   UpdateWorkerRequest,
@@ -48,11 +62,27 @@ export interface EdgeContracts {
     body: ConvertAdminToWorkerRequest;
     response: ConvertAdminToWorkerResponse;
   };
+  "create-location": {
+    body: CreateLocationRequest;
+    response: CreateLocationResponse;
+  };
+  "create-location-hierarchy": {
+    body: CreateLocationHierarchyRequest;
+    response: CreateLocationHierarchyResponse;
+  };
   "create-organization-user": {
     body: CreateOrganizationUserRequest;
     response: CreateOrganizationUserResponse;
   };
   "create-worker": { body: CreateWorkerRequest; response: CreateWorkerResponse };
+  "delete-location": {
+    body: DeleteLocationRequest;
+    response: DeleteLocationResponse;
+  };
+  "delete-location-hierarchy": {
+    body: DeleteLocationHierarchyRequest;
+    response: DeleteLocationHierarchyResponse;
+  };
   "delete-organization-user": {
     body: DeleteOrganizationUserRequest;
     response: DeleteOrganizationUserResponse;
@@ -60,6 +90,10 @@ export interface EdgeContracts {
   "delete-worker": { body: DeleteWorkerRequest; response: DeleteWorkerResponse };
   "get-job-edits": { body: GetJobEditsRequest; response: GetJobEditsResponse };
   "list-jobs": { body: ListJobsRequest; response: ListJobsResponse };
+  "list-location-hierarchy": {
+    body: ListLocationHierarchyRequest;
+    response: ListLocationHierarchyEdgeResponse;
+  };
   "list-organization-users": {
     body: ListOrganizationUsersRequest;
     response: ListOrganizationUsersResponse;
@@ -81,6 +115,14 @@ export interface EdgeContracts {
     response: SendFeedbackEmailResponse;
   };
   "update-job": { body: UpdateJobRequest; response: UpdateJobResponse };
+  "update-location": {
+    body: UpdateLocationRequest;
+    response: UpdateLocationResponse;
+  };
+  "update-location-hierarchy": {
+    body: UpdateLocationHierarchyRequest;
+    response: UpdateLocationHierarchyResponse;
+  };
   "update-organization-user": {
     body: UpdateOrganizationUserRequest;
     response: UpdateOrganizationUserResponse;

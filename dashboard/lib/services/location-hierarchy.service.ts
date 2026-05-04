@@ -1,53 +1,30 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import type { LocationHierarchyNode } from "@/lib/types";
-
-interface ListLocationHierarchyRequest {
-  organization_id: string;
-}
-
-interface ListLocationHierarchyResponse {
-  nodes: LocationHierarchyNode[];
-}
-
-interface CreateLocationHierarchyRequest {
-  organization_id: string;
-  name: string;
-  type: "company" | "region";
-  parent_id?: string | null;
-  metadata?: Record<string, unknown>;
-}
-
-interface UpdateLocationHierarchyRequest {
-  id: string;
-  name?: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface DeleteLocationHierarchyRequest {
-  id: string;
-}
+import type {
+  CreateLocationHierarchyRequest,
+  DeleteLocationHierarchyRequest,
+  ListLocationHierarchyRequest,
+  UpdateLocationHierarchyRequest,
+} from "@/lib/types/api";
 
 export class LocationHierarchyService {
   static async list(
-    request: ListLocationHierarchyRequest,
-  ): Promise<ListLocationHierarchyResponse> {
+    request: ListLocationHierarchyRequest
+  ): Promise<{ nodes: LocationHierarchyNode[] }> {
     try {
       log.debug("LocationHierarchyService: listing nodes", {
         organizationId: request.organization_id,
       });
 
-      const data = await invokeEdgeFunction<{
-        success?: boolean;
-        nodes?: LocationHierarchyNode[];
-      }>("list-location-hierarchy", request as unknown as Record<string, unknown>);
+      const data = await invokeTypedEdge("list-location-hierarchy", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to list location hierarchy");
       }
 
       return {
-        nodes: (data.nodes ?? []) as LocationHierarchyNode[],
+        nodes: data.nodes ?? [],
       };
     } catch (err) {
       log.error("LocationHierarchyService: Failed to list hierarchy", {
@@ -57,28 +34,20 @@ export class LocationHierarchyService {
     }
   }
 
-  static async create(
-    request: CreateLocationHierarchyRequest,
-  ): Promise<LocationHierarchyNode> {
+  static async create(request: CreateLocationHierarchyRequest): Promise<LocationHierarchyNode> {
     try {
       log.debug("LocationHierarchyService: creating node", {
         name: request.name,
         type: request.type,
       });
 
-      const data = await invokeEdgeFunction<{
-        success?: boolean;
-        node?: LocationHierarchyNode;
-      }>(
-        "create-location-hierarchy",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("create-location-hierarchy", request);
 
       if (!data || !data.success || !data.node) {
         throw new Error("Failed to create location hierarchy node");
       }
 
-      return data.node as LocationHierarchyNode;
+      return data.node;
     } catch (err) {
       log.error("LocationHierarchyService: Failed to create node", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -87,27 +56,19 @@ export class LocationHierarchyService {
     }
   }
 
-  static async update(
-    request: UpdateLocationHierarchyRequest,
-  ): Promise<LocationHierarchyNode> {
+  static async update(request: UpdateLocationHierarchyRequest): Promise<LocationHierarchyNode> {
     try {
       log.debug("LocationHierarchyService: updating node", {
         id: request.id,
       });
 
-      const data = await invokeEdgeFunction<{
-        success?: boolean;
-        node?: LocationHierarchyNode;
-      }>(
-        "update-location-hierarchy",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("update-location-hierarchy", request);
 
       if (!data || !data.success || !data.node) {
         throw new Error("Failed to update location hierarchy node");
       }
 
-      return data.node as LocationHierarchyNode;
+      return data.node;
     } catch (err) {
       log.error("LocationHierarchyService: Failed to update node", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -122,15 +83,10 @@ export class LocationHierarchyService {
         id: request.id,
       });
 
-      const data = await invokeEdgeFunction<{
-        success?: boolean;
-        message?: string;
-      }>("delete-location-hierarchy", request as unknown as Record<string, unknown>);
+      const data = await invokeTypedEdge("delete-location-hierarchy", request);
 
       if (!data || !data.success) {
-        throw new Error(
-          data?.message || "Failed to delete location hierarchy node",
-        );
+        throw new Error(data?.message || "Failed to delete location hierarchy node");
       }
     } catch (err) {
       log.error("LocationHierarchyService: Failed to delete node", {

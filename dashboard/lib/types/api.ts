@@ -168,6 +168,61 @@ export interface DeleteLocationRequest {
   id: string;
 }
 
+export interface CreateLocationResponse {
+  location?: Location;
+}
+
+export interface UpdateLocationResponse {
+  location?: Location;
+}
+
+export interface DeleteLocationResponse {
+  success?: boolean;
+}
+
+/** Edge JSON from `list-location-hierarchy` */
+export interface ListLocationHierarchyEdgeResponse {
+  success?: boolean;
+  nodes?: LocationHierarchyNode[];
+}
+
+export interface ListLocationHierarchyRequest {
+  organization_id: string;
+}
+
+export interface CreateLocationHierarchyRequest {
+  organization_id: string;
+  name: string;
+  type: "company" | "region";
+  parent_id?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateLocationHierarchyResponse {
+  success?: boolean;
+  node?: LocationHierarchyNode;
+}
+
+export interface UpdateLocationHierarchyRequest {
+  id: string;
+  name?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateLocationHierarchyResponse {
+  success?: boolean;
+  node?: LocationHierarchyNode;
+}
+
+export interface DeleteLocationHierarchyRequest {
+  id: string;
+}
+
+export interface DeleteLocationHierarchyResponse {
+  success?: boolean;
+  message?: string;
+}
+
 // Jobs API
 export interface ListJobsRequest {
   organization_id: string;
@@ -312,6 +367,7 @@ import type {
   FieldPricing,
   Job,
   Location,
+  LocationHierarchyNode,
   OrganizationSettings,
   OrganizationUser,
   Worker,
