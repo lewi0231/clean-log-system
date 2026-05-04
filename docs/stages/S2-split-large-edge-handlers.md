@@ -266,7 +266,7 @@ Before starting PR 1, confirm:
 | **Tests**     | §4 — edge-unit + **T6/T7** (catch mapping + CORS) + targeted unit modules                                       |
 | **Docs**      | **`split-handlers.md`** style guide                                                                             |
 | **Pre-impl**  | §12.1 gate — confirm no conflicting PRs, staging healthy, seams validated                                       |
-| **Next work** | **`stripe-webhook`** or **`calculate-worker-payment`** chunk 1                                                  |
+| **Next work** | **`S2`§inventory** — next largest unsecured monolith **or** batch “thin entrypoint” pass                        |
 
 ---
 

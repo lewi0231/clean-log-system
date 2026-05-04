@@ -89,3 +89,17 @@ Run against **staging** Stripe webhook endpoint (or **`stripe listen`** → loca
 | 5   | **OPTIONS** — CORS preflight succeeds.                                                                                                                                                    |
 
 Correlate **`event.id`** with **`webhook_event`** rows when debugging.
+
+---
+
+## Reference layout — `calculate-worker-payment` (Rank 3 milestone **2b**)
+
+Financial core: keep **`index.ts`** limited to **CORS**, **`req.json()`** validation, and **`try`/`catch`**; load data + orchestrate in **`handlers/run-*`**, pure pricing/split logic in **`handlers/calculation-engine.ts`**.
+
+- `database/supabase/functions/calculate-worker-payment/index.ts` — **`handleCors`**, body validation (**`organization_id`**, non-empty **`job_ids`**), delegate **`runCalculateWorkerPaymentPersistence`**.
+- `handlers/types.ts` — request-local interfaces (**`WorkerPaymentCalculation`**, **`PricingRuleRow`**, …).
+- `handlers/worker-rate-card-map.ts` — **`buildWorkerRateCardMultiMap`**, **`getWorkerRateCard`**.
+- `handlers/calculation-engine.ts` — **`calculateWorkerPayment`**, **`calculateWorkerSplits`**, and pricing helpers (**~970 LOC**, unchanged behaviour vs monolith).
+- `handlers/run-calculate-worker-payment-persistence.ts` — org gate, Supabase reads (**jobs**, field configs, hierarchy, rules, rate cards, **`job_worker`**), per-job loop, **`jsonResponse`**.
+
+Shared split math remains in **`_utils/worker-payment-split.ts`** ([worker-payment-split tests](../../../../database/supabase/functions/_utils/__tests__/worker-payment-split.test.ts)).
