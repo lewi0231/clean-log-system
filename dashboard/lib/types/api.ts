@@ -45,6 +45,25 @@ export interface ResendWorkerInvitationRequest {
   organization_id: string;
 }
 
+/** Raw JSON from `create-worker` Edge Function (snake_case email flags). */
+export interface CreateWorkerResponse {
+  worker?: Worker;
+  email_sent?: boolean;
+  email_error?: string;
+}
+
+export interface UpdateWorkerResponse {
+  worker?: Worker;
+}
+
+export interface DeleteWorkerResponse {
+  success?: boolean;
+}
+
+export interface ResendWorkerInvitationResponse {
+  success?: boolean;
+}
+
 // Organization Users API
 export interface ListOrganizationUsersRequest {
   organization_id: string;
