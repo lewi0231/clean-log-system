@@ -36,19 +36,22 @@ vi.mock("@/components/pricing/field-price-input", () => ({
   ),
 }));
 
-vi.mock("@/components/pricing/location-overrides-matrix", () => ({
-  LocationOverridesMatrix: ({
-    rows,
-    onDelete,
+vi.mock("@/components/pricing/pricing-scope-controls", () => ({
+  PricingScopeControls: ({
+    existingOverrides,
+    onDeleteExistingOverride,
   }: {
-    rows: Array<{ id: string; scopeLabel: string }>;
-    onDelete: (id: string) => void;
+    existingOverrides: Array<{ locationName: string; customerRuleId?: string }>;
+    onDeleteExistingOverride: (row: { customerRuleId?: string }) => Promise<void>;
   }) => (
-    <div data-testid="location-overrides-matrix">
-      {rows.map((row) => (
-        <div key={row.id} data-testid={`override-${row.id}`}>
-          {row.scopeLabel}
-          <button onClick={() => onDelete(row.id)}>Delete</button>
+    <div data-testid="pricing-scope-controls">
+      {existingOverrides.map((row) => (
+        <div
+          key={row.customerRuleId ?? row.locationName}
+          data-testid={`override-${row.customerRuleId}`}
+        >
+          {row.locationName}
+          <button onClick={() => onDeleteExistingOverride(row)}>Delete override</button>
         </div>
       ))}
     </div>
@@ -71,6 +74,13 @@ vi.mock("@/lib/utils", async () => {
 
 vi.mock("@/hooks/use-field-pricing-card-state", () => ({
   useFieldPricingCardState: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
 }));
 
 describe("FieldPricingCard", () => {
@@ -146,6 +156,39 @@ describe("FieldPricingCard", () => {
     location_node: null,
   });
 
+  const createYardScope = (
+    overrides: Array<{ customerRuleId?: string; locationName: string }> = [],
+    onDeleteExistingOverride = vi.fn()
+  ) => ({
+    chipVariant: "all-yards-default" as const,
+    inheritedLabel: null,
+    overrideCount: overrides.length,
+    expanded: true,
+    onExpandedChange: vi.fn(),
+    existingOverrides: overrides.map((o) => ({
+      locationId: "loc-1",
+      locationName: o.locationName,
+      customerPrice: 100,
+      workerPrice: null,
+      validUntil: null,
+      customerRuleId: o.customerRuleId,
+      workerRuleId: undefined,
+    })),
+    availableLocations: [{ id: "loc-2", name: "Hillcrest" }],
+    usedLocationIds: new Set<string>(),
+    orgDefaultCustomer: 50,
+    orgDefaultWorker: 25,
+    draftOverrides: [],
+    onAddDraftOverride: vi.fn(),
+    onUpdateDraftOverride: vi.fn(),
+    onRemoveDraftOverride: vi.fn(),
+    onDeleteExistingOverride,
+    onSaveOverrides: vi.fn(),
+    saving: false,
+    isMobile: false,
+    hasWorkers: true,
+  });
+
   const defaultProps = {
     fieldConfig: mockFieldConfig,
     customerPricingRecord: null,
@@ -155,14 +198,12 @@ describe("FieldPricingCard", () => {
     currentCustomerPrice: "",
     currentWorkerPrice: "",
     hasChanges: false,
-    overrides: [],
     conditions: [],
     hasScopedValue: false,
     locationId: null,
     locationHierarchyId: null,
     onPriceChange: vi.fn(),
     onSave: vi.fn(),
-    onDeleteOverride: vi.fn(),
     onOpenConditionalModal: vi.fn(),
   };
 
@@ -177,6 +218,10 @@ describe("FieldPricingCard", () => {
       setLocationNodeId: vi.fn(),
       locationId: null,
       setLocationId: vi.fn(),
+      previewLocationId: null,
+      setPreviewLocationId: vi.fn(),
+      previewLocationHierarchyId: null,
+      setPreviewLocationHierarchyId: vi.fn(),
       effectiveDate: null,
       setEffectiveDate: vi.fn(),
       expirationDate: null,
@@ -214,22 +259,24 @@ describe("FieldPricingCard", () => {
     expect(screen.getByText("Hours of service")).toBeInTheDocument();
   });
 
-  it("should show live formula preview for number field (prompt when customer price empty)", () => {
+  it("should show formula behind sigma control for number field", () => {
     render(<FieldPricingCard {...defaultProps} />);
 
-    expect(screen.getByText("Formula Preview")).toBeInTheDocument();
+    expect(screen.getByLabelText("View pricing formula")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("View pricing formula"));
     expect(
       screen.getByText(/Enter a customer price to see the formula preview/)
     ).toBeInTheDocument();
   });
 
-  it("should display equation preview for boolean field", () => {
+  it("should display equation preview for boolean field when expanded", () => {
     const booleanFieldConfig = {
       ...mockFieldConfig,
       field_type: "boolean" as const,
     };
     render(<FieldPricingCard {...defaultProps} fieldConfig={booleanFieldConfig} />);
 
+    fireEvent.click(screen.getByLabelText("View pricing formula"));
     expect(screen.getByText(/Total = base_price \(when field is true\)/)).toBeInTheDocument();
   });
 
@@ -243,6 +290,10 @@ describe("FieldPricingCard", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -292,6 +343,10 @@ describe("FieldPricingCard", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -327,6 +382,10 @@ describe("FieldPricingCard", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -357,6 +416,10 @@ describe("FieldPricingCard", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -387,6 +450,10 @@ describe("FieldPricingCard", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -490,76 +557,78 @@ describe("FieldPricingCard", () => {
 
       expect(onSave).toHaveBeenCalledWith(mockFieldConfig);
     });
+
+    it("should show an error toast when save fails", async () => {
+      const { toast } = await import("sonner");
+      const onSave = vi.fn().mockRejectedValue(new Error("Save failed"));
+
+      render(
+        <FieldPricingCard
+          {...defaultProps}
+          hasChanges={true}
+          currentCustomerPrice="100"
+          onSave={onSave}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /save|update/i }));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith("Failed to save pricing");
+      });
+    });
   });
 
-  describe("location overrides", () => {
-    it("should not display location overrides when location is selected", () => {
+  describe("yard overrides", () => {
+    it("should not display yard scope controls when location is selected", () => {
       render(
         <FieldPricingCard
           {...defaultProps}
           locationId="loc-1"
-          overrides={[
-            {
-              id: "override-1",
-              scopeLabel: "Location 1",
-              scopeType: "location",
-              price: 100,
-              workerPayment: null,
-            },
-          ]}
+          yardScope={createYardScope([
+            { customerRuleId: "override-1", locationName: "Location 1" },
+          ])}
         />
       );
 
-      expect(screen.queryByTestId("location-overrides-matrix")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("pricing-scope-controls")).not.toBeInTheDocument();
     });
 
-    it("should display location overrides when no location is selected", () => {
+    it("should display yard scope controls when no location is selected", () => {
       render(
         <FieldPricingCard
           {...defaultProps}
           locationId={null}
           locationHierarchyId={null}
-          overrides={[
-            {
-              id: "override-1",
-              scopeLabel: "Location 1",
-              scopeType: "location",
-              price: 100,
-              workerPayment: null,
-            },
-          ]}
+          yardScope={createYardScope([
+            { customerRuleId: "override-1", locationName: "Location 1" },
+          ])}
         />
       );
 
-      expect(screen.getByTestId("location-overrides-matrix")).toBeInTheDocument();
+      expect(screen.getByTestId("pricing-scope-controls")).toBeInTheDocument();
       expect(screen.getByTestId("override-override-1")).toBeInTheDocument();
     });
 
-    it("should call onDeleteOverride when delete is clicked", async () => {
-      const onDeleteOverride = vi.fn();
+    it("should call onDeleteExistingOverride when delete is clicked", async () => {
+      const onDeleteExistingOverride = vi.fn();
       render(
         <FieldPricingCard
           {...defaultProps}
           locationId={null}
           locationHierarchyId={null}
-          overrides={[
-            {
-              id: "override-1",
-              scopeLabel: "Location 1",
-              scopeType: "location",
-              price: 100,
-              workerPayment: null,
-            },
-          ]}
-          onDeleteOverride={onDeleteOverride}
+          yardScope={createYardScope(
+            [{ customerRuleId: "override-1", locationName: "Location 1" }],
+            onDeleteExistingOverride
+          )}
         />
       );
 
-      const deleteButton = screen.getByRole("button", { name: /delete/i });
+      const deleteButton = screen.getByRole("button", { name: /delete override/i });
       fireEvent.click(deleteButton);
 
       await waitFor(() => {
-        expect(onDeleteOverride).toHaveBeenCalledWith("override-1");
+        expect(onDeleteExistingOverride).toHaveBeenCalled();
       });
     });
   });
@@ -587,6 +656,10 @@ describe("FieldPricingCard", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,

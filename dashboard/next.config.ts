@@ -2,6 +2,8 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Allow HMR connections from 127.0.0.1 (browser MCP uses this)
+  allowedDevOrigins: ["127.0.0.1"],
   images: {
     remotePatterns: [
       // Local Supabase development (kong is the API gateway service)

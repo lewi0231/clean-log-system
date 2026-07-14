@@ -127,13 +127,13 @@ export default function InvoicePreviewDialog({
   };
 
   const handleSend = async () => {
-    if (!invoiceId || !invoice) return;
+    if (!invoiceId || !invoice || !organizationId) return;
 
     try {
       setSending(true);
       log.info("Sending invoice", { invoiceId });
 
-      await InvoiceService.updateStatus(invoiceId, "sent", {
+      await InvoiceService.updateStatus(invoiceId, organizationId, "sent", {
         senderDisplayName: senderDisplayNameFromUser(user),
       });
 

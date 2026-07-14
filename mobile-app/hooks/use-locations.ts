@@ -10,27 +10,25 @@ export function useLocations(organizationId: string | null) {
 
     async function fetchLocations() {
       try {
-        console.log(
-          "Locations: Fetching locations for organization",
-          organizationId
-        );
+        if (__DEV__) {
+          console.log("Locations: Fetching locations for organization", organizationId);
+        }
 
-        const { data, error } = await supabase.functions.invoke(
-          "list-locations",
-          {
-            body: { organization_id: organizationId },
-          }
-        );
+        const { data, error } = await supabase.functions.invoke("list-locations", {
+          body: { organization_id: organizationId },
+        });
 
         if (error) {
           console.error("Fetch Locations Error", error);
           return;
         }
 
-        console.log("Fetch Locations: Response received", {
-          success: data?.success,
-          workers: data?.locations,
-        });
+        if (__DEV__) {
+          console.log("Fetch Locations: Response received", {
+            success: data?.success,
+            locations: data?.locations,
+          });
+        }
 
         if (data?.locations) {
           setLocations(data.locations);

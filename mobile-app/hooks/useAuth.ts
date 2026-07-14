@@ -20,13 +20,17 @@ export function useAuth() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       if (currentSession?.user) {
-        console.log("🔐 Auth: Session found", {
-          userId: currentSession.user.id,
-          email: currentSession.user.email,
-        });
+        if (__DEV__) {
+          console.log("🔐 Auth: Session found", {
+            userId: currentSession.user.id,
+            email: currentSession.user.email,
+          });
+        }
         currentUserIdRef.current = currentSession.user.id;
       } else {
-        console.log("🔐 Auth: No active session");
+        if (__DEV__) {
+          console.log("🔐 Auth: No active session");
+        }
         currentUserIdRef.current = null;
       }
       setUser(currentSession?.user ?? null);
@@ -43,11 +47,13 @@ export function useAuth() {
         return;
       }
 
-      console.log("🔐 Auth: State changed", {
-        event,
-        hasSession: !!currentSession,
-        email: currentSession?.user?.email,
-      });
+      if (__DEV__) {
+        console.log("🔐 Auth: State changed", {
+          event,
+          hasSession: !!currentSession,
+          email: currentSession?.user?.email,
+        });
+      }
 
       const sessionUser = currentSession?.user ?? null;
       const sessionUserId = sessionUser?.id ?? null;
@@ -58,13 +64,17 @@ export function useAuth() {
       // Only update user state if the user actually changed
       if (sessionUserId !== currentUserIdRef.current) {
         if (sessionUser) {
-          console.log("🔐 Auth: User authenticated", {
-            userId: sessionUser.id,
-            email: sessionUser.email,
-            event,
-          });
+          if (__DEV__) {
+            console.log("🔐 Auth: User authenticated", {
+              userId: sessionUser.id,
+              email: sessionUser.email,
+              event,
+            });
+          }
         } else {
-          console.log("🔐 Auth: User signed out", { event });
+          if (__DEV__) {
+            console.log("🔐 Auth: User signed out", { event });
+          }
         }
 
         setUser(sessionUser);

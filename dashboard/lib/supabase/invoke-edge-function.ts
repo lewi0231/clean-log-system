@@ -1,5 +1,6 @@
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import type { EdgeContracts } from "@/lib/types/edge-contracts";
 import {
   FunctionsFetchError,
   FunctionsHttpError,
@@ -226,6 +227,19 @@ export async function invokeEdgeFunction<TResponse>(
   }
 
   return data as TResponse;
+}
+
+/**
+ * Invoke an Edge Function with request/response types inferred from {@link EdgeContracts}.
+ *
+ * Prefer this over `invokeEdgeFunction` + `as unknown as Record<string, unknown>` when the
+ * function is registered in `edge-contracts.ts`.
+ */
+export async function invokeTypedEdge<K extends keyof EdgeContracts>(
+  functionName: K,
+  body: EdgeContracts[K]["body"]
+): Promise<EdgeContracts[K]["response"]> {
+  return invokeEdgeFunction<EdgeContracts[K]["response"]>(functionName as string, body);
 }
 
 /**

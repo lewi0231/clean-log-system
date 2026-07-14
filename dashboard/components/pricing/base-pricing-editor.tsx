@@ -6,9 +6,11 @@ import {
 } from "@/components/pricing/conditional-rule-builder";
 import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
 import {
-  LocationOverridesMatrix,
-  type LocationOverrideRow,
-} from "@/components/pricing/location-overrides-matrix";
+  PricingScopeControls,
+  type ExistingOverrideRow,
+  type YardOverrideDraft,
+} from "@/components/pricing/pricing-scope-controls";
+import type { LocationOverrideRow } from "@/components/pricing/location-overrides-matrix";
 import { serializeCondition } from "@/components/pricing/pricing-condition-helpers";
 import { ContextualHelp } from "@/components/ui/contextual-help";
 import { Button } from "@/components/ui/button";
@@ -28,14 +30,18 @@ import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import { usePricingScope } from "@/components/pricing/pricing-scope-context";
 import { useBasePricing } from "@/hooks/use-base-pricing";
+import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
 import { buildScopedPricingMap, getPricingScopeSource, isEntryForScope } from "@/lib/pricing-scope";
+import { countLocationOverrides } from "@/lib/pricing-scope-display";
+import { mergeOverrideRowsByLocation, parsePriceString } from "@/lib/pricing-utils";
 import type { BasePricing } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import { AlertCircle, ChevronDown, DollarSign, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 interface BasePricingEditorProps {
   fieldConfigs: FieldConfig[];
@@ -61,6 +67,7 @@ export default function BasePricingEditor({
     error: customerError,
     upsertPricing: upsertCustomerPricing,
     deletePricing: deleteCustomerPricing,
+    refetch: refetchCustomerPricing,
   } = useBasePricing(organizationId, {
     locationHierarchyId,
     locationId,
@@ -73,6 +80,7 @@ export default function BasePricingEditor({
     error: workerError,
     upsertPricing: upsertWorkerPricing,
     deletePricing: deleteWorkerPricing,
+    refetch: refetchWorkerPricing,
   } = useBasePricing(organizationId, {
     locationHierarchyId,
     locationId,
@@ -80,12 +88,6 @@ export default function BasePricingEditor({
     pricingContext: "worker",
   });
 
-  // Use the appropriate pricing based on showBothContexts
-  const basePricing = showBothContexts
-    ? [...customerPricing, ...workerPricing]
-    : pricingContext === "customer"
-      ? customerPricing
-      : workerPricing;
   const loading = showBothContexts
     ? customerLoading || workerLoading
     : pricingContext === "customer"
@@ -136,6 +138,24 @@ export default function BasePricingEditor({
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
+  const [standaloneOverridesExpanded, setStandaloneOverridesExpanded] = useState(false);
+  const [standaloneDraftOverrides, setStandaloneDraftOverrides] = useState<YardOverrideDraft[]>([]);
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const { locations } = useLocations();
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const activeLocations = useMemo(
+    () => [...locations].filter((l) => l.active).sort((a, b) => a.name.localeCompare(b.name)),
+    [locations]
+  );
 
   // Create maps for quick lookup
   const customerStandaloneEntry = useMemo(() => {
@@ -595,6 +615,103 @@ export default function BasePricingEditor({
     }
   };
 
+  const standaloneAdjustmentType =
+    editingAdjustmentTypes["standalone"] ||
+    customerStandalonePricing?.adjustment_type ||
+    workerStandalonePricing?.adjustment_type ||
+    standalonePricing?.adjustment_type ||
+    "add";
+
+  const orgDefaultStandaloneCustomer = customerStandalonePricing?.customer_base_price ?? null;
+  const orgDefaultStandaloneWorker = workerStandalonePricing?.worker_base_payment ?? null;
+
+  const standaloneExistingOverrides = useMemo(
+    () =>
+      mapStandaloneBaseOverrideRows(customerPricing, workerPricing, orgDefaultStandaloneCustomer),
+    [customerPricing, workerPricing, orgDefaultStandaloneCustomer]
+  );
+
+  const standaloneOverrideCount = countLocationOverrides(
+    customerPricing.filter((p) => !p.job_type_field_config_id && p.location_id)
+  );
+
+  const standaloneUsedLocationIds = useMemo(
+    () =>
+      new Set([
+        ...standaloneExistingOverrides.map((o) => o.locationId),
+        ...standaloneDraftOverrides.map((d) => d.locationId),
+      ]),
+    [standaloneExistingOverrides, standaloneDraftOverrides]
+  );
+
+  const saveStandaloneOverrideDrafts = async (drafts: YardOverrideDraft[]) => {
+    if (drafts.length === 0) return;
+
+    for (const draft of drafts) {
+      if (draft.validUntil && orgDefaultStandaloneCustomer == null) {
+        toast.error("Set an All yards default adjustment before adding a dated yard override.");
+        return;
+      }
+    }
+
+    setOverrideSaving(true);
+    try {
+      for (const draft of drafts) {
+        const customerPrice = parsePriceString(draft.customerPrice);
+        const workerPrice = parsePriceString(draft.workerPrice);
+
+        if (customerPrice === undefined) {
+          throw new Error(`Valid adjustment value required for ${draft.locationName}`);
+        }
+
+        if (standaloneAdjustmentType === "multiply" && customerPrice <= 0) {
+          throw new Error(`Multiplier must be greater than 0 for ${draft.locationName}`);
+        }
+
+        const expirationDate = draft.validUntil || null;
+
+        await upsertCustomerPricing({
+          job_type_field_config_id: null,
+          job_type_value: null,
+          customer_base_price: customerPrice,
+          worker_base_payment: workerPrice ?? null,
+          adjustment_type: standaloneAdjustmentType,
+          location_id: draft.locationId,
+          expirationDate,
+          pricingContext: "customer",
+        });
+
+        if (workerPrice !== undefined && hasWorkers) {
+          if (standaloneAdjustmentType === "multiply" && workerPrice <= 0) {
+            throw new Error(`Worker multiplier must be greater than 0 for ${draft.locationName}`);
+          }
+
+          await upsertWorkerPricing({
+            job_type_field_config_id: null,
+            job_type_value: null,
+            customer_base_price: workerPrice,
+            worker_base_payment: workerPrice,
+            adjustment_type: standaloneAdjustmentType,
+            location_id: draft.locationId,
+            expirationDate,
+            pricingContext: "worker",
+          });
+        }
+      }
+
+      await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
+      setStandaloneDraftOverrides([]);
+      toast.success("Yard overrides saved");
+    } catch (err) {
+      log.error("Failed to save standalone yard overrides", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      toast.error(err instanceof Error ? err.message : "Failed to save yard overrides");
+    } finally {
+      setOverrideSaving(false);
+    }
+  };
+
   const selectedFieldConfig = useMemo(() => {
     return selectFieldConfigs.find((fc) => fc.id === selectedFieldConfigId);
   }, [selectFieldConfigs, selectedFieldConfigId]);
@@ -661,8 +778,8 @@ export default function BasePricingEditor({
           <CardHeader>
             <CardTitle>Universal Adjustment</CardTitle>
             <CardDescription>
-              Apply a fixed fee (e.g., call-out fee) or multiplier (e.g., profit margin) to every
-              invoice
+              Default adjustment for all yards. Use manage overrides below for yard-specific fees or
+              multipliers.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -904,36 +1021,67 @@ export default function BasePricingEditor({
               </Button>
             </div>
 
-            {/* Location Overrides for Standalone */}
-            {(() => {
-              const standaloneOverrides = getBasePricingOverrides(
-                basePricing,
-                null, // standalone has no job_type_field_config_id
-                null, // standalone has no job_type_value
-                locationId,
-                locationHierarchyId
-              );
-              // Only show if there are overrides
-              if (standaloneOverrides.length === 0) {
-                return null;
-              }
-              return (
-                <LocationOverridesMatrix
-                  rows={standaloneOverrides}
-                  emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit the base price to create an override."
-                  onDelete={async (id) => {
-                    try {
-                      await deletePricing(id);
-                    } catch (error) {
-                      log.error("Failed to delete override", {
-                        error: error instanceof Error ? error.message : "Unknown error",
-                        pricingId: id,
-                      });
+            {!locationId && !locationHierarchyId && (
+              <PricingScopeControls
+                chipVariant={standaloneOverrideCount > 0 ? "yard-override" : "all-yards-default"}
+                overrideCount={standaloneOverrideCount}
+                expanded={standaloneOverridesExpanded}
+                onExpandedChange={setStandaloneOverridesExpanded}
+                existingOverrides={standaloneExistingOverrides}
+                availableLocations={activeLocations}
+                usedLocationIds={standaloneUsedLocationIds}
+                orgDefaultCustomer={orgDefaultStandaloneCustomer}
+                orgDefaultWorker={orgDefaultStandaloneWorker}
+                previewActive={false}
+                hasWorkers={hasWorkers}
+                draftOverrides={standaloneDraftOverrides}
+                onAddDraftOverride={(locId, locName) => {
+                  setStandaloneDraftOverrides((prev) => [
+                    ...prev,
+                    {
+                      draftId: `${locId}-${Date.now()}`,
+                      locationId: locId,
+                      locationName: locName,
+                      customerPrice:
+                        editingPrices["standalone"]?.customer ??
+                        customerStandalonePricing?.customer_base_price?.toString() ??
+                        "",
+                      workerPrice:
+                        editingPrices["standalone"]?.worker ??
+                        workerStandalonePricing?.worker_base_payment?.toString() ??
+                        "",
+                      validUntil: "",
+                    },
+                  ]);
+                }}
+                onUpdateDraftOverride={(draftId, patch) => {
+                  setStandaloneDraftOverrides((prev) =>
+                    prev.map((d) => (d.draftId === draftId ? { ...d, ...patch } : d))
+                  );
+                }}
+                onRemoveDraftOverride={(draftId) => {
+                  setStandaloneDraftOverrides((prev) => prev.filter((d) => d.draftId !== draftId));
+                }}
+                onDeleteExistingOverride={async (row) => {
+                  try {
+                    if (row.customerRuleId) {
+                      await deleteCustomerPricing(row.customerRuleId);
                     }
-                  }}
-                />
-              );
-            })()}
+                    if (row.workerRuleId) {
+                      await deleteWorkerPricing(row.workerRuleId);
+                    }
+                    await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
+                    toast.success("Override removed");
+                  } catch {
+                    toast.error("Failed to remove override");
+                  }
+                }}
+                onSaveOverrides={() => saveStandaloneOverrideDrafts(standaloneDraftOverrides)}
+                saving={overrideSaving}
+                isMobile={isMobile}
+                adjustmentType={standaloneAdjustmentType}
+              />
+            )}
 
             {standalonePricing && isPricingRulesEnabled() && (
               <Collapsible defaultOpen={standaloneConditions.length > 0}>
@@ -1240,6 +1388,34 @@ export default function BasePricingEditor({
       )}
     </div>
   );
+}
+
+function mapStandaloneBaseOverrideRows(
+  customerPricing: BasePricing[],
+  workerPricing: BasePricing[],
+  orgDefaultCustomer: number | null
+): ExistingOverrideRow[] {
+  const customerRows = getBasePricingOverrides(customerPricing, null, null, null, null);
+  const workerRows = getBasePricingOverrides(workerPricing, null, null, null, null);
+  const merged = mergeOverrideRowsByLocation(customerRows, workerRows);
+
+  return merged.map((row) => {
+    const customerRecord = customerPricing.find((p) => p.id === row.customerRuleId);
+    const workerRecord = workerPricing.find((p) => p.id === row.workerRuleId);
+    const locationId = customerRecord?.location_id ?? workerRecord?.location_id ?? "";
+
+    return {
+      locationId,
+      locationName: row.scopeLabel.replace(/ \(inactive\)$/, ""),
+      customerPrice: row.price,
+      workerPrice: row.workerPayment ?? null,
+      validUntil: row.expiresAt ? row.expiresAt.split("T")[0] : null,
+      customerRuleId: row.customerRuleId,
+      workerRuleId: row.workerRuleId,
+      isActive: row.isActive,
+      revertsToCustomer: orgDefaultCustomer,
+    };
+  });
 }
 
 function getBasePricingOverrides(

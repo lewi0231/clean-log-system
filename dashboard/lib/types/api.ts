@@ -45,6 +45,25 @@ export interface ResendWorkerInvitationRequest {
   organization_id: string;
 }
 
+/** Raw JSON from `create-worker` Edge Function (snake_case email flags). */
+export interface CreateWorkerResponse {
+  worker?: Worker;
+  email_sent?: boolean;
+  email_error?: string;
+}
+
+export interface UpdateWorkerResponse {
+  worker?: Worker;
+}
+
+export interface DeleteWorkerResponse {
+  success?: boolean;
+}
+
+export interface ResendWorkerInvitationResponse {
+  success?: boolean;
+}
+
 // Organization Users API
 export interface ListOrganizationUsersRequest {
   organization_id: string;
@@ -82,6 +101,39 @@ export interface ResendAdminInvitationRequest {
   organization_id: string;
 }
 
+export interface CreateOrganizationUserResponse {
+  organization_user?: OrganizationUser;
+  invitation_sent?: boolean;
+  existing_user?: boolean;
+  message?: string;
+}
+
+export interface UpdateOrganizationUserResponse {
+  organization_user?: OrganizationUser;
+}
+
+export interface DeleteOrganizationUserResponse {
+  success?: boolean;
+}
+
+export interface ResendAdminInvitationResponse {
+  success?: boolean;
+  message?: string;
+}
+
+export interface ConvertAdminToWorkerRequest {
+  organization_user_id: string;
+  organization_id: string;
+}
+
+export interface ConvertAdminToWorkerResponse {
+  success?: boolean;
+  message?: string;
+  worker?: { id?: string };
+  worker_id?: string;
+  already_worker?: boolean;
+}
+
 // Locations API
 export interface CreateLocationRequest {
   organization_id: string;
@@ -114,6 +166,61 @@ export interface UpdateLocationRequest {
 
 export interface DeleteLocationRequest {
   id: string;
+}
+
+export interface CreateLocationResponse {
+  location?: Location;
+}
+
+export interface UpdateLocationResponse {
+  location?: Location;
+}
+
+export interface DeleteLocationResponse {
+  success?: boolean;
+}
+
+/** Edge JSON from `list-location-hierarchy` */
+export interface ListLocationHierarchyEdgeResponse {
+  success?: boolean;
+  nodes?: LocationHierarchyNode[];
+}
+
+export interface ListLocationHierarchyRequest {
+  organization_id: string;
+}
+
+export interface CreateLocationHierarchyRequest {
+  organization_id: string;
+  name: string;
+  type: "company" | "region";
+  parent_id?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateLocationHierarchyResponse {
+  success?: boolean;
+  node?: LocationHierarchyNode;
+}
+
+export interface UpdateLocationHierarchyRequest {
+  id: string;
+  name?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UpdateLocationHierarchyResponse {
+  success?: boolean;
+  node?: LocationHierarchyNode;
+}
+
+export interface DeleteLocationHierarchyRequest {
+  id: string;
+}
+
+export interface DeleteLocationHierarchyResponse {
+  success?: boolean;
+  message?: string;
 }
 
 // Jobs API
@@ -168,6 +275,17 @@ export interface GetJobEditsResponse {
   edits: JobEdit[];
 }
 
+/** Edge function `send-feedback-email` */
+export interface SendFeedbackEmailRequest {
+  job_id: string;
+}
+
+export interface SendFeedbackEmailResponse {
+  success?: boolean;
+  error?: string;
+  emailId?: string;
+}
+
 // Feedback API
 export interface ListFeedbackRequest {
   organization_id: string;
@@ -205,10 +323,51 @@ export interface GetOrganizationSettingsResponse {
   settings: OrganizationSettings;
 }
 
-export interface UpdateOrganizationSettingsRequest {
+export interface UpdateOrganizationSettingsResponse {
+  success: boolean;
+  settings: OrganizationSettings;
+}
+
+export type UpdateOrganizationSettingsRequest = {
   organization_id: string;
-  use_predefined_locations?: boolean;
-  business_mode?: BusinessMode;
+} & Partial<OrganizationSettings>;
+
+/** `refresh-org-sending-domain-status` */
+export interface RefreshOrgSendingDomainStatusRequest {
+  organization_id: string;
+}
+
+export interface RefreshOrgSendingDomainStatusResponse {
+  success: boolean;
+  resend_status: string;
+  display_status: string;
+  dns_records: unknown;
+  domain_name: string;
+}
+
+/** `remove-org-sending-domain` */
+export interface RemoveOrgSendingDomainRequest {
+  organization_id: string;
+}
+
+export interface RemoveOrgSendingDomainResponse {
+  success: boolean;
+}
+
+/** `register-org-sending-domain` */
+export interface RegisterOrgSendingDomainRequest {
+  organization_id: string;
+  domain_name: string;
+}
+
+export interface RegisterOrgSendingDomainResponse {
+  success: boolean;
+  resend_domain_id?: string;
+  domain_name: string;
+  resend_status: string;
+  display_status: string;
+  dns_records: unknown;
+  reusedExisting?: boolean;
 }
 
 // Field Pricing API
@@ -241,16 +400,127 @@ export interface DeleteFieldPricingResponse {
   success: boolean;
 }
 
+// Job approval API (Edge)
+export interface ResolveFlaggedJobRequest {
+  job_id: string;
+  action: "approve" | "cancel";
+  admin_notes?: string;
+}
+
+export interface ResolveFlaggedJobResponse {
+  success: boolean;
+  message: string;
+  job_status: "approved" | "cancelled";
+}
+
+// Service pricing modes API (Edge)
+export interface ListServicePricingModesRequest {
+  organization_id: string;
+  location_id?: string | null;
+  service_type_field_config_id?: string;
+  service_type_value?: string;
+}
+
+export interface ListServicePricingModesResponse {
+  success?: boolean;
+  error?: string;
+  service_pricing_modes?: ServicePricingMode[];
+}
+
+export interface UpsertServicePricingModeRequest {
+  organization_id: string;
+  service_type_field_config_id: string;
+  service_type_value: string;
+  pricing_mode: "field_based" | "fixed_price";
+  fixed_customer_price?: number | null;
+  fixed_worker_payment?: number | null;
+  fixed_price_currency?: string;
+  location_id?: string | null;
+}
+
+export interface UpsertServicePricingModeResponse {
+  success?: boolean;
+  error?: string;
+  service_pricing_mode?: ServicePricingMode;
+}
+
+export interface DeleteServicePricingModeRequest {
+  id: string;
+}
+
+export interface DeleteServicePricingModeResponse {
+  success?: boolean;
+  error?: string;
+}
+
+// Invoice template API (Edge)
+export interface GetInvoiceTemplateConfigRequest {
+  organization_id: string;
+}
+
+export interface GetInvoiceTemplateConfigResponse {
+  success: boolean;
+  config: InvoiceTemplateConfig;
+}
+
+export interface UpdateInvoiceTemplateConfigRequest {
+  organization_id: string;
+  invoice_title?: string;
+  show_logo?: boolean;
+  show_abn?: boolean;
+  bill_to_fields?: string[];
+  service_address_config?: ServiceAddressConfig;
+  billing_address_config?: BillingAddressConfig;
+  email_recipient_config?: InvoiceEmailRecipientConfig;
+  line_item_display?: Partial<LineItemDisplayConfig>;
+}
+
+export interface UpdateInvoiceTemplateConfigResponse {
+  success: boolean;
+  config: InvoiceTemplateConfig;
+}
+
+// Onboarding + signup (Edge)
+export interface CompleteOnboardingRequest {
+  industry_type: string;
+  employee_count: "none" | "1-5" | "6-20" | "21-50" | "50+";
+  abn: string;
+  has_locations: boolean;
+  has_workers: boolean;
+  worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
+  worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
+  invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
+  invoice_weekly_day: number | null;
+  invoice_monthly_day: number | null;
+  auto_generate_invoices: boolean;
+}
+
+export interface CompleteOnboardingResponse {
+  success: boolean;
+  organizationId: string;
+}
+
+export interface RegisterOrganizationResponse {
+  organization?: { id?: string; org_code?: string };
+  error?: string;
+}
+
 // Common types (re-exported from lib/types.ts for convenience)
 import type { FieldConfig } from "@clean-log/shared/types";
 import type {
-  BusinessMode,
+  BillingAddressConfig,
   Feedback,
   FieldPricing,
+  InvoiceEmailRecipientConfig,
+  InvoiceTemplateConfig,
   Job,
+  LineItemDisplayConfig,
   Location,
+  LocationHierarchyNode,
   OrganizationSettings,
   OrganizationUser,
+  ServiceAddressConfig,
+  ServicePricingMode,
   Worker,
 } from "../types";
 

@@ -13,6 +13,29 @@ vi.mock("@/hooks/use-field-pricing");
 vi.mock("@/hooks/use-field-configs");
 vi.mock("@/components/pricing/pricing-scope-context");
 vi.mock("@/hooks/use-organization-currency");
+vi.mock("@/hooks/use-locations", () => ({
+  useLocations: () => ({
+    locations: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+    createLocation: vi.fn(),
+    updateLocation: vi.fn(),
+    deleteLocation: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/use-workers", () => ({
+  useWorkers: () => ({
+    workers: [{ id: "worker-1" }],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+    createWorker: vi.fn(),
+    updateWorker: vi.fn(),
+    deleteWorker: vi.fn(),
+    resendInvitation: vi.fn(),
+  }),
+}));
 
 describe("FieldPricingList - Zero Price Handling", () => {
   const mockFieldConfig: FieldConfig = {
@@ -86,6 +109,10 @@ describe("FieldPricingList - Zero Price Handling", () => {
       setLocationNodeId: vi.fn(),
       locationId: null,
       setLocationId: vi.fn(),
+      previewLocationId: null,
+      setPreviewLocationId: vi.fn(),
+      previewLocationHierarchyId: null,
+      setPreviewLocationHierarchyId: vi.fn(),
       effectiveDate: null,
       setEffectiveDate: vi.fn(),
       expirationDate: null,
@@ -169,9 +196,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
       );
 
       // Find the input field by ID (the label says "Price per Unit")
-      const priceInput = screen.getByLabelText(
-        /price per unit/i
-      ) as HTMLInputElement;
+      const priceInput = screen.getByLabelText(/price per unit/i) as HTMLInputElement;
 
       // Type "0" into the input
       fireEvent.change(priceInput, { target: { value: "0" } });
@@ -247,9 +272,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
       );
 
       // Find the input field (should show existing price of 100)
-      const priceInput = screen.getByLabelText(
-        /price per unit/i
-      ) as HTMLInputElement;
+      const priceInput = screen.getByLabelText(/price per unit/i) as HTMLInputElement;
       expect(priceInput.value).toBe("100");
 
       // Change to "0"
@@ -324,9 +347,7 @@ describe("FieldPricingList - Zero Price Handling", () => {
       );
 
       // Change price to "0"
-      const priceInput = screen.getByLabelText(
-        /price per unit/i
-      ) as HTMLInputElement;
+      const priceInput = screen.getByLabelText(/price per unit/i) as HTMLInputElement;
       fireEvent.change(priceInput, { target: { value: "0" } });
 
       // Click save

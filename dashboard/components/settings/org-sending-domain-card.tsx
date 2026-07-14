@@ -5,10 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { APP_DISPLAY_NAME } from "@/lib/brand";
+import { getSupportEmail } from "@/lib/env";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-import { CheckCircle2, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Copy,
+  ExternalLink,
+  Loader2,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 type SendingDomainRow = {
@@ -27,13 +37,204 @@ const DISPLAY_LABEL: Record<string, string> = {
   disabled: "Disabled",
 };
 
-function DnsRecordsList({ snapshot }: { snapshot: unknown }) {
-  if (snapshot == null) return null;
-  const text = typeof snapshot === "string" ? snapshot : JSON.stringify(snapshot, null, 2);
+interface DnsRecord {
+  name: string;
+  type: string;
+  value: string;
+  ttl?: string;
+  priority?: number;
+  record?: string;
+  status?: string;
+}
+
+const DNS_PROVIDER_GUIDES = [
+  {
+    name: "Cloudflare",
+    url: "https://developers.cloudflare.com/dns/manage-dns-records/how-to/create-dns-records/",
+  },
+  { name: "GoDaddy", url: "https://www.godaddy.com/help/add-a-txt-record-19232" },
+  {
+    name: "Namecheap",
+    url: "https://www.namecheap.com/support/knowledgebase/article.aspx/317/2237/how-do-i-add-txtspfdaborecdnsmxnsaaaa-records-for-my-domain/",
+  },
+  {
+    name: "Route 53",
+    url: "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-creating.html",
+  },
+];
+
+const RECORD_EXPLANATIONS: Record<string, string> = {
+  DKIM: "Authenticates your emails with a digital signature. Required for good deliverability.",
+  SPF: "Tells email servers which services can send mail on your behalf.",
+  MX: "Handles bounce and complaint feedback from email providers.",
+};
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      log.warn("Clipboard copy failed");
+    }
+  };
+
   return (
-    <pre className="text-xs bg-muted/50 border rounded-md p-3 overflow-x-auto max-h-64 whitespace-pre-wrap break-all">
-      {text}
-    </pre>
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 px-2 text-xs gap-1 cursor-pointer"
+      onClick={handleCopy}
+      title={`Copy ${label}`}
+    >
+      {copied ? <CheckCircle2 className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+      {copied ? "Copied" : "Copy"}
+    </Button>
+  );
+}
+
+function DnsRecordRow({ record, domainName }: { record: DnsRecord; domainName: string }) {
+  const recordType = record.record || record.type;
+  const explanation = RECORD_EXPLANATIONS[recordType] || "";
+  const statusIcon =
+    record.status === "verified" ? (
+      <CheckCircle2 className="h-4 w-4 text-green-600" />
+    ) : record.status === "not_started" || record.status === "pending" ? (
+      <Clock className="h-4 w-4 text-amber-500" />
+    ) : (
+      <AlertCircle className="h-4 w-4 text-muted-foreground" />
+    );
+
+  const fullHostname = record.name.endsWith(domainName)
+    ? record.name
+    : `${record.name}.${domainName}`;
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2 bg-card">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {statusIcon}
+          <span className="font-medium text-sm">{recordType}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded bg-muted">{record.type}</span>
+        </div>
+        {record.status && (
+          <span className="text-xs text-muted-foreground capitalize">
+            {record.status.replace(/_/g, " ")}
+          </span>
+        )}
+      </div>
+
+      {explanation && <p className="text-xs text-muted-foreground">{explanation}</p>}
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2 bg-muted/50 rounded px-2 py-1">
+          <div className="min-w-0 flex-1">
+            <span className="text-xs text-muted-foreground block">Host / Name</span>
+            <code className="text-xs break-all">{fullHostname}</code>
+          </div>
+          <CopyButton value={record.name} label="host" />
+        </div>
+
+        <div className="flex items-center justify-between gap-2 bg-muted/50 rounded px-2 py-1">
+          <div className="min-w-0 flex-1">
+            <span className="text-xs text-muted-foreground block">Value</span>
+            <code className="text-xs break-all">{record.value}</code>
+          </div>
+          <CopyButton value={record.value} label="value" />
+        </div>
+
+        {record.priority !== undefined && (
+          <div className="flex items-center justify-between gap-2 bg-muted/50 rounded px-2 py-1">
+            <div>
+              <span className="text-xs text-muted-foreground block">Priority</span>
+              <code className="text-xs">{record.priority}</code>
+            </div>
+            <CopyButton value={String(record.priority)} label="priority" />
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground">
+          TTL: {record.ttl || "Auto"} • Type: {record.type}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DnsRecordsGuide({ snapshot, domainName }: { snapshot: unknown; domainName: string }) {
+  if (snapshot == null) return null;
+
+  let records: DnsRecord[] = [];
+  try {
+    if (Array.isArray(snapshot)) {
+      records = snapshot as DnsRecord[];
+    } else if (typeof snapshot === "string") {
+      records = JSON.parse(snapshot) as DnsRecord[];
+    }
+  } catch {
+    return (
+      <pre className="text-xs bg-muted/50 border rounded-md p-3 overflow-x-auto max-h-64 whitespace-pre-wrap break-all">
+        {typeof snapshot === "string" ? snapshot : JSON.stringify(snapshot, null, 2)}
+      </pre>
+    );
+  }
+
+  if (records.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <h4 className="font-medium text-sm mb-2">How to set up your DNS records</h4>
+        <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+          <li>Log in to your domain registrar or DNS provider</li>
+          <li>
+            Navigate to DNS settings for{" "}
+            <strong>{domainName.split(".").slice(-2).join(".")}</strong>
+          </li>
+          <li>Add each record below using the Copy buttons</li>
+          <li>Save changes and wait for propagation (up to 48 hours)</li>
+          <li>
+            Click <strong>Check DNS</strong> to verify — or we&apos;ll notify you when it&apos;s
+            ready
+          </li>
+        </ol>
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="font-medium text-sm">Required DNS Records ({records.length})</h4>
+        {records.map((record, idx) => (
+          <DnsRecordRow
+            key={`${record.type}-${record.name}-${idx}`}
+            record={record}
+            domainName={domainName}
+          />
+        ))}
+      </div>
+
+      <div className="border-t pt-3">
+        <p className="text-xs text-muted-foreground mb-2">
+          Need help? Here are guides for common DNS providers:
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {DNS_PROVIDER_GUIDES.map((guide) => (
+            <a
+              key={guide.name}
+              href={guide.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              {guide.name}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -140,6 +341,8 @@ export function OrgSendingDomainCard({
   }
 
   if (!entitled) {
+    const supportEmail = getSupportEmail();
+    const mailSubject = encodeURIComponent(`${APP_DISPLAY_NAME}: Custom email domain (Pro)`);
     return (
       <Card>
         <CardHeader>
@@ -148,11 +351,16 @@ export function OrgSendingDomainCard({
             Send invoices and system mail from your own domain (Resend).
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Custom sending domain is not enabled for this organization. When your plan includes it,
-            an administrator can add DNS records and verify the domain here.
+            Custom email domain is available on Pro accounts. Interested? Contact support — an
+            administrator can add DNS records and verify the domain once enabled.
           </p>
+          {supportEmail ? (
+            <Button variant="outline" size="sm" className="w-fit" asChild>
+              <a href={`mailto:${supportEmail}?subject=${mailSubject}`}>Email support</a>
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     );
@@ -164,7 +372,7 @@ export function OrgSendingDomainCard({
     setActionError(null);
     setBusy("register");
     try {
-      await invokeEdgeFunction<Record<string, unknown>>("register-org-sending-domain", {
+      await invokeTypedEdge("register-org-sending-domain", {
         organization_id: organizationId,
         domain_name: name,
       });
@@ -172,7 +380,7 @@ export function OrgSendingDomainCard({
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed";
       setActionError(msg);
-      log.error("register-org-sending-domain", { error: msg });
+      log.warn("register-org-sending-domain failed (user action)", { error: msg });
     } finally {
       setBusy(null);
     }
@@ -182,14 +390,14 @@ export function OrgSendingDomainCard({
     setActionError(null);
     setBusy("refresh");
     try {
-      await invokeEdgeFunction("refresh-org-sending-domain-status", {
+      await invokeTypedEdge("refresh-org-sending-domain-status", {
         organization_id: organizationId,
       });
       await load();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed";
       setActionError(msg);
-      log.error("refresh-org-sending-domain-status", { error: msg });
+      log.warn("refresh-org-sending-domain-status failed (user action)", { error: msg });
     } finally {
       setBusy(null);
     }
@@ -200,14 +408,14 @@ export function OrgSendingDomainCard({
     setActionError(null);
     setBusy("remove");
     try {
-      await invokeEdgeFunction("remove-org-sending-domain", {
+      await invokeTypedEdge("remove-org-sending-domain", {
         organization_id: organizationId,
       });
       await load();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed";
       setActionError(msg);
-      log.error("remove-org-sending-domain", { error: msg });
+      log.warn("remove-org-sending-domain failed (user action)", { error: msg });
     } finally {
       setBusy(null);
     }
@@ -218,8 +426,9 @@ export function OrgSendingDomainCard({
       <CardHeader>
         <CardTitle>Email &amp; domain</CardTitle>
         <CardDescription>
-          Register a domain with our email provider (Resend), add the DNS records shown below, then
-          check status until verified.
+          Register a domain with our email provider, add the DNS records shown below, then wait for
+          verification. We check automatically every few hours and will notify you when it&apos;s
+          ready.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -249,7 +458,7 @@ export function OrgSendingDomainCard({
               type="button"
               onClick={() => void handleRegister()}
               disabled={busy !== null}
-              className="w-fit"
+              className="w-fit cursor-pointer"
             >
               {busy === "register" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {row ? "Update / sync domain" : "Register domain"}
@@ -300,10 +509,7 @@ export function OrgSendingDomainCard({
                 Remove domain
               </Button>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm font-medium">DNS records (from provider)</p>
-              <DnsRecordsList snapshot={row.dns_records_snapshot} />
-            </div>
+            <DnsRecordsGuide snapshot={row.dns_records_snapshot} domainName={row.domain_name} />
           </div>
         )}
       </CardContent>

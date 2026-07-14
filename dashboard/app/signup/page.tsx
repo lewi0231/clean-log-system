@@ -14,7 +14,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
 import { formatZodErrors, signUpSchema } from "@/lib/validations";
-import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { EdgeFunctionError, invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -72,10 +72,7 @@ export default function SignUp() {
         hasOrganisation: !!validatedData.organisation,
       });
 
-      const data = await invokeEdgeFunction<{
-        organization?: { id?: string; org_code?: string };
-        error?: string;
-      }>("register-organization", validatedData as unknown as Record<string, unknown>);
+      const data = await invokeTypedEdge("register-organization", validatedData);
 
       if (data?.error) throw new Error(data.error);
 
@@ -92,13 +89,9 @@ export default function SignUp() {
       setOrganisation("");
       setErrors({});
 
-      log.info(
-        "SignUp: Signup process completed, redirecting to verification page"
-      );
+      log.info("SignUp: Signup process completed, redirecting to verification page");
       // Redirect to verification page - email should have been sent by backend
-      window.location.href = `/verify-email?email=${encodeURIComponent(
-        validatedData.email
-      )}`;
+      window.location.href = `/verify-email?email=${encodeURIComponent(validatedData.email)}`;
     } catch (error) {
       // Errors are already set in validateInput via setErrors
       if (error instanceof EdgeFunctionError) {
@@ -134,9 +127,7 @@ export default function SignUp() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Create an account</CardTitle>
-          <CardDescription>
-            Enter your organization details to get started
-          </CardDescription>
+          <CardDescription>Enter your organization details to get started</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {generalError && (
@@ -182,9 +173,7 @@ export default function SignUp() {
               aria-invalid={!!errors.email}
               required
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email}</p>
-            )}
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
@@ -202,9 +191,7 @@ export default function SignUp() {
               aria-invalid={!!errors.password}
               required
             />
-            {errors.password && (
-              <p className="text-sm text-destructive">{errors.password}</p>
-            )}
+            {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">

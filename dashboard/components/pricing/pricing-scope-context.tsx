@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { FieldConfig } from "@clean-log/shared/types";
 
 interface PricingScopeValue {
@@ -17,6 +10,11 @@ interface PricingScopeValue {
   setLocationNodeId: (nodeId: string | null) => void;
   locationId: string | null;
   setLocationId: (locationId: string | null) => void;
+  /** Display-only preview on Pricing tab — not used for org-default saves */
+  previewLocationId: string | null;
+  setPreviewLocationId: (locationId: string | null) => void;
+  previewLocationHierarchyId: string | null;
+  setPreviewLocationHierarchyId: (nodeId: string | null) => void;
   effectiveDate: string | null;
   setEffectiveDate: (date: string | null) => void;
   expirationDate: string | null;
@@ -30,9 +28,7 @@ interface PricingScopeValue {
   fieldLabelLookup: Record<string, string>;
 }
 
-const PricingScopeContext = createContext<PricingScopeValue | undefined>(
-  undefined
-);
+const PricingScopeContext = createContext<PricingScopeValue | undefined>(undefined);
 
 interface PricingScopeProviderProps {
   children: ReactNode;
@@ -51,12 +47,10 @@ export function PricingScopeProvider({
   initialEffectiveDate,
 }: PricingScopeProviderProps) {
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [locationNodeId, setLocationNodeId] = useState<string | null>(
-    initialLocationNodeId
-  );
-  const [locationId, setLocationId] = useState<string | null>(
-    initialLocationId
-  );
+  const [locationNodeId, setLocationNodeId] = useState<string | null>(initialLocationNodeId);
+  const [locationId, setLocationId] = useState<string | null>(initialLocationId);
+  const [previewLocationId, setPreviewLocationId] = useState<string | null>(null);
+  const [previewLocationHierarchyId, setPreviewLocationHierarchyId] = useState<string | null>(null);
   // Default effective date to today's date (YYYY-MM-DD format for HTML date input)
   // Only default if initialEffectiveDate is not provided (undefined)
   // If explicitly null, respect that (allows clearing the date)
@@ -71,8 +65,7 @@ export function PricingScopeProvider({
     initialEffectiveDate !== undefined ? initialEffectiveDate : getTodayDate()
   );
   const [expirationDate, setExpirationDate] = useState<string | null>(null);
-  const [pricingHistoryRefreshToken, setPricingHistoryRefreshToken] =
-    useState(0);
+  const [pricingHistoryRefreshToken, setPricingHistoryRefreshToken] = useState(0);
   const [pricingContext, setPricingContext] = useState<"customer" | "worker">("customer");
   const [showBothContexts, setShowBothContexts] = useState(false);
 
@@ -96,6 +89,10 @@ export function PricingScopeProvider({
       setLocationNodeId,
       locationId,
       setLocationId,
+      previewLocationId,
+      setPreviewLocationId,
+      previewLocationHierarchyId,
+      setPreviewLocationHierarchyId,
       effectiveDate,
       setEffectiveDate,
       expirationDate,
@@ -112,6 +109,8 @@ export function PricingScopeProvider({
       selectedFieldId,
       locationNodeId,
       locationId,
+      previewLocationId,
+      previewLocationHierarchyId,
       effectiveDate,
       expirationDate,
       pricingHistoryRefreshToken,
@@ -122,19 +121,13 @@ export function PricingScopeProvider({
     ]
   );
 
-  return (
-    <PricingScopeContext.Provider value={value}>
-      {children}
-    </PricingScopeContext.Provider>
-  );
+  return <PricingScopeContext.Provider value={value}>{children}</PricingScopeContext.Provider>;
 }
 
 export function usePricingScope() {
   const context = useContext(PricingScopeContext);
   if (!context) {
-    throw new Error(
-      "usePricingScope must be used within a PricingScopeProvider"
-    );
+    throw new Error("usePricingScope must be used within a PricingScopeProvider");
   }
   return context;
 }

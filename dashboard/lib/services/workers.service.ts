@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import type { Worker } from "@/lib/types";
 import type {
   CreateWorkerRequest,
@@ -23,17 +23,14 @@ export class WorkersService {
         organizationId: request.organization_id,
       });
 
-      const data = await invokeEdgeFunction<ListWorkersAndLocationsResponse>(
-        "list-workers-and-locations",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("list-workers-and-locations", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch workers and locations");
       }
 
       log.info("WorkersService: Workers and locations fetched successfully");
-      return data as ListWorkersAndLocationsResponse;
+      return data;
     } catch (err) {
       log.error("WorkersService: Failed to fetch workers and locations", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -52,11 +49,7 @@ export class WorkersService {
         name: `${request.first_name} ${request.last_name}`,
       });
 
-      const data = await invokeEdgeFunction<{
-        worker?: Worker;
-        email_sent?: boolean;
-        email_error?: string;
-      }>("create-worker", request as unknown as Record<string, unknown>);
+      const data = await invokeTypedEdge("create-worker", request);
 
       if (!data || !data.worker) {
         throw new Error("Failed to create worker");
@@ -74,7 +67,7 @@ export class WorkersService {
         emailSent: data.email_sent,
       });
       return {
-        worker: data.worker as Worker,
+        worker: data.worker,
         emailSent: Boolean(data.email_sent),
         ...(data.email_error && { emailError: data.email_error }),
       };
@@ -95,10 +88,7 @@ export class WorkersService {
         workerId: request.id,
       });
 
-      const data = await invokeEdgeFunction<{ worker?: Worker }>(
-        "update-worker",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("update-worker", request);
 
       if (!data || !data.worker) {
         throw new Error("Failed to update worker");
@@ -107,7 +97,7 @@ export class WorkersService {
       log.info("WorkersService: Worker updated successfully", {
         workerId: data.worker.id,
       });
-      return data.worker as Worker;
+      return data.worker;
     } catch (err) {
       log.error("WorkersService: Failed to update worker", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -125,10 +115,7 @@ export class WorkersService {
         workerId: request.id,
       });
 
-      await invokeEdgeFunction<{ success?: boolean }>(
-        "delete-worker",
-        request as unknown as Record<string, unknown>
-      );
+      await invokeTypedEdge("delete-worker", request);
 
       log.info("WorkersService: Worker deleted successfully", {
         workerId: request.id,
@@ -151,10 +138,7 @@ export class WorkersService {
         organizationId: request.organization_id,
       });
 
-      const data = await invokeEdgeFunction<{ success?: boolean }>(
-        "resend-worker-invitation",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("resend-worker-invitation", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to resend invitation");

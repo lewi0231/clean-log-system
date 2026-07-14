@@ -4,59 +4,13 @@
  * These tests ensure invoices are sent at the correct times.
  * Incorrect scheduling could send invoices at wrong times or not at all.
  *
- * Run with: deno test --allow-all functions/__tests__/auto-send-invoices.test.ts
+ * Scheduling helpers: `auto-send-invoices/handlers/auto-send-scheduling.ts`.
+ * Run with: `pnpm test:edge-unit` (includes this file).
  */
 
 import { assertEquals } from "@std/assert";
-
-// Import the shouldRunAutoSend function
-// Since it's not exported, we'll need to test it via the edge function or extract it
-// For now, we'll recreate the logic for testing
-
-interface AutoSendConfig {
-  enabled: boolean;
-  period: "daily" | "weekly" | "monthly";
-  day_of_week?: number; // 0-6 (Sunday-Saturday) for weekly
-  day_of_month?: number; // 1-31 for monthly
-  time?: string; // HH:mm format (e.g., "09:00")
-}
-
-/**
- * Check if auto-send should run based on configuration and current time
- * This matches the logic in auto-send-invoices/index.ts
- */
-function shouldRunAutoSend(
-  config: AutoSendConfig,
-  now: Date,
-): boolean {
-  if (!config.enabled) return false;
-
-  const hour = now.getHours();
-  const minute = now.getMinutes();
-  const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
-  const dayOfMonth = now.getDate();
-
-  // Parse time if provided
-  if (config.time) {
-    const [configHour, configMinute] = config.time.split(":").map(Number);
-    if (hour !== configHour || minute !== configMinute) {
-      return false; // Not the right time
-    }
-  }
-
-  switch (config.period) {
-    case "daily":
-      return true; // Run daily at the specified time
-    case "weekly":
-      return config.day_of_week !== undefined &&
-        dayOfWeek === config.day_of_week;
-    case "monthly":
-      return config.day_of_month !== undefined &&
-        dayOfMonth === config.day_of_month;
-    default:
-      return false;
-  }
-}
+import { shouldRunAutoSend } from "../auto-send-invoices/handlers/auto-send-scheduling.ts";
+import type { AutoSendConfig } from "../auto-send-invoices/handlers/types.ts";
 
 // Daily schedule tests
 Deno.test("P0: should return true at configured time for daily schedule", () => {

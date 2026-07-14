@@ -5,17 +5,14 @@ import { useEffect } from "react";
 
 import { organizationSettingsKey } from "@/app/query-provider";
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import { OrganizationSettings } from "@/lib/types";
 import useOrganization from "./useOrganization";
 
 async function fetchOrganizationSettings(organizationId: string): Promise<OrganizationSettings> {
-  const data = await invokeEdgeFunction<{ settings?: OrganizationSettings }>(
-    "get-organization-settings",
-    {
-      organization_id: organizationId,
-    }
-  );
+  const data = await invokeTypedEdge("get-organization-settings", {
+    organization_id: organizationId,
+  });
 
   if (!data?.settings) {
     throw new Error("No settings found");

@@ -43,23 +43,22 @@ export function useOrganization() {
       isFetchingRef.current = true;
 
       try {
-        console.log("🏢 Organization: Fetching organization for user", {
-          userId: user.id,
-          email: user.email,
-        });
+        if (__DEV__) {
+          console.log("🏢 Organization: Fetching organization for user", {
+            userId: user.id,
+            email: user.email,
+          });
+        }
 
         // Call Edge Function to get organization_id
         // For workers: auth token is automatically included in headers
         // For admin users: we can optionally pass email, but the function
         // will also check auth token (for workers)
-        const { data, error: fetchError } = await supabase.functions.invoke(
-          "get-organization-id",
-          {
-            // Pass email if available (for admin users), but function will
-            // also check auth token (for workers)
-            body: user.email ? { email: user.email } : {},
-          },
-        );
+        const { data, error: fetchError } = await supabase.functions.invoke("get-organization-id", {
+          // Pass email if available (for admin users), but function will
+          // also check auth token (for workers)
+          body: user.email ? { email: user.email } : {},
+        });
 
         if (fetchError) {
           console.error("🏢 Organization: Error fetching", fetchError);
@@ -67,13 +66,17 @@ export function useOrganization() {
         }
 
         if (data?.organization_id) {
-          console.log("🏢 Organization: Found", {
-            organizationId: data.organization_id,
-          });
+          if (__DEV__) {
+            console.log("🏢 Organization: Found", {
+              organizationId: data.organization_id,
+            });
+          }
           setOrganizationId(data.organization_id);
           fetchedUserIdRef.current = user.id;
         } else {
-          console.warn("🏢 Organization: No organization found for user");
+          if (__DEV__) {
+            console.warn("🏢 Organization: No organization found for user");
+          }
           setError("No organization found");
           fetchedUserIdRef.current = user.id; // Mark as fetched even if no org found
         }
@@ -81,9 +84,7 @@ export function useOrganization() {
         console.error("🏢 Organization: Failed to fetch", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch organization",
-        );
+        setError(err instanceof Error ? err.message : "Failed to fetch organization");
         fetchedUserIdRef.current = user.id; // Mark as fetched even on error
       } finally {
         setLoading(false);

@@ -1,40 +1,32 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-import type {
-    ListFeedbackRequest,
-    ListFeedbackResponse,
-} from "@/lib/types/api";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
+import type { ListFeedbackRequest, ListFeedbackResponse } from "@/lib/types/api";
 
 export class FeedbackService {
-    /**
-     * List feedback for an organization
-     */
-    static async list(
-        request: ListFeedbackRequest,
-    ): Promise<ListFeedbackResponse> {
-        try {
-            log.debug("FeedbackService: Fetching feedback", {
-                organizationId: request.organization_id,
-            });
+  /**
+   * List feedback for an organization
+   */
+  static async list(request: ListFeedbackRequest): Promise<ListFeedbackResponse> {
+    try {
+      log.debug("FeedbackService: Fetching feedback", {
+        organizationId: request.organization_id,
+      });
 
-            const data = await invokeEdgeFunction<ListFeedbackResponse>(
-                "list-feedback",
-                request as unknown as Record<string, unknown>,
-            );
+      const data = await invokeTypedEdge("list-feedback", request);
 
-            if (!data || !data.success) {
-                throw new Error("Failed to fetch feedback");
-            }
+      if (!data || !data.success) {
+        throw new Error("Failed to fetch feedback");
+      }
 
-            log.info("FeedbackService: Feedback fetched successfully", {
-                feedbackCount: data.feedback?.length || 0,
-            });
-            return data as ListFeedbackResponse;
-        } catch (err) {
-            log.error("FeedbackService: Failed to fetch feedback", {
-                error: err instanceof Error ? err.message : "Unknown error",
-            });
-            throw err;
-        }
+      log.info("FeedbackService: Feedback fetched successfully", {
+        feedbackCount: data.feedback?.length || 0,
+      });
+      return data;
+    } catch (err) {
+      log.error("FeedbackService: Failed to fetch feedback", {
+        error: err instanceof Error ? err.message : "Unknown error",
+      });
+      throw err;
     }
+  }
 }

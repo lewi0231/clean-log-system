@@ -2,6 +2,8 @@
 
 > Standard structure and organization for Supabase Edge Functions.
 
+Oversized handlers: extract orchestration under **`<function>/handlers/`** per [split-handlers.md](./split-handlers.md).
+
 ---
 
 ## Function Template
@@ -68,7 +70,6 @@ serve(async (req) => {
       success: true,
       worker: data,
     });
-
   } catch (error) {
     logger.error("Failed to create worker", error);
     return errorResponse(error);
@@ -108,11 +109,11 @@ Each function has its own `deno.json` for dependency management:
 
 ### Required Dependencies
 
-| Import | Source | Purpose |
-|--------|--------|---------|
-| `server` | `jsr:@supabase/functions-js/server` | HTTP server |
-| `@supabase/supabase-js` | `jsr:@supabase/supabase-js@2` | Database client |
-| `zod` | `npm:zod@^3.23.8` | Validation |
+| Import                  | Source                              | Purpose         |
+| ----------------------- | ----------------------------------- | --------------- |
+| `server`                | `jsr:@supabase/functions-js/server` | HTTP server     |
+| `@supabase/supabase-js` | `jsr:@supabase/supabase-js@2`       | Database client |
+| `zod`                   | `npm:zod@^3.23.8`                   | Validation      |
 
 ---
 
@@ -155,22 +156,16 @@ export function jsonResponse(data: unknown, status = 200): Response {
 /**
  * Create an error response
  */
-export function errorResponse(
-  error: unknown,
-  status = 500
-): Response {
+export function errorResponse(error: unknown, status = 500): Response {
   const message = error instanceof Error ? error.message : String(error);
-  
-  return new Response(
-    JSON.stringify({ success: false, error: message }),
-    {
-      status,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    }
-  );
+
+  return new Response(JSON.stringify({ success: false, error: message }), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
 }
 ```
 
@@ -211,14 +206,16 @@ export function createLogger(req: Request, context: LogContext) {
   const requestId = crypto.randomUUID();
 
   const log = (level: string, message: string, data?: unknown) => {
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level,
-      functionName: context.functionName,
-      requestId,
-      message,
-      ...(data && { data }),
-    }));
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level,
+        functionName: context.functionName,
+        requestId,
+        message,
+        ...(data && { data }),
+      })
+    );
   };
 
   return {
@@ -250,12 +247,12 @@ send-invoice-email/
 
 ### Function Categories
 
-| Category | Examples |
-|----------|----------|
-| **CRUD** | `create-worker`, `update-worker`, `delete-worker`, `list-workers` |
-| **Actions** | `send-invoice-email`, `calculate-invoice`, `process-payment` |
-| **Webhooks** | `stripe-webhook`, `resend-webhook` |
-| **Utilities** | `generate-report`, `validate-org-code` |
+| Category      | Examples                                                          |
+| ------------- | ----------------------------------------------------------------- |
+| **CRUD**      | `create-worker`, `update-worker`, `delete-worker`, `list-workers` |
+| **Actions**   | `send-invoice-email`, `calculate-invoice`, `process-payment`      |
+| **Webhooks**  | `stripe-webhook`, `resend-webhook`                                |
+| **Utilities** | `generate-report`, `validate-org-code`                            |
 
 ---
 
@@ -266,10 +263,11 @@ send-invoice-email/
 ```typescript
 return jsonResponse({
   success: true,
-  worker: data,          // Single entity
+  worker: data, // Single entity
   // OR
-  workers: data,         // Collection
-  pagination: {          // Optional pagination
+  workers: data, // Collection
+  pagination: {
+    // Optional pagination
     total: 100,
     page: 1,
     pageSize: 20,
@@ -298,11 +296,13 @@ const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 ```
 
 **Available in Supabase:**
+
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 **Custom (set in Supabase dashboard):**
+
 - `STRIPE_SECRET_KEY`
 - `RESEND_API_KEY`
 - etc.
@@ -311,11 +311,11 @@ const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
 
 ## Rules Summary
 
-| Rule | Description |
-|------|-------------|
-| CORS first | Always handle before other logic |
-| Per-function deno.json | Each function specifies its deps |
-| Service role client | For database operations |
-| Structured logging | JSON format with context |
-| Consistent responses | `{ success, data/error }` format |
-| kebab-case names | `create-worker`, not `createWorker` |
+| Rule                   | Description                         |
+| ---------------------- | ----------------------------------- |
+| CORS first             | Always handle before other logic    |
+| Per-function deno.json | Each function specifies its deps    |
+| Service role client    | For database operations             |
+| Structured logging     | JSON format with context            |
+| Consistent responses   | `{ success, data/error }` format    |
+| kebab-case names       | `create-worker`, not `createWorker` |

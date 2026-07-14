@@ -9,6 +9,7 @@ import {
   getDefaultInvoiceTemplateConfig,
 } from "../_utils/invoice-template-defaults.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -28,6 +29,16 @@ serve(async (req) => {
     const { organization_id } = body;
 
     const supabase = createServiceRoleClient();
+
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
 
     // Fetch existing config
     let { data: config, error: configError } = await supabase
@@ -61,22 +72,16 @@ serve(async (req) => {
         show_logo: config.show_logo ?? true,
         show_abn: config.show_abn ?? true,
         bill_to_fields: config.bill_to_fields ?? [],
-        service_address_config: config.service_address_config ??
-          DEFAULT_SERVICE_ADDRESS_CONFIG,
-        billing_address_config: config.billing_address_config ??
-          DEFAULT_BILLING_ADDRESS_CONFIG,
-        email_recipient_config: config.email_recipient_config ??
-          DEFAULT_EMAIL_RECIPIENT_CONFIG,
-        line_item_display: config.line_item_display ??
-          DEFAULT_LINE_ITEM_DISPLAY,
+        service_address_config: config.service_address_config ?? DEFAULT_SERVICE_ADDRESS_CONFIG,
+        billing_address_config: config.billing_address_config ?? DEFAULT_BILLING_ADDRESS_CONFIG,
+        email_recipient_config: config.email_recipient_config ?? DEFAULT_EMAIL_RECIPIENT_CONFIG,
+        line_item_display: config.line_item_display ?? DEFAULT_LINE_ITEM_DISPLAY,
         created_at: config.created_at,
         updated_at: config.updated_at,
       },
     });
   } catch (error) {
     logger.error("Get invoice template config error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to get invoice template config",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to get invoice template config");
   }
 });

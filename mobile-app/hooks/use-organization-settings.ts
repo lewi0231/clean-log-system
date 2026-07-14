@@ -11,14 +11,16 @@ export function useOrganizationSettings(organizationId: string | null) {
     if (!organizationId) return;
 
     const fetchSettings = async () => {
-      console.log("Organization Settings: Fetching...", { organizationId });
+      if (__DEV__) {
+        console.log("Organization Settings: Fetching...", { organizationId });
+      }
 
       try {
         const { data, error: fetchError } = await supabase.functions.invoke(
           "get-organization-settings",
           {
             body: { organization_id: organizationId },
-          },
+          }
         );
 
         if (fetchError) {
@@ -27,21 +29,21 @@ export function useOrganizationSettings(organizationId: string | null) {
         }
 
         if (data?.settings) {
-          console.info("Organization Settings: Success!", data.settings);
+          if (__DEV__) {
+            console.info("Organization Settings: Success!", data.settings);
+          }
           setSettings(data.settings);
         } else {
-          console.warn("🏢 Organization Settings: None found");
+          if (__DEV__) {
+            console.warn("🏢 Organization Settings: None found");
+          }
           setError("No organization settings found");
         }
       } catch (err) {
         console.error("🏢 Organization Settings: Failed to fetch", {
           error: err instanceof Error ? err.message : "Unknown error",
         });
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Organization Settings: Failed to fetch",
-        );
+        setError(err instanceof Error ? err.message : "Organization Settings: Failed to fetch");
       } finally {
         setLoading(false);
       }

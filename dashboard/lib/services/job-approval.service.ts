@@ -1,17 +1,6 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-
-export interface ResolveFlaggedJobRequest {
-  job_id: string;
-  action: "approve" | "cancel";
-  admin_notes?: string;
-}
-
-export interface ResolveFlaggedJobResponse {
-  success: boolean;
-  message: string;
-  job_status: "approved" | "cancelled";
-}
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
+import type { ResolveFlaggedJobRequest, ResolveFlaggedJobResponse } from "@/lib/types/api";
 
 export interface ListFlaggedJobsRequest {
   organization_id: string;
@@ -52,10 +41,7 @@ export class JobApprovalService {
         action: request.action,
       });
 
-      const data = await invokeEdgeFunction<ResolveFlaggedJobResponse>(
-        "resolve-flagged-job",
-        request as unknown as Record<string, unknown>
-      );
+      const data = await invokeTypedEdge("resolve-flagged-job", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to resolve flagged job");
@@ -80,18 +66,14 @@ export class JobApprovalService {
   /**
    * Get count of flagged jobs for the organization
    */
-  static getFlaggedJobsFromList(
-    jobs: Array<{ approval_status?: string }>
-  ): number {
+  static getFlaggedJobsFromList(jobs: Array<{ approval_status?: string }>): number {
     return jobs.filter((job) => job.approval_status === "flagged").length;
   }
 
   /**
    * Get count of pending jobs for the organization
    */
-  static getPendingJobsFromList(
-    jobs: Array<{ approval_status?: string }>
-  ): number {
+  static getPendingJobsFromList(jobs: Array<{ approval_status?: string }>): number {
     return jobs.filter((job) => job.approval_status === "pending").length;
   }
 
@@ -141,9 +123,7 @@ export class JobApprovalService {
   /**
    * Get remaining time in edit window
    */
-  static getTimeUntilEditWindowExpires(
-    editWindowExpiresAt: string | null | undefined
-  ): {
+  static getTimeUntilEditWindowExpires(editWindowExpiresAt: string | null | undefined): {
     hours: number;
     minutes: number;
     expired: boolean;

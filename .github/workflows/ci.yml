@@ -44,6 +44,12 @@ jobs:
         with:
           deno-version: v2.x
 
+      - name: Validate Edge Functions inventory (S1 Phase 4)
+        run: pnpm validate:functions-inventory
+
+      - name: Deno unit tests (Edge Functions, excludes integration)
+        run: pnpm test:edge-unit
+
       - name: Prettier check (changed files — PR)
         if: github.event_name == 'pull_request'
         run: |
@@ -58,10 +64,22 @@ jobs:
       - name: Prettier check (changed files — push)
         if: github.event_name == 'push'
         run: |
-          FILES=$(git diff --name-only --diff-filter=d HEAD~1 HEAD 2>/dev/null \
+          # Diff the whole push (all commits), not only HEAD~1..HEAD. Otherwise a batch push
+          # can leave earlier commits' files unchecked; Prettier failures surface on the next
+          # unrelated one-file commit (looks like "staging formatter is flaky").
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            RANGE_SPEC="single-commit fallback HEAD~1 HEAD"
+            RANGE_ARGS=(HEAD~1 HEAD)
+          else
+            RANGE_SPEC="push range $BEFORE..${{ github.sha }}"
+            RANGE_ARGS=("$BEFORE" "${{ github.sha }}")
+          fi
+          echo "Prettier file list: $RANGE_SPEC"
+          FILES=$(git diff --name-only --diff-filter=d "${RANGE_ARGS[@]}" 2>/dev/null \
             | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
           if [ -z "$FILES" ]; then
-            echo "No matching files changed in this commit"
+            echo "No matching files changed in this push"
             exit 0
           fi
           echo "$FILES" | xargs pnpm exec prettier --check
@@ -265,6 +283,12 @@ jobs:
   # When staging moves forward (e.g. after a PR merge), open or refresh staging → main.
   # Implemented here instead of workflow_run so the logic runs from the branch that was
   # pushed and does not depend on the completing workflow metadata (event/head_branch).
+  #
+  # PR create/merge via GITHUB_TOKEN requires either:
+  # - Repo: Settings → Actions → General → Workflow permissions → enable
+  #   "Allow GitHub Actions to create and approve pull requests", OR
+  # - A repo secret PIPELINE_TOKEN (classic PAT: repo scope; or fine-grained PAT with
+  #   Contents + Pull requests read/write on this repository).
   promote-staging-to-main:
     name: Staging → main (promotion PR)
     runs-on: ubuntu-latest
@@ -335,9 +359,11 @@ jobs:
           FILE_COUNT=${{ steps.details.outputs.file_count }}
           CI_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
+          set +e
           PR_URL=$(gh pr create \
             --base main \
             --head staging \
+            --repo "${{ github.repository }}" \
             --title "Staging → main ($FILE_COUNT files)" \
             --body "$(cat <<EOF
           ## Promotion to main
@@ -357,7 +383,15 @@ jobs:
           ---
           *Job: \`promote-staging-to-main\` in \`.github/workflows/ci.yml\`*
           EOF
-          )")
+          )" 2>&1)
+          CREATE_EXIT=$?
+          set -e
+
+          if [ "$CREATE_EXIT" -ne 0 ]; then
+            echo "$PR_URL"
+            echo "::error::GitHub refused PR creation (createPullRequest). Enable \"Allow GitHub Actions to create and approve pull requests\" under Settings → Actions → General → Workflow permissions, or set repo secret PIPELINE_TOKEN (PAT with repo / pull-requests+contents access)."
+            exit 1
+          fi
 
           echo "promotion PR: $PR_URL"
           PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
@@ -425,6 +459,7 @@ jobs:
             const codeBlock = [
               '```bash',
               'pnpm install',
+              'pnpm validate:functions-inventory',
               'pnpm lint && pnpm lint:edge-functions',
               'pnpm typecheck && pnpm build:dashboard',
               'pnpm --filter @clean-log/dashboard exec vitest run',

@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import type { Location } from "@/lib/types";
 import type {
   CreateLocationRequest,
@@ -14,24 +14,21 @@ export class LocationsService {
    * List workers and locations for an organization
    */
   static async listWorkersAndLocations(
-    request: ListWorkersAndLocationsRequest,
+    request: ListWorkersAndLocationsRequest
   ): Promise<ListWorkersAndLocationsResponse> {
     try {
       log.debug("LocationsService: Fetching workers and locations", {
         organizationId: request.organization_id,
       });
 
-      const data = await invokeEdgeFunction<ListWorkersAndLocationsResponse>(
-        "list-workers-and-locations",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("list-workers-and-locations", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch workers and locations");
       }
 
       log.info("LocationsService: Workers and locations fetched successfully");
-      return data as ListWorkersAndLocationsResponse;
+      return data;
     } catch (err) {
       log.error("LocationsService: Failed to fetch workers and locations", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -52,13 +49,8 @@ export class LocationsService {
 
       // Validate pricing mode and fixed price fields
       if (request.pricing_mode === "fixed_price") {
-        if (
-          request.fixed_customer_price === undefined ||
-          request.fixed_customer_price === null
-        ) {
-          throw new Error(
-            "Fixed customer price is required when pricing mode is fixed price",
-          );
+        if (request.fixed_customer_price === undefined || request.fixed_customer_price === null) {
+          throw new Error("Fixed customer price is required when pricing mode is fixed price");
         }
         if (request.fixed_customer_price < 0) {
           throw new Error("Fixed customer price must be non-negative");
@@ -66,17 +58,12 @@ export class LocationsService {
         if (request.fixed_price_currency) {
           const currencyRegex = /^[A-Z]{3}$/;
           if (!currencyRegex.test(request.fixed_price_currency)) {
-            throw new Error(
-              "Fixed price currency must be a valid 3-letter ISO code",
-            );
+            throw new Error("Fixed price currency must be a valid 3-letter ISO code");
           }
         }
       }
 
-      const data = await invokeEdgeFunction<{ location?: Location }>(
-        "create-location",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("create-location", request);
 
       if (!data || !data.location) {
         throw new Error("Failed to create location");
@@ -85,7 +72,7 @@ export class LocationsService {
       log.info("LocationsService: Location created successfully", {
         locationId: data.location.id,
       });
-      return data.location as Location;
+      return data.location;
     } catch (err) {
       log.error("LocationsService: Failed to create location", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -115,27 +102,19 @@ export class LocationsService {
         if (request.fixed_price_currency) {
           const currencyRegex = /^[A-Z]{3}$/;
           if (!currencyRegex.test(request.fixed_price_currency)) {
-            throw new Error(
-              "Fixed price currency must be a valid 3-letter ISO code",
-            );
+            throw new Error("Fixed price currency must be a valid 3-letter ISO code");
           }
         }
         // If switching to fixed_price mode, require fixed_customer_price
         if (
           request.pricing_mode === "fixed_price" &&
-          (request.fixed_customer_price === undefined ||
-            request.fixed_customer_price === null)
+          (request.fixed_customer_price === undefined || request.fixed_customer_price === null)
         ) {
-          throw new Error(
-            "Fixed customer price is required when pricing mode is fixed price",
-          );
+          throw new Error("Fixed customer price is required when pricing mode is fixed price");
         }
       }
 
-      const data = await invokeEdgeFunction<{ location?: Location }>(
-        "update-location",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("update-location", request);
 
       if (!data || !data.location) {
         throw new Error("Failed to update location");
@@ -144,7 +123,7 @@ export class LocationsService {
       log.info("LocationsService: Location updated successfully", {
         locationId: data.location.id,
       });
-      return data.location as Location;
+      return data.location;
     } catch (err) {
       log.error("LocationsService: Failed to update location", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -162,7 +141,7 @@ export class LocationsService {
         locationId: request.id,
       });
 
-      await invokeEdgeFunction("delete-location", request as unknown as Record<string, unknown>);
+      await invokeTypedEdge("delete-location", request);
 
       log.info("LocationsService: Location deleted successfully", {
         locationId: request.id,

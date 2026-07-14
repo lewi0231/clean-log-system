@@ -98,13 +98,6 @@ export const mobileConfigTourSteps: TourStep[] = [
 
 export const pricingTourSteps: TourStep[] = [
   {
-    target: "[data-tour='location-scope']",
-    title: "Location Scope",
-    content:
-      "Select which location or region you're configuring pricing for. You can set pricing at the organization level, regional level, or for specific locations.",
-    position: "bottom",
-  },
-  {
     target: "[data-tour='invoice-adjustments']",
     title: "Invoice Adjustments",
     content:

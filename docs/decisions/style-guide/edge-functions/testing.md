@@ -2,6 +2,8 @@
 
 > Deno test patterns for Supabase Edge Functions.
 
+Pure helpers co-located with **`handlers/`** modules should be covered by **`pnpm test:edge-unit`** where practical — see [split-handlers.md](./split-handlers.md).
+
 ---
 
 ## Test Setup
@@ -24,11 +26,11 @@ deno test --allow-env --allow-net --watch supabase/functions/__tests__/
 
 ### Deno Permissions
 
-| Permission | Purpose |
-|------------|---------|
-| `--allow-env` | Access environment variables |
-| `--allow-net` | Make HTTP requests |
-| `--allow-read` | Read files (if needed) |
+| Permission     | Purpose                      |
+| -------------- | ---------------------------- |
+| `--allow-env`  | Access environment variables |
+| `--allow-net`  | Make HTTP requests           |
+| `--allow-read` | Read files (if needed)       |
 
 ---
 
@@ -38,16 +40,8 @@ deno test --allow-env --allow-net --watch supabase/functions/__tests__/
 
 ```typescript
 // supabase/functions/__tests__/create-worker.test.ts
-import {
-  assertEquals,
-  assertExists,
-} from "https://deno.land/std@0.208.0/assert/mod.ts";
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  it,
-} from "https://deno.land/std@0.208.0/testing/bdd.ts";
+import { assertEquals, assertExists } from "https://deno.land/std@0.208.0/assert/mod.ts";
+import { afterAll, beforeAll, describe, it } from "https://deno.land/std@0.208.0/testing/bdd.ts";
 
 const FUNCTION_URL = "http://localhost:54321/functions/v1/create-worker";
 
@@ -71,7 +65,7 @@ describe("create-worker", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${authToken}`,
+        Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({
         organization_id: testOrgId,
@@ -94,12 +88,12 @@ describe("create-worker", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${authToken}`,
+        Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({
         organization_id: testOrgId,
         // Missing required name
-        email: "invalid-email",  // Invalid format
+        email: "invalid-email", // Invalid format
       }),
     });
 
@@ -115,7 +109,7 @@ describe("create-worker", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${authToken}`,
+        Authorization: `Bearer ${authToken}`,
       },
       body: JSON.stringify({
         organization_id: "00000000-0000-0000-0000-000000000000", // Not a member
@@ -352,11 +346,11 @@ export SUPABASE_SERVICE_ROLE_KEY="your-local-service-key"
 
 ## Rules Summary
 
-| Rule | Description |
-|------|-------------|
-| Integration tests | Test against running functions |
-| Setup/teardown | Create and clean test data |
-| Test all paths | Success, validation errors, auth errors |
-| Mock webhooks | Use proper signature generation |
-| Unit test utils | Test schemas and helpers separately |
-| Local Supabase | Required for integration tests |
+| Rule              | Description                             |
+| ----------------- | --------------------------------------- |
+| Integration tests | Test against running functions          |
+| Setup/teardown    | Create and clean test data              |
+| Test all paths    | Success, validation errors, auth errors |
+| Mock webhooks     | Use proper signature generation         |
+| Unit test utils   | Test schemas and helpers separately     |
+| Local Supabase    | Required for integration tests          |

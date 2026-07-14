@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/useAuth";
 import { useInvoices } from "@/hooks/use-invoices";
+import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
 import { senderDisplayNameFromUser } from "@/lib/sender-display-name";
 import { InvoiceService } from "@/lib/services/invoice.service";
@@ -147,6 +148,7 @@ export default function InvoiceList({
   isAdmin = false,
 }: InvoiceListProps) {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [showTests, setShowTests] = useState(false);
@@ -245,11 +247,15 @@ export default function InvoiceList({
 
   const handleSendInvoice = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation(); // Prevent row click
+    if (!organizationId) {
+      toast.error("Organization not loaded");
+      return;
+    }
     try {
       setSendingInvoiceId(invoiceId);
       log.info("Sending invoice", { invoiceId });
 
-      await InvoiceService.updateStatus(invoiceId, "sent", {
+      await InvoiceService.updateStatus(invoiceId, organizationId, "sent", {
         senderDisplayName: senderDisplayNameFromUser(user),
       });
 
@@ -288,7 +294,7 @@ export default function InvoiceList({
       setSendingInvoiceId(invoiceToResend.id);
       log.info("Resending invoice", { invoiceId: invoiceToResend.id });
 
-      await InvoiceService.resendInvoice(invoiceToResend.id, {
+      await InvoiceService.resendInvoice(invoiceToResend.id, invoiceToResend.organization_id, {
         senderDisplayName: senderDisplayNameFromUser(user),
       });
 
@@ -340,12 +346,16 @@ export default function InvoiceList({
 
   const handleApproveInvoice = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation();
+    if (!organizationId) {
+      toast.error("Organization not loaded");
+      return;
+    }
     try {
       setApprovingInvoiceId(invoiceId);
       log.info("Approving invoice", { invoiceId });
 
       // Approve: Change status from pending_review to draft (ready to send)
-      await InvoiceService.updateStatus(invoiceId, "draft");
+      await InvoiceService.updateStatus(invoiceId, organizationId, "draft");
 
       await refetch();
 
@@ -366,12 +376,16 @@ export default function InvoiceList({
 
   const handleRejectInvoice = async (e: React.MouseEvent, invoiceId: string) => {
     e.stopPropagation();
+    if (!organizationId) {
+      toast.error("Organization not loaded");
+      return;
+    }
     try {
       setRejectingInvoiceId(invoiceId);
       log.info("Rejecting invoice", { invoiceId });
 
       // Reject: Change status to cancelled
-      await InvoiceService.updateStatus(invoiceId, "cancelled");
+      await InvoiceService.updateStatus(invoiceId, organizationId, "cancelled");
 
       await refetch();
 
@@ -418,6 +432,10 @@ export default function InvoiceList({
 
   const handleBulkApprove = async () => {
     if (selectedPendingReview.length === 0) return;
+    if (!organizationId) {
+      toast.error("Organization not loaded");
+      return;
+    }
 
     try {
       setBulkProcessing(true);
@@ -430,7 +448,7 @@ export default function InvoiceList({
 
       for (const invoiceId of selectedPendingReview) {
         try {
-          await InvoiceService.updateStatus(invoiceId, "draft");
+          await InvoiceService.updateStatus(invoiceId, organizationId, "draft");
           successCount++;
         } catch {
           errorCount++;
@@ -459,6 +477,10 @@ export default function InvoiceList({
 
   const handleBulkReject = async () => {
     if (selectedPendingReview.length === 0) return;
+    if (!organizationId) {
+      toast.error("Organization not loaded");
+      return;
+    }
 
     try {
       setBulkProcessing(true);
@@ -471,7 +493,7 @@ export default function InvoiceList({
 
       for (const invoiceId of selectedPendingReview) {
         try {
-          await InvoiceService.updateStatus(invoiceId, "cancelled");
+          await InvoiceService.updateStatus(invoiceId, organizationId, "cancelled");
           successCount++;
         } catch {
           errorCount++;

@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -114,6 +115,16 @@ serve(async (req: Request) => {
 
     const supabase = createServiceRoleClient();
 
+    const orgGate = await requireAuthenticatedOrgMember(req, organization_id, supabase);
+    if (!orgGate.ok) {
+      if (orgGate.response.status === 403) {
+        logger.warn("Unauthorized organization access attempt", {
+          organization_id,
+        });
+      }
+      return orgGate.response;
+    }
+
     // First, get all pricing rule IDs for this organization
     const { data: pricingRules, error: rulesError } = await supabase
       .from("pricing_rule")
@@ -180,7 +191,7 @@ serve(async (req: Request) => {
       ...new Set(
         auditEntries
           .map((entry: AuditEntry) => entry.pricing_rule_id)
-          .filter((id: string | null): id is string => id !== null),
+          .filter((id: string | null): id is string => id !== null)
       ),
     ];
 
@@ -231,7 +242,7 @@ serve(async (req: Request) => {
             id,
             name
           )
-        `,
+        `
         )
         .in("id", uniqueRuleIds);
 
@@ -257,35 +268,35 @@ serve(async (req: Request) => {
           updated_by: string | null;
           field_config?:
             | {
-              id: string;
-              name: string;
-              label: string;
-            }
+                id: string;
+                name: string;
+                label: string;
+              }
             | Array<{
-              id: string;
-              name: string;
-              label: string;
-            }>
+                id: string;
+                name: string;
+                label: string;
+              }>
             | null;
           location?:
             | {
-              id: string;
-              name: string;
-            }
+                id: string;
+                name: string;
+              }
             | Array<{
-              id: string;
-              name: string;
-            }>
+                id: string;
+                name: string;
+              }>
             | null;
           location_node?:
             | {
-              id: string;
-              name: string;
-            }
+                id: string;
+                name: string;
+              }
             | Array<{
-              id: string;
-              name: string;
-            }>
+                id: string;
+                name: string;
+              }>
             | null;
         };
 
@@ -294,8 +305,8 @@ serve(async (req: Request) => {
           id: typedRule.id,
           organization_id: typedRule.organization_id,
           scope: typedRule.scope,
-          pricing_context: (typedRule as { pricing_context?: string | null })
-            .pricing_context || null,
+          pricing_context:
+            (typedRule as { pricing_context?: string | null }).pricing_context || null,
           field_config_id: typedRule.field_config_id,
           option_value: typedRule.option_value,
           location_id: typedRule.location_id,
@@ -407,8 +418,7 @@ serve(async (req: Request) => {
       // Note: We need to use the service role client to access auth.users
       for (const userId of userIdsFromAudit) {
         try {
-          const { data: user, error: userError } = await supabase.auth.admin
-            .getUserById(userId);
+          const { data: user, error: userError } = await supabase.auth.admin.getUserById(userId);
           if (!userError && user?.user?.email) {
             userEmailMap.set(userId, user.user.email);
           }
@@ -423,18 +433,14 @@ serve(async (req: Request) => {
     }
 
     // Helper function to safely extract pricing data from JSONB
-    const extractPricingData = (
-      data: Record<string, unknown> | null,
-    ): PricingData | null => {
+    const extractPricingData = (data: Record<string, unknown> | null): PricingData | null => {
       if (!data) return null;
       return data as PricingData;
     };
 
     // Transform the audit data into the format expected by the frontend
     const pricingHistory = auditEntries.map((entry: AuditEntry) => {
-      const rule = entry.pricing_rule_id
-        ? rulesMap.get(entry.pricing_rule_id)
-        : null;
+      const rule = entry.pricing_rule_id ? rulesMap.get(entry.pricing_rule_id) : null;
       const oldData = extractPricingData(entry.old_data);
       const newData = extractPricingData(entry.new_data);
 
@@ -472,12 +478,9 @@ serve(async (req: Request) => {
 
       // Get field name - prefer from rule, fallback to field config map, then data
       const fieldConfig = rule?.field_config;
-      const fieldConfigId = rule?.field_config_id ||
-        newData?.field_config_id ||
-        oldData?.field_config_id;
-      const fieldConfigFromMap = fieldConfigId
-        ? fieldConfigMap.get(fieldConfigId)
-        : null;
+      const fieldConfigId =
+        rule?.field_config_id || newData?.field_config_id || oldData?.field_config_id;
+      const fieldConfigFromMap = fieldConfigId ? fieldConfigMap.get(fieldConfigId) : null;
 
       // Determine the scope for better fallback naming
       const ruleScope = rule?.scope || newData?.scope || oldData?.scope;
@@ -487,14 +490,11 @@ serve(async (req: Request) => {
       if (fieldConfig?.label || fieldConfig?.name) {
         fieldName = fieldConfig.label || fieldConfig.name || "Unknown Field";
       } else if (fieldConfigFromMap?.label || fieldConfigFromMap?.name) {
-        fieldName = fieldConfigFromMap.label || fieldConfigFromMap.name ||
-          "Unknown Field";
+        fieldName = fieldConfigFromMap.label || fieldConfigFromMap.name || "Unknown Field";
       } else if (newData?.field_config?.label || newData?.field_config?.name) {
-        fieldName = newData.field_config.label || newData.field_config.name ||
-          "Unknown Field";
+        fieldName = newData.field_config.label || newData.field_config.name || "Unknown Field";
       } else if (oldData?.field_config?.label || oldData?.field_config?.name) {
-        fieldName = oldData.field_config.label || oldData.field_config.name ||
-          "Unknown Field";
+        fieldName = oldData.field_config.label || oldData.field_config.name || "Unknown Field";
       } else if (ruleScope === "base") {
         // Base pricing without a field_config - standalone base price
         fieldName = "Base Price";
@@ -507,10 +507,9 @@ serve(async (req: Request) => {
       // Get location name - prefer from rule, fallback to location map, then data
       const location = rule?.location;
       const locationNode = rule?.location_node;
-      const locationId = rule?.location_id ||
-        newData?.location_id ||
-        oldData?.location_id;
-      const locationHierarchyId = rule?.location_hierarchy_id ||
+      const locationId = rule?.location_id || newData?.location_id || oldData?.location_id;
+      const locationHierarchyId =
+        rule?.location_hierarchy_id ||
         newData?.location_hierarchy_id ||
         oldData?.location_hierarchy_id;
 
@@ -535,28 +534,20 @@ serve(async (req: Request) => {
 
       // Get changed_by (from created_by or updated_by in new_data or old_data)
       // These are UUIDs, we'll look up the email below
-      const changedByUserId = newData?.updated_by ||
-        newData?.created_by ||
-        oldData?.updated_by ||
-        oldData?.created_by;
+      const changedByUserId =
+        newData?.updated_by || newData?.created_by || oldData?.updated_by || oldData?.created_by;
 
       // Get option_value
-      const optionValue = rule?.option_value ||
-        newData?.option_value ||
-        oldData?.option_value ||
-        undefined;
+      const optionValue =
+        rule?.option_value || newData?.option_value || oldData?.option_value || undefined;
 
       // Get effective_at and expires_at
-      const effectiveAt = newData?.effective_at ||
-        oldData?.effective_at ||
-        entry.changed_at;
+      const effectiveAt = newData?.effective_at || oldData?.effective_at || entry.changed_at;
       const expiresAt = newData?.expires_at || oldData?.expires_at || undefined;
 
       // Get pricing_context - prefer from rule, then new_data, then old_data
-      const pricingContext = rule?.pricing_context ||
-        newData?.pricing_context ||
-        oldData?.pricing_context ||
-        "customer"; // Default to customer for backward compatibility
+      const pricingContext =
+        rule?.pricing_context || newData?.pricing_context || oldData?.pricing_context || "customer"; // Default to customer for backward compatibility
 
       // Look up user email from UUID
       const changedByEmail = changedByUserId
@@ -573,11 +564,7 @@ serve(async (req: Request) => {
         old_price: oldPrice ?? undefined,
         // Fixed: Only use oldPrice as fallback for DELETE actions, not when newPrice is 0
         // When newPrice is 0, it's a valid value and should be displayed
-        new_price: newPrice !== null
-          ? newPrice
-          : changeType === "expired"
-          ? oldPrice ?? 0
-          : 0,
+        new_price: newPrice !== null ? newPrice : changeType === "expired" ? (oldPrice ?? 0) : 0,
         effective_at: effectiveAt,
         changed_at: entry.changed_at, // When the change was actually made (vs when it takes effect)
         expires_at: expiresAt,
@@ -592,13 +579,14 @@ serve(async (req: Request) => {
       pricing_history: pricingHistory,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error
-      ? error.message
-      : typeof error === "object" && error !== null && "message" in error
-      ? String(error.message)
-      : typeof error === "string"
-      ? error
-      : "Failed to list pricing history";
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : typeof error === "object" && error !== null && "message" in error
+          ? String(error.message)
+          : typeof error === "string"
+            ? error
+            : "Failed to list pricing history";
     logger.error("List pricing history error", error, { message: errorMessage });
     return errorResponse(errorMessage, 500);
   }

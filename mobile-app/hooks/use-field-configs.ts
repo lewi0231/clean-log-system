@@ -250,9 +250,11 @@ export function useFieldConfigs(organizationId: string | null, locationId?: stri
     async function fetchFieldConfigs() {
       try {
         setLoading(true);
-        console.log("📋 Field Configs: Fetching for organization", {
-          organizationId,
-        });
+        if (__DEV__) {
+          console.log("📋 Field Configs: Fetching for organization", {
+            organizationId,
+          });
+        }
 
         // Fetch both field configs and sections in parallel
         const [fieldConfigsResponse, sectionsResponse] = await Promise.all([
@@ -278,10 +280,12 @@ export function useFieldConfigs(organizationId: string | null, locationId?: stri
           // Continue even if sections fail
         }
 
-        console.log("📋 Field Configs: Response received", {
-          success: fieldConfigsResponse.data?.success,
-          fieldConfigs: fieldConfigsResponse.data?.field_configs,
-        });
+        if (__DEV__) {
+          console.log("📋 Field Configs: Response received", {
+            success: fieldConfigsResponse.data?.success,
+            fieldConfigs: fieldConfigsResponse.data?.field_configs,
+          });
+        }
 
         // Process field configs
         if (fieldConfigsResponse.data?.field_configs) {
@@ -313,10 +317,12 @@ export function useFieldConfigs(organizationId: string | null, locationId?: stri
 
         // Process sections
         if (sectionsResponse.data?.sections) {
-          console.log("📋 Sections: Response received", {
-            success: sectionsResponse.data?.success,
-            sections: sectionsResponse.data?.sections,
-          });
+          if (__DEV__) {
+            console.log("📋 Sections: Response received", {
+              success: sectionsResponse.data?.success,
+              sections: sectionsResponse.data?.sections,
+            });
+          }
           // Convert to FormSectionWithFields by adding field_ids
           const sectionsWithFields: FormSectionWithFields[] = sectionsResponse.data.sections.map(
             (section: FormSectionWithFields) => ({

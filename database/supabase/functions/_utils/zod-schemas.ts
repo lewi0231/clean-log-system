@@ -18,11 +18,7 @@ export const uuidSchema = z.string().uuid("Invalid UUID format");
 /**
  * Email validation schema
  */
-export const emailSchema = z
-  .string()
-  .email("Invalid email format")
-  .toLowerCase()
-  .trim();
+export const emailSchema = z.string().email("Invalid email format").toLowerCase().trim();
 
 /**
  * Non-negative number schema
@@ -43,14 +39,7 @@ export const positiveNumberSchema = z
 /**
  * Currency code schema (ISO 4217)
  */
-export const currencyCodeSchema = z.enum([
-  "AUD",
-  "USD",
-  "GBP",
-  "EUR",
-  "CAD",
-  "NZD",
-]);
+export const currencyCodeSchema = z.enum(["AUD", "USD", "GBP", "EUR", "CAD", "NZD"]);
 
 /**
  * Organization ID schema
@@ -75,13 +64,7 @@ export const pricingScopeSchema = z.enum(["field", "option", "base", "global"]);
 /**
  * Pricing type schema
  */
-export const pricingTypeSchema = z.enum([
-  "unit",
-  "fixed",
-  "tiered",
-  "percentage",
-  "conditional",
-]);
+export const pricingTypeSchema = z.enum(["unit", "fixed", "tiered", "percentage", "conditional"]);
 
 /**
  * Pricing context schema
@@ -91,11 +74,7 @@ export const pricingContextSchema = z.enum(["customer", "worker"]);
 /**
  * Worker payment type schema
  */
-export const workerPaymentTypeSchema = z.enum([
-  "same_structure",
-  "percentage",
-  "fixed_rate",
-]);
+export const workerPaymentTypeSchema = z.enum(["same_structure", "percentage", "fixed_rate"]);
 
 /**
  * Role schema
@@ -105,10 +84,7 @@ export const roleSchema = z.enum(["admin", "viewer"]);
 /**
  * Business mode schema
  */
-export const businessModeSchema = z.enum([
-  "service_based",
-  "resource_tracking",
-]);
+export const businessModeSchema = z.enum(["service_based", "resource_tracking"]);
 
 /**
  * Invoice status schema
@@ -165,12 +141,14 @@ export const percentageSchema = z
  */
 export function validateRequest<T>(
   schema: z.ZodSchema<T>,
-  data: unknown,
-): { success: true; data: T } | {
-  success: false;
-  error: string;
-  issues: z.ZodIssue[];
-} {
+  data: unknown
+):
+  | { success: true; data: T }
+  | {
+      success: false;
+      error: string;
+      issues: z.ZodIssue[];
+    } {
   const result = schema.safeParse(data);
 
   if (result.success) {
@@ -220,58 +198,62 @@ export const commonSchemas = {
 /**
  * Schema for creating a pricing rule
  */
-export const createPricingRuleSchema = z.object({
-  organization_id: uuidSchema,
-  scope: pricingScopeSchema,
-  pricing_type: pricingTypeSchema,
-  pricing_context: pricingContextSchema.optional(),
-  field_config_id: uuidSchema.nullable().optional(),
-  option_value: z.string().nullable().optional(),
-  applies_to_field_type: z.string().nullable().optional(),
-  location_hierarchy_id: uuidSchema.nullable().optional(),
-  location_id: uuidSchema.nullable().optional(),
-  currency: currencyCodeSchema.optional(),
-  base_price: nonNegativeNumberSchema.nullable().optional(),
-  percentage_rate: percentageSchema.nullable().optional(),
-  minimum_quantity: nonNegativeNumberSchema.optional(),
-  maximum_quantity: nonNegativeNumberSchema.optional(),
-  tier_definition: z.record(z.any()).nullable().optional(),
-  metadata: z.record(z.any()).optional(),
-  worker_payment_type: workerPaymentTypeSchema.nullable().optional(),
-  worker_payment_value: nonNegativeNumberSchema.nullable().optional(),
-  priority: z.number().int().min(0).optional(),
-  active: z.boolean().optional(),
-  effective_at: z.string().datetime().nullable().optional(),
-  expires_at: z.string().datetime().nullable().optional(),
-  created_by: uuidSchema.nullable().optional(),
-  conditions: z.array(z.object({
-    condition_field_config_id: uuidSchema,
-    operator: z.string(),
-    condition_value: z.union([z.string(), z.number()]),
-    action_type: z.string(),
-    action_value: z.union([z.string(), z.number()]),
+export const createPricingRuleSchema = z
+  .object({
+    organization_id: uuidSchema,
+    scope: pricingScopeSchema,
+    pricing_type: pricingTypeSchema,
+    pricing_context: pricingContextSchema.optional(),
+    field_config_id: uuidSchema.nullable().optional(),
+    option_value: z.string().nullable().optional(),
+    applies_to_field_type: z.string().nullable().optional(),
+    location_hierarchy_id: uuidSchema.nullable().optional(),
+    location_id: uuidSchema.nullable().optional(),
+    currency: currencyCodeSchema.optional(),
+    base_price: nonNegativeNumberSchema.nullable().optional(),
+    percentage_rate: percentageSchema.nullable().optional(),
+    minimum_quantity: nonNegativeNumberSchema.optional(),
+    maximum_quantity: nonNegativeNumberSchema.optional(),
+    tier_definition: z.record(z.any()).nullable().optional(),
     metadata: z.record(z.any()).optional(),
+    worker_payment_type: workerPaymentTypeSchema.nullable().optional(),
+    worker_payment_value: nonNegativeNumberSchema.nullable().optional(),
     priority: z.number().int().min(0).optional(),
-  })).optional(),
-}).refine(
-  (data) => {
-    // If scope is "field", field_config_id is required
-    if (data.scope === "field" && !data.field_config_id) {
-      return false;
+    active: z.boolean().optional(),
+    effective_at: z.string().datetime().nullable().optional(),
+    expires_at: z.string().datetime().nullable().optional(),
+    created_by: uuidSchema.nullable().optional(),
+    conditions: z
+      .array(
+        z.object({
+          condition_field_config_id: uuidSchema,
+          operator: z.string(),
+          condition_value: z.union([z.string(), z.number()]),
+          action_type: z.string(),
+          action_value: z.union([z.string(), z.number()]),
+          metadata: z.record(z.any()).optional(),
+          priority: z.number().int().min(0).optional(),
+        })
+      )
+      .optional(),
+  })
+  .refine(
+    (data) => {
+      // If scope is "field", field_config_id is required
+      if (data.scope === "field" && !data.field_config_id) {
+        return false;
+      }
+      // If scope is "option", both field_config_id and option_value are required
+      if (data.scope === "option" && (!data.field_config_id || !data.option_value)) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message:
+        "field_config_id is required for field scope, and both field_config_id and option_value are required for option scope",
     }
-    // If scope is "option", both field_config_id and option_value are required
-    if (
-      data.scope === "option" && (!data.field_config_id || !data.option_value)
-    ) {
-      return false;
-    }
-    return true;
-  },
-  {
-    message:
-      "field_config_id is required for field scope, and both field_config_id and option_value are required for option scope",
-  },
-);
+  );
 
 /**
  * Schema for updating a pricing rule
@@ -301,15 +283,19 @@ export const updatePricingRuleSchema = z.object({
   effective_at: z.string().datetime().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
   updated_by: uuidSchema.nullable().optional(),
-  conditions: z.array(z.object({
-    condition_field_config_id: uuidSchema,
-    operator: z.string(),
-    condition_value: z.union([z.string(), z.number()]),
-    action_type: z.string(),
-    action_value: z.union([z.string(), z.number()]),
-    metadata: z.record(z.any()).optional(),
-    priority: z.number().int().min(0).optional(),
-  })).optional(),
+  conditions: z
+    .array(
+      z.object({
+        condition_field_config_id: uuidSchema,
+        operator: z.string(),
+        condition_value: z.union([z.string(), z.number()]),
+        action_type: z.string(),
+        action_value: z.union([z.string(), z.number()]),
+        metadata: z.record(z.any()).optional(),
+        priority: z.number().int().min(0).optional(),
+      })
+    )
+    .optional(),
 });
 
 /**
@@ -338,14 +324,8 @@ export const createInvoiceSchema = z.object({
  */
 export const updateInvoiceStatusSchema = z.object({
   invoice_id: uuidSchema,
-  status: z.enum([
-    "draft",
-    "pending_review",
-    "sent",
-    "paid",
-    "overdue",
-    "cancelled",
-  ]),
+  organization_id: uuidSchema,
+  status: z.enum(["draft", "pending_review", "sent", "paid", "overdue", "cancelled"]),
   resend: z.boolean().optional(),
   /** Display name of the user sending the invoice (shown in email sign-off) */
   sender_display_name: z.string().max(200).optional(),
@@ -379,6 +359,11 @@ export const listInvoicesSchema = z.object({
   status: z.string().optional(),
   page: z.number().int().min(1).optional(),
   page_size: z.number().int().min(1).max(100).optional(),
+});
+
+/** Body for `list-form-sections` (secured org scope). */
+export const listFormSectionsBodySchema = z.object({
+  organization_id: uuidSchema,
 });
 
 /**

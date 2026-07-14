@@ -1,5 +1,5 @@
 import { log } from "@/lib/logger";
-import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import type {
   CreateJobRequest,
   CreateJobResponse,
@@ -21,10 +21,7 @@ export class JobsService {
         organizationId: request.organization_id,
       });
 
-      const data = await invokeEdgeFunction<ListJobsResponse>(
-        "list-jobs",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("list-jobs", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to fetch jobs");
@@ -33,7 +30,7 @@ export class JobsService {
       log.info("JobsService: Jobs fetched successfully", {
         jobsCount: data.jobs?.length || 0,
       });
-      return data as ListJobsResponse;
+      return data;
     } catch (err) {
       log.error("JobsService: Failed to fetch jobs", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -53,10 +50,7 @@ export class JobsService {
         workerIdsCount: request.worker_ids?.length || 0,
       });
 
-      const data = await invokeEdgeFunction<CreateJobResponse>(
-        "admin-create-job",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("admin-create-job", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to create job");
@@ -65,7 +59,7 @@ export class JobsService {
       log.info("JobsService: Job created successfully", {
         jobId: data.job?.id,
       });
-      return data as CreateJobResponse;
+      return data;
     } catch (err) {
       log.error("JobsService: Failed to create job", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -87,10 +81,7 @@ export class JobsService {
         hasCompletedAt: !!request.completed_at,
       });
 
-      const data = await invokeEdgeFunction<UpdateJobResponse>(
-        "update-job",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("update-job", request);
 
       if (!data || !data.success) {
         throw new Error("Failed to update job");
@@ -99,7 +90,7 @@ export class JobsService {
       log.info("JobsService: Job updated successfully", {
         jobId: data.job?.id,
       });
-      return data as UpdateJobResponse;
+      return data;
     } catch (err) {
       log.error("JobsService: Failed to update job", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -112,18 +103,13 @@ export class JobsService {
    * Get edit history for a job
    * Returns empty array if there's an error (e.g., table doesn't exist yet)
    */
-  static async getEdits(
-    request: GetJobEditsRequest,
-  ): Promise<GetJobEditsResponse> {
+  static async getEdits(request: GetJobEditsRequest): Promise<GetJobEditsResponse> {
     try {
       log.debug("JobsService: Fetching job edit history", {
         jobId: request.job_id,
       });
 
-      const data = await invokeEdgeFunction<GetJobEditsResponse>(
-        "get-job-edits",
-        request as unknown as Record<string, unknown>,
-      );
+      const data = await invokeTypedEdge("get-job-edits", request);
 
       if (!data || !data.success) {
         log.error("JobsService: No data returned from get-job-edits", {
@@ -136,7 +122,7 @@ export class JobsService {
         jobId: request.job_id,
         editCount: data.edits?.length || 0,
       });
-      return data as GetJobEditsResponse;
+      return data;
     } catch (err) {
       log.error("JobsService: Exception fetching job edit history", {
         error: err instanceof Error ? err.message : "Unknown error",
@@ -155,11 +141,9 @@ export class JobsService {
         jobId,
       });
 
-      const data = await invokeEdgeFunction<{
-        success?: boolean;
-        error?: string;
-        emailId?: string;
-      }>("send-feedback-email", { job_id: jobId });
+      const data = await invokeTypedEdge("send-feedback-email", {
+        job_id: jobId,
+      });
 
       if (!data || !data.success) {
         throw new Error(data?.error || "Failed to send feedback email");
