@@ -5,10 +5,10 @@ import type { ScopeChipVariant } from "@/lib/pricing-scope-display";
 import { cn } from "@/lib/utils";
 
 const CHIP_LABELS: Record<ScopeChipVariant, string> = {
-  "all-yards-default": "All yards default",
-  "yard-override": "Yard override",
+  "all-yards-default": "Default",
+  "yard-override": "Override",
   inherited: "Inherited",
-  mixed: "Mixed scope",
+  mixed: "Override", // Treat mixed as override - user feedback: mixed badge is redundant
 };
 
 interface PricingScopeChipProps {
@@ -18,13 +18,16 @@ interface PricingScopeChipProps {
 }
 
 export function PricingScopeChip({ variant, inheritedLabel, className }: PricingScopeChipProps) {
+  // Don't render for "mixed" - use only the override badge
+  const effectiveVariant = variant === "mixed" ? "yard-override" : variant;
+
   return (
     <div className={cn("flex flex-col gap-0.5 min-w-0", className)}>
       <Badge
-        variant={variant === "yard-override" ? "default" : "secondary"}
+        variant={effectiveVariant === "yard-override" ? "default" : "secondary"}
         className="text-xs font-normal w-fit"
       >
-        {CHIP_LABELS[variant]}
+        {CHIP_LABELS[effectiveVariant]}
       </Badge>
       {inheritedLabel && (
         <span className="text-xs text-muted-foreground truncate" title={inheritedLabel}>

@@ -6,7 +6,6 @@ import { useLocationFixedPricingGuard } from "@/components/pricing/location-fixe
 import LocationScopeSelector from "@/components/pricing/location-scope-selector";
 import NumberPricingList from "@/components/pricing/number-pricing-list";
 import OptionPricingEditor from "@/components/pricing/option-pricing-editor";
-import { PricingContextBar } from "@/components/pricing/pricing-context-bar";
 import { PricingHistory } from "@/components/pricing/pricing-history";
 import { PricingScopeProvider, usePricingScope } from "@/components/pricing/pricing-scope-context";
 import {
@@ -41,7 +40,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 
 export default function PricingPage() {
   const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
@@ -119,10 +117,6 @@ function PricingPageContent({
     setLocationNodeId,
     locationId,
     setLocationId,
-    previewLocationId,
-    setPreviewLocationId,
-    previewLocationHierarchyId,
-    setPreviewLocationHierarchyId,
     effectiveDate,
     setEffectiveDate,
     expirationDate,
@@ -135,7 +129,7 @@ function PricingPageContent({
     setShowBothContexts(true);
   }, [setShowBothContexts]);
 
-  const { isFixedPricing, location } = useLocationFixedPricingGuard(previewLocationId);
+  const { isFixedPricing, location } = useLocationFixedPricingGuard(null);
   const { formatCurrency } = useOrganizationCurrency();
   const [testInvoiceOpen, setTestInvoiceOpen] = useState(false);
   const [mainTab, setMainTab] = useState("pricing");
@@ -329,26 +323,6 @@ function PricingPageContent({
             )}
 
             {!hasNoPriceableFields && (
-              <PricingContextBar
-                effectiveDate={effectiveDate}
-                onEffectiveDateChange={setEffectiveDate}
-                previewLocationId={previewLocationId}
-                previewLocationHierarchyId={previewLocationHierarchyId}
-                onPreviewChange={(locId, hierarchyId) => {
-                  setPreviewLocationId(locId);
-                  setPreviewLocationHierarchyId(hierarchyId);
-                }}
-                onAdvancedScopeClick={() => setMainTab("scope")}
-                onBlockedPreviewChange={() =>
-                  toast.message(
-                    "You have unsaved pricing changes. Discard or save before changing preview."
-                  )
-                }
-              />
-            )}
-
-            {/* Field Type Pricing — Sidebar + Main Layout (S2 §4.1) */}
-            {!hasNoPriceableFields && (
               <div className="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-6">
                 {/* Sidebar: Field type navigation (desktop: vertical, mobile: horizontal scroll) */}
                 <aside className="hidden lg:block">
@@ -508,22 +482,17 @@ function PricingPageContent({
                       </CardHeader>
                       <CardContent>
                         {selectFields.length > 0 ? (
-                          <div className="space-y-6">
+                          <div className="space-y-8">
                             {selectFields.map((fieldConfig) => (
-                              <div key={fieldConfig.id} className="space-y-4">
-                                <div>
-                                  <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Configure pricing for each option in this field
-                                  </p>
-                                </div>
-                                <OptionPricingEditor
-                                  fieldConfig={fieldConfig}
-                                  effectiveAt={effectiveDate}
-                                  organizationId={organizationId}
-                                  disabled={isFixedPricing}
-                                />
-                              </div>
+                              <OptionPricingEditor
+                                key={fieldConfig.id}
+                                fieldConfig={fieldConfig}
+                                fieldLabel={fieldConfig.label}
+                                showBulkOverride
+                                effectiveAt={effectiveDate}
+                                organizationId={organizationId}
+                                disabled={isFixedPricing}
+                              />
                             ))}
                           </div>
                         ) : (
@@ -573,22 +542,17 @@ function PricingPageContent({
                       </CardHeader>
                       <CardContent>
                         {groupedBreakdownFields.length > 0 ? (
-                          <div className="space-y-6">
+                          <div className="space-y-8">
                             {groupedBreakdownFields.map((fieldConfig) => (
-                              <div key={fieldConfig.id} className="space-y-4">
-                                <div>
-                                  <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Configure pricing for each group in this field
-                                  </p>
-                                </div>
-                                <OptionPricingEditor
-                                  fieldConfig={fieldConfig}
-                                  effectiveAt={effectiveDate}
-                                  organizationId={organizationId}
-                                  disabled={isFixedPricing}
-                                />
-                              </div>
+                              <OptionPricingEditor
+                                key={fieldConfig.id}
+                                fieldConfig={fieldConfig}
+                                fieldLabel={fieldConfig.label}
+                                showBulkOverride
+                                effectiveAt={effectiveDate}
+                                organizationId={organizationId}
+                                disabled={isFixedPricing}
+                              />
                             ))}
                           </div>
                         ) : (
@@ -634,9 +598,9 @@ function PricingPageContent({
           <div data-tour="location-scope" className="space-y-4">
             <p className="text-sm text-muted-foreground max-w-2xl">
               Set region, company, or hierarchy pricing here, and optional default expiration for
-              rules created at that scope. Day-to-day option and field pricing uses{" "}
-              <strong>Manage overrides</strong> on the Pricing tab. Invoice adjustments also use
-              this edit scope.
+              rules created at that scope. Yard-specific prices use{" "}
+              <strong>Manage overrides</strong> on each field on the Pricing tab. Invoice
+              adjustments also use this edit scope.
             </p>
             <LocationScopeSelector
               selectedNodeId={locationNodeId}

@@ -37,11 +37,8 @@ export function FieldPriceInput({
     return (
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label
-            htmlFor={`customer-price-${fieldConfig.id}`}
-            className="text-sm"
-          >
-            Customer Price per Unit
+          <Label htmlFor={`customer-price-${fieldConfig.id}`} className="text-sm">
+            Default customer price
           </Label>
           <div className="relative">
             <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -52,23 +49,16 @@ export function FieldPriceInput({
               min="0"
               placeholder="0.00"
               value={currentCustomerPrice}
-              onChange={(e) =>
-                onPriceChange(fieldConfig.id, e.target.value, "customer")
-              }
+              onChange={(e) => onPriceChange(fieldConfig.id, e.target.value, "customer")}
               className="pl-8"
               disabled={isSaving}
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            {getFieldTypeDescription(fieldConfig)}
-          </p>
+          <p className="text-xs text-muted-foreground">{getFieldTypeDescription(fieldConfig)}</p>
         </div>
         <div className="space-y-2">
-          <Label
-            htmlFor={`worker-price-${fieldConfig.id}`}
-            className="text-sm"
-          >
-            Worker Payment per Unit
+          <Label htmlFor={`worker-price-${fieldConfig.id}`} className="text-sm">
+            Default worker payment
           </Label>
           <div className="relative">
             <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -79,16 +69,12 @@ export function FieldPriceInput({
               min="0"
               placeholder="0.00"
               value={currentWorkerPrice}
-              onChange={(e) =>
-                onPriceChange(fieldConfig.id, e.target.value, "worker")
-              }
+              onChange={(e) => onPriceChange(fieldConfig.id, e.target.value, "worker")}
               className="pl-8"
               disabled={isSaving}
             />
           </div>
-          <p className="text-xs text-muted-foreground">
-            Payment rate for workers
-          </p>
+          <p className="text-xs text-muted-foreground">Applied when no yard override exists</p>
         </div>
       </div>
     );
@@ -98,9 +84,7 @@ export function FieldPriceInput({
     <div className="grid gap-3 lg:grid-cols-[2fr_minmax(0,1fr)]">
       <div className="space-y-2">
         <Label htmlFor={`price-${fieldConfig.id}`} className="text-sm">
-          {pricingContext === "customer"
-            ? "Price per Unit"
-            : "Payment per Unit"}
+          {pricingContext === "customer" ? "Price per Unit" : "Payment per Unit"}
         </Label>
         <div className="relative">
           <DollarSign className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -110,23 +94,14 @@ export function FieldPriceInput({
             step="0.01"
             min="0"
             placeholder="0.00"
-            value={
-              pricingContext === "customer"
-                ? currentCustomerPrice
-                : currentWorkerPrice
-            }
-            onChange={(e) =>
-              onPriceChange(fieldConfig.id, e.target.value, pricingContext)
-            }
+            value={pricingContext === "customer" ? currentCustomerPrice : currentWorkerPrice}
+            onChange={(e) => onPriceChange(fieldConfig.id, e.target.value, pricingContext)}
             className="pl-8"
             disabled={isSaving}
           />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {getFieldTypeDescription(fieldConfig)}
-        </p>
+        <p className="text-xs text-muted-foreground">{getFieldTypeDescription(fieldConfig)}</p>
       </div>
     </div>
   );
 }
-

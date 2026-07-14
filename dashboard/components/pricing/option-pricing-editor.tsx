@@ -6,6 +6,10 @@ import {
   type YardOverrideDraft,
 } from "@/components/pricing/pricing-scope-controls";
 import {
+  PricingBulkYardOverrideDialog,
+  type BulkYardOptionPrice,
+} from "@/components/pricing/pricing-bulk-yard-override-dialog";
+import {
   PricingScopeSaveDialog,
   type MultiYardOverrideSummaryRow,
 } from "@/components/pricing/pricing-scope-save-dialog";
@@ -20,23 +24,26 @@ import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
 import {
   buildOrgDefaultPricingMap,
-  buildPreviewPricingMap,
   countLocationOverrides,
   resolveDisplayScope,
 } from "@/lib/pricing-scope-display";
 import { getScopedPricingOverrides, mergeOverrideRowsByLocation } from "@/lib/pricing-utils";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import type { FieldConfig } from "@clean-log/shared/types";
-import { AlertCircle, DollarSign, Save, Undo2 } from "lucide-react";
+import { AlertCircle, DollarSign, Layers, Save, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 interface OptionPricingEditorProps {
   fieldConfig: FieldConfig;
-  /** View-as-of date for fetching rules (display only) */
+  /** Shown in header with bulk override action */
+  fieldLabel?: string;
+  /** View-as-of date for fetching rules */
   effectiveAt?: string | null;
   organizationId: string | null;
   disabled?: boolean;
+  /** Show bulk yard override for all options in this field */
+  showBulkOverride?: boolean;
 }
 
 function parsePriceValue(value: string | undefined): number | undefined {
@@ -48,12 +55,13 @@ function parsePriceValue(value: string | undefined): number | undefined {
 
 export default function OptionPricingEditor({
   fieldConfig,
+  fieldLabel,
   effectiveAt = null,
   organizationId,
   disabled = false,
+  showBulkOverride = false,
 }: OptionPricingEditorProps) {
-  const { showBothContexts, previewLocationId, previewLocationHierarchyId, effectiveDate } =
-    usePricingScope();
+  const { showBothContexts, effectiveDate } = usePricingScope();
   const { formatCurrency } = useOrganizationCurrency();
   const { locations } = useLocations();
   const viewDate = effectiveAt ?? effectiveDate;
@@ -99,6 +107,7 @@ export default function OptionPricingEditor({
     optionValue: string;
     rows: MultiYardOverrideSummaryRow[];
   } | null>(null);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [overrideSaving, setOverrideSaving] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -111,14 +120,7 @@ export default function OptionPricingEditor({
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  const previewParams = useMemo(
-    () => ({
-      locationId: previewLocationId,
-      locationHierarchyId: previewLocationHierarchyId,
-    }),
-    [previewLocationId, previewLocationHierarchyId]
-  );
-  const previewActive = !!(previewLocationId || previewLocationHierarchyId);
+  const previewActive = false;
 
   const orgCustomerMap = useMemo(
     () => buildOrgDefaultPricingMap(customerPricing, (r) => r.option_value || null),
@@ -128,20 +130,8 @@ export default function OptionPricingEditor({
     () => buildOrgDefaultPricingMap(workerPricing, (r) => r.option_value || null),
     [workerPricing]
   );
-  const previewCustomerMap = useMemo(
-    () =>
-      previewActive
-        ? buildPreviewPricingMap(customerPricing, previewParams, (r) => r.option_value || null)
-        : orgCustomerMap,
-    [customerPricing, previewActive, previewParams, orgCustomerMap]
-  );
-  const previewWorkerMap = useMemo(
-    () =>
-      previewActive
-        ? buildPreviewPricingMap(workerPricing, previewParams, (r) => r.option_value || null)
-        : orgWorkerMap,
-    [workerPricing, previewActive, previewParams, orgWorkerMap]
-  );
+  const previewCustomerMap = orgCustomerMap;
+  const previewWorkerMap = orgWorkerMap;
 
   const activeLocations = useMemo(
     () => [...locations].filter((l) => l.active).sort((a, b) => a.name.localeCompare(b.name)),
@@ -402,6 +392,65 @@ export default function OptionPricingEditor({
 
   const hasUnpricedOptions = pricedCount < options.length;
 
+  const handleBulkYardOverrideSave = async (
+    locationId: string,
+    _locationName: string,
+    pricesByOption: Record<string, BulkYardOptionPrice>,
+    validUntil: string
+  ) => {
+    setOverrideSaving(true);
+    try {
+      for (const optionValue of options) {
+        const row = pricesByOption[optionValue];
+        if (!row) continue;
+        const customerPrice = parsePriceValue(row.customerPrice);
+        const workerPrice = parsePriceValue(row.workerPrice);
+        const org = getOrgDefaultPrices(optionValue);
+
+        if (validUntil && org.customerNum == null) {
+          toast.error(
+            `Set an All yards price for ${optionValue} before adding a dated yard override.`
+          );
+          return;
+        }
+
+        if (customerPrice === undefined) continue;
+
+        const expirationDate = validUntil || null;
+
+        await upsertCustomerPricing(fieldConfig.id, optionValue, customerPrice, {
+          locationId,
+          locationHierarchyId: null,
+          expirationDate,
+          pricingContext: "customer",
+          workerPaymentRate: workerPrice ?? null,
+        });
+
+        if (workerPrice !== undefined && hasWorkers) {
+          await upsertWorkerPricing(fieldConfig.id, optionValue, workerPrice, {
+            locationId,
+            locationHierarchyId: null,
+            expirationDate,
+            pricingContext: "worker",
+            workerPaymentRate: workerPrice,
+          });
+        }
+      }
+      await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
+      toast.success("Bulk yard overrides saved");
+    } catch (err) {
+      log.error("Failed to save bulk yard overrides", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldConfigId: fieldConfig.id,
+      });
+      toast.error("Failed to save bulk yard overrides");
+    } finally {
+      setOverrideSaving(false);
+    }
+  };
+
+  const displayLabel = fieldLabel ?? fieldConfig.label;
+
   if (loading) {
     return <TableSkeleton rows={5} columns={3} />;
   }
@@ -425,6 +474,30 @@ export default function OptionPricingEditor({
 
   return (
     <div className="space-y-4">
+      {(showBulkOverride || fieldLabel) && (
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold">{displayLabel}</h3>
+            <p className="text-sm text-muted-foreground">
+              All yards default — use per-option or bulk overrides for specific yards
+            </p>
+          </div>
+          {showBulkOverride && !disabled && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1"
+              onClick={() => setBulkDialogOpen(true)}
+              disabled={overrideSaving}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Bulk yard override
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="rounded-lg border overflow-hidden">
         <div
           className={`grid ${
@@ -649,6 +722,20 @@ export default function OptionPricingEditor({
             );
             setConfirmDialog(null);
           }}
+        />
+      )}
+
+      {showBulkOverride && (
+        <PricingBulkYardOverrideDialog
+          open={bulkDialogOpen}
+          onOpenChange={setBulkDialogOpen}
+          fieldLabel={displayLabel}
+          options={options}
+          availableLocations={activeLocations}
+          hasWorkers={hasWorkers}
+          showBothContexts={showBothContexts}
+          saving={overrideSaving}
+          onSave={handleBulkYardOverrideSave}
         />
       )}
     </div>

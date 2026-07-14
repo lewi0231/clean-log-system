@@ -1,26 +1,29 @@
 "use client";
 
 import { usePricingScope } from "@/components/pricing/pricing-scope-context";
-import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
 import {
-  LocationOverridesMatrix,
-  type LocationOverrideRow,
-} from "@/components/pricing/location-overrides-matrix";
+  PricingScopeControls,
+  type ExistingOverrideRow,
+  type YardOverrideDraft,
+} from "@/components/pricing/pricing-scope-controls";
+import { ConditionalRuleChips } from "@/components/pricing/conditional-rule-chips";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFieldPricingCardState } from "@/hooks/use-field-pricing-card-state";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { getMaxUpdatedAt } from "@/lib/pricing-formula-preview";
 import type { ScopedPricingEntry } from "@/lib/pricing-scope";
+import type { ScopeChipVariant } from "@/lib/pricing-scope-display";
 import type { FieldPricing, PricingCondition } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig } from "@clean-log/shared";
+import { formatDistanceToNow } from "date-fns";
 import { ChevronDown, ChevronRight, Save, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useMemo } from "react";
 import { FieldPriceInput } from "./field-price-input";
-import { FormulaPreview } from "./formula-preview";
-import { PricingInsightsCard } from "./pricing-insights-card";
+import { FormulaPreviewIcon } from "./formula-preview";
 
 interface FieldPricingCardProps {
   fieldConfig: FieldConfig;
@@ -31,19 +34,40 @@ interface FieldPricingCardProps {
   currentCustomerPrice: string;
   currentWorkerPrice: string;
   hasChanges: boolean;
-  overrides: LocationOverrideRow[];
   conditions: PricingCondition[];
   hasScopedValue: boolean;
   locationId: string | null;
   locationHierarchyId: string | null;
   onPriceChange: (fieldId: string, value: string, context: "customer" | "worker") => void;
   onSave: (fieldConfig: FieldConfig) => Promise<void>;
-  /** Discard unsaved changes and revert to server values. @see S2 §4.7 */
   onDiscard?: () => void;
-  /** Navigate to History tab. @see S2 §4.6.4 */
   onNavigateToHistory?: () => void;
-  onDeleteOverride: (id: string) => Promise<void>;
   onOpenConditionalModal: (field: FieldConfig) => void;
+  /** Yard override controls (org-default scope only) */
+  yardScope?: {
+    chipVariant: ScopeChipVariant;
+    inheritedLabel?: string | null;
+    overrideCount: number;
+    expanded: boolean;
+    onExpandedChange: (open: boolean) => void;
+    existingOverrides: ExistingOverrideRow[];
+    availableLocations: Array<{ id: string; name: string }>;
+    usedLocationIds: Set<string>;
+    orgDefaultCustomer: number | null;
+    orgDefaultWorker: number | null;
+    draftOverrides: YardOverrideDraft[];
+    onAddDraftOverride: (locationId: string, locationName: string) => void;
+    onUpdateDraftOverride: (
+      draftId: string,
+      patch: Partial<Pick<YardOverrideDraft, "customerPrice" | "workerPrice" | "validUntil">>
+    ) => void;
+    onRemoveDraftOverride: (draftId: string) => void;
+    onDeleteExistingOverride: (row: ExistingOverrideRow) => Promise<void>;
+    onSaveOverrides: () => Promise<void>;
+    saving: boolean;
+    isMobile: boolean;
+    hasWorkers: boolean;
+  };
 }
 
 export function FieldPricingCard({
@@ -54,7 +78,6 @@ export function FieldPricingCard({
   currentCustomerPrice,
   currentWorkerPrice,
   hasChanges,
-  overrides,
   conditions,
   hasScopedValue,
   locationId,
@@ -63,14 +86,13 @@ export function FieldPricingCard({
   onSave,
   onDiscard,
   onNavigateToHistory,
-  onDeleteOverride,
   onOpenConditionalModal,
+  yardScope,
 }: FieldPricingCardProps) {
   const { pricingContext, showBothContexts, fieldLabelLookup } = usePricingScope();
   const { isExpanded, setIsExpanded, isSaving, setIsSaving } = useFieldPricingCardState(
     fieldConfig.id
   );
-  const [deletingOverrideId, setDeletingOverrideId] = useState<string | null>(null);
   const { formatCurrency } = useOrganizationCurrency();
 
   const handleSave = async () => {
@@ -82,14 +104,23 @@ export function FieldPricingCard({
     }
   };
 
-  const handleDeleteOverride = async (id: string) => {
-    setDeletingOverrideId(id);
+  const lastUpdateInfo = useMemo(() => {
+    return getMaxUpdatedAt(
+      customerPricingRecord?.source_rule?.updated_at,
+      customerPricingRecord?.source_rule?.updated_by,
+      workerPricingRecord?.source_rule?.updated_at,
+      workerPricingRecord?.source_rule?.updated_by
+    );
+  }, [customerPricingRecord, workerPricingRecord]);
+
+  const relativeTime = useMemo(() => {
+    if (!lastUpdateInfo.updatedAt) return null;
     try {
-      await onDeleteOverride(id);
-    } finally {
-      setDeletingOverrideId(null);
+      return formatDistanceToNow(new Date(lastUpdateInfo.updatedAt), { addSuffix: true });
+    } catch {
+      return null;
     }
-  };
+  }, [lastUpdateInfo.updatedAt]);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
@@ -104,11 +135,45 @@ export function FieldPricingCard({
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 )}
                 <CardTitle className="text-base">{fieldConfig.label}</CardTitle>
+                {(fieldConfig.field_type === "number" || fieldConfig.field_type === "boolean") && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <FormulaPreviewIcon
+                      fieldType={fieldConfig.field_type}
+                      customerPriceStr={currentCustomerPrice}
+                      workerPriceStr={currentWorkerPrice}
+                      workerPaymentType={
+                        workerPricingRecord?.worker_payment_type ??
+                        scopedPricing?.worker_payment_type ??
+                        null
+                      }
+                      formatCurrency={formatCurrency}
+                    />
+                  </div>
+                )}
                 <span className="text-xs text-muted-foreground font-mono">
                   ({fieldConfig.field_type})
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {relativeTime && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-[10px] text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToHistory?.();
+                          }}
+                        >
+                          {relativeTime}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>View pricing history</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 {showBothContexts ? (
                   <div className="flex items-center gap-3 text-xs">
                     {customerPricingRecord && (
@@ -152,19 +217,6 @@ export function FieldPricingCard({
 
         <CollapsibleContent>
           <CardContent className="pt-0 space-y-3">
-            {/* Formula Preview with live values (S2 §4.4) */}
-            <FormulaPreview
-              fieldType={fieldConfig.field_type}
-              customerPriceStr={currentCustomerPrice}
-              workerPriceStr={currentWorkerPrice}
-              workerPaymentType={
-                workerPricingRecord?.worker_payment_type ??
-                scopedPricing?.worker_payment_type ??
-                null
-              }
-              formatCurrency={formatCurrency}
-            />
-
             <FieldPriceInput
               fieldConfig={fieldConfig}
               currentCustomerPrice={currentCustomerPrice}
@@ -258,29 +310,28 @@ export function FieldPricingCard({
               )}
             </div>
 
-            {/* Profitability Check + Last Update (S2 §4.5, §4.6) */}
-            <PricingInsightsCard
-              fieldType={fieldConfig.field_type}
-              customerPriceStr={currentCustomerPrice}
-              workerPriceStr={currentWorkerPrice}
-              workerPaymentType={
-                workerPricingRecord?.worker_payment_type ??
-                scopedPricing?.worker_payment_type ??
-                null
-              }
-              customerPricingRecord={customerPricingRecord}
-              workerPricingRecord={workerPricingRecord}
-              formatCurrency={formatCurrency}
-              onViewHistory={onNavigateToHistory}
-            />
-
-            {/* Only show location overrides when organizational default is selected and there are overrides */}
-            {!locationId && !locationHierarchyId && overrides.length > 0 && (
-              <LocationOverridesMatrix
-                rows={overrides}
-                emptyMessage="No location overrides yet. Select a location in 'Where to Apply Pricing' above, then edit this field's price to create an override."
-                onDelete={handleDeleteOverride}
-                deletingIds={deletingOverrideId ? new Set([deletingOverrideId]) : new Set()}
+            {yardScope && !locationId && !locationHierarchyId && (
+              <PricingScopeControls
+                chipVariant={yardScope.chipVariant}
+                inheritedLabel={yardScope.inheritedLabel}
+                overrideCount={yardScope.overrideCount}
+                expanded={yardScope.expanded}
+                onExpandedChange={yardScope.onExpandedChange}
+                existingOverrides={yardScope.existingOverrides}
+                availableLocations={yardScope.availableLocations}
+                usedLocationIds={yardScope.usedLocationIds}
+                orgDefaultCustomer={yardScope.orgDefaultCustomer}
+                orgDefaultWorker={yardScope.orgDefaultWorker}
+                previewActive={false}
+                hasWorkers={yardScope.hasWorkers}
+                draftOverrides={yardScope.draftOverrides}
+                onAddDraftOverride={yardScope.onAddDraftOverride}
+                onUpdateDraftOverride={yardScope.onUpdateDraftOverride}
+                onRemoveDraftOverride={yardScope.onRemoveDraftOverride}
+                onDeleteExistingOverride={yardScope.onDeleteExistingOverride}
+                onSaveOverrides={yardScope.onSaveOverrides}
+                saving={yardScope.saving}
+                isMobile={yardScope.isMobile}
               />
             )}
 

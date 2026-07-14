@@ -1,6 +1,10 @@
 "use client";
 
 import { FieldPricingCard } from "@/components/pricing/field-pricing-card";
+import type {
+  YardOverrideDraft,
+  ExistingOverrideRow,
+} from "@/components/pricing/pricing-scope-controls";
 import {
   actionLabels,
   operatorLabels,
@@ -28,17 +32,33 @@ import {
 } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/ui/skeleton-loaders";
 import { useFieldPricing } from "@/hooks/use-field-pricing";
+import { useLocations } from "@/hooks/use-locations";
+import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { useWorkers } from "@/hooks/use-workers";
 import { log } from "@/lib/logger";
 import { buildScopedPricingMap, getPricingScopeSource, isEntryForScope } from "@/lib/pricing-scope";
-import { getLocationOverrides } from "@/lib/pricing-utils";
+import {
+  buildOrgDefaultPricingMap,
+  countLocationOverrides,
+  resolveDisplayScope,
+} from "@/lib/pricing-scope-display";
+import { getScopedPricingOverrides, mergeOverrideRowsByLocation } from "@/lib/pricing-utils";
 import type { PricingCondition, PricingType } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig, FieldType } from "@clean-log/shared";
 import Link from "next/link";
-import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { toast } from "sonner";
 
 // Field types that support pricing (only number and boolean - select and grouped_breakdown use option pricing)
 const PRICING_SUPPORTED_TYPES: FieldType[] = ["number", "boolean"];
+
+function parsePriceValue(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const price = parseFloat(value);
+  if (isNaN(price) || price < 0) return undefined;
+  return price;
+}
 
 interface FieldPricingListProps {
   fieldConfigs: FieldConfig[];
@@ -105,10 +125,42 @@ export default function FieldPricingList({
       ? upsertCustomerPricing
       : upsertWorkerPricing;
   const { setSelectedFieldId, expirationDate, refreshPricingHistory } = usePricingScope();
+  const { formatCurrency } = useOrganizationCurrency();
+  const { locations } = useLocations();
+  const { workers } = useWorkers();
+  const hasWorkers = workers && workers.length > 0;
 
   const [editingPrices, setEditingPrices] = useState<
     Record<string, { customer?: string; worker?: string }>
   >({});
+  const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+  const [draftOverridesByField, setDraftOverridesByField] = useState<
+    Record<string, YardOverrideDraft[]>
+  >({});
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const activeLocations = useMemo(
+    () => [...locations].filter((l) => l.active).sort((a, b) => a.name.localeCompare(b.name)),
+    [locations]
+  );
+
+  const orgCustomerMap = useMemo(
+    () => buildOrgDefaultPricingMap(customerPricing, (r) => r.field_config_id || null),
+    [customerPricing]
+  );
+  const orgWorkerMap = useMemo(
+    () => buildOrgDefaultPricingMap(workerPricing, (r) => r.field_config_id || null),
+    [workerPricing]
+  );
   const [ruleModalField, setRuleModalField] = useState<FieldConfig | null>(null);
   const [ruleSaving, setRuleSaving] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
@@ -185,6 +237,105 @@ export default function FieldPricingList({
       delete next[fieldConfigId];
       return next;
     });
+  };
+
+  const getOverrideRowsForField = (fieldId: string): ExistingOverrideRow[] => {
+    const customerRows = getScopedPricingOverrides(
+      customerPricing,
+      fieldId,
+      null,
+      "customer",
+      effectiveAt
+    );
+    const workerRows = getScopedPricingOverrides(
+      workerPricing,
+      fieldId,
+      null,
+      "worker",
+      effectiveAt
+    );
+    const merged = mergeOverrideRowsByLocation(customerRows, workerRows);
+    const customerRecord = customerPricingMap[fieldId]?.record;
+    const orgDefaultCustomer = customerRecord?.customer_price ?? null;
+
+    return merged
+      .filter((row) => row.scopeType === "location")
+      .map((row) => {
+        const customerRule = customerPricing.find((p) => p.id === row.customerRuleId);
+        const workerRule = workerPricing.find((p) => p.id === row.workerRuleId);
+        const locId = customerRule?.location_id ?? workerRule?.location_id ?? "";
+
+        return {
+          locationId: locId,
+          locationName: row.scopeLabel,
+          customerPrice: row.price,
+          workerPrice: row.workerPayment ?? null,
+          validUntil: row.expiresAt ? row.expiresAt.split("T")[0] : null,
+          customerRuleId: row.customerRuleId,
+          workerRuleId: row.workerRuleId,
+          isActive: row.isActive,
+          revertsToCustomer: orgDefaultCustomer,
+        };
+      });
+  };
+
+  const saveFieldOverrideDrafts = async (fieldConfig: FieldConfig, drafts: YardOverrideDraft[]) => {
+    const customerRecord = customerPricingMap[fieldConfig.id]?.record;
+    const orgDefaultCustomer = customerRecord?.customer_price ?? null;
+
+    for (const draft of drafts) {
+      if (draft.validUntil && orgDefaultCustomer == null) {
+        toast.error(
+          `Set an All yards price for ${fieldConfig.label} before adding a dated yard override.`
+        );
+        return;
+      }
+    }
+
+    setOverrideSaving(true);
+    try {
+      for (const draft of drafts) {
+        const customerPrice = parsePriceValue(draft.customerPrice);
+        const workerPrice = parsePriceValue(draft.workerPrice);
+        if (customerPrice === undefined) {
+          throw new Error(`Customer price required for ${draft.locationName}`);
+        }
+
+        const expirationDate = draft.validUntil || null;
+
+        await upsertCustomerPricing(fieldConfig.id, customerPrice, {
+          appliesToFieldType: fieldConfig.field_type,
+          pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+          locationId: draft.locationId,
+          locationHierarchyId: null,
+          expirationDate,
+          pricingContext: "customer",
+        });
+
+        if (workerPrice !== undefined && hasWorkers) {
+          await upsertWorkerPricing(fieldConfig.id, workerPrice, {
+            appliesToFieldType: fieldConfig.field_type,
+            pricingType: fieldConfig.field_type === "boolean" ? "fixed" : "unit",
+            locationId: draft.locationId,
+            locationHierarchyId: null,
+            expirationDate,
+            pricingContext: "worker",
+          });
+        }
+      }
+      await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
+      setDraftOverridesByField((prev) => ({ ...prev, [fieldConfig.id]: [] }));
+      refreshPricingHistory();
+      toast.success("Yard overrides saved");
+    } catch (err) {
+      log.error("Failed to save field yard overrides", {
+        error: err instanceof Error ? err.message : "Unknown error",
+        fieldConfigId: fieldConfig.id,
+      });
+      toast.error("Failed to save yard overrides");
+    } finally {
+      setOverrideSaving(false);
+    }
   };
 
   const handleSave = async (fieldConfig: FieldConfig) => {
@@ -506,80 +657,104 @@ export default function FieldPricingList({
               ? hasCustomerChanges
               : hasWorkerChanges;
 
-          // Get location overrides for both customer and worker contexts when showBothContexts is true
-          // When showBothContexts, we show customer overrides with customer price and worker payment
-          // We also show worker overrides separately with worker price
-          // CRITICAL: Filter by pricing_context to ensure worker rules don't appear in customer overrides
-          const customerOverrides = getLocationOverrides(
-            customerPricing.filter(
-              (p) => (p.source_rule?.pricing_context || "customer") === "customer"
-            ), // Defensive filter: ensure only customer context rules
-            fieldConfig.id,
-            locationId,
-            locationHierarchyId,
-            "customer"
-          );
-          const workerOverrides = showBothContexts
-            ? getLocationOverrides(
-                workerPricing.filter((p) => p.source_rule?.pricing_context === "worker"), // Defensive filter: ensure only worker context rules
-                fieldConfig.id,
-                locationId,
-                locationHierarchyId,
-                "worker"
-              )
-            : [];
-          // Combine overrides - customer first, then worker
-          const overrides = [...customerOverrides, ...workerOverrides];
           const conditions = customerPricingRecord?.source_rule?.conditions ?? [];
           const hasScopedValue = isEntryForScope(pricingEntry, scopeSource);
 
-          const handleDeleteOverride = async (id: string) => {
-            try {
-              // Find which context this override belongs to
-              const override = overrides.find((o) => o.id === id);
-              const overrideContext =
-                override?.pricingContext ||
-                (customerOverrides.some((o) => o.id === id) ? "customer" : "worker");
+          const overrideCount = countLocationOverrides(
+            customerPricing.filter((p) => p.field_config_id === fieldConfig.id && p.location_id)
+          );
+          const display = resolveDisplayScope(
+            orgCustomerMap[fieldConfig.id],
+            orgWorkerMap[fieldConfig.id],
+            orgCustomerMap[fieldConfig.id],
+            orgWorkerMap[fieldConfig.id],
+            overrideCount,
+            false,
+            formatCurrency
+          );
 
-              if (pricingDebug) {
-                log.debug("[Pricing Debug] Deleting location override", {
-                  ruleId: id,
-                  fieldConfigId: fieldConfig.id,
-                  overrideContext,
-                  pricingContext,
-                  showBothContexts,
-                });
-              }
+          const existingOverrides = getOverrideRowsForField(fieldConfig.id);
+          const drafts = draftOverridesByField[fieldConfig.id] ?? [];
+          const usedLocationIds = new Set([
+            ...existingOverrides.map((o) => o.locationId),
+            ...drafts.map((d) => d.locationId),
+          ]);
 
-              // Use the correct delete function based on the override's context
-              if (overrideContext === "customer") {
-                await deleteCustomerPricing(id);
-              } else {
-                await deleteWorkerPricing(id);
-              }
-
-              // Refetch both contexts to ensure UI updates immediately
-              if (showBothContexts) {
-                await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
-              } else {
-                if (overrideContext === "customer") {
-                  await refetchCustomerPricing();
-                } else {
-                  await refetchWorkerPricing();
+          const yardScope =
+            !locationId && !locationHierarchyId
+              ? {
+                  chipVariant: display.chip,
+                  inheritedLabel: display.inheritedLabel,
+                  overrideCount,
+                  expanded: expandedFieldId === fieldConfig.id,
+                  onExpandedChange: (open: boolean) =>
+                    setExpandedFieldId(open ? fieldConfig.id : null),
+                  existingOverrides,
+                  availableLocations: activeLocations,
+                  usedLocationIds,
+                  orgDefaultCustomer: customerPricingRecord?.customer_price ?? null,
+                  orgDefaultWorker: workerPricingRecord?.worker_payment_value ?? null,
+                  draftOverrides: drafts,
+                  onAddDraftOverride: (locId: string, locName: string) => {
+                    setDraftOverridesByField((prev) => ({
+                      ...prev,
+                      [fieldConfig.id]: [
+                        ...(prev[fieldConfig.id] ?? []),
+                        {
+                          draftId: `${locId}-${Date.now()}`,
+                          locationId: locId,
+                          locationName: locName,
+                          customerPrice: currentCustomerPrice || "",
+                          workerPrice: currentWorkerPrice || "",
+                          validUntil: "",
+                        },
+                      ],
+                    }));
+                  },
+                  onUpdateDraftOverride: (
+                    draftId: string,
+                    patch: Partial<
+                      Pick<YardOverrideDraft, "customerPrice" | "workerPrice" | "validUntil">
+                    >
+                  ) => {
+                    setDraftOverridesByField((prev) => ({
+                      ...prev,
+                      [fieldConfig.id]: (prev[fieldConfig.id] ?? []).map((d) =>
+                        d.draftId === draftId ? { ...d, ...patch } : d
+                      ),
+                    }));
+                  },
+                  onRemoveDraftOverride: (draftId: string) => {
+                    setDraftOverridesByField((prev) => ({
+                      ...prev,
+                      [fieldConfig.id]: (prev[fieldConfig.id] ?? []).filter(
+                        (d) => d.draftId !== draftId
+                      ),
+                    }));
+                  },
+                  onDeleteExistingOverride: async (row: ExistingOverrideRow) => {
+                    try {
+                      if (row.customerRuleId) {
+                        await deleteCustomerPricing(row.customerRuleId);
+                      }
+                      if (row.workerRuleId) {
+                        await deleteWorkerPricing(row.workerRuleId);
+                      }
+                      await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
+                      refreshPricingHistory();
+                      toast.success("Override removed");
+                    } catch {
+                      toast.error("Failed to remove override");
+                    }
+                  },
+                  onSaveOverrides: async () => {
+                    await saveFieldOverrideDrafts(fieldConfig, drafts);
+                  },
+                  saving: overrideSaving,
+                  isMobile,
+                  hasWorkers: !!hasWorkers,
                 }
-              }
-
-              // Refresh pricing history after delete
-              refreshPricingHistory();
-            } catch (error) {
-              log.error("Failed to delete location override", {
-                error: error instanceof Error ? error.message : "Unknown error",
-                ruleId: id,
-                fieldConfigId: fieldConfig.id,
-              });
-              throw error;
-            }
-          };
+              : undefined;
 
           return (
             <FieldPricingCard
@@ -592,7 +767,6 @@ export default function FieldPricingList({
               currentCustomerPrice={currentCustomerPrice}
               currentWorkerPrice={currentWorkerPrice}
               hasChanges={hasChanges}
-              overrides={overrides}
               conditions={conditions}
               hasScopedValue={hasScopedValue}
               locationId={locationId}
@@ -601,8 +775,8 @@ export default function FieldPricingList({
               onSave={handleSave}
               onDiscard={() => handleDiscard(fieldConfig.id)}
               onNavigateToHistory={onNavigateToHistory}
-              onDeleteOverride={handleDeleteOverride}
               onOpenConditionalModal={openConditionalModal}
+              yardScope={yardScope}
             />
           );
         })}
