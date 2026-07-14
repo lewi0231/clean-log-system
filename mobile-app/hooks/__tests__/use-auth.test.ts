@@ -1,19 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { useAuth } from "../useAuth";
+import { createElement, type ReactNode } from "react";
+import { AuthProvider, useAuth } from "../useAuth";
 
-// Mock Supabase
 vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
-      getSession: vi.fn(),
       onAuthStateChange: vi.fn(),
       signOut: vi.fn(),
     },
   },
 }));
 
-// Mock expo-router
+vi.mock("@/lib/purge-stale-supabase-auth-storage", () => ({
+  purgeStaleSupabaseAuthStorage: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("expo-router", () => ({
   useRouter: () => ({
     replace: vi.fn(),
@@ -22,6 +24,32 @@ vi.mock("expo-router", () => ({
 
 const { supabase } = await import("@/lib/supabase");
 
+function createWrapper() {
+  function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(AuthProvider, null, children);
+  }
+  Wrapper.displayName = "AuthTestWrapper";
+  return Wrapper;
+}
+
+function mockInitialAuthState(
+  session: {
+    user: { id: string; email: string; aud: string; created_at: string };
+    access_token: string;
+    token_type: string;
+    expires_in: number;
+    expires_at: number;
+    refresh_token: string;
+  } | null
+) {
+  const subscription = { unsubscribe: vi.fn() };
+  vi.mocked(supabase.auth.onAuthStateChange).mockImplementation((callback) => {
+    queueMicrotask(() => callback("INITIAL_SESSION", session));
+    return { data: { subscription } };
+  });
+  return subscription;
+}
+
 describe("useAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,15 +57,11 @@ describe("useAuth", () => {
 
   it("should initialize with loading state", () => {
     const subscription = { unsubscribe: vi.fn() };
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: { session: null },
-      error: null,
-    });
     vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
       data: { subscription },
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
 
     expect(result.current.loading).toBe(true);
     expect(result.current.user).toBe(null);
@@ -51,25 +75,16 @@ describe("useAuth", () => {
       created_at: new Date().toISOString(),
     };
 
-    const subscription = { unsubscribe: vi.fn() };
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: {
-        session: {
-          user: mockUser,
-          access_token: "test-token",
-          token_type: "bearer",
-          expires_in: 3600,
-          expires_at: Date.now() + 3600000,
-          refresh_token: "test-refresh",
-        },
-      },
-      error: null,
-    });
-    vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
-      data: { subscription },
+    mockInitialAuthState({
+      user: mockUser,
+      access_token: "test-token",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: Date.now() + 3600000,
+      refresh_token: "test-refresh",
     });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -87,20 +102,15 @@ describe("useAuth", () => {
     };
 
     const subscription = { unsubscribe: vi.fn() };
-    let authCallback: (event: string, session: any) => void;
+    let authCallback: (event: string, session: unknown) => void;
 
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: { session: null },
-      error: null,
+    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation((callback) => {
+      authCallback = callback;
+      queueMicrotask(() => callback("INITIAL_SESSION", null));
+      return { data: { subscription } };
     });
-    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(
-      (callback) => {
-        authCallback = callback;
-        return { data: { subscription } };
-      }
-    );
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -108,8 +118,7 @@ describe("useAuth", () => {
 
     expect(result.current.user).toBe(null);
 
-    // Trigger SIGNED_IN event
-    authCallback("SIGNED_IN", {
+    authCallback!("SIGNED_IN", {
       user: mockUser,
       access_token: "test-token",
       token_type: "bearer",
@@ -124,17 +133,10 @@ describe("useAuth", () => {
   });
 
   it("should handle sign out", async () => {
-    const subscription = { unsubscribe: vi.fn() };
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: { session: null },
-      error: null,
-    });
-    vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
-      data: { subscription },
-    });
+    mockInitialAuthState(null);
     vi.mocked(supabase.auth.signOut).mockResolvedValue({ error: null });
 
-    const { result } = renderHook(() => useAuth());
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -146,16 +148,9 @@ describe("useAuth", () => {
   });
 
   it("should unsubscribe on unmount", async () => {
-    const subscription = { unsubscribe: vi.fn() };
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: { session: null },
-      error: null,
-    });
-    vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
-      data: { subscription },
-    });
+    const subscription = mockInitialAuthState(null);
 
-    const { unmount } = renderHook(() => useAuth());
+    const { unmount } = renderHook(() => useAuth(), { wrapper: createWrapper() });
 
     await waitFor(() => {});
 

@@ -20,7 +20,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.paullewis1308.tallyrunner"
+      "package": "com.paullewis1308.tallyrunner",
+      "usesCleartextTraffic": true
+    },
+    "androidNavigationBar": {
+      "barStyle": "dark-content"
     },
     "web": {
       "output": "static",
@@ -29,6 +33,13 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-navigation-bar",
+        {
+          "barStyle": "dark",
+          "enforceContrast": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

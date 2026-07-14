@@ -1,11 +1,19 @@
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
 
+type GroupedBreakdownItem = { brand: string; quantity: number };
+
+function isGroupedBreakdownArray(value: unknown[]): value is GroupedBreakdownItem[] {
+  return value.every(
+    (item) => typeof item === "object" && item !== null && "brand" in item && "quantity" in item
+  );
+}
+
 /**
  * Render submission_data from a job as readable rows for the mobile job summary screen.
  */
 export function formatSubmissionDataRows(
-  data: Record<string, unknown> | null | undefined,
+  data: Record<string, unknown> | null | undefined
 ): ReactNode[] {
   if (!data || typeof data !== "object") {
     return [];
@@ -24,7 +32,29 @@ export function formatSubmissionDataRows(
           <View key={keyId} className="mb-2">
             <Text className="text-xs text-muted-foreground">{label}</Text>
             <Text className="text-sm text-foreground">—</Text>
-          </View>,
+          </View>
+        );
+        continue;
+      }
+
+      if (Array.isArray(value) && isGroupedBreakdownArray(value)) {
+        rows.push(
+          <View key={keyId} className="mb-3">
+            <Text className="text-xs text-muted-foreground mb-2">{label}</Text>
+            <View className="rounded-lg border border-border/50 overflow-hidden">
+              {value.map((item, index) => (
+                <View
+                  key={`${item.brand}-${index}`}
+                  className={`flex-row items-center justify-between px-3 py-2.5 ${
+                    index < value.length - 1 ? "border-b border-border/30" : ""
+                  }`}
+                >
+                  <Text className="text-sm text-foreground flex-1 mr-3">{item.brand}</Text>
+                  <Text className="text-sm font-semibold text-foreground">{item.quantity}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
         );
         continue;
       }
@@ -38,7 +68,7 @@ export function formatSubmissionDataRows(
         <View key={keyId} className="mb-2">
           <Text className="text-xs text-muted-foreground">{label}</Text>
           <Text className="text-sm text-foreground">{formatLeaf(value)}</Text>
-        </View>,
+        </View>
       );
     }
   };

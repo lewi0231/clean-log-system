@@ -30,6 +30,7 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
 import { useOrganization } from "@/hooks/useOrganization";
+import { useTheme } from "@/lib/theme-context";
 import { supabase } from "@/lib/supabase";
 import { ConditionalLogic, FieldConfig } from "@clean-log/shared/types";
 import { FormSectionWithFields } from "@clean-log/shared/types/form-section";
@@ -103,6 +104,7 @@ function evaluateCondition(
 export default function NewEntryScreen() {
   const scrollViewRef = useRef<any>(null);
   const fieldPositions = useRef<Record<string, number>>({});
+  const { colors } = useTheme();
   const { organizationId, loading: orgLoading } = useOrganization();
   const { settings } = useOrganizationSettings(organizationId);
   const { user } = useAuth();
@@ -167,16 +169,12 @@ export default function NewEntryScreen() {
 
   const currentUserColleagueId = useMemo(() => {
     if (!user || !colleagues.length) return null;
-    const currentUser = colleagues.find(
-      (colleague) => colleague.auth_user_id === user.id
-    );
+    const currentUser = colleagues.find((colleague) => colleague.auth_user_id === user.id);
     return currentUser?.id || null;
   }, [user, colleagues]);
 
   // Track selected clusters for mutual exclusion groups
-  const [selectedClusters, setSelectedClusters] = useState<
-    Record<string, string | null>
-  >({});
+  const [selectedClusters, setSelectedClusters] = useState<Record<string, string | null>>({});
 
   // Track touched fields for validation UX (only show errors after interaction)
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
@@ -188,16 +186,11 @@ export default function NewEntryScreen() {
   const filteredColleagues = useMemo(() => {
     const activeOnly = colleagues.filter((c) => c.active === true);
     if (!currentUserColleagueId) return activeOnly;
-    return activeOnly.filter(
-      (colleague) => colleague.id !== currentUserColleagueId,
-    );
+    return activeOnly.filter((colleague) => colleague.id !== currentUserColleagueId);
   }, [colleagues, currentUserColleagueId]);
 
   useEffect(() => {
-    if (
-      currentUserColleagueId &&
-      !selectedColleagues.includes(currentUserColleagueId)
-    ) {
+    if (currentUserColleagueId && !selectedColleagues.includes(currentUserColleagueId)) {
       setSelectedColleagues([currentUserColleagueId]);
     }
   }, [currentUserColleagueId]);
@@ -259,11 +252,7 @@ export default function NewEntryScreen() {
 
   const isFieldVisible = useCallback(
     (field: FieldConfig): boolean => {
-      return evaluateCondition(
-        field.conditional_logic,
-        fieldValues,
-        fieldConfigs
-      );
+      return evaluateCondition(field.conditional_logic, fieldValues, fieldConfigs);
     },
     [fieldValues, fieldConfigs]
   );
@@ -311,10 +300,7 @@ export default function NewEntryScreen() {
           const displayName = isCurrentUser ? "your" : `${colleagueName}'s`;
 
           if (!times?.startTime) {
-            showAlert(
-              "Required Field",
-              `Please select ${displayName} start time to continue.`
-            );
+            showAlert("Required Field", `Please select ${displayName} start time to continue.`);
             return;
           }
           if (times.finishTime && times.finishTime > new Date()) {
@@ -362,10 +348,7 @@ export default function NewEntryScreen() {
           if (!hasValue(value, config.field_type, config)) {
             // Mark field as touched to show error
             markFieldAsTouched(config.id);
-            showAlert(
-              "Required Field",
-              `Please fill in ${config.label} to continue.`
-            );
+            showAlert("Required Field", `Please fill in ${config.label} to continue.`);
             return;
           }
         }
@@ -374,8 +357,7 @@ export default function NewEntryScreen() {
       // Validate section steps: Check if mutual exclusion groups have selections
       const sectionFields = organizedFields.get(currentSection?.id || "") || [];
       const visibleFields = sectionFields.filter(isFieldVisible);
-      const mutualExclusionGroups =
-        groupFieldsByMutualExclusivity(visibleFields);
+      const mutualExclusionGroups = groupFieldsByMutualExclusivity(visibleFields);
 
       // Check each mutual exclusion group
       for (const [groupId, configs] of mutualExclusionGroups.entries()) {
@@ -391,16 +373,10 @@ export default function NewEntryScreen() {
               ? settings.default_exclusive_group_label
               : firstField.mutually_exclusive_group
                   ?.split("_")
-                  .map(
-                    (word) =>
-                      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-                  )
+                  .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                   .join(" ") || "an option";
 
-          showAlert(
-            "Required Field",
-            `Please select ${groupLabel} to continue.`
-          );
+          showAlert("Required Field", `Please select ${groupLabel} to continue.`);
           return;
         }
       }
@@ -415,10 +391,7 @@ export default function NewEntryScreen() {
           if (!hasValue(value, config.field_type, config)) {
             // Mark field as touched to show error
             markFieldAsTouched(config.id);
-            showAlert(
-              "Required Field",
-              `Please fill in ${config.label} to continue.`
-            );
+            showAlert("Required Field", `Please fill in ${config.label} to continue.`);
             return;
           }
         }
@@ -482,19 +455,13 @@ export default function NewEntryScreen() {
 
     setIsSubmitting(true);
     try {
-      const { data, error: fetchError } = await supabase.functions.invoke(
-        "create-job",
-        {
-          body: { submissionData },
-        }
-      );
+      const { data, error: fetchError } = await supabase.functions.invoke("create-job", {
+        body: { submissionData },
+      });
 
       if (fetchError) {
         setIsSubmitting(false);
-        showAlert(
-          "Error",
-          "There was a problem on the server! Please try again later."
-        );
+        showAlert("Error", "There was a problem on the server! Please try again later.");
         return;
       }
 
@@ -507,9 +474,7 @@ export default function NewEntryScreen() {
       if (data?.success) {
         try {
           if (Platform.OS === "ios") {
-            await Haptics.notificationAsync(
-              Haptics.NotificationFeedbackType.Success
-            );
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           }
         } catch (err) {}
 
@@ -537,9 +502,7 @@ export default function NewEntryScreen() {
       setIsSubmitting(false);
       showAlert(
         "Error",
-        err instanceof Error
-          ? err.message
-          : "An unexpected error occurred. Please try again."
+        err instanceof Error ? err.message : "An unexpected error occurred. Please try again."
       );
     }
   };
@@ -554,18 +517,13 @@ export default function NewEntryScreen() {
     if (colleagueId === currentUserColleagueId) {
       return;
     }
-    setSelectedColleagues(
-      selectedColleagues.filter((id) => id !== colleagueId)
-    );
+    setSelectedColleagues(selectedColleagues.filter((id) => id !== colleagueId));
   };
 
   const getColleagueName = (colleagueId: string) => {
     const colleague = colleagues.find((c) => c.id === colleagueId);
     if (!colleague) return "";
-    return (
-      colleague.name.charAt(0).toUpperCase() +
-      colleague.name.substring(1).toLowerCase()
-    );
+    return colleague.name.charAt(0).toUpperCase() + colleague.name.substring(1).toLowerCase();
   };
 
   // Format cluster name from snake_case to Title Case
@@ -631,10 +589,7 @@ export default function NewEntryScreen() {
 
   const scrollToError = useCallback(() => {
     const firstErrorField = fieldConfigs.find((fc) => errors[fc.id]);
-    if (
-      firstErrorField &&
-      fieldPositions.current[firstErrorField.id] !== undefined
-    ) {
+    if (firstErrorField && fieldPositions.current[firstErrorField.id] !== undefined) {
       const y = fieldPositions.current[firstErrorField.id];
       scrollViewRef.current?.scrollTo({
         y: Math.max(0, y - 50),
@@ -737,28 +692,20 @@ export default function NewEntryScreen() {
         {filteredColleagues.length > 0 && (
           <View>
             <View className="mb-2">
-              <Text className="text-sm font-medium text-foreground">
-                Who worked on this job?
-              </Text>
+              <Text className="text-sm font-medium text-foreground">Who worked on this job?</Text>
             </View>
             <View className="rounded-xl h-12 bg-card border border-border">
               <Select
                 value=""
                 onValueChange={handleAddColleague}
                 placeholder={
-                  selectedColleagues.length > 0
-                    ? "Add another colleague"
-                    : "Add a colleague"
+                  selectedColleagues.length > 0 ? "Add another colleague" : "Add a colleague"
                 }
                 size="medium"
                 triggerClassName="border-0 h-12 pl-5"
               >
                 {filteredColleagues.map((colleague) => (
-                  <SelectItem
-                    key={colleague.id}
-                    value={colleague.id}
-                    className=""
-                  >
+                  <SelectItem key={colleague.id} value={colleague.id} className="">
                     {colleague.name.charAt(0).toUpperCase() +
                       colleague.name.substring(1).toLowerCase()}
                   </SelectItem>
@@ -825,9 +772,7 @@ export default function NewEntryScreen() {
               </Select>
             </View>
             {touchedFields.has("location") && !selectedLocation && (
-              <Text className="text-sm text-destructive mt-1">
-                Location is required
-              </Text>
+              <Text className="text-sm text-destructive mt-1">Location is required</Text>
             )}
           </View>
         )}
@@ -878,10 +823,7 @@ export default function NewEntryScreen() {
                   }}
                   placeholder={
                     startTime
-                      ? `${startTime
-                          .getHours()
-                          .toString()
-                          .padStart(2, "0")}:${startTime
+                      ? `${startTime.getHours().toString().padStart(2, "0")}:${startTime
                           .getMinutes()
                           .toString()
                           .padStart(2, "0")}`
@@ -893,14 +835,10 @@ export default function NewEntryScreen() {
                 />
               </View>
               {startTime && (
-                <Text className="text-xs text-muted-foreground mt-1">
-                  Tap to change
-                </Text>
+                <Text className="text-xs text-muted-foreground mt-1">Tap to change</Text>
               )}
               {touchedFields.has("startTime") && !startTime && (
-                <Text className="text-sm text-destructive mt-1">
-                  Start time is required
-                </Text>
+                <Text className="text-sm text-destructive mt-1">Start time is required</Text>
               )}
             </View>
 
@@ -913,9 +851,7 @@ export default function NewEntryScreen() {
               </View>
               <View
                 className={`bg-card border rounded-xl h-12 justify-center ${
-                  finishTime && finishTime > new Date()
-                    ? "border-destructive"
-                    : "border-border"
+                  finishTime && finishTime > new Date() ? "border-destructive" : "border-border"
                 }`}
               >
                 <TimePicker
@@ -927,10 +863,7 @@ export default function NewEntryScreen() {
                   }}
                   placeholder={
                     finishTime
-                      ? `${finishTime
-                          .getHours()
-                          .toString()
-                          .padStart(2, "0")}:${finishTime
+                      ? `${finishTime.getHours().toString().padStart(2, "0")}:${finishTime
                           .getMinutes()
                           .toString()
                           .padStart(2, "0")}`
@@ -965,10 +898,7 @@ export default function NewEntryScreen() {
               };
 
               return (
-                <View
-                  key={colleagueId}
-                  className="bg-card border border-border rounded-xl p-4"
-                >
+                <View key={colleagueId} className="bg-card border border-border rounded-xl p-4">
                   {/* Worker header */}
                   <View className="flex-row items-center gap-2 mb-3 pb-2 border-b border-border/50">
                     <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
@@ -983,9 +913,7 @@ export default function NewEntryScreen() {
 
                   {/* Start Time */}
                   <View className="mb-3">
-                    <Text className="text-xs text-muted-foreground mb-1.5">
-                      Start time
-                    </Text>
+                    <Text className="text-xs text-muted-foreground mb-1.5">Start time</Text>
                     <View className="bg-background border border-border rounded-lg h-11 justify-center">
                       <TimePicker
                         value={times.startTime}
@@ -1012,9 +940,7 @@ export default function NewEntryScreen() {
 
                   {/* Finish Time */}
                   <View>
-                    <Text className="text-xs text-muted-foreground mb-1.5">
-                      Finish time
-                    </Text>
+                    <Text className="text-xs text-muted-foreground mb-1.5">Finish time</Text>
                     <View className="bg-background border border-border rounded-lg h-11 justify-center">
                       <TimePicker
                         value={times.finishTime}
@@ -1115,13 +1041,9 @@ export default function NewEntryScreen() {
         {/* Section Card - following mobile UX best practices */}
         <View className="bg-gray-50 dark:bg-gray-900/30 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
           <View className="mb-4">
-            <Text className="text-lg font-bold text-foreground mb-1">
-              {section.title}
-            </Text>
+            <Text className="text-lg font-bold text-foreground mb-1">{section.title}</Text>
             {section.description && (
-              <Text className="text-sm text-muted-foreground">
-                {section.description}
-              </Text>
+              <Text className="text-sm text-muted-foreground">{section.description}</Text>
             )}
           </View>
 
@@ -1139,11 +1061,7 @@ export default function NewEntryScreen() {
                 ? settings.default_exclusive_group_label
                 : firstField.mutually_exclusive_group
                     ?.split("_")
-                    .map(
-                      (word) =>
-                        word.charAt(0).toUpperCase() +
-                        word.slice(1).toLowerCase()
-                    )
+                    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                     .join(" ") || "Select Option";
 
             return (
@@ -1156,8 +1074,7 @@ export default function NewEntryScreen() {
                 </View>
                 <View
                   className={`rounded-xl h-12 bg-card border ${
-                    touchedFields.has(`mutual-exclusion-${groupId}`) &&
-                    !selectedCluster
+                    touchedFields.has(`mutual-exclusion-${groupId}`) && !selectedCluster
                       ? "border-destructive"
                       : "border-border"
                   }`}
@@ -1179,19 +1096,14 @@ export default function NewEntryScreen() {
                     ))}
                   </Select>
                 </View>
-                {touchedFields.has(`mutual-exclusion-${groupId}`) &&
-                  !selectedCluster && (
-                    <Text className="text-sm text-destructive mt-1">
-                      {groupLabel} is required
-                    </Text>
-                  )}
+                {touchedFields.has(`mutual-exclusion-${groupId}`) && !selectedCluster && (
+                  <Text className="text-sm text-destructive mt-1">{groupLabel} is required</Text>
+                )}
 
                 {/* Render fields only for the selected cluster */}
                 {selectedCluster &&
                   fields
-                    .filter(
-                      (field) => getFieldCluster(field) === selectedCluster
-                    )
+                    .filter((field) => getFieldCluster(field) === selectedCluster)
                     .map(renderField)}
               </View>
             );
@@ -1207,13 +1119,7 @@ export default function NewEntryScreen() {
   // Format field value for display
   const formatFieldValue = (
     config: FieldConfig,
-    value:
-      | string
-      | number
-      | boolean
-      | string[]
-      | GroupedBreakdownItem[]
-      | undefined
+    value: string | number | boolean | string[] | GroupedBreakdownItem[] | undefined
   ): string => {
     if (value === undefined || value === null || value === "") {
       return "Not provided";
@@ -1238,11 +1144,7 @@ export default function NewEntryScreen() {
         }
         return String(value);
       case "grouped_breakdown":
-        if (
-          Array.isArray(value) &&
-          value.length > 0 &&
-          typeof value[0] !== "string"
-        ) {
+        if (Array.isArray(value) && value.length > 0 && typeof value[0] !== "string") {
           return (value as GroupedBreakdownItem[])
             .map((item) => `${item.brand}: ${item.quantity}`)
             .join(", ");
@@ -1273,9 +1175,7 @@ export default function NewEntryScreen() {
     return (
       <View className="flex-col gap-4">
         <View className="mb-4">
-          <Text className="text-xl font-bold text-foreground mb-2">
-            Review Your Entry
-          </Text>
+          <Text className="text-xl font-bold text-foreground mb-2">Review Your Entry</Text>
           <Text className="text-sm text-muted-foreground">
             Review your entry. You can edit any section before submitting.
           </Text>
@@ -1284,9 +1184,7 @@ export default function NewEntryScreen() {
         {/* Basic Info Section */}
         <View className="bg-card rounded-xl p-4">
           <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-lg font-semibold text-card-foreground">
-              Basic Information
-            </Text>
+            <Text className="text-lg font-semibold text-card-foreground">Basic Information</Text>
             <Pressable
               onPress={() => setCurrentStep(0)}
               className="px-3 py-1.5 rounded-lg bg-secondary active:opacity-80"
@@ -1302,9 +1200,7 @@ export default function NewEntryScreen() {
                   Who worked on this job?
                 </Text>
                 <Text className="text-base text-card-foreground flex-1 text-right">
-                  {selectedColleagues
-                    .map((id) => getColleagueName(id))
-                    .join(", ")}
+                  {selectedColleagues.map((id) => getColleagueName(id)).join(", ")}
                 </Text>
               </View>
             )}
@@ -1312,12 +1208,9 @@ export default function NewEntryScreen() {
             {/* Location */}
             {selectedLocation && (
               <View className="flex-row justify-between items-start">
-                <Text className="text-sm text-muted-foreground flex-1">
-                  Where did you work?
-                </Text>
+                <Text className="text-sm text-muted-foreground flex-1">Where did you work?</Text>
                 <Text className="text-base text-card-foreground flex-1 text-right">
-                  {locations.find((l) => l.id === selectedLocation)?.name ||
-                    selectedLocation}
+                  {locations.find((l) => l.id === selectedLocation)?.name || selectedLocation}
                 </Text>
               </View>
             )}
@@ -1325,9 +1218,7 @@ export default function NewEntryScreen() {
             {/* Start Time */}
             {startTime && (
               <View className="flex-row justify-between items-start">
-                <Text className="text-sm text-muted-foreground flex-1">
-                  Start Time
-                </Text>
+                <Text className="text-sm text-muted-foreground flex-1">Start Time</Text>
                 <Text className="text-base text-card-foreground flex-1 text-right">
                   {startTime.getHours().toString().padStart(2, "0")}:
                   {startTime.getMinutes().toString().padStart(2, "0")}
@@ -1338,9 +1229,7 @@ export default function NewEntryScreen() {
             {/* Finish Time */}
             {finishTime && (
               <View className="flex-row justify-between items-start">
-                <Text className="text-sm text-muted-foreground flex-1">
-                  Finish Time
-                </Text>
+                <Text className="text-sm text-muted-foreground flex-1">Finish Time</Text>
                 <Text className="text-base text-card-foreground flex-1 text-right">
                   {finishTime.getHours().toString().padStart(2, "0")}:
                   {finishTime.getMinutes().toString().padStart(2, "0")}
@@ -1359,9 +1248,7 @@ export default function NewEntryScreen() {
           const fieldsToShow = visibleFields.filter((config) => {
             const value = fieldValues[config.id];
             // Show if required OR has a value
-            return (
-              config.required || hasValue(value, config.field_type, config)
-            );
+            return config.required || hasValue(value, config.field_type, config);
           });
 
           if (fieldsToShow.length === 0) return null;
@@ -1389,9 +1276,7 @@ export default function NewEntryScreen() {
                     onPress={() => setCurrentStep(sectionStep)}
                     className="px-3 py-1.5 rounded-lg bg-secondary active:opacity-80 ml-3"
                   >
-                    <Text className="text-sm text-primary font-medium">
-                      Edit
-                    </Text>
+                    <Text className="text-sm text-primary font-medium">Edit</Text>
                   </Pressable>
                 </View>
                 <View className="flex-col gap-4">
@@ -1400,15 +1285,10 @@ export default function NewEntryScreen() {
                     const displayValue = formatFieldValue(config, value);
 
                     return (
-                      <View
-                        key={config.id}
-                        className="flex-row justify-between items-start"
-                      >
+                      <View key={config.id} className="flex-row justify-between items-start">
                         <Text className="text-sm text-muted-foreground flex-1">
                           {config.label}
-                          {config.required && (
-                            <Text className="text-destructive ml-1">*</Text>
-                          )}
+                          {config.required && <Text className="text-destructive ml-1">*</Text>}
                         </Text>
                         <Text className="text-base text-card-foreground flex-1 text-right">
                           {displayValue}
@@ -1441,9 +1321,7 @@ export default function NewEntryScreen() {
                     <Text className="text-xs font-semibold text-primary">
                       {(
                         worker?.name ||
-                        (isAdmin && user?.email
-                          ? user.email.split("@")[0]
-                          : "") ||
+                        (isAdmin && user?.email ? user.email.split("@")[0] : "") ||
                         ""
                       )
                         .split(" ")
@@ -1505,25 +1383,16 @@ export default function NewEntryScreen() {
               {Object.keys(errors).length > 0 && (
                 <View className="bg-destructive/10 border-2 border-destructive rounded-xl p-4 mb-6">
                   <View className="flex-row items-center gap-2 mb-3">
-                    <Ionicons
-                      name="alert-circle"
-                      size={22}
-                      color="rgb(220 38 38)"
-                    />
+                    <Ionicons name="alert-circle" size={22} color="rgb(220 38 38)" />
                     <Text className="text-base font-bold text-destructive">
                       Please fix the following errors:
                     </Text>
                   </View>
                   <View className="flex-col gap-2">
                     {Object.entries(errors).map(([fieldId, errorMessage]) => {
-                      const field = fieldConfigs.find(
-                        (fc) => fc.id === fieldId
-                      );
+                      const field = fieldConfigs.find((fc) => fc.id === fieldId);
                       return (
-                        <Text
-                          key={fieldId}
-                          className="text-sm text-destructive leading-5"
-                        >
+                        <Text key={fieldId} className="text-sm text-destructive leading-5">
                           • {field?.label || fieldId}: {errorMessage}
                         </Text>
                       );
@@ -1584,9 +1453,7 @@ export default function NewEntryScreen() {
                     onPress={async () => {
                       if (Platform.OS === "ios") {
                         try {
-                          await Haptics.impactAsync(
-                            Haptics.ImpactFeedbackStyle.Light
-                          );
+                          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         } catch (err) {
                           // Haptics not available
                         }
@@ -1598,10 +1465,8 @@ export default function NewEntryScreen() {
                     size="lg"
                     className="flex-1"
                   >
-                    <Text className="text-white text-base font-semibold">
-                      Next
-                    </Text>
-                    <Ionicons name="chevron-forward" size={20} color="white" />
+                    <Text className="text-primary-foreground text-base font-semibold">Next</Text>
+                    <Ionicons name="chevron-forward" size={20} color={colors.primaryForeground} />
                   </Button>
                 )}
                 {/* Submit Button - shown only on last step */}
@@ -1610,9 +1475,7 @@ export default function NewEntryScreen() {
                     onPress={async () => {
                       if (Platform.OS === "ios") {
                         try {
-                          await Haptics.impactAsync(
-                            Haptics.ImpactFeedbackStyle.Medium
-                          );
+                          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         } catch (err) {
                           // Haptics not available
                         }
@@ -1625,15 +1488,15 @@ export default function NewEntryScreen() {
                     className="flex-1"
                   >
                     {isSubmitting ? (
-                      <ActivityIndicator color="white" size="small" />
+                      <ActivityIndicator color={colors.primaryForeground} size="small" />
                     ) : (
                       <Ionicons
                         name="checkmark-circle"
                         size={20}
-                        color="white"
+                        color={colors.primaryForeground}
                       />
                     )}
-                    <Text className="text-white text-base font-semibold">
+                    <Text className="text-primary-foreground text-base font-semibold">
                       {isSubmitting ? "Submitting..." : "Submit Entry"}
                     </Text>
                   </Button>
@@ -1654,9 +1517,7 @@ export default function NewEntryScreen() {
           }}
         >
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-card-foreground">
-              {alertTitle}
-            </AlertDialogTitle>
+            <AlertDialogTitle className="text-card-foreground">{alertTitle}</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
               {alertMessage}
             </AlertDialogDescription>
@@ -1670,7 +1531,7 @@ export default function NewEntryScreen() {
                 }}
                 className="bg-primary active:bg-primary-600 px-6 py-3 rounded-lg"
               >
-                <Text className="text-white text-base font-semibold">OK</Text>
+                <Text className="text-primary-foreground text-base font-semibold">OK</Text>
               </Pressable>
             </AlertDialogAction>
           </AlertDialogFooter>
