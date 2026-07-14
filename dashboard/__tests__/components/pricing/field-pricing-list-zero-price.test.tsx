@@ -13,6 +13,29 @@ vi.mock("@/hooks/use-field-pricing");
 vi.mock("@/hooks/use-field-configs");
 vi.mock("@/components/pricing/pricing-scope-context");
 vi.mock("@/hooks/use-organization-currency");
+vi.mock("@/hooks/use-locations", () => ({
+  useLocations: () => ({
+    locations: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+    createLocation: vi.fn(),
+    updateLocation: vi.fn(),
+    deleteLocation: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/use-workers", () => ({
+  useWorkers: () => ({
+    workers: [{ id: "worker-1" }],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+    createWorker: vi.fn(),
+    updateWorker: vi.fn(),
+    deleteWorker: vi.fn(),
+    resendInvitation: vi.fn(),
+  }),
+}));
 
 describe("FieldPricingList - Zero Price Handling", () => {
   const mockFieldConfig: FieldConfig = {

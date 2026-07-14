@@ -5,9 +5,7 @@ import { useFieldPricing } from "@/hooks/use-field-pricing";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import type { FieldPricing, PricingRule } from "@/lib/types";
 import type { FieldConfig } from "@clean-log/shared";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
-import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock dependencies
@@ -15,22 +13,29 @@ vi.mock("@/hooks/use-field-pricing");
 vi.mock("@/hooks/use-field-configs");
 vi.mock("@/components/pricing/pricing-scope-context");
 vi.mock("@/hooks/use-organization-currency");
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-
-  function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-  }
-  Wrapper.displayName = "QueryClientWrapper";
-
-  return Wrapper;
-}
+vi.mock("@/hooks/use-locations", () => ({
+  useLocations: () => ({
+    locations: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+    createLocation: vi.fn(),
+    updateLocation: vi.fn(),
+    deleteLocation: vi.fn(),
+  }),
+}));
+vi.mock("@/hooks/use-workers", () => ({
+  useWorkers: () => ({
+    workers: [{ id: "worker-1" }],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+    createWorker: vi.fn(),
+    updateWorker: vi.fn(),
+    deleteWorker: vi.fn(),
+    resendInvitation: vi.fn(),
+  }),
+}));
 
 function createPricingScopeMock(
   overrides: {
@@ -194,17 +199,14 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
       refetch: vi.fn(),
     });
 
-    const Wrapper = createWrapper();
     render(
-      <Wrapper>
-        <FieldPricingList
-          fieldConfigs={[mockFieldConfig]}
-          configsLoading={false}
-          locationId={null}
-          locationHierarchyId={null}
-          organizationId="org-1"
-        />
-      </Wrapper>
+      <FieldPricingList
+        fieldConfigs={[mockFieldConfig]}
+        configsLoading={false}
+        locationId={null}
+        locationHierarchyId={null}
+        organizationId="org-1"
+      />
     );
 
     // Should only show customer overrides, not worker
@@ -242,17 +244,14 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
       refetch: vi.fn(),
     });
 
-    const Wrapper = createWrapper();
     render(
-      <Wrapper>
-        <FieldPricingList
-          fieldConfigs={[mockFieldConfig]}
-          configsLoading={false}
-          locationId={null}
-          locationHierarchyId={null}
-          organizationId="org-1"
-        />
-      </Wrapper>
+      <FieldPricingList
+        fieldConfigs={[mockFieldConfig]}
+        configsLoading={false}
+        locationId={null}
+        locationHierarchyId={null}
+        organizationId="org-1"
+      />
     );
 
     // Verify both hooks are called with correct contexts
