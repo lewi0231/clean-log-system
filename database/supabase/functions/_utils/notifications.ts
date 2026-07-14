@@ -22,7 +22,9 @@ export type NotificationType =
   | "job_resolved_approved"
   | "job_resolved_cancelled"
   | "job_auto_approved"
-  | "job_colleagues_confirmed";
+  | "job_colleagues_confirmed"
+  // Email domain verification
+  | "domain_verified";
 
 export interface CreateNotificationParams {
   organization_id: string;
@@ -48,7 +50,7 @@ export interface CreateNotificationResult {
  */
 export async function createNotification(
   supabase: SupabaseClient,
-  params: CreateNotificationParams,
+  params: CreateNotificationParams
 ): Promise<CreateNotificationResult> {
   const logger = createLoggerWithoutRequest({ functionName: "createNotification" });
   try {
@@ -83,9 +85,7 @@ export async function createNotification(
         related_entity_id: params.related_entity_id,
       }));
 
-      const { error } = await supabase
-        .from("notification")
-        .insert(notifications);
+      const { error } = await supabase.from("notification").insert(notifications);
 
       if (error) {
         logger.warn("Insert failed", {
@@ -104,15 +104,17 @@ export async function createNotification(
       return { success: true, notificationCount: notifications.length };
     } else {
       // Single notification for specific user
-      const { error } = await supabase.from("notification").insert([{
-        organization_id: params.organization_id,
-        receiver_id: params.receiver_id,
-        type: params.type,
-        title: params.title,
-        message: params.message,
-        related_entity_type: params.related_entity_type,
-        related_entity_id: params.related_entity_id,
-      }]);
+      const { error } = await supabase.from("notification").insert([
+        {
+          organization_id: params.organization_id,
+          receiver_id: params.receiver_id,
+          type: params.type,
+          title: params.title,
+          message: params.message,
+          related_entity_type: params.related_entity_type,
+          related_entity_id: params.related_entity_id,
+        },
+      ]);
 
       if (error) {
         return { success: false, error: error.message };
@@ -133,7 +135,7 @@ export async function createNotification(
  */
 export async function markNotificationRead(
   supabase: SupabaseClient,
-  notificationId: string,
+  notificationId: string
 ): Promise<{ success: boolean; error?: string }> {
   const { error } = await supabase
     .from("notification")
@@ -156,7 +158,7 @@ export async function markNotificationRead(
 export async function markAllNotificationsRead(
   supabase: SupabaseClient,
   organizationId: string,
-  receiverId: string,
+  receiverId: string
 ): Promise<{ success: boolean; error?: string }> {
   const { error } = await supabase
     .from("notification")

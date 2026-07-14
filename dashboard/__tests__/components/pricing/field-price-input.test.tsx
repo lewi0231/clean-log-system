@@ -51,6 +51,10 @@ describe("FieldPriceInput", () => {
       setLocationNodeId: vi.fn(),
       locationId: null,
       setLocationId: vi.fn(),
+      previewLocationId: null,
+      setPreviewLocationId: vi.fn(),
+      previewLocationHierarchyId: null,
+      setPreviewLocationHierarchyId: vi.fn(),
       effectiveDate: null,
       setEffectiveDate: vi.fn(),
       expirationDate: null,
@@ -75,6 +79,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -100,12 +108,8 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      expect(
-        screen.getByLabelText(/customer price per unit/i)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByLabelText(/worker payment per unit/i)
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(/customer price per unit/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/worker payment per unit/i)).toBeInTheDocument();
     });
 
     it("should call onPriceChange with customer context when customer input changes", () => {
@@ -122,11 +126,7 @@ describe("FieldPriceInput", () => {
       const customerInput = screen.getByLabelText(/customer price per unit/i);
       fireEvent.change(customerInput, { target: { value: "150" } });
 
-      expect(mockOnPriceChange).toHaveBeenCalledWith(
-        "field-1",
-        "150",
-        "customer"
-      );
+      expect(mockOnPriceChange).toHaveBeenCalledWith("field-1", "150", "customer");
     });
 
     it("should call onPriceChange with worker context when worker input changes", () => {
@@ -137,6 +137,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -174,6 +178,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -212,6 +220,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -235,9 +247,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      expect(
-        screen.getByText(/price multiplied by the field value/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/price multiplied by the field value/i)).toBeInTheDocument();
     });
 
     it("should display correct field type description for boolean field", () => {
@@ -248,6 +258,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -276,9 +290,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      expect(
-        screen.getByText(/price applied when field is true/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/price applied when field is true/i)).toBeInTheDocument();
     });
   });
 
@@ -291,6 +303,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -315,9 +331,7 @@ describe("FieldPriceInput", () => {
       );
 
       expect(screen.getByLabelText(/price per unit/i)).toBeInTheDocument();
-      expect(
-        screen.queryByLabelText(/worker payment per unit/i)
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/worker payment per unit/i)).not.toBeInTheDocument();
     });
 
     it("should display 'Price per Unit' label for customer context", () => {
@@ -328,6 +342,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -362,6 +380,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -385,9 +407,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const input = screen.getByLabelText(
-        /price per unit/i
-      ) as HTMLInputElement;
+      const input = screen.getByLabelText(/price per unit/i) as HTMLInputElement;
       expect(input.value).toBe("150");
     });
 
@@ -399,6 +419,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -425,11 +449,7 @@ describe("FieldPriceInput", () => {
       const input = screen.getByLabelText(/price per unit/i);
       fireEvent.change(input, { target: { value: "200" } });
 
-      expect(mockOnPriceChange).toHaveBeenCalledWith(
-        "field-1",
-        "200",
-        "customer"
-      );
+      expect(mockOnPriceChange).toHaveBeenCalledWith("field-1", "200", "customer");
     });
   });
 
@@ -442,6 +462,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -476,6 +500,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -510,6 +538,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -533,9 +565,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const input = screen.getByLabelText(
-        /payment per unit/i
-      ) as HTMLInputElement;
+      const input = screen.getByLabelText(/payment per unit/i) as HTMLInputElement;
       expect(input.value).toBe("75");
     });
 
@@ -547,6 +577,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -586,6 +620,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -609,9 +647,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const input = screen.getByLabelText(
-        /price per unit/i
-      ) as HTMLInputElement;
+      const input = screen.getByLabelText(/price per unit/i) as HTMLInputElement;
       expect(input.value).toBe("0");
     });
 
@@ -623,6 +659,10 @@ describe("FieldPriceInput", () => {
         setLocationNodeId: vi.fn(),
         locationId: null,
         setLocationId: vi.fn(),
+        previewLocationId: null,
+        setPreviewLocationId: vi.fn(),
+        previewLocationHierarchyId: null,
+        setPreviewLocationHierarchyId: vi.fn(),
         effectiveDate: null,
         setEffectiveDate: vi.fn(),
         expirationDate: null,
@@ -646,12 +686,8 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const customerInput = screen.getByLabelText(
-        /customer price per unit/i
-      ) as HTMLInputElement;
-      const workerInput = screen.getByLabelText(
-        /worker payment per unit/i
-      ) as HTMLInputElement;
+      const customerInput = screen.getByLabelText(/customer price per unit/i) as HTMLInputElement;
+      const workerInput = screen.getByLabelText(/worker payment per unit/i) as HTMLInputElement;
 
       expect(customerInput.value).toBe("0");
       expect(workerInput.value).toBe("0");

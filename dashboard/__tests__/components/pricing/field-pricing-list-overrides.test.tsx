@@ -25,24 +25,28 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
   return Wrapper;
 }
 
-function createPricingScopeMock(overrides: {
-  showBothContexts?: boolean;
-  pricingContext?: "customer" | "worker";
-} = {}) {
+function createPricingScopeMock(
+  overrides: {
+    showBothContexts?: boolean;
+    pricingContext?: "customer" | "worker";
+  } = {}
+) {
   return {
     locationNodeId: null,
     setLocationNodeId: vi.fn(),
     locationId: null,
     setLocationId: vi.fn(),
+    previewLocationId: null,
+    setPreviewLocationId: vi.fn(),
+    previewLocationHierarchyId: null,
+    setPreviewLocationHierarchyId: vi.fn(),
     effectiveDate: null,
     setEffectiveDate: vi.fn(),
     expirationDate: null,
@@ -120,8 +124,7 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
         maximum_quantity: null,
         tier_definition: null,
         metadata: {},
-        worker_payment_type:
-          pricingContext === "customer" ? "fixed_rate" : null,
+        worker_payment_type: pricingContext === "customer" ? "fixed_rate" : null,
         worker_payment_value: workerPaymentValue,
         priority: 0,
         active: true,
@@ -169,28 +172,11 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
   });
 
   it("should NOT display worker overrides when only customer pricing is fetched", () => {
-    const customerPricing1 = createMockFieldPricing(
-      "customer-1",
-      "loc-1",
-      "customer",
-      100,
-      50
-    );
-    const customerPricing2 = createMockFieldPricing(
-      "customer-2",
-      "loc-2",
-      "customer",
-      150,
-      75
-    );
+    const customerPricing1 = createMockFieldPricing("customer-1", "loc-1", "customer", 100, 50);
+    const customerPricing2 = createMockFieldPricing("customer-2", "loc-2", "customer", 150, 75);
 
     // Simulate bug: customerPricing array accidentally contains a worker rule
-    const workerPricing = createMockFieldPricing(
-      "worker-1",
-      "loc-3",
-      "worker",
-      200
-    );
+    const workerPricing = createMockFieldPricing("worker-1", "loc-3", "worker", 200);
 
     // This simulates the bug - customerPricing array contains a worker rule
     const customerPricingArray: FieldPricing[] = [
@@ -233,23 +219,10 @@ describe("FieldPricingList - Location Overrides Context Separation", () => {
   });
 
   it("should correctly separate customer and worker overrides when showBothContexts is true", () => {
-    vi.mocked(usePricingScope).mockReturnValue(
-      createPricingScopeMock({ showBothContexts: true }),
-    );
+    vi.mocked(usePricingScope).mockReturnValue(createPricingScopeMock({ showBothContexts: true }));
 
-    const customerPricing1 = createMockFieldPricing(
-      "customer-1",
-      "loc-1",
-      "customer",
-      100,
-      50
-    );
-    const workerPricing1 = createMockFieldPricing(
-      "worker-1",
-      "loc-2",
-      "worker",
-      200
-    );
+    const customerPricing1 = createMockFieldPricing("customer-1", "loc-1", "customer", 100, 50);
+    const workerPricing1 = createMockFieldPricing("worker-1", "loc-2", "worker", 200);
 
     vi.mocked(useFieldPricing).mockReturnValueOnce({
       fieldPricing: [customerPricing1],
