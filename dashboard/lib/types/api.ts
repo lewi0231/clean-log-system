@@ -227,6 +227,8 @@ export interface DeleteLocationHierarchyResponse {
 export interface ListJobsRequest {
   organization_id: string;
   include_tests?: boolean;
+  worker_id?: string;
+  mine?: boolean;
 }
 
 export interface ListJobsResponse {

@@ -1,4 +1,5 @@
 import { useCurrentWorker } from "@/hooks/use-current-worker";
+import { usePendingConfirmationsCount } from "@/hooks/use-pending-confirmations-count";
 import { useAuth } from "@/hooks/useAuth";
 import { Drawer } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,6 +42,7 @@ export default function PendingConfirmationsScreen() {
   const { user, session, loading: authLoading } = useAuth();
   const { worker } = useCurrentWorker();
   const { colors } = useTheme();
+  const { decrementCount, refresh: refreshPendingCount } = usePendingConfirmationsCount();
 
   const [confirmations, setConfirmations] = useState<PendingConfirmation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,7 +148,8 @@ export default function PendingConfirmationsScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchConfirmations();
-  }, [fetchConfirmations]);
+    void refreshPendingCount();
+  }, [fetchConfirmations, refreshPendingCount]);
 
   const handleConfirm = async (jobId: string) => {
     if (!session?.access_token) return;
@@ -168,9 +171,10 @@ export default function PendingConfirmationsScreen() {
         return;
       }
 
-      // Remove from list
+      // Remove from list and update tab badge immediately
       setConfirmations((prev) => prev.filter((c) => c.job_id !== jobId));
       setSelectedConfirmation((prev) => (prev?.job_id === jobId ? null : prev));
+      decrementCount();
 
       const message = data?.job_approved
         ? "Job has been approved!"
@@ -213,8 +217,9 @@ export default function PendingConfirmationsScreen() {
         return;
       }
 
-      // Remove from list
+      // Remove from list and update tab badge immediately
       setConfirmations((prev) => prev.filter((c) => c.job_id !== selectedJobId));
+      decrementCount();
 
       setFlagModalVisible(false);
       setSelectedJobId(null);

@@ -1,17 +1,23 @@
-import { supabase } from "@/lib/supabase";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { Worker } from "@/types/worker";
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useOrganization } from "./useOrganization";
 
 export function useCurrentWorker() {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { organizationId } = useOrganization();
   const [worker, setWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !organizationId) {
+    const accessToken = session?.access_token;
+
+    if (authLoading) {
+      return;
+    }
+
+    if (!user || !organizationId || !accessToken) {
       setWorker(null);
       setLoading(false);
       return;
@@ -26,7 +32,7 @@ export function useCurrentWorker() {
 
       try {
         // Use edge function to get workers, then filter by auth_user_id
-        const { data, error } = await supabase.functions.invoke("list-workers", {
+        const { data, error } = await invokeAuthedFunction("list-workers", accessToken, {
           body: { organization_id: organizationId },
         });
 
@@ -73,8 +79,9 @@ export function useCurrentWorker() {
       }
     }
 
-    fetchCurrentWorker();
-  }, [user, organizationId]);
+    setLoading(true);
+    void fetchCurrentWorker();
+  }, [user, organizationId, session?.access_token, authLoading]);
 
   return { worker, loading };
 }

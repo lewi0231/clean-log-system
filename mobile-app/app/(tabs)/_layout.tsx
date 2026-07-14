@@ -1,13 +1,15 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
-import { View, Text } from "react-native";
-
 import { HapticTab } from "@/components/haptic-tab";
+import {
+  PendingConfirmationsProvider,
+  usePendingConfirmationsCount,
+} from "@/hooks/use-pending-confirmations-count";
 import { getTabBarColors } from "@/lib/navigation-theme";
 import { useTheme } from "@/lib/theme-context";
-import { usePendingConfirmationsCount } from "@/hooks/use-pending-confirmations-count";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import { Text, View } from "react-native";
 
-export default function TabLayout() {
+function TabNavigator() {
   const { theme } = useTheme();
   const tabBar = getTabBarColors(theme);
   const { count: pendingCount } = usePendingConfirmationsCount();
@@ -99,5 +101,13 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <PendingConfirmationsProvider>
+      <TabNavigator />
+    </PendingConfirmationsProvider>
   );
 }

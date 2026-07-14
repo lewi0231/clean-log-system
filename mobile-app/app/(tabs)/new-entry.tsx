@@ -168,10 +168,11 @@ export default function NewEntryScreen() {
   >({});
 
   const currentUserColleagueId = useMemo(() => {
+    if (worker?.id) return worker.id;
     if (!user || !colleagues.length) return null;
     const currentUser = colleagues.find((colleague) => colleague.auth_user_id === user.id);
     return currentUser?.id || null;
-  }, [user, colleagues]);
+  }, [worker?.id, user, colleagues]);
 
   // Track selected clusters for mutual exclusion groups
   const [selectedClusters, setSelectedClusters] = useState<Record<string, string | null>>({});
@@ -521,6 +522,9 @@ export default function NewEntryScreen() {
   };
 
   const getColleagueName = (colleagueId: string) => {
+    if (colleagueId === worker?.id && worker?.name) {
+      return worker.name.charAt(0).toUpperCase() + worker.name.substring(1).toLowerCase();
+    }
     const colleague = colleagues.find((c) => c.id === colleagueId);
     if (!colleague) return "";
     return colleague.name.charAt(0).toUpperCase() + colleague.name.substring(1).toLowerCase();

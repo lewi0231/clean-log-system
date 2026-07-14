@@ -1,5 +1,5 @@
 import { serve } from "server";
-import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { extractAuthToken, getAuthUser, resolveWorkerIdForAuthUser } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -36,8 +36,12 @@ serve(async (req) => {
       return errorResponse("User not found", 401);
     }
 
-    // Get worker ID from auth user metadata
-    const workerId = authUser.user_metadata?.worker_id;
+    // Resolve worker from JWT (metadata first, then auth_user_id fallback)
+    const workerId = await resolveWorkerIdForAuthUser(
+      supabase,
+      authUser.id,
+      authUser.user_metadata
+    );
     if (!workerId) {
       logger.warn("User is not a worker", { userId: authUser.id });
       return errorResponse("Only workers can view pending confirmations", 403);

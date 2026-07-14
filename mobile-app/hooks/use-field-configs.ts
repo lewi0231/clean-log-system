@@ -1,4 +1,6 @@
 import type { GroupedBreakdownItem } from "@/components/group-breakdown-field";
+import { useAuth } from "@/hooks/useAuth";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { supabase } from "@/lib/supabase";
 import { createSchemaFromFieldConfig } from "@/lib/utils";
 import { FieldConfig } from "@clean-log/shared/types/field-config";
@@ -160,6 +162,7 @@ export function isFieldDisabled(
 }
 
 export function useFieldConfigs(organizationId: string | null, locationId?: string | null) {
+  const { session, loading: authLoading } = useAuth();
   const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
   const [sections, setSections] = useState<FormSectionWithFields[]>([]);
   const [loading, setLoading] = useState(true);
@@ -243,8 +246,9 @@ export function useFieldConfigs(organizationId: string | null, locationId?: stri
   };
 
   useEffect(() => {
-    if (!organizationId) {
-      return; // Keep loading true until we have org and can fetch
+    const accessToken = session?.access_token;
+    if (!organizationId || authLoading || !accessToken) {
+      return; // Keep loading true until we have org, auth, and can fetch
     }
 
     async function fetchFieldConfigs() {
@@ -258,7 +262,7 @@ export function useFieldConfigs(organizationId: string | null, locationId?: stri
 
         // Fetch both field configs and sections in parallel
         const [fieldConfigsResponse, sectionsResponse] = await Promise.all([
-          supabase.functions.invoke("list-field-configs", {
+          invokeAuthedFunction("list-field-configs", accessToken, {
             body: {
               organization_id: organizationId,
               location_id: locationId || undefined,
@@ -348,8 +352,8 @@ export function useFieldConfigs(organizationId: string | null, locationId?: stri
       }
     }
 
-    fetchFieldConfigs();
-  }, [organizationId, locationId]);
+    void fetchFieldConfigs();
+  }, [organizationId, locationId, session?.access_token, authLoading]);
 
   return {
     fieldValues,

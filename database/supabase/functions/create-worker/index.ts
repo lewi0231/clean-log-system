@@ -1,9 +1,11 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import {
-  getOrganizationName,
-  sendWorkerInvitationEmail,
-} from "../_utils/email.ts";
+  findCrossOrganizationEmailConflict,
+  formatCrossOrgEmailError,
+  normalizeLookupEmail,
+} from "../_utils/cross-org-email.ts";
+import { getOrganizationName, sendWorkerInvitationEmail } from "../_utils/email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
 import {
   errorResponse,
@@ -53,16 +55,44 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized attempt to create worker", {
         organization_id,
       });
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
+    }
+
+    const normalizedEmail = normalizeLookupEmail(email);
+
+    const crossOrgConflict = await findCrossOrganizationEmailConflict(
+      supabase,
+      email,
+      organization_id
+    );
+    if (crossOrgConflict) {
+      logger.warn("Rejected worker creation due to cross-org email conflict", {
+        organization_id,
+        existing_organization_id: crossOrgConflict.existingOrganizationId,
+        existing_as: crossOrgConflict.existingAs,
+      });
+      return errorResponse(formatCrossOrgEmailError(crossOrgConflict), 400);
+    }
+
+    const { data: existingWorkerInOrg, error: duplicateWorkerError } = await supabase
+      .from("worker")
+      .select("id")
+      .eq("organization_id", organization_id)
+      .ilike("email", normalizedEmail)
+      .maybeSingle();
+
+    if (duplicateWorkerError) {
+      throw duplicateWorkerError;
+    }
+
+    if (existingWorkerInOrg) {
+      return errorResponse("A worker with this email already exists in this organization", 400);
     }
 
     // Create worker (without PIN code)
@@ -91,15 +121,13 @@ serve(async (req) => {
     expiresAt.setDate(expiresAt.getDate() + 7);
 
     // Create worker invitation
-    const { error: invitationError } = await supabase
-      .from("worker_invitation")
-      .insert({
-        id: invitationToken,
-        organization_id,
-        worker_id: worker.id,
-        worker_email: email,
-        expires_at: expiresAt.toISOString(),
-      });
+    const { error: invitationError } = await supabase.from("worker_invitation").insert({
+      id: invitationToken,
+      organization_id,
+      worker_id: worker.id,
+      worker_email: email,
+      expires_at: expiresAt.toISOString(),
+    });
 
     if (invitationError) throw invitationError;
 
@@ -116,7 +144,7 @@ serve(async (req) => {
         organizationId: organization_id,
         invitationToken,
       },
-      false,
+      false
     ); // false = don't throw on error
 
     if (!emailResult.success) {
@@ -148,7 +176,7 @@ serve(async (req) => {
     logger.error("Create worker error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to create worker"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

@@ -1,9 +1,10 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import {
-  getOrganizationName,
-  sendAdminInvitationEmail,
-} from "../_utils/email.ts";
+  findCrossOrganizationEmailConflict,
+  formatCrossOrgEmailError,
+} from "../_utils/cross-org-email.ts";
+import { getOrganizationName, sendAdminInvitationEmail } from "../_utils/email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
 import {
   errorResponse,
@@ -58,16 +59,27 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized attempt to create organization user", {
         organization_id,
       });
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
+    }
+
+    const crossOrgConflict = await findCrossOrganizationEmailConflict(
+      supabase,
+      email,
+      organization_id
+    );
+    if (crossOrgConflict) {
+      logger.warn("Rejected organization user creation due to cross-org email conflict", {
+        organization_id,
+        existing_organization_id: crossOrgConflict.existingOrganizationId,
+        existing_as: crossOrgConflict.existingAs,
+      });
+      return errorResponse(formatCrossOrgEmailError(crossOrgConflict), 400);
     }
 
     // Check if user already exists in organization_user
@@ -90,8 +102,10 @@ serve(async (req) => {
     // If the user already exists in Supabase Auth, link them directly.
     // This avoids confusing "invite" flows for existing accounts and preserves
     // the expectation that they can log in with their existing credentials.
-    const { data: existingAuthUserData, error: existingAuthUserError } =
-      await getAuthUserByEmail(supabase, email);
+    const { data: existingAuthUserData, error: existingAuthUserError } = await getAuthUserByEmail(
+      supabase,
+      email
+    );
 
     if (existingAuthUserError) {
       // Not fatal: some Supabase errors for "not found" can surface here depending on version.
@@ -147,8 +161,7 @@ serve(async (req) => {
         success: true,
         organization_user: organizationUser,
         existing_user: true,
-        message:
-          "User already has an account. They can log in with their existing credentials.",
+        message: "User already has an account. They can log in with their existing credentials.",
       });
     }
 
@@ -156,19 +169,17 @@ serve(async (req) => {
     // Best practice: use `generateLink({ type: "invite" })` for custom email providers to
     // avoid sending both Supabase's default email and our branded one.
     const siteUrl = Deno.env.get("SITE_URL") || "http://127.0.0.1:3000";
-    const redirectTo =
-      `${siteUrl}/verify-email?type=admin_invite&email=${
-        encodeURIComponent(email)
-      }`;
+    const redirectTo = `${siteUrl}/verify-email?type=admin_invite&email=${encodeURIComponent(
+      email
+    )}`;
 
-    const { data: linkData, error: linkError } = await supabase.auth.admin
-      .generateLink({
-        type: "invite",
-        email,
-        options: {
-          redirectTo,
-        },
-      });
+    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+      type: "invite",
+      email,
+      options: {
+        redirectTo,
+      },
+    });
 
     if (linkError || !linkData?.properties?.action_link) {
       logger.error("Failed to generate invitation link", linkError, {
@@ -176,10 +187,7 @@ serve(async (req) => {
         email,
         role,
       });
-      return errorResponse(
-        "Failed to generate invitation link. Please try again later.",
-        500,
-      );
+      return errorResponse("Failed to generate invitation link. Please try again later.", 500);
     }
 
     // Create organization_user entry with pending status
@@ -223,7 +231,7 @@ serve(async (req) => {
         invitationLink,
         role,
       },
-      false, // Don't throw on email error - user is already created
+      false // Don't throw on email error - user is already created
     );
 
     if (!emailResult.success) {
@@ -251,7 +259,7 @@ serve(async (req) => {
     logger.error("Create organization user error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to create organization user"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useOrganization } from "./useOrganization";
@@ -6,7 +6,7 @@ import { useOrganization } from "./useOrganization";
 export type UserRole = "admin" | "worker" | null;
 
 export function useUserRole() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { organizationId } = useOrganization();
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
@@ -14,7 +14,7 @@ export function useUserRole() {
   useEffect(() => {
     let cancelled = false;
 
-    if (authLoading || !user?.id || !organizationId) {
+    if (authLoading || !user?.id || !organizationId || !session?.access_token) {
       setRole(null);
       setLoading(false);
       return () => {
@@ -24,8 +24,9 @@ export function useUserRole() {
 
     async function fetchUserRole() {
       try {
-        const { data: roleData, error: roleError } = await supabase.functions.invoke(
+        const { data: roleData, error: roleError } = await invokeAuthedFunction(
           "get-user-role",
+          session.access_token,
           {
             body: {
               organization_id: organizationId,
@@ -74,7 +75,7 @@ export function useUserRole() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, organizationId, authLoading]);
+  }, [user?.id, organizationId, authLoading, session?.access_token]);
 
   return {
     role,

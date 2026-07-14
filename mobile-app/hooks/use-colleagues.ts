@@ -1,12 +1,15 @@
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { Worker } from "@/types/worker";
 import { useEffect, useState } from "react";
 
 export function useColleagues(organizationId: string | null) {
+  const { session, loading: authLoading } = useAuth();
   const [colleagues, setColleagues] = useState<Worker[]>([]);
 
   useEffect(() => {
-    if (!organizationId) return;
+    const accessToken = session?.access_token;
+    if (!organizationId || authLoading || !accessToken) return;
 
     async function fetchColleagues() {
       try {
@@ -14,7 +17,7 @@ export function useColleagues(organizationId: string | null) {
           console.log("Workers: Fetching workers for organization", organizationId);
         }
 
-        const { data, error } = await supabase.functions.invoke("list-workers", {
+        const { data, error } = await invokeAuthedFunction("list-workers", accessToken, {
           body: { organization_id: organizationId },
         });
 
@@ -42,7 +45,7 @@ export function useColleagues(organizationId: string | null) {
     }
 
     fetchColleagues();
-  }, [organizationId]);
+  }, [organizationId, session?.access_token, authLoading]);
 
   return { colleagues };
 }
