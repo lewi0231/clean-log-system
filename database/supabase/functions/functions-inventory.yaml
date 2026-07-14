@@ -18,6 +18,7 @@ functions:
   apply-field-config-template: secured
   auto-approve-jobs: privileged_batch
   auto-generate-invoices: privileged_batch
+  auto-refresh-pending-domains: privileged_batch
   auto-send-invoices: privileged_batch
   calculate-invoice: secured
   calculate-worker-payment: secured

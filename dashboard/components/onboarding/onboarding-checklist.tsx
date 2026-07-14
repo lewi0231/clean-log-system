@@ -11,6 +11,7 @@ import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
 import { log } from "@/lib/logger";
+import { supabase } from "@/lib/supabase";
 import {
   CheckCircle2,
   ChevronDown,
@@ -18,13 +19,14 @@ import {
   CreditCard,
   DollarSign,
   FileText,
+  Mail,
   MapPin,
   Smartphone,
   Users,
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useOnboardingChecklist } from "./onboarding-checklist-context";
 
 interface SetupStep {
@@ -35,16 +37,22 @@ interface SetupStep {
   icon: React.ComponentType<{ className?: string }>;
   required: boolean;
   completed: boolean;
+  /** Per-step skip (sessionStorage); omit when completed */
+  onSkip?: () => void;
 }
 
 export function OnboardingChecklist() {
-  const { organizationId } = useOrganization();
+  const { organizationId, userRole, loading: orgLoading } = useOrganization();
   const { onboardingStatus, loading: onboardingLoading } = useOnboardingStatus();
   const { workers, loading: workersLoading } = useWorkers();
   const { locations, loading: locationsLoading } = useLocations();
   const { fieldConfigs, loading: configLoading } = useMobileConfig(organizationId);
   const { settings, loading: settingsLoading } = useOrganizationSettings();
   const { isOpen, setIsOpen, isDismissed, setIsDismissed } = useOnboardingChecklist();
+
+  const [emailDomainSkipped, setEmailDomainSkipped] = useState(false);
+  const [sendingDomainRow, setSendingDomainRow] = useState<{ display_status: string } | null>(null);
+  const [sendingDomainLoading, setSendingDomainLoading] = useState(false);
 
   // Check if pricing has been configured
   const [hasPricing, setHasPricing] = useState(false);
@@ -75,6 +83,60 @@ export function OnboardingChecklist() {
     checkPricing();
   }, [organizationId]);
 
+  useEffect(() => {
+    if (!organizationId) {
+      setEmailDomainSkipped(false);
+      return;
+    }
+    try {
+      if (typeof window !== "undefined") {
+        setEmailDomainSkipped(
+          sessionStorage.getItem(`onboarding-email-domain-skipped:${organizationId}`) === "1"
+        );
+      }
+    } catch {
+      setEmailDomainSkipped(false);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (!organizationId || !settings?.custom_email_domain_enabled || userRole !== "admin") {
+      setSendingDomainRow(null);
+      setSendingDomainLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSendingDomainLoading(true);
+    void supabase
+      .from("organization_sending_domain")
+      .select("display_status")
+      .eq("organization_id", organizationId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setSendingDomainLoading(false);
+        if (error) {
+          log.error("onboarding-checklist: organization_sending_domain read failed", { error });
+          setSendingDomainRow(null);
+          return;
+        }
+        setSendingDomainRow(data as { display_status: string } | null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, settings?.custom_email_domain_enabled, userRole]);
+
+  const handleSkipEmailDomain = useCallback(() => {
+    if (!organizationId) return;
+    try {
+      sessionStorage.setItem(`onboarding-email-domain-skipped:${organizationId}`, "1");
+    } catch {
+      /* ignore private mode / quota */
+    }
+    setEmailDomainSkipped(true);
+  }, [organizationId]);
+
   // Check if invoice configuration has been set up
   // Invoice config is considered complete when:
   // 1. Logo has been uploaded
@@ -92,7 +154,8 @@ export function OnboardingChecklist() {
     locationsLoading ||
     configLoading ||
     settingsLoading ||
-    pricingLoading;
+    pricingLoading ||
+    orgLoading;
 
   // Only show if onboarding is completed and not dismissed
   if (!onboardingStatus?.completed || isDismissed || loading || !onboardingStatus?.data) {
@@ -166,6 +229,27 @@ export function OnboardingChecklist() {
       required: true,
       completed: hasInvoiceConfig,
     });
+
+    const showEmailDomainStep =
+      Boolean(organizationId) &&
+      settings?.custom_email_domain_enabled === true &&
+      userRole === "admin";
+
+    if (showEmailDomainStep) {
+      const verified = !sendingDomainLoading && sendingDomainRow?.display_status === "verified";
+      const completed = verified || emailDomainSkipped;
+      steps.push({
+        id: "email-domain",
+        title: "Set Up Email Domain",
+        description:
+          "Use a custom domain for transactional email. DNS verification can take up to 48 hours depending on your provider.",
+        href: "/dashboard/settings?tab=email",
+        icon: Mail,
+        required: false,
+        completed,
+        onSkip: completed ? undefined : handleSkipEmailDomain,
+      });
+    }
 
     // Step 6: Payment Setup (optional, can be done later)
     const hasStripe = !!settings?.stripe_account_id;
@@ -251,40 +335,54 @@ export function OnboardingChecklist() {
               {steps.map((step) => {
                 const Icon = step.icon;
                 return (
-                  <Link
-                    key={step.id}
-                    href={step.href}
-                    className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors group"
-                  >
-                    <div className="shrink-0 mt-0.5">
-                      {step.completed ? (
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/10 text-green-600">
-                          <CheckCircle2 className="h-4 w-4" />
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
-                          <Icon className="h-4 w-4" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p
-                          className={`text-sm font-medium ${
-                            step.completed ? "text-muted-foreground line-through" : ""
-                          }`}
-                        >
-                          {step.title}
-                        </p>
-                        {!step.required && (
-                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                            Optional
-                          </span>
+                  <div key={step.id} className="rounded-md border border-transparent">
+                    <Link
+                      href={step.href}
+                      className="flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors group"
+                    >
+                      <div className="shrink-0 mt-0.5">
+                        {step.completed ? (
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-green-500/10 text-green-600">
+                            <CheckCircle2 className="h-4 w-4" />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground">
+                            <Icon className="h-4 w-4" />
+                          </div>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
-                    </div>
-                  </Link>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p
+                            className={`text-sm font-medium ${
+                              step.completed ? "text-muted-foreground line-through" : ""
+                            }`}
+                          >
+                            {step.title}
+                          </p>
+                          {!step.required && (
+                            <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                              Optional
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
+                      </div>
+                    </Link>
+                    {step.onSkip ? (
+                      <div className="pl-10 pr-2 pb-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs text-muted-foreground"
+                          onClick={() => step.onSkip?.()}
+                        >
+                          Skip for now
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
               {allRequiredComplete && (

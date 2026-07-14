@@ -1,9 +1,9 @@
 "use client";
 
 import BasePricingEditor from "@/components/pricing/base-pricing-editor";
+import { InvoiceAdjustmentsGstHint } from "@/components/pricing/invoice-adjustments-gst-hint";
 import BooleanPricingList from "@/components/pricing/boolean-pricing-list";
 import { useLocationFixedPricingGuard } from "@/components/pricing/location-fixed-pricing-guard";
-import LocationScopeSelector from "@/components/pricing/location-scope-selector";
 import NumberPricingList from "@/components/pricing/number-pricing-list";
 import OptionPricingEditor from "@/components/pricing/option-pricing-editor";
 import { PricingHistory } from "@/components/pricing/pricing-history";
@@ -33,7 +33,6 @@ import {
   Hash,
   Layers,
   List,
-  MapPin,
   ScrollText,
   Sparkles,
   TestTube,
@@ -112,24 +111,14 @@ function PricingPageContent({
   fieldConfigsLoading,
   organizationId,
 }: PricingPageContentProps) {
-  const {
-    locationNodeId,
-    setLocationNodeId,
-    locationId,
-    setLocationId,
-    effectiveDate,
-    setEffectiveDate,
-    expirationDate,
-    setExpirationDate,
-    setShowBothContexts,
-  } = usePricingScope();
+  const { locationNodeId, locationId, effectiveDate, setShowBothContexts } = usePricingScope();
 
   // Set showBothContexts to true for pricing page (all components show both customer and worker pricing)
   useEffect(() => {
     setShowBothContexts(true);
   }, [setShowBothContexts]);
 
-  const { isFixedPricing, location } = useLocationFixedPricingGuard(locationId);
+  const { isFixedPricing, location } = useLocationFixedPricingGuard(null);
   const { formatCurrency } = useOrganizationCurrency();
   const [testInvoiceOpen, setTestInvoiceOpen] = useState(false);
   const [mainTab, setMainTab] = useState("pricing");
@@ -202,14 +191,6 @@ function PricingPageContent({
           >
             <ScrollText className="h-4 w-4 mr-2" />
             History
-          </TabsTrigger>
-          <TabsTrigger
-            value="scope"
-            className="cursor-pointer"
-            title="Choose organization-wide, region/company, or a specific site, and the effective date range for new rules"
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Scope
           </TabsTrigger>
           {!isFixedPricing && (
             <TabsTrigger
@@ -322,7 +303,6 @@ function PricingPageContent({
               </Card>
             )}
 
-            {/* Field Type Pricing — Sidebar + Main Layout (S2 §4.1) */}
             {!hasNoPriceableFields && (
               <div className="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-6">
                 {/* Sidebar: Field type navigation (desktop: vertical, mobile: horizontal scroll) */}
@@ -419,8 +399,8 @@ function PricingPageContent({
                         <NumberPricingList
                           fieldConfigs={fieldConfigs}
                           configsLoading={fieldConfigsLoading}
-                          locationHierarchyId={locationNodeId}
-                          locationId={locationId}
+                          locationHierarchyId={null}
+                          locationId={null}
                           effectiveAt={effectiveDate}
                           organizationId={organizationId}
                           onNavigateToHistory={handleNavigateToHistory}
@@ -452,8 +432,8 @@ function PricingPageContent({
                         <BooleanPricingList
                           fieldConfigs={fieldConfigs}
                           configsLoading={fieldConfigsLoading}
-                          locationHierarchyId={locationNodeId}
-                          locationId={locationId}
+                          locationHierarchyId={null}
+                          locationId={null}
                           effectiveAt={effectiveDate}
                           organizationId={organizationId}
                           onNavigateToHistory={handleNavigateToHistory}
@@ -483,23 +463,17 @@ function PricingPageContent({
                       </CardHeader>
                       <CardContent>
                         {selectFields.length > 0 ? (
-                          <div className="space-y-6">
+                          <div className="space-y-8">
                             {selectFields.map((fieldConfig) => (
-                              <div key={fieldConfig.id} className="space-y-4">
-                                <div>
-                                  <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Configure pricing for each option in this field
-                                  </p>
-                                </div>
-                                <OptionPricingEditor
-                                  fieldConfig={fieldConfig}
-                                  locationHierarchyId={locationNodeId}
-                                  locationId={locationId}
-                                  effectiveAt={effectiveDate}
-                                  organizationId={organizationId}
-                                />
-                              </div>
+                              <OptionPricingEditor
+                                key={fieldConfig.id}
+                                fieldConfig={fieldConfig}
+                                fieldLabel={fieldConfig.label}
+                                showBulkOverride
+                                effectiveAt={effectiveDate}
+                                organizationId={organizationId}
+                                disabled={isFixedPricing}
+                              />
                             ))}
                           </div>
                         ) : (
@@ -549,23 +523,17 @@ function PricingPageContent({
                       </CardHeader>
                       <CardContent>
                         {groupedBreakdownFields.length > 0 ? (
-                          <div className="space-y-6">
+                          <div className="space-y-8">
                             {groupedBreakdownFields.map((fieldConfig) => (
-                              <div key={fieldConfig.id} className="space-y-4">
-                                <div>
-                                  <h3 className="text-lg font-semibold">{fieldConfig.label}</h3>
-                                  <p className="text-sm text-muted-foreground">
-                                    Configure pricing for each group in this field
-                                  </p>
-                                </div>
-                                <OptionPricingEditor
-                                  fieldConfig={fieldConfig}
-                                  locationHierarchyId={locationNodeId}
-                                  locationId={locationId}
-                                  effectiveAt={effectiveDate}
-                                  organizationId={organizationId}
-                                />
-                              </div>
+                              <OptionPricingEditor
+                                key={fieldConfig.id}
+                                fieldConfig={fieldConfig}
+                                fieldLabel={fieldConfig.label}
+                                showBulkOverride
+                                effectiveAt={effectiveDate}
+                                organizationId={organizationId}
+                                disabled={isFixedPricing}
+                              />
                             ))}
                           </div>
                         ) : (
@@ -607,26 +575,6 @@ function PricingPageContent({
           </div>
         </TabsContent>
 
-        <TabsContent value="scope" className="space-y-6">
-          <div data-tour="location-scope" className="space-y-4">
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              Choose the location hierarchy node (or specific location) and the effective date range
-              for prices. This scope applies to the <strong>Pricing</strong> tab and{" "}
-              <strong>Invoice adjustments</strong>.
-            </p>
-            <LocationScopeSelector
-              selectedNodeId={locationNodeId}
-              selectedLocationId={locationId}
-              onNodeChange={setLocationNodeId}
-              onLocationChange={setLocationId}
-              effectiveDate={effectiveDate}
-              onEffectiveDateChange={setEffectiveDate}
-              expirationDate={expirationDate}
-              onExpirationDateChange={setExpirationDate}
-            />
-          </div>
-        </TabsContent>
-
         {!isFixedPricing && (
           <TabsContent
             value="invoice-adjustments"
@@ -658,7 +606,8 @@ function PricingPageContent({
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <InvoiceAdjustmentsGstHint />
                 <BasePricingEditor
                   fieldConfigs={fieldConfigs}
                   locationHierarchyId={locationNodeId}

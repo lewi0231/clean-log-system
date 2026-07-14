@@ -42,7 +42,7 @@ export default function RootLayout({
           />
           <Nav />
           {children}
-          <Toaster position="top-right" richColors />
+          <Toaster position="bottom-right" richColors />
         </QueryProvider>
       </body>
     </html>

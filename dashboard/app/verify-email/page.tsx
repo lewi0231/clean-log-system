@@ -12,10 +12,7 @@ import {
 } from "@/components/ui/card";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import {
-  invokeEdgeFunction,
-  invokeEdgeFunctionSafe,
-} from "@/lib/supabase/invoke-edge-function";
+import { invokeEdgeFunction, invokeEdgeFunctionSafe } from "@/lib/supabase/invoke-edge-function";
 import { AlertCircle, CheckCircle2, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -31,9 +28,7 @@ function VerifyEmailLoading() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
           <CardTitle>Loading...</CardTitle>
-          <CardDescription>
-            Please wait while we load your verification status.
-          </CardDescription>
+          <CardDescription>Please wait while we load your verification status.</CardDescription>
         </CardHeader>
       </Card>
     </div>
@@ -72,8 +67,7 @@ function VerifyEmailContent() {
         const searchParams = new URLSearchParams(window.location.search);
 
         // Try both hash and query params
-        const tokenHash =
-          hashParams.get("token_hash") || searchParams.get("token_hash");
+        const tokenHash = hashParams.get("token_hash") || searchParams.get("token_hash");
         const type = hashParams.get("type") || searchParams.get("type");
         const accessToken = hashParams.get("access_token");
 
@@ -86,21 +80,17 @@ function VerifyEmailContent() {
 
         // If we have verification tokens in the URL, verify them
         if (tokenHash && type === "email") {
-          log.debug(
-            "VerifyEmail: Found verification tokens in URL, verifying",
-            {
-              type,
-              hasTokenHash: !!tokenHash,
-            },
-          );
+          log.debug("VerifyEmail: Found verification tokens in URL, verifying", {
+            type,
+            hasTokenHash: !!tokenHash,
+          });
 
           try {
             // Verify the OTP token from the email link
-            const { data: verifyData, error: verifyError } =
-              await supabase.auth.verifyOtp({
-                token_hash: tokenHash,
-                type: "email",
-              });
+            const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: "email",
+            });
 
             if (verifyError) {
               log.error("VerifyEmail: Error verifying token", {
@@ -108,7 +98,7 @@ function VerifyEmailContent() {
                 code: verifyError.status,
               });
               setResendError(
-                `Verification failed: ${verifyError.message}. Please try resending the email.`,
+                `Verification failed: ${verifyError.message}. Please try resending the email.`
               );
               setIsChecking(false);
               // Clear the hash/params so user can try again
@@ -128,14 +118,9 @@ function VerifyEmailContent() {
             await new Promise((resolve) => setTimeout(resolve, 500));
           } catch (verifyErr) {
             log.error("VerifyEmail: Unexpected error during verification", {
-              error:
-                verifyErr instanceof Error
-                  ? verifyErr.message
-                  : "Unknown error",
+              error: verifyErr instanceof Error ? verifyErr.message : "Unknown error",
             });
-            setResendError(
-              "An error occurred during verification. Please try again.",
-            );
+            setResendError("An error occurred during verification. Please try again.");
             setIsChecking(false);
             return;
           }
@@ -144,28 +129,23 @@ function VerifyEmailContent() {
         // If we have an access token in the hash, we need to set the session explicitly
         // The SSR client doesn't automatically process hash tokens
         if (accessToken && !tokenHash) {
-          log.debug(
-            "VerifyEmail: Found access_token in hash, setting session explicitly",
-          );
+          log.debug("VerifyEmail: Found access_token in hash, setting session explicitly");
 
           try {
             const refreshToken = hashParams.get("refresh_token");
 
             if (refreshToken) {
               // Set the session using the tokens from the hash
-              const { data: sessionData, error: setSessionError } =
-                await supabase.auth.setSession({
-                  access_token: accessToken,
-                  refresh_token: refreshToken,
-                });
+              const { data: sessionData, error: setSessionError } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
 
               if (setSessionError) {
                 log.error("VerifyEmail: Error setting session from hash", {
                   error: setSessionError.message,
                 });
-                setResendError(
-                  `Failed to establish session: ${setSessionError.message}`,
-                );
+                setResendError(`Failed to establish session: ${setSessionError.message}`);
                 setIsChecking(false);
                 return;
               }
@@ -179,7 +159,7 @@ function VerifyEmailContent() {
               window.history.replaceState(
                 null,
                 "",
-                window.location.pathname + window.location.search,
+                window.location.pathname + window.location.search
               );
 
               // Wait a moment for session to be fully established
@@ -189,14 +169,9 @@ function VerifyEmailContent() {
             }
           } catch (setSessionErr) {
             log.error("VerifyEmail: Unexpected error setting session", {
-              error:
-                setSessionErr instanceof Error
-                  ? setSessionErr.message
-                  : "Unknown error",
+              error: setSessionErr instanceof Error ? setSessionErr.message : "Unknown error",
             });
-            setResendError(
-              "An error occurred while establishing your session. Please try again.",
-            );
+            setResendError("An error occurred while establishing your session. Please try again.");
             setIsChecking(false);
             return;
           }
@@ -212,23 +187,25 @@ function VerifyEmailContent() {
         if (userError) {
           // Expected "no session" cases: unverified users or stale/invalid sessions
           // "User from sub claim in JWT does not exist" = stale JWT (e.g. after DB reset)
+          // "refresh_token_not_found" = stale cookies after Supabase restart
+          const errorCode = (userError as { code?: string }).code || "";
+          const isStaleSession =
+            userError.message === "User from sub claim in JWT does not exist" ||
+            errorCode === "refresh_token_not_found" ||
+            userError.message.includes("Refresh Token Not Found");
+
           const isExpectedNoSession =
-            userError.message === "Auth session missing!" ||
-            userError.message === "User from sub claim in JWT does not exist";
+            userError.message === "Auth session missing!" || isStaleSession;
 
           if (isExpectedNoSession) {
-            if (
-              userError.message === "User from sub claim in JWT does not exist"
-            ) {
+            if (isStaleSession) {
               // Clear stale session so polling works correctly
               await supabase.auth.signOut();
               log.debug(
-                "VerifyEmail: Cleared stale session (user no longer exists)",
+                "VerifyEmail: Cleared stale session (token invalid or user no longer exists)"
               );
             } else {
-              log.debug(
-                "VerifyEmail: No user session (expected for unverified users)",
-              );
+              log.debug("VerifyEmail: No user session (expected for unverified users)");
             }
           } else {
             log.error("VerifyEmail: Error getting user", {
@@ -267,7 +244,7 @@ function VerifyEmailContent() {
                 {
                   email: user.email,
                   auth_user_id: user.id,
-                },
+                }
               );
               if (result.error) {
                 log.warn("VerifyEmail: Failed to accept admin invitation", {
@@ -330,10 +307,9 @@ function VerifyEmailContent() {
       log.debug("VerifyEmail: Resending verification email", { hasEmail: !!email });
 
       // Use the custom edge function that sends the same email template as signup
-      const data = await invokeEdgeFunction<{ message?: string }>(
-        "resend-activation-link",
-        { email },
-      );
+      const data = await invokeEdgeFunction<{ message?: string }>("resend-activation-link", {
+        email,
+      });
 
       log.info("VerifyEmail: Verification email resent successfully", {
         message: data?.message,
@@ -345,9 +321,7 @@ function VerifyEmailContent() {
       log.error("VerifyEmail: Unexpected error resending email", {
         error: error instanceof Error ? error.message : "Unknown error",
       });
-      setResendError(
-        error instanceof Error ? error.message : "Failed to resend email",
-      );
+      setResendError(error instanceof Error ? error.message : "Failed to resend email");
     } finally {
       setIsResending(false);
     }
@@ -379,9 +353,7 @@ function VerifyEmailContent() {
               <CheckCircle2 className="h-16 w-16 text-green-500" />
             </div>
             <CardTitle className="text-center">
-              {isAdminInvite
-                ? "Account Activated!"
-                : "Email Verified Successfully!"}
+              {isAdminInvite ? "Account Activated!" : "Email Verified Successfully!"}
             </CardTitle>
             <CardDescription className="text-center">
               {isAdminInvite
@@ -410,26 +382,19 @@ function VerifyEmailContent() {
           <div className="flex items-center justify-center mb-4">
             <Mail className="h-16 w-16 text-primary" />
           </div>
-          <CardTitle>
-            {isAdminInvite ? "Accept Your Invitation" : "Verify Your Email"}
-          </CardTitle>
+          <CardTitle>{isAdminInvite ? "Accept Your Invitation" : "Verify Your Email"}</CardTitle>
           <CardDescription>
             {isAdminInvite ? (
               <>
                 We&apos;ve sent an invitation email to{" "}
-                <span className="font-semibold">
-                  {email || "your email address"}
-                </span>
-                . Please check your inbox and click the link to set up your
-                account.
+                <span className="font-semibold">{email || "your email address"}</span>. Please check
+                your inbox and click the link to set up your account.
               </>
             ) : (
               <>
                 We&apos;ve sent a verification email to{" "}
-                <span className="font-semibold">
-                  {email || "your email address"}
-                </span>
-                . Please check your inbox and click the verification link.
+                <span className="font-semibold">{email || "your email address"}</span>. Please check
+                your inbox and click the verification link.
               </>
             )}
           </CardDescription>
@@ -438,9 +403,7 @@ function VerifyEmailContent() {
           {resendSuccess && (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>
-                Verification email sent! Please check your inbox.
-              </AlertDescription>
+              <AlertDescription>Verification email sent! Please check your inbox.</AlertDescription>
             </Alert>
           )}
 

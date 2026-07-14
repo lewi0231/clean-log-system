@@ -12,6 +12,8 @@ const envSchema = z.object({
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NEXT_PUBLIC_GEOAPIFY_API_KEY: z.string().optional(),
+  /** Support inbox for mailto CTAs (e.g. Pro / custom domain upgrade). Optional. */
+  NEXT_PUBLIC_SUPPORT_EMAIL: z.string().optional(),
   // Feature flags for development
   NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION: z
     .string()
@@ -49,6 +51,7 @@ export function getEnv(): Env {
     NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_GEOAPIFY_API_KEY: process.env.NEXT_PUBLIC_GEOAPIFY_API_KEY,
+    NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
     NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION: process.env.NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION,
   };
 
@@ -74,6 +77,7 @@ export function getEnv(): Env {
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: rawEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
         NEXT_PUBLIC_APP_URL: rawEnv.NEXT_PUBLIC_APP_URL,
         NEXT_PUBLIC_GEOAPIFY_API_KEY: rawEnv.NEXT_PUBLIC_GEOAPIFY_API_KEY,
+        NEXT_PUBLIC_SUPPORT_EMAIL: rawEnv.NEXT_PUBLIC_SUPPORT_EMAIL,
         NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION: false, // Always false in production fallback
       };
       return validatedEnv;
@@ -115,4 +119,10 @@ export function shouldSkipEmailVerification(): boolean {
   }
   const env = getEnv();
   return env.NEXT_PUBLIC_DEV_SKIP_EMAIL_VERIFICATION ?? false;
+}
+
+/** Public support email for mailto links when configured */
+export function getSupportEmail(): string | undefined {
+  const raw = getEnv().NEXT_PUBLIC_SUPPORT_EMAIL?.trim();
+  return raw && raw.length > 0 ? raw : undefined;
 }
