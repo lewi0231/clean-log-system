@@ -27,7 +27,11 @@ import {
   countLocationOverrides,
   resolveDisplayScope,
 } from "@/lib/pricing-scope-display";
-import { getScopedPricingOverrides, mergeOverrideRowsByLocation } from "@/lib/pricing-utils";
+import {
+  getScopedPricingOverrides,
+  mergeOverrideRowsByLocation,
+  parsePriceString,
+} from "@/lib/pricing-utils";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { AlertCircle, DollarSign, Layers, Save, Undo2 } from "lucide-react";
@@ -44,13 +48,6 @@ interface OptionPricingEditorProps {
   disabled?: boolean;
   /** Show bulk yard override for all options in this field */
   showBulkOverride?: boolean;
-}
-
-function parsePriceValue(value: string | undefined): number | undefined {
-  if (value === undefined || value.trim() === "") return undefined;
-  const price = parseFloat(value);
-  if (isNaN(price) || price < 0) return undefined;
-  return price;
 }
 
 export default function OptionPricingEditor({
@@ -225,11 +222,11 @@ export default function OptionPricingEditor({
       } = { optionValue };
 
       if (editing.customer !== undefined && editing.customer !== org.customer) {
-        const price = parsePriceValue(editing.customer);
+        const price = parsePriceString(editing.customer);
         if (price !== undefined) change.customerPrice = price;
       }
       if (editing.worker !== undefined && editing.worker !== org.worker) {
-        const price = parsePriceValue(editing.worker);
+        const price = parsePriceString(editing.worker);
         if (price !== undefined) change.workerPrice = price;
       }
 
@@ -296,8 +293,8 @@ export default function OptionPricingEditor({
     const savedIds: string[] = [];
     try {
       for (const draft of drafts) {
-        const customerPrice = parsePriceValue(draft.customerPrice);
-        const workerPrice = parsePriceValue(draft.workerPrice);
+        const customerPrice = parsePriceString(draft.customerPrice);
+        const workerPrice = parsePriceString(draft.workerPrice);
         if (customerPrice === undefined) {
           throw new Error(`Customer price required for ${draft.locationName}`);
         }
@@ -348,8 +345,8 @@ export default function OptionPricingEditor({
     const org = getOrgDefaultPrices(optionValue);
     const rows: MultiYardOverrideSummaryRow[] = drafts.map((d) => ({
       yardName: d.locationName,
-      customerPrice: parsePriceValue(d.customerPrice) ?? 0,
-      workerPrice: parsePriceValue(d.workerPrice) ?? null,
+      customerPrice: parsePriceString(d.customerPrice) ?? 0,
+      workerPrice: parsePriceString(d.workerPrice) ?? null,
       validUntil: d.validUntil || null,
       revertsToCustomer: org.customerNum,
     }));
@@ -397,27 +394,33 @@ export default function OptionPricingEditor({
     _locationName: string,
     pricesByOption: Record<string, BulkYardOptionPrice>,
     validUntil: string
-  ) => {
+  ): Promise<boolean> => {
     setOverrideSaving(true);
     try {
-      for (const optionValue of options) {
-        const row = pricesByOption[optionValue];
-        if (!row) continue;
-        const customerPrice = parsePriceValue(row.customerPrice);
-        const workerPrice = parsePriceValue(row.workerPrice);
-        const org = getOrgDefaultPrices(optionValue);
+      const sampleRow = pricesByOption[options[0]];
+      const customerPrice = parsePriceString(sampleRow?.customerPrice);
+      const workerPrice = parsePriceString(sampleRow?.workerPrice);
 
-        if (validUntil && org.customerNum == null) {
-          toast.error(
-            `Set an All yards price for ${optionValue} before adding a dated yard override.`
-          );
-          return;
+      if (customerPrice === undefined) {
+        toast.error("Enter a valid customer price");
+        return false;
+      }
+
+      if (validUntil) {
+        for (const optionValue of options) {
+          const org = getOrgDefaultPrices(optionValue);
+          if (org.customerNum == null) {
+            toast.error(
+              `Set an All yards price for ${optionValue} before adding a dated yard override.`
+            );
+            return false;
+          }
         }
+      }
 
-        if (customerPrice === undefined) continue;
+      const expirationDate = validUntil || null;
 
-        const expirationDate = validUntil || null;
-
+      for (const optionValue of options) {
         await upsertCustomerPricing(fieldConfig.id, optionValue, customerPrice, {
           locationId,
           locationHierarchyId: null,
@@ -436,14 +439,17 @@ export default function OptionPricingEditor({
           });
         }
       }
+
       await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
       toast.success("Bulk yard overrides saved");
+      return true;
     } catch (err) {
       log.error("Failed to save bulk yard overrides", {
         error: err instanceof Error ? err.message : "Unknown error",
         fieldConfigId: fieldConfig.id,
       });
       toast.error("Failed to save bulk yard overrides");
+      return false;
     } finally {
       setOverrideSaving(false);
     }

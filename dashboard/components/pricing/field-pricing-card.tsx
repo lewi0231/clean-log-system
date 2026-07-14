@@ -22,6 +22,7 @@ import type { FieldConfig } from "@clean-log/shared";
 import { formatDistanceToNow } from "date-fns";
 import { ChevronDown, ChevronRight, Save, Sparkles } from "lucide-react";
 import { useMemo } from "react";
+import { toast } from "sonner";
 import { FieldPriceInput } from "./field-price-input";
 import { FormulaPreviewIcon } from "./formula-preview";
 
@@ -99,6 +100,8 @@ export function FieldPricingCard({
     setIsSaving(true);
     try {
       await onSave(fieldConfig);
+    } catch {
+      toast.error("Failed to save pricing");
     } finally {
       setIsSaving(false);
     }

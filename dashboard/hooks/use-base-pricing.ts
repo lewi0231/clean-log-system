@@ -31,6 +31,7 @@ interface UseBasePricingResult {
     currency?: string;
     conditions?: UpsertPricingRuleRequest["conditions"];
     effectiveAt?: string | null; // Explicit effective date for timeline support
+    expirationDate?: string | null;
     pricingContext?: "customer" | "worker";
   }) => Promise<BasePricing>;
   deletePricing: (id: string) => Promise<void>;
@@ -186,6 +187,7 @@ export function useBasePricing(
     currency?: string;
     conditions?: UpsertPricingRuleRequest["conditions"];
     effectiveAt?: string | null;
+    expirationDate?: string | null;
     pricingContext?: "customer" | "worker";
   }): Promise<BasePricing> => {
     if (!organizationId) {
@@ -262,6 +264,7 @@ export function useBasePricing(
       currency: request.currency || "USD",
       conditions: request.conditions,
       effective_at: targetEffectiveAt,
+      expires_at: request.expirationDate || null,
     };
 
     if (targetPricingContext === "customer") {
@@ -301,7 +304,7 @@ export function useBasePricing(
           : null,
       priority: 0,
       effective_at: targetEffectiveAt,
-      expires_at: null,
+      expires_at: request.expirationDate || null,
       active: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),

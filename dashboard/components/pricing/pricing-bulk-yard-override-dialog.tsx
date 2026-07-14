@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { DollarSign } from "lucide-react";
 import { useMemo, useState } from "react";
+import { parsePriceString } from "@/lib/pricing-utils";
 
 export interface BulkYardOptionPrice {
   customerPrice: string;
@@ -40,7 +41,7 @@ interface PricingBulkYardOverrideDialogProps {
     locationName: string,
     pricesByOption: Record<string, BulkYardOptionPrice>,
     validUntil: string
-  ) => Promise<void>;
+  ) => Promise<boolean>;
 }
 
 interface BulkYardOverrideFormProps {
@@ -81,12 +82,18 @@ function BulkYardOverrideForm({
       };
     }
 
-    await onSave(locationId, loc.name, pricesByOption, validUntil);
-    onClose();
+    try {
+      const saved = await onSave(locationId, loc.name, pricesByOption, validUntil);
+      if (saved) {
+        onClose();
+      }
+    } catch {
+      // Parent surfaces errors via toast.
+    }
   };
 
   const locationName = sortedLocations.find((l) => l.id === locationId)?.name;
-  const canSave = locationId && customerPrice.trim() !== "";
+  const canSave = Boolean(locationId && parsePriceString(customerPrice) !== undefined);
 
   return (
     <>

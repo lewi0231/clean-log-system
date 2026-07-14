@@ -1563,7 +1563,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* Tax / GST */}
-          <Card>
+          <Card id="tax-gst">
             <CardHeader>
               <CardTitle>Tax / GST</CardTitle>
               <CardDescription>

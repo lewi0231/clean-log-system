@@ -76,6 +76,13 @@ vi.mock("@/hooks/use-field-pricing-card-state", () => ({
   useFieldPricingCardState: vi.fn(),
 }));
 
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 describe("FieldPricingCard", () => {
   const mockFieldConfig: FieldConfig = {
     id: "field-1",
@@ -549,6 +556,26 @@ describe("FieldPricingCard", () => {
       fireEvent.click(saveButton);
 
       expect(onSave).toHaveBeenCalledWith(mockFieldConfig);
+    });
+
+    it("should show an error toast when save fails", async () => {
+      const { toast } = await import("sonner");
+      const onSave = vi.fn().mockRejectedValue(new Error("Save failed"));
+
+      render(
+        <FieldPricingCard
+          {...defaultProps}
+          hasChanges={true}
+          currentCustomerPrice="100"
+          onSave={onSave}
+        />
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: /save|update/i }));
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith("Failed to save pricing");
+      });
     });
   });
 

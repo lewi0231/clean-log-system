@@ -42,7 +42,11 @@ import {
   countLocationOverrides,
   resolveDisplayScope,
 } from "@/lib/pricing-scope-display";
-import { getScopedPricingOverrides, mergeOverrideRowsByLocation } from "@/lib/pricing-utils";
+import {
+  getScopedPricingOverrides,
+  mergeOverrideRowsByLocation,
+  parsePriceString,
+} from "@/lib/pricing-utils";
 import type { PricingCondition, PricingType } from "@/lib/types";
 import { isPricingRulesEnabled } from "@/lib/utils";
 import type { FieldConfig, FieldType } from "@clean-log/shared";
@@ -52,13 +56,6 @@ import { toast } from "sonner";
 
 // Field types that support pricing (only number and boolean - select and grouped_breakdown use option pricing)
 const PRICING_SUPPORTED_TYPES: FieldType[] = ["number", "boolean"];
-
-function parsePriceValue(value: string | undefined): number | undefined {
-  if (value === undefined || value.trim() === "") return undefined;
-  const price = parseFloat(value);
-  if (isNaN(price) || price < 0) return undefined;
-  return price;
-}
 
 interface FieldPricingListProps {
   fieldConfigs: FieldConfig[];
@@ -295,8 +292,8 @@ export default function FieldPricingList({
     setOverrideSaving(true);
     try {
       for (const draft of drafts) {
-        const customerPrice = parsePriceValue(draft.customerPrice);
-        const workerPrice = parsePriceValue(draft.workerPrice);
+        const customerPrice = parsePriceString(draft.customerPrice);
+        const workerPrice = parsePriceString(draft.workerPrice);
         if (customerPrice === undefined) {
           throw new Error(`Customer price required for ${draft.locationName}`);
         }

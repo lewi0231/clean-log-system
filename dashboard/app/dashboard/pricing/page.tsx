@@ -1,9 +1,9 @@
 "use client";
 
 import BasePricingEditor from "@/components/pricing/base-pricing-editor";
+import { InvoiceAdjustmentsGstHint } from "@/components/pricing/invoice-adjustments-gst-hint";
 import BooleanPricingList from "@/components/pricing/boolean-pricing-list";
 import { useLocationFixedPricingGuard } from "@/components/pricing/location-fixed-pricing-guard";
-import LocationScopeSelector from "@/components/pricing/location-scope-selector";
 import NumberPricingList from "@/components/pricing/number-pricing-list";
 import OptionPricingEditor from "@/components/pricing/option-pricing-editor";
 import { PricingHistory } from "@/components/pricing/pricing-history";
@@ -33,7 +33,6 @@ import {
   Hash,
   Layers,
   List,
-  MapPin,
   ScrollText,
   Sparkles,
   TestTube,
@@ -112,17 +111,7 @@ function PricingPageContent({
   fieldConfigsLoading,
   organizationId,
 }: PricingPageContentProps) {
-  const {
-    locationNodeId,
-    setLocationNodeId,
-    locationId,
-    setLocationId,
-    effectiveDate,
-    setEffectiveDate,
-    expirationDate,
-    setExpirationDate,
-    setShowBothContexts,
-  } = usePricingScope();
+  const { locationNodeId, locationId, effectiveDate, setShowBothContexts } = usePricingScope();
 
   // Set showBothContexts to true for pricing page (all components show both customer and worker pricing)
   useEffect(() => {
@@ -202,14 +191,6 @@ function PricingPageContent({
           >
             <ScrollText className="h-4 w-4 mr-2" />
             History
-          </TabsTrigger>
-          <TabsTrigger
-            value="scope"
-            className="cursor-pointer"
-            title="Region, company, or hierarchy pricing and bulk tools"
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Advanced
           </TabsTrigger>
           {!isFixedPricing && (
             <TabsTrigger
@@ -594,27 +575,6 @@ function PricingPageContent({
           </div>
         </TabsContent>
 
-        <TabsContent value="scope" className="space-y-6">
-          <div data-tour="location-scope" className="space-y-4">
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              Set region, company, or hierarchy pricing here, and optional default expiration for
-              rules created at that scope. Yard-specific prices use{" "}
-              <strong>Manage overrides</strong> on each field on the Pricing tab. Invoice
-              adjustments also use this edit scope.
-            </p>
-            <LocationScopeSelector
-              selectedNodeId={locationNodeId}
-              selectedLocationId={locationId}
-              onNodeChange={setLocationNodeId}
-              onLocationChange={setLocationId}
-              effectiveDate={effectiveDate}
-              onEffectiveDateChange={setEffectiveDate}
-              expirationDate={expirationDate}
-              onExpirationDateChange={setExpirationDate}
-            />
-          </div>
-        </TabsContent>
-
         {!isFixedPricing && (
           <TabsContent
             value="invoice-adjustments"
@@ -646,7 +606,8 @@ function PricingPageContent({
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <InvoiceAdjustmentsGstHint />
                 <BasePricingEditor
                   fieldConfigs={fieldConfigs}
                   locationHierarchyId={locationNodeId}

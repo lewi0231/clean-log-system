@@ -1,6 +1,17 @@
 import type { LocationOverrideRow } from "@/components/pricing/location-overrides-matrix";
 import type { FieldPricing } from "@/lib/types";
 
+/**
+ * Parse a user-entered price string into a non-negative number.
+ * Returns undefined for empty, invalid, or negative values.
+ */
+export function parsePriceString(value: string | undefined): number | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const price = parseFloat(value);
+  if (isNaN(price) || price < 0) return undefined;
+  return price;
+}
+
 export interface OverridePricingRecord {
   id: string;
   field_config_id: string;

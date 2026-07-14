@@ -108,8 +108,8 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      expect(screen.getByLabelText(/customer price per unit/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/worker payment per unit/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/default customer price/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/default worker payment/i)).toBeInTheDocument();
     });
 
     it("should call onPriceChange with customer context when customer input changes", () => {
@@ -123,7 +123,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const customerInput = screen.getByLabelText(/customer price per unit/i);
+      const customerInput = screen.getByLabelText(/default customer price/i);
       fireEvent.change(customerInput, { target: { value: "150" } });
 
       expect(mockOnPriceChange).toHaveBeenCalledWith("field-1", "150", "customer");
@@ -164,7 +164,7 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const workerInput = screen.getByLabelText(/worker payment per unit/i);
+      const workerInput = screen.getByLabelText(/default worker payment/i);
       fireEvent.change(workerInput, { target: { value: "75" } });
 
       expect(mockOnPriceChange).toHaveBeenCalledWith("field-1", "75", "worker");
@@ -205,8 +205,8 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const customerInput = screen.getByLabelText(/customer price per unit/i);
-      const workerInput = screen.getByLabelText(/worker payment per unit/i);
+      const customerInput = screen.getByLabelText(/default customer price/i);
+      const workerInput = screen.getByLabelText(/default worker payment/i);
 
       expect(customerInput).toBeDisabled();
       expect(workerInput).toBeDisabled();
@@ -686,8 +686,8 @@ describe("FieldPriceInput", () => {
         />
       );
 
-      const customerInput = screen.getByLabelText(/customer price per unit/i) as HTMLInputElement;
-      const workerInput = screen.getByLabelText(/worker payment per unit/i) as HTMLInputElement;
+      const customerInput = screen.getByLabelText(/default customer price/i) as HTMLInputElement;
+      const workerInput = screen.getByLabelText(/default worker payment/i) as HTMLInputElement;
 
       expect(customerInput.value).toBe("0");
       expect(workerInput.value).toBe("0");

@@ -72,6 +72,41 @@ interface PricingScopeControlsProps {
   onDeleteExistingOverride: (row: ExistingOverrideRow) => Promise<void>;
   onSaveOverrides: () => Promise<void>;
   saving?: boolean;
+  /** When set (invoice adjustments), labels and formatting reflect add vs multiply */
+  adjustmentType?: "add" | "multiply";
+}
+
+function formatOverrideValue(
+  value: number,
+  adjustmentType: "add" | "multiply" | undefined,
+  formatCurrency: (n: number) => string
+): string {
+  if (adjustmentType === "multiply") {
+    return `×${value}`;
+  }
+  return formatCurrency(value);
+}
+
+function getOverrideFieldLabels(adjustmentType: "add" | "multiply" | undefined) {
+  if (adjustmentType === "multiply") {
+    return {
+      customer: "Customer multiplier",
+      worker: "Worker multiplier",
+      hint: "Overrides multiply the invoice total (e.g. 1.15 = +15%).",
+      inputStep: "0.01",
+      inputMin: "0.01",
+      placeholder: "1.15",
+    };
+  }
+
+  return {
+    customer: "Customer amount",
+    worker: "Worker amount",
+    hint: "Overrides add a fixed amount to the invoice total.",
+    inputStep: "0.01",
+    inputMin: "0",
+    placeholder: "0.00",
+  };
 }
 
 function OverridePanelContent({
@@ -90,6 +125,7 @@ function OverridePanelContent({
   onDeleteExistingOverride,
   onSaveOverrides,
   saving,
+  adjustmentType,
   formatCurrency,
 }: Omit<
   PricingScopeControlsProps,
@@ -102,6 +138,7 @@ function OverridePanelContent({
   const displayedExisting = showAllExisting ? existingOverrides : visibleExisting;
 
   const unusedLocations = availableLocations.filter((loc) => !usedLocationIds.has(loc.id));
+  const fieldLabels = getOverrideFieldLabels(adjustmentType);
 
   const handleAdd = () => {
     const loc = availableLocations.find((l) => l.id === addLocationId);
@@ -117,6 +154,15 @@ function OverridePanelContent({
         <p className="text-xs text-muted-foreground">
           Edits below update <strong>All yards</strong> default — use overrides for a specific yard.
         </p>
+      )}
+
+      {adjustmentType && (
+        <div className="rounded-md bg-muted/40 px-2.5 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {adjustmentType === "multiply" ? "Multiply invoice" : "Add amount"}
+          </span>
+          {fieldLabels.hint && <> — {fieldLabels.hint}</>}
+        </div>
       )}
 
       {displayedExisting.map((row) => (
@@ -138,15 +184,22 @@ function OverridePanelContent({
             </Button>
           </div>
           <div className="text-xs text-muted-foreground">
-            Customer {formatCurrency(row.customerPrice)}
+            {fieldLabels.customer}{" "}
+            {formatOverrideValue(row.customerPrice, adjustmentType, formatCurrency)}
             {row.workerPrice != null && hasWorkers && (
-              <> · Worker {formatCurrency(row.workerPrice)}</>
+              <>
+                {" "}
+                · {fieldLabels.worker}{" "}
+                {formatOverrideValue(row.workerPrice, adjustmentType, formatCurrency)}
+              </>
             )}
             {row.validUntil && <> · Until {row.validUntil}</>}
           </div>
           {row.revertsToCustomer != null && row.validUntil && (
             <div className="text-xs text-muted-foreground">
-              Reverts to {formatCurrency(row.revertsToCustomer)} (All yards)
+              Reverts to{" "}
+              {formatOverrideValue(row.revertsToCustomer, adjustmentType, formatCurrency)} (All
+              yards)
             </div>
           )}
         </div>
@@ -181,11 +234,12 @@ function OverridePanelContent({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <Label className="text-xs">Customer</Label>
+              <Label className="text-xs">{fieldLabels.customer}</Label>
               <Input
                 type="number"
-                min="0"
-                step="0.01"
+                min={fieldLabels.inputMin}
+                step={fieldLabels.inputStep}
+                placeholder={fieldLabels.placeholder}
                 value={draft.customerPrice}
                 onChange={(e) =>
                   onUpdateDraftOverride(draft.draftId, { customerPrice: e.target.value })
@@ -196,11 +250,12 @@ function OverridePanelContent({
             </div>
             {hasWorkers && (
               <div>
-                <Label className="text-xs">Worker</Label>
+                <Label className="text-xs">{fieldLabels.worker}</Label>
                 <Input
                   type="number"
-                  min="0"
-                  step="0.01"
+                  min={fieldLabels.inputMin}
+                  step={fieldLabels.inputStep}
+                  placeholder={fieldLabels.placeholder}
                   value={draft.workerPrice}
                   onChange={(e) =>
                     onUpdateDraftOverride(draft.draftId, { workerPrice: e.target.value })
@@ -222,7 +277,8 @@ function OverridePanelContent({
             />
             {draft.validUntil && orgDefaultCustomer != null && (
               <p className="text-xs text-muted-foreground mt-1">
-                Reverts to {formatCurrency(orgDefaultCustomer)} (All yards)
+                Reverts to {formatOverrideValue(orgDefaultCustomer, adjustmentType, formatCurrency)}{" "}
+                (All yards)
               </p>
             )}
           </div>
@@ -316,7 +372,9 @@ export function PricingScopeControls(props: PricingScopeControlsProps) {
             <SheetHeader>
               <SheetTitle>Yard overrides</SheetTitle>
               <SheetDescription>
-                Set yard-specific prices. Org default applies everywhere else.
+                {props.adjustmentType === "multiply"
+                  ? "Set yard-specific multipliers. The org default applies everywhere else."
+                  : "Set yard-specific prices. Org default applies everywhere else."}
               </SheetDescription>
             </SheetHeader>
             <OverridePanelContent {...props} formatCurrency={formatCurrency} />
