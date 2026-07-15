@@ -44,6 +44,15 @@ describe("formatLineItemDescription", () => {
     ).toBe("Extra Rooms");
   });
 
+  it("treats whitespace-only option_value as missing", () => {
+    expect(
+      formatLineItemDescription(
+        { field_label: "Service Type", option_value: "   " },
+        { include_option_value: true }
+      )
+    ).toBe("Service Type");
+  });
+
   it("defaults to include option values when config is missing", () => {
     expect(formatLineItemDescription(item, null)).toBe("Service Type: Full Detail");
     expect(formatLineItemDescription(item)).toBe(
@@ -64,8 +73,11 @@ describe("shouldShowBasePriceSeparately", () => {
     expect(shouldShowBasePriceSeparately(50, { show_base_price_separately: false })).toBe(false);
   });
 
-  it("returns false when base price is zero or negative", () => {
+  it("returns false when base price is zero, negative, or non-finite", () => {
     expect(shouldShowBasePriceSeparately(0, { show_base_price_separately: true })).toBe(false);
     expect(shouldShowBasePriceSeparately(-1, { show_base_price_separately: true })).toBe(false);
+    expect(shouldShowBasePriceSeparately(Number.NaN, { show_base_price_separately: true })).toBe(
+      false
+    );
   });
 });

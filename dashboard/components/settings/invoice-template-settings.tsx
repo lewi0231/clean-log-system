@@ -40,6 +40,7 @@ import type {
   ServiceAddressConfig,
 } from "@/lib/types";
 import { log } from "@/lib/logger";
+import { normalizeEmailRecipientConfigOrDefault } from "@/lib/utils/normalize-email-recipient-config";
 import { validateInvoiceTemplateConfig } from "@/lib/validations/invoice-template";
 import { AlertCircle, Eye, Loader2, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -112,7 +113,10 @@ export default function InvoiceTemplateSettings(
       };
       const billing = config.billing_address_config || DEFAULT_BILLING_ADDRESS_CONFIG;
       const lineItem = config.line_item_display || DEFAULT_LINE_ITEM_DISPLAY;
-      const email = config.email_recipient_config || DEFAULT_EMAIL_RECIPIENT_CONFIG;
+      const email = normalizeEmailRecipientConfigOrDefault(
+        config.email_recipient_config as InvoiceEmailRecipientConfig | null,
+        DEFAULT_EMAIL_RECIPIENT_CONFIG
+      );
 
       setServiceAddressConfig(service);
       setBillingAddressConfig(billing);
@@ -238,7 +242,7 @@ export default function InvoiceTemplateSettings(
   };
 
   const handleEmailRecipientSourceChange = (
-    value: "location_email" | "hierarchy_billing_email" | "location_contact_email"
+    value: "location_email" | "hierarchy_billing_email"
   ) => {
     const updated = { ...emailRecipientConfig, location_email_source: value };
     setEmailRecipientConfig(updated);
@@ -314,11 +318,8 @@ export default function InvoiceTemplateSettings(
 
   const emailFieldConfigs = fieldConfigs.filter((field) => field.field_type === "email");
   const showLocationEmailSource = usePredefinedLocations && hasLocations;
-  const showFormFieldEmailConfig =
-    emailFieldConfigs.length > 0 &&
-    (serviceAddressConfig.source === "auto" ||
-      serviceAddressConfig.source === "form_fields" ||
-      !usePredefinedLocations);
+  // Email recipient for jobs without a location is independent of service-address display source.
+  const showFormFieldEmailConfig = emailFieldConfigs.length > 0;
 
   // Auto-add address field to form_fields if it exists and form_fields is empty
   useEffect(() => {
@@ -334,40 +335,23 @@ export default function InvoiceTemplateSettings(
     }
   }, [addressField, serviceAddressConfig.form_fields]);
 
-  // Migrate deprecated/unimplemented location_contact_email to location_email
+  // One-shot migrate deprecated/unimplemented location_contact_email → location_email
+  const migratedContactEmailSourceRef = useRef(false);
   useEffect(() => {
-    if (emailRecipientConfig.location_email_source !== "location_contact_email") return;
+    if (migratedContactEmailSourceRef.current) return;
+    if (!config) return;
+    const rawSource = (config.email_recipient_config as { location_email_source?: string } | null)
+      ?.location_email_source;
+    if (rawSource !== "location_contact_email") return;
 
-    const updated = {
+    migratedContactEmailSourceRef.current = true;
+    const updated: InvoiceEmailRecipientConfig = {
       ...emailRecipientConfig,
-      location_email_source: "location_email" as const,
+      location_email_source: "location_email",
     };
     setEmailRecipientConfig(updated);
-    saveConfig({ emailRecipientConfig: updated }, "email-source");
-  }, [emailRecipientConfig.location_email_source, emailRecipientConfig, saveConfig]);
-
-  // Auto-set email field for email recipient when applicable and not already set
-  useEffect(() => {
-    const firstEmailField = emailFieldConfigs[0];
-    if (
-      !showFormFieldEmailConfig ||
-      !firstEmailField ||
-      emailRecipientConfig.form_field_email ||
-      config?.email_recipient_config?.form_field_email
-    ) {
-      return;
-    }
-
-    setEmailRecipientConfig((prev) => ({
-      ...prev,
-      form_field_email: firstEmailField.id,
-    }));
-  }, [
-    emailFieldConfigs,
-    showFormFieldEmailConfig,
-    emailRecipientConfig.form_field_email,
-    config?.email_recipient_config?.form_field_email,
-  ]);
+    void saveConfig({ emailRecipientConfig: updated }, "email-source");
+  }, [config, emailRecipientConfig, saveConfig]);
 
   const getFieldLabel = (fieldName: string) => {
     const field = fieldConfigs.find((f) => f.name === fieldName);
@@ -636,7 +620,7 @@ export default function InvoiceTemplateSettings(
                 value={emailRecipientConfig.location_email_source}
                 onValueChange={(value) =>
                   handleEmailRecipientSourceChange(
-                    value as "location_email" | "hierarchy_billing_email" | "location_contact_email"
+                    value as "location_email" | "hierarchy_billing_email"
                   )
                 }
               >
@@ -696,17 +680,14 @@ export default function InvoiceTemplateSettings(
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Used when a job has no linked location
-                  {serviceAddressConfig.source === "auto"
-                    ? " (including Auto service address jobs that fall back to form fields)"
-                    : ""}
-                  . Invoices without a valid email will not be auto-sent.
+                  Used when a job has no linked location. Invoices without a valid email will not be
+                  auto-sent.
                 </p>
               </div>
             </>
           )}
 
-          {!showFormFieldEmailConfig && emailFieldConfigs.length === 0 && (
+          {!showFormFieldEmailConfig && (
             <div className="rounded-lg bg-muted/50 border border-muted p-4">
               <p className="text-sm text-muted-foreground">
                 Add an <strong>email</strong> field to your entry form to configure invoice
@@ -714,19 +695,6 @@ export default function InvoiceTemplateSettings(
               </p>
             </div>
           )}
-
-          {!showFormFieldEmailConfig &&
-            emailFieldConfigs.length > 0 &&
-            serviceAddressConfig.source === "location" &&
-            usePredefinedLocations && (
-              <div className="rounded-lg bg-muted/50 border border-muted p-4">
-                <p className="text-sm text-muted-foreground">
-                  Form field email is available when Service Address source is <strong>Auto</strong>{" "}
-                  or <strong>Always use form fields</strong>, or when predefined locations are
-                  disabled.
-                </p>
-              </div>
-            )}
         </CardContent>
       </Card>
 

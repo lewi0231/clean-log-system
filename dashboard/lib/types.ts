@@ -496,7 +496,7 @@ export interface BillingAddressConfig {
 }
 
 export interface InvoiceEmailRecipientConfig {
-  location_email_source: "location_email" | "hierarchy_billing_email" | "location_contact_email";
+  location_email_source: "location_email" | "hierarchy_billing_email";
   form_field_email: string | null; // Field config ID that contains email for jobs without location
   /** @deprecated No longer used; fallback removed. Kept for backward compatibility. */
   default_email?: string | null;

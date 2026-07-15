@@ -34,11 +34,7 @@ export interface AutoInvoiceOptions {
     info: (message: string, context?: Record<string, unknown>) => void;
     debug: (message: string, context?: Record<string, unknown>) => void;
     warn: (message: string, context?: Record<string, unknown>) => void;
-    error: (
-      message: string,
-      error?: unknown,
-      context?: Record<string, unknown>,
-    ) => void;
+    error: (message: string, error?: unknown, context?: Record<string, unknown>) => void;
   };
   /**
    * Optional: Provide a mock calculation for testing when calculate-invoice
@@ -53,7 +49,7 @@ export interface AutoInvoiceOptions {
 export async function isAutoGenerateEnabled(
   supabaseAdmin: SupabaseClientType,
   organizationId: string,
-  logger?: AutoInvoiceOptions["logger"],
+  logger?: AutoInvoiceOptions["logger"]
 ): Promise<boolean> {
   const { data: orgSettings, error } = await supabaseAdmin
     .from("organization_settings")
@@ -85,7 +81,7 @@ export async function isAutoGenerateEnabled(
  */
 export async function hasHierarchyAutoGenerate(
   supabaseAdmin: SupabaseClientType,
-  locationId: string | null,
+  locationId: string | null
 ): Promise<boolean> {
   if (!locationId) {
     return false;
@@ -127,7 +123,7 @@ export async function hasHierarchyAutoGenerate(
  */
 export async function invoiceExistsForJob(
   supabaseAdmin: SupabaseClientType,
-  jobId: string,
+  jobId: string
 ): Promise<boolean> {
   const { data: existingInvoice } = await supabaseAdmin
     .from("invoice_job")
@@ -143,7 +139,7 @@ export async function invoiceExistsForJob(
  */
 export async function generateInvoiceNumber(
   supabaseAdmin: SupabaseClientType,
-  organizationId: string,
+  organizationId: string
 ): Promise<string> {
   // Get organization code
   const { data: org } = await supabaseAdmin
@@ -185,7 +181,7 @@ export async function generateInvoiceNumber(
  */
 export async function getOrganizationCurrency(
   supabaseAdmin: SupabaseClientType,
-  organizationId: string,
+  organizationId: string
 ): Promise<string> {
   const { data: org } = await supabaseAdmin
     .from("organization")
@@ -201,7 +197,7 @@ export async function getOrganizationCurrency(
  */
 export async function getDefaultInvoiceDueDays(
   supabaseAdmin: SupabaseClientType,
-  organizationId: string,
+  organizationId: string
 ): Promise<number> {
   const { data: orgSettings } = await supabaseAdmin
     .from("organization_settings")
@@ -231,17 +227,13 @@ export function calculateDueDate(dueDays: number = 30): string {
  * @returns Result object indicating success/failure and any relevant details
  */
 export async function autoGenerateInvoiceForJob(
-  options: AutoInvoiceOptions,
+  options: AutoInvoiceOptions
 ): Promise<AutoInvoiceResult> {
   const { jobId, organizationId, locationId, supabaseAdmin, logger } = options;
 
   try {
     // Check if organization has auto-generate enabled
-    const autoGenerateEnabled = await isAutoGenerateEnabled(
-      supabaseAdmin,
-      organizationId,
-      logger,
-    );
+    const autoGenerateEnabled = await isAutoGenerateEnabled(supabaseAdmin, organizationId, logger);
 
     logger.debug("Checking auto-generate invoices setting", {
       jobId,
@@ -262,17 +254,13 @@ export async function autoGenerateInvoiceForJob(
     }
 
     // Check if location has hierarchy auto-generate (takes precedence)
-    const hierarchyAutoGenerate = await hasHierarchyAutoGenerate(
-      supabaseAdmin,
-      locationId,
-    );
+    const hierarchyAutoGenerate = await hasHierarchyAutoGenerate(supabaseAdmin, locationId);
 
     if (hierarchyAutoGenerate) {
       return {
         success: true,
         skipped: true,
-        skipReason:
-          "Location has hierarchy auto-generate enabled (takes precedence)",
+        skipReason: "Location has hierarchy auto-generate enabled (takes precedence)",
       };
     }
 
@@ -339,14 +327,16 @@ export async function autoGenerateInvoiceForJob(
         .maybeSingle();
 
       // Calculate invoice totals via edge function
-      const { data: calculationData, error: calcError } = await supabaseAdmin
-        .functions.invoke("calculate-invoice", {
+      const { data: calculationData, error: calcError } = await supabaseAdmin.functions.invoke(
+        "calculate-invoice",
+        {
           body: {
             organization_id: organizationId,
             job_ids: [jobId],
             email: adminUser?.email, // Pass email for auth verification
           },
-        });
+        }
+      );
 
       if (calcError) {
         // Log detailed error information for debugging
@@ -355,8 +345,8 @@ export async function autoGenerateInvoiceForJob(
         if (
           calcError.name === "FunctionsHttpError" &&
           "context" in calcError &&
-          typeof (calcError as { context?: { json?: () => Promise<unknown> } })
-              .context?.json === "function"
+          typeof (calcError as { context?: { json?: () => Promise<unknown> } }).context?.json ===
+            "function"
         ) {
           try {
             responseBody = await (
@@ -388,7 +378,7 @@ export async function autoGenerateInvoiceForJob(
         });
         throw new Error(
           calculationData?.error ||
-            "Failed to calculate invoice totals - no calculation data returned",
+            "Failed to calculate invoice totals - no calculation data returned"
         );
       }
 
@@ -396,20 +386,11 @@ export async function autoGenerateInvoiceForJob(
     }
 
     // Get currency, due days, and generate invoice number
-    const currency = await getOrganizationCurrency(
-      supabaseAdmin,
-      organizationId,
-    );
-    const invoiceNumber = await generateInvoiceNumber(
-      supabaseAdmin,
-      organizationId,
-    );
+    const currency = await getOrganizationCurrency(supabaseAdmin, organizationId);
+    const invoiceNumber = await generateInvoiceNumber(supabaseAdmin, organizationId);
 
     // Calculate due date using organization's configured due days
-    const dueDays = await getDefaultInvoiceDueDays(
-      supabaseAdmin,
-      organizationId,
-    );
+    const dueDays = await getDefaultInvoiceDueDays(supabaseAdmin, organizationId);
     const dueDate = calculateDueDate(dueDays);
 
     // Create invoice with pending_review status
@@ -423,6 +404,7 @@ export async function autoGenerateInvoiceForJob(
         total: calculation.total,
         currency: currency,
         due_date: dueDate,
+        calculation_snapshot: calculation,
       })
       .select()
       .single();
@@ -432,12 +414,10 @@ export async function autoGenerateInvoiceForJob(
     }
 
     // Link invoice to job
-    const { error: linkError } = await supabaseAdmin
-      .from("invoice_job")
-      .insert({
-        invoice_id: invoice.id,
-        job_id: jobId,
-      });
+    const { error: linkError } = await supabaseAdmin.from("invoice_job").insert({
+      invoice_id: invoice.id,
+      job_id: jobId,
+    });
 
     if (linkError) {
       // Try to clean up the invoice if linking fails

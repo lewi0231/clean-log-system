@@ -44,13 +44,10 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
     }
 
     // Validate all config updates before processing
@@ -82,19 +79,13 @@ serve(async (req) => {
     if (Object.keys(configToValidate).length > 0) {
       const validation = validateInvoiceTemplateConfigUpdate(configToValidate);
       if (!validation.valid && validation.errors) {
-        return errorResponse(
-          `Validation failed: ${validation.errors.join("; ")}`,
-          400,
-        );
+        return errorResponse(`Validation failed: ${validation.errors.join("; ")}`, 400);
       }
     }
 
     // Validate and add invoice_title
     if (invoice_title !== undefined) {
-      if (
-        typeof invoice_title !== "string" ||
-        invoice_title.trim().length === 0
-      ) {
+      if (typeof invoice_title !== "string" || invoice_title.trim().length === 0) {
         return errorResponse("Invoice title cannot be empty", 400);
       }
       updateData.invoice_title = invoice_title.trim();
@@ -139,30 +130,21 @@ serve(async (req) => {
         line_item_display.include_option_value !== undefined &&
         typeof line_item_display.include_option_value !== "boolean"
       ) {
-        return errorResponse(
-          "line_item_display.include_option_value must be a boolean",
-          400,
-        );
+        return errorResponse("line_item_display.include_option_value must be a boolean", 400);
       }
 
       if (
         line_item_display.description_format !== undefined &&
         typeof line_item_display.description_format !== "string"
       ) {
-        return errorResponse(
-          "line_item_display.description_format must be a string",
-          400,
-        );
+        return errorResponse("line_item_display.description_format must be a string", 400);
       }
 
       if (
         line_item_display.show_base_price_separately !== undefined &&
         typeof line_item_display.show_base_price_separately !== "boolean"
       ) {
-        return errorResponse(
-          "line_item_display.show_base_price_separately must be a boolean",
-          400,
-        );
+        return errorResponse("line_item_display.show_base_price_separately must be a boolean", 400);
       }
 
       updateData.line_item_display = line_item_display;
@@ -170,41 +152,27 @@ serve(async (req) => {
 
     // Validate and add service_address_config
     if (service_address_config !== undefined) {
-      if (
-        typeof service_address_config !== "object" ||
-        service_address_config === null
-      ) {
+      if (typeof service_address_config !== "object" || service_address_config === null) {
         return errorResponse("service_address_config must be an object", 400);
       }
 
       // Validate source
       if (
         service_address_config.source !== undefined &&
-        !["auto", "location", "form_fields"].includes(
-          service_address_config.source,
-        )
+        !["auto", "location", "form_fields"].includes(service_address_config.source)
       ) {
         return errorResponse(
           "service_address_config.source must be 'auto', 'location', or 'form_fields'",
-          400,
+          400
         );
       }
 
       // Validate location_fields if provided
       if (service_address_config.location_fields !== undefined) {
         if (!Array.isArray(service_address_config.location_fields)) {
-          return errorResponse(
-            "service_address_config.location_fields must be an array",
-            400,
-          );
+          return errorResponse("service_address_config.location_fields must be an array", 400);
         }
-        const validFields = [
-          "name",
-          "email",
-          "address",
-          "contact_person",
-          "phone",
-        ];
+        const validFields = ["name", "email", "address", "contact_person", "phone"];
         if (
           !service_address_config.location_fields.every((field: string) =>
             validFields.includes(field)
@@ -212,7 +180,7 @@ serve(async (req) => {
         ) {
           return errorResponse(
             "service_address_config.location_fields must contain only valid field names",
-            400,
+            400
           );
         }
       }
@@ -222,10 +190,7 @@ serve(async (req) => {
 
     // Validate and add billing_address_config
     if (billing_address_config !== undefined) {
-      if (
-        typeof billing_address_config !== "object" ||
-        billing_address_config === null
-      ) {
+      if (typeof billing_address_config !== "object" || billing_address_config === null) {
         return errorResponse("billing_address_config must be an object", 400);
       }
 
@@ -234,22 +199,19 @@ serve(async (req) => {
         billing_address_config.enabled !== undefined &&
         typeof billing_address_config.enabled !== "boolean"
       ) {
-        return errorResponse(
-          "billing_address_config.enabled must be a boolean",
-          400,
-        );
+        return errorResponse("billing_address_config.enabled must be a boolean", 400);
       }
 
       // Validate source
       if (
         billing_address_config.source !== undefined &&
         !["auto", "organization", "hierarchy", "form_fields"].includes(
-          billing_address_config.source,
+          billing_address_config.source
         )
       ) {
         return errorResponse(
           "billing_address_config.source must be 'auto', 'organization', 'hierarchy', or 'form_fields'",
-          400,
+          400
         );
       }
 
@@ -258,22 +220,24 @@ serve(async (req) => {
 
     // Validate and add email_recipient_config
     if (email_recipient_config !== undefined) {
-      if (
-        typeof email_recipient_config !== "object" ||
-        email_recipient_config === null
-      ) {
+      if (typeof email_recipient_config !== "object" || email_recipient_config === null) {
         return errorResponse("email_recipient_config must be an object", 400);
       }
 
-      // Validate location_email_source
+      // Coerce deprecated location_contact_email, then validate
+      if (email_recipient_config.location_email_source === "location_contact_email") {
+        email_recipient_config.location_email_source = "location_email";
+      }
+
       if (
         email_recipient_config.location_email_source !== undefined &&
-        !["location_email", "hierarchy_billing_email", "location_contact_email"]
-          .includes(email_recipient_config.location_email_source)
+        !["location_email", "hierarchy_billing_email"].includes(
+          email_recipient_config.location_email_source
+        )
       ) {
         return errorResponse(
-          "email_recipient_config.location_email_source must be 'location_email', 'hierarchy_billing_email', or 'location_contact_email'",
-          400,
+          "email_recipient_config.location_email_source must be 'location_email' or 'hierarchy_billing_email'",
+          400
         );
       }
 
@@ -285,7 +249,7 @@ serve(async (req) => {
         ) {
           return errorResponse(
             "email_recipient_config.form_field_email must be a string or null",
-            400,
+            400
           );
         }
       }
@@ -298,7 +262,7 @@ serve(async (req) => {
         ) {
           return errorResponse(
             "email_recipient_config.default_email must be a string or null",
-            400,
+            400
           );
         }
         // Validate email format if provided (RFC-compliant)
@@ -308,7 +272,7 @@ serve(async (req) => {
           if (!emailRegex.test(email_recipient_config.default_email.trim())) {
             return errorResponse(
               "email_recipient_config.default_email must be a valid email address",
-              400,
+              400
             );
           }
         }
@@ -367,14 +331,10 @@ serve(async (req) => {
         show_logo: config.show_logo ?? true,
         show_abn: config.show_abn ?? true,
         bill_to_fields: config.bill_to_fields ?? [],
-        service_address_config: config.service_address_config ??
-          DEFAULT_SERVICE_ADDRESS_CONFIG,
-        billing_address_config: config.billing_address_config ??
-          DEFAULT_BILLING_ADDRESS_CONFIG,
-        email_recipient_config: config.email_recipient_config ??
-          DEFAULT_EMAIL_RECIPIENT_CONFIG,
-        line_item_display: config.line_item_display ??
-          DEFAULT_LINE_ITEM_DISPLAY,
+        service_address_config: config.service_address_config ?? DEFAULT_SERVICE_ADDRESS_CONFIG,
+        billing_address_config: config.billing_address_config ?? DEFAULT_BILLING_ADDRESS_CONFIG,
+        email_recipient_config: config.email_recipient_config ?? DEFAULT_EMAIL_RECIPIENT_CONFIG,
+        line_item_display: config.line_item_display ?? DEFAULT_LINE_ITEM_DISPLAY,
         created_at: config.created_at,
         updated_at: config.updated_at,
       },
@@ -382,9 +342,7 @@ serve(async (req) => {
   } catch (error) {
     logger.error("Update invoice template config error", error);
     return errorResponse(
-      error instanceof Error
-        ? error
-        : "Failed to update invoice template config",
+      error instanceof Error ? error : "Failed to update invoice template config"
     );
   }
 });

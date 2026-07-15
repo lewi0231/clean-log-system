@@ -58,6 +58,18 @@ function formatDate(dateStr: string): string {
 }
 
 /**
+ * Escape text for safe interpolation into HTML templates.
+ */
+function escapeHtml(value: unknown): string {
+  const s = value == null ? "" : String(value);
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
  * Generate HTML content for the invoice
  */
 function generateInvoiceHtml(
@@ -65,7 +77,7 @@ function generateInvoiceHtml(
   organization: Record<string, unknown>,
   lineItems: Array<Record<string, unknown>>
 ): string {
-  const invoiceNumber = invoice.invoice_number as string;
+  const invoiceNumber = escapeHtml(invoice.invoice_number);
   const createdAt = invoice.created_at as string;
   const dueDate = invoice.due_date as string;
   const subtotal = invoice.subtotal as number;
@@ -75,16 +87,16 @@ function generateInvoiceHtml(
   const notes = invoice.notes as string | null;
   const status = invoice.status as string;
 
-  const orgName = organization.name as string;
-  const orgAbn = organization.abn as string | null;
+  const orgName = escapeHtml(organization.name);
+  const orgAbn = organization.abn ? escapeHtml(organization.abn) : null;
 
   // Generate line items rows
   const lineItemsHtml = lineItems
     .map(
       (item) => `
     <tr>
-      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${item.description || ""}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity || 1}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.description)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${escapeHtml(item.quantity ?? 1)}</td>
       <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency((item.unit_price as number) || 0, currency)}</td>
       <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency((item.amount as number) || 0, currency)}</td>
     </tr>
@@ -102,10 +114,12 @@ function generateInvoiceHtml(
     cancelled: "#9ca3af",
   };
   const statusColor = statusColors[status] || "#6b7280";
-  const statusLabel =
+  const statusLabel = escapeHtml(
     status === "pending_review"
       ? "Pending Review"
-      : status.charAt(0).toUpperCase() + status.slice(1);
+      : status.charAt(0).toUpperCase() + status.slice(1)
+  );
+  const safeNotes = notes ? escapeHtml(notes) : null;
 
   return `
 <!DOCTYPE html>
@@ -337,11 +351,11 @@ function generateInvoiceHtml(
     </div>
 
     ${
-      notes
+      safeNotes
         ? `
     <div class="notes">
       <h3>Notes</h3>
-      <p>${notes}</p>
+      <p>${safeNotes}</p>
     </div>
     `
         : ""
@@ -410,6 +424,7 @@ serve(async (req: Request) => {
         notes,
         status,
         organization_id,
+        calculation_snapshot,
         invoice_job:invoice_job (
           job:job_id (
             id
@@ -440,40 +455,45 @@ serve(async (req: Request) => {
       return errorResponse("Invoice has no associated jobs", 404);
     }
 
-    const { data: calculationData, error: calcError } = await supabase.functions.invoke(
-      "calculate-invoice",
-      {
-        body: {
-          organization_id,
-          job_ids: jobIds,
-          email: userEmail,
-        },
-      }
-    );
+    type PdfCalculation = {
+      total_adjustments?: number;
+      job_calculations?: Array<{
+        base_price?: number;
+        line_items: Array<{
+          field_label: string;
+          option_value?: string;
+          quantity: number;
+          unit_price: number;
+          total: number;
+        }>;
+      }>;
+    };
 
-    if (calcError) {
-      logger.error("Failed to calculate invoice for PDF", calcError);
-      return errorResponse("Failed to calculate invoice line items", 500);
-    }
-
-    const calculation = calculationData?.calculation as
-      | {
-          total_adjustments?: number;
-          job_calculations?: Array<{
-            base_price?: number;
-            line_items: Array<{
-              field_label: string;
-              option_value?: string;
-              quantity: number;
-              unit_price: number;
-              total: number;
-            }>;
-          }>;
-        }
-      | undefined;
+    let calculation =
+      (invoice as { calculation_snapshot?: PdfCalculation | null }).calculation_snapshot ?? null;
 
     if (!calculation?.job_calculations) {
-      return errorResponse("Failed to calculate invoice line items", 500);
+      const { data: calculationData, error: calcError } = await supabase.functions.invoke(
+        "calculate-invoice",
+        {
+          body: {
+            organization_id,
+            job_ids: jobIds,
+            email: userEmail,
+          },
+        }
+      );
+
+      if (calcError) {
+        logger.error("Failed to calculate invoice for PDF", calcError);
+        return errorResponse("Failed to calculate invoice line items", 500);
+      }
+
+      calculation = calculationData?.calculation as PdfCalculation | null;
+
+      if (!calculation?.job_calculations) {
+        return errorResponse("Failed to calculate invoice line items", 500);
+      }
     }
 
     // Get organization details
@@ -488,11 +508,18 @@ serve(async (req: Request) => {
       return errorResponse("Organization not found", 404);
     }
 
-    const { data: templateConfig } = await supabase
+    const { data: templateConfig, error: templateError } = await supabase
       .from("invoice_template_config")
       .select("line_item_display")
       .eq("organization_id", organization_id)
       .maybeSingle();
+
+    if (templateError) {
+      logger.warn("Failed to load invoice template config; using defaults", {
+        organization_id,
+        error: templateError,
+      });
+    }
 
     const lineItemDisplay =
       (templateConfig?.line_item_display as LineItemDisplayConfig | null) ??

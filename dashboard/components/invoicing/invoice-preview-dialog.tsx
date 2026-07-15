@@ -96,7 +96,9 @@ export default function InvoicePreviewDialog({
     } catch (err) {
       const msg = getInvokeErrorMessage(err);
       log.error("Failed to send invoice", { message: msg });
-      alert(`Failed to send invoice: ${msg}`);
+      toast.error("Failed to send invoice", {
+        description: msg,
+      });
     } finally {
       setSending(false);
     }

@@ -42,10 +42,12 @@ interface InvoiceCalculation {
 
 interface JobWithLocation {
   id: string;
-  location: {
-    id: string;
-    hierarchy_parent_id: string | null;
-  }[] | null;
+  location:
+    | {
+        id: string;
+        hierarchy_parent_id: string | null;
+      }[]
+    | null;
 }
 
 interface HierarchyNode {
@@ -87,13 +89,10 @@ serve(async (req) => {
       req,
       organization_id,
       supabase,
-      body as Record<string, unknown>,
+      body as Record<string, unknown>
     );
     if (!membershipCheck) {
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
     }
 
     // Verify jobs exist and belong to organization
@@ -106,23 +105,22 @@ serve(async (req) => {
     if (jobsError) throw jobsError;
 
     if (!jobs || jobs.length !== job_ids.length) {
-      return errorResponse(
-        "One or more jobs not found or don't belong to organization",
-        404,
-      );
+      return errorResponse("One or more jobs not found or don't belong to organization", 404);
     }
 
     // Check if any of these jobs are already on an invoice
     const { data: existingInvoiceJobs, error: existingError } = await supabase
       .from("invoice_job")
-      .select(`
+      .select(
+        `
         job_id,
         invoice:invoice_id (
           id,
           invoice_number,
           status
         )
-      `)
+      `
+      )
       .in("job_id", job_ids);
 
     if (existingError) throw existingError;
@@ -134,9 +132,7 @@ serve(async (req) => {
         .filter((ij) => ij.invoice !== null)
         .map((ij) => {
           const invoiceRaw = ij.invoice as unknown;
-          const invoice = Array.isArray(invoiceRaw)
-            ? invoiceRaw[0]
-            : invoiceRaw;
+          const invoice = Array.isArray(invoiceRaw) ? invoiceRaw[0] : invoiceRaw;
           const invoiceObj = invoice as {
             invoice_number?: string;
             status?: string;
@@ -149,14 +145,12 @@ serve(async (req) => {
         });
 
       if (invoicedJobsInfo.length > 0) {
-        const invoiceNumbers = [
-          ...new Set(invoicedJobsInfo.map((i) => i.invoice_number)),
-        ];
+        const invoiceNumbers = [...new Set(invoicedJobsInfo.map((i) => i.invoice_number))];
         return errorResponse(
-          `Cannot create invoice: ${invoicedJobsInfo.length} job(s) are already included in invoice(s): ${
-            invoiceNumbers.join(", ")
-          }. Each job can only be invoiced once.`,
-          400,
+          `Cannot create invoice: ${invoicedJobsInfo.length} job(s) are already included in invoice(s): ${invoiceNumbers.join(
+            ", "
+          )}. Each job can only be invoiced once.`,
+          400
         );
       }
     }
@@ -175,14 +169,16 @@ serve(async (req) => {
     // Calculate invoice totals by calling calculate-invoice function
     // IMPORTANT: Pass email for nested function auth (service role key doesn't carry user context)
     // Use membershipCheck.userEmail which is extracted from JWT token, not body.email
-    const { data: calculationData, error: calcError } = await supabase.functions
-      .invoke("calculate-invoice", {
+    const { data: calculationData, error: calcError } = await supabase.functions.invoke(
+      "calculate-invoice",
+      {
         body: {
           organization_id,
           job_ids,
           email: membershipCheck.userEmail || body.email, // Use JWT email first, fallback to body.email
         },
-      });
+      }
+    );
 
     if (calcError) throw calcError;
 
@@ -200,13 +196,10 @@ serve(async (req) => {
       .single();
 
     if (orgError) {
-      logger.warn(
-        "Failed to fetch organization settings, defaulting to draft",
-        {
-          organization_id,
-          error: orgError,
-        },
-      );
+      logger.warn("Failed to fetch organization settings, defaulting to draft", {
+        organization_id,
+        error: orgError,
+      });
     }
 
     // Fetch organization settings to get currency
@@ -239,22 +232,22 @@ serve(async (req) => {
       // If so, defer to the scheduled auto-send instead
       const { data: jobsWithLocations } = await supabase
         .from("job")
-        .select(`
+        .select(
+          `
           id,
           location:location_id (
             id,
             hierarchy_parent_id
           )
-        `)
+        `
+        )
         .eq("organization_id", organization_id)
         .in("id", job_ids);
 
       if (jobsWithLocations && jobsWithLocations.length > 0) {
         const hierarchyParentIds = (jobsWithLocations as JobWithLocation[])
           .map((job) => {
-            const location = Array.isArray(job.location)
-              ? job.location[0]
-              : job.location;
+            const location = Array.isArray(job.location) ? job.location[0] : job.location;
             return location?.hierarchy_parent_id;
           })
           .filter((id: string | null | undefined): id is string => !!id);
@@ -267,15 +260,14 @@ serve(async (req) => {
             .eq("active", true);
 
           // Check if any hierarchy node has auto-send enabled
-          const hasAutoSendEnabled = (hierarchyNodes as HierarchyNode[] | null)
-            ?.some((node) => {
-              const metadata = node.metadata as Record<string, unknown> | null;
-              if (!metadata || typeof metadata !== "object") return false;
-              const autoSend = metadata.auto_send_invoices;
-              if (!autoSend || typeof autoSend !== "object") return false;
-              const config = autoSend as Record<string, unknown>;
-              return config.enabled === true;
-            });
+          const hasAutoSendEnabled = (hierarchyNodes as HierarchyNode[] | null)?.some((node) => {
+            const metadata = node.metadata as Record<string, unknown> | null;
+            if (!metadata || typeof metadata !== "object") return false;
+            const autoSend = metadata.auto_send_invoices;
+            if (!autoSend || typeof autoSend !== "object") return false;
+            const config = autoSend as Record<string, unknown>;
+            return config.enabled === true;
+          });
 
           // If auto-send is enabled on hierarchy, create as draft to be sent on schedule
           if (hasAutoSendEnabled) {
@@ -300,30 +292,27 @@ serve(async (req) => {
       ) || [];
 
     // Create invoice + invoice_job + pricing_snapshot atomically (RPC)
-    const { data: invoiceId, error: atomicError } = await supabase.rpc(
-      "create_invoice_atomic",
-      {
-        p_organization_id: organization_id,
-        p_job_ids: job_ids,
-        p_due_date: due_date,
-        p_notes: notes || null,
-        p_subtotal: calculation.total_subtotal,
-        p_total: calculation.total,
-        p_currency: currency,
-        p_status: initialStatus,
-        p_snapshot_records: snapshotRecords,
-      },
-    );
+    const { data: invoiceId, error: atomicError } = await supabase.rpc("create_invoice_atomic", {
+      p_organization_id: organization_id,
+      p_job_ids: job_ids,
+      p_due_date: due_date,
+      p_notes: notes || null,
+      p_subtotal: calculation.total_subtotal,
+      p_total: calculation.total,
+      p_currency: currency,
+      p_status: initialStatus,
+      p_snapshot_records: snapshotRecords,
+      p_calculation_snapshot: calculation,
+    });
 
     if (atomicError) {
       // Friendly message for the most common atomic failure (job already invoiced)
-      const msg = typeof atomicError.message === "string"
-        ? atomicError.message
-        : "Failed to create invoice";
+      const msg =
+        typeof atomicError.message === "string" ? atomicError.message : "Failed to create invoice";
       if (msg.toLowerCase().includes("idx_invoice_job_job_id_unique")) {
         return errorResponse(
           "Cannot create invoice: one or more jobs are already included in another invoice. Each job can only be invoiced once.",
-          400,
+          400
         );
       }
       throw atomicError;
@@ -367,7 +356,7 @@ serve(async (req) => {
             )
           )
         )
-        `,
+        `
       )
       .eq("id", invoiceId)
       .single();
@@ -380,8 +369,6 @@ serve(async (req) => {
     });
   } catch (error) {
     logger.error("Create invoice error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to create invoice",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to create invoice");
   }
 });
