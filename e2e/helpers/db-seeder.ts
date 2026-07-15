@@ -154,9 +154,10 @@ export async function seedScenario1(): Promise<SeededDataIds> {
           industry_type: "automotive",
           employee_count: "6-10",
           has_locations: true,
-          worker_payment_method: "bank_transfer",
+          has_company_client_groups: false,
+          worker_payment_method: "per_job",
           worker_payment_frequency: "weekly",
-          invoice_frequency: "per_job",
+          invoice_frequency: "immediately",
           review_invoices_before_sending: false,
         },
       })

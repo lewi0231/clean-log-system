@@ -8,6 +8,11 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { gateOrganizationRequest } from "../_utils/gate-organization-request.ts";
+import {
+  buildInvoiceDisplayRows,
+  type LineItemDisplayConfig,
+} from "../_utils/invoice-line-item-display.ts";
+import { DEFAULT_LINE_ITEM_DISPLAY } from "../_utils/invoice-template-defaults.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { uuidSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
@@ -384,6 +389,7 @@ serve(async (req: Request) => {
     const gated = await gateOrganizationRequest(req, organization_id, logger);
     if (!gated.ok) return gated.response;
     const supabase = gated.ctx.supabase;
+    const userEmail = gated.ctx.userEmail;
 
     logger.info("Generating invoice PDF", {
       invoice_id,
@@ -399,12 +405,16 @@ serve(async (req: Request) => {
         created_at,
         due_date,
         subtotal,
-        adjustments,
         total,
         currency,
         notes,
         status,
-        organization_id
+        organization_id,
+        invoice_job:invoice_job (
+          job:job_id (
+            id
+          )
+        )
       `
       )
       .eq("id", invoice_id)
@@ -414,6 +424,56 @@ serve(async (req: Request) => {
     if (invoiceError || !invoice) {
       logger.warn("Invoice not found", { invoice_id, organization_id });
       return errorResponse("Invoice not found", 404);
+    }
+
+    const jobIds: string[] = [];
+    const invoiceJobs = invoice.invoice_job as Array<{ job?: { id?: string } }> | null;
+    if (invoiceJobs && Array.isArray(invoiceJobs)) {
+      for (const invoiceJob of invoiceJobs) {
+        if (invoiceJob.job?.id) {
+          jobIds.push(invoiceJob.job.id);
+        }
+      }
+    }
+
+    if (jobIds.length === 0) {
+      return errorResponse("Invoice has no associated jobs", 404);
+    }
+
+    const { data: calculationData, error: calcError } = await supabase.functions.invoke(
+      "calculate-invoice",
+      {
+        body: {
+          organization_id,
+          job_ids: jobIds,
+          email: userEmail,
+        },
+      }
+    );
+
+    if (calcError) {
+      logger.error("Failed to calculate invoice for PDF", calcError);
+      return errorResponse("Failed to calculate invoice line items", 500);
+    }
+
+    const calculation = calculationData?.calculation as
+      | {
+          total_adjustments?: number;
+          job_calculations?: Array<{
+            base_price?: number;
+            line_items: Array<{
+              field_label: string;
+              option_value?: string;
+              quantity: number;
+              unit_price: number;
+              total: number;
+            }>;
+          }>;
+        }
+      | undefined;
+
+    if (!calculation?.job_calculations) {
+      return errorResponse("Failed to calculate invoice line items", 500);
     }
 
     // Get organization details
@@ -428,23 +488,28 @@ serve(async (req: Request) => {
       return errorResponse("Organization not found", 404);
     }
 
-    // Get line items
-    const { data: lineItems, error: lineItemsError } = await supabase
-      .from("invoice_line_item")
-      .select("description, quantity, unit_price, amount")
-      .eq("invoice_id", invoice_id)
-      .order("created_at", { ascending: true });
+    const { data: templateConfig } = await supabase
+      .from("invoice_template_config")
+      .select("line_item_display")
+      .eq("organization_id", organization_id)
+      .maybeSingle();
 
-    if (lineItemsError) {
-      logger.error("Failed to fetch line items", lineItemsError);
-      return errorResponse("Failed to fetch invoice line items", 500);
-    }
+    const lineItemDisplay =
+      (templateConfig?.line_item_display as LineItemDisplayConfig | null) ??
+      DEFAULT_LINE_ITEM_DISPLAY;
+
+    const lineItems = buildInvoiceDisplayRows(calculation.job_calculations, lineItemDisplay);
+    const adjustments =
+      calculation.total_adjustments ?? Number(invoice.total) - Number(invoice.subtotal);
 
     // Generate HTML
     const html = generateInvoiceHtml(
-      invoice as Record<string, unknown>,
+      {
+        ...invoice,
+        adjustments,
+      } as Record<string, unknown>,
       organization as Record<string, unknown>,
-      (lineItems || []) as Array<Record<string, unknown>>
+      lineItems
     );
 
     logger.info("Invoice HTML generated successfully", {

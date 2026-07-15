@@ -14,7 +14,7 @@ import { log } from "@/lib/logger";
 import { senderDisplayNameFromUser } from "@/lib/sender-display-name";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { getInvokeErrorMessage } from "@/lib/supabase/invoke-edge-function";
-import { Download, Mail, Plus, Printer } from "lucide-react";
+import { ExternalLink, Mail, Plus } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import InvoicePreview from "./invoice-preview";
@@ -42,88 +42,40 @@ export default function InvoicePreviewDialog({
   const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
-  const handleDownloadPdf = async () => {
+  const handleOpenPdf = async () => {
     if (!invoiceId || !organizationId || !invoice) return;
 
     try {
       setGeneratingPdf(true);
-      log.info("Generating invoice PDF", { invoiceId });
+      log.info("Opening invoice PDF view", { invoiceId });
 
       const { html, invoiceNumber } = await InvoiceService.generatePdfHtml(
         invoiceId,
         organizationId
       );
 
-      // Open in new window for printing to PDF
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) {
-        toast.error("Please allow pop-ups to download PDF");
+      const pdfWindow = window.open("", "_blank");
+      if (!pdfWindow) {
+        toast.error("Please allow pop-ups to open the invoice PDF");
         return;
       }
 
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.document.title = `Invoice-${invoiceNumber}`;
+      pdfWindow.document.write(html);
+      pdfWindow.document.close();
+      pdfWindow.document.title = `Invoice-${invoiceNumber}`;
 
-      // Wait for content to load then trigger print
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      };
-
-      toast.success("PDF ready", {
-        description: "Use 'Save as PDF' in the print dialog",
+      toast.success("Invoice opened", {
+        description: "Use Print → Save as PDF in the new tab if you need a file.",
       });
     } catch (err) {
       const msg = getInvokeErrorMessage(err);
-      log.error("Failed to generate PDF", { message: msg });
-      toast.error("Failed to generate PDF", {
+      log.error("Failed to open invoice PDF", { message: msg });
+      toast.error("Failed to open invoice PDF", {
         description: msg,
       });
     } finally {
       setGeneratingPdf(false);
     }
-  };
-
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    const invoiceElement = document.getElementById("invoice-preview");
-    if (!invoiceElement) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Invoice ${invoice?.invoice_number || ""}</title>
-          <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              font-family: system-ui, -apple-system, sans-serif;
-              padding: 20px;
-              color: #000;
-              background: #fff;
-            }
-            ${document.querySelector("style")?.innerHTML || ""}
-          </style>
-        </head>
-        <body>
-          ${invoiceElement.innerHTML}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => {
-      printWindow.print();
-      printWindow.close();
-    }, 250);
   };
 
   const handleSend = async () => {
@@ -272,13 +224,9 @@ export default function InvoicePreviewDialog({
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
-              <Button variant="outline" onClick={handleDownloadPdf} disabled={generatingPdf}>
-                <Download className="mr-2 h-4 w-4" />
-                {generatingPdf ? "Generating..." : "Download PDF"}
-              </Button>
-              <Button variant="outline" onClick={handlePrint}>
-                <Printer className="mr-2 h-4 w-4" />
-                Print
+              <Button variant="outline" onClick={handleOpenPdf} disabled={generatingPdf}>
+                <ExternalLink className="mr-2 h-4 w-4" />
+                {generatingPdf ? "Opening..." : "Open PDF"}
               </Button>
               {invoice.status === "draft" && (
                 <Button

@@ -21,13 +21,16 @@ interface OnboardingData {
   employee_count: "none" | "1-5" | "6-20" | "21-50" | "50+";
   abn: string;
   has_locations: boolean;
+  /** Soft signal for post-onboarding hierarchy setup; not required for product features. */
+  has_company_client_groups?: boolean;
   has_workers: boolean;
+  /** Preference only. `per_job` means output/piece rate. Legacy `fixed_salary` may still appear in stored JSON. */
   worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
   worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
   invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
   invoice_weekly_day: number | null;
   invoice_monthly_day: number | null;
-  auto_generate_invoices: boolean; // Preference for auto-generating invoices (requires location setup)
+  auto_generate_invoices: boolean;
 }
 
 serve(async (req: Request) => {
@@ -73,14 +76,11 @@ serve(async (req: Request) => {
       supabase,
       organizationId,
       userEmail,
-      userId,
+      userId
     );
 
     if (!isMember) {
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
     }
 
     // NOW parse the body (after we've gotten what we need from auth)
@@ -111,10 +111,7 @@ serve(async (req: Request) => {
     }
 
     // 2. Configure worker payment cycle if applicable
-    if (
-      onboardingData.has_workers &&
-      onboardingData.worker_payment_frequency
-    ) {
+    if (onboardingData.has_workers && onboardingData.worker_payment_frequency) {
       // Get or create organization_settings
       const { data: existingSettings } = await supabase
         .from("organization_settings")
@@ -145,12 +142,10 @@ serve(async (req: Request) => {
           // Don't throw - this is optional
         }
       } else {
-        const { error: settingsError } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id: organizationId,
-            worker_payment_cycle_config: workerPaymentConfig,
-          });
+        const { error: settingsError } = await supabase.from("organization_settings").insert({
+          organization_id: organizationId,
+          worker_payment_cycle_config: workerPaymentConfig,
+        });
 
         if (settingsError) {
           logger.error("Failed to create worker payment config", {
@@ -223,12 +218,10 @@ serve(async (req: Request) => {
           });
         }
       } else {
-        const { error: settingsError } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id: organizationId,
-            auto_send_invoices_config: autoSendConfig,
-          });
+        const { error: settingsError } = await supabase.from("organization_settings").insert({
+          organization_id: organizationId,
+          auto_send_invoices_config: autoSendConfig,
+        });
 
         if (settingsError) {
           logger.error("Failed to create auto-send config", {
@@ -280,12 +273,10 @@ serve(async (req: Request) => {
           // Don't throw - this is optional
         }
       } else {
-        const { error: settingsError } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id: organizationId,
-            auto_generate_invoices_immediately: true,
-          });
+        const { error: settingsError } = await supabase.from("organization_settings").insert({
+          organization_id: organizationId,
+          auto_generate_invoices_immediately: true,
+        });
 
         if (settingsError) {
           logger.error("Failed to create auto-generate invoices setting", {
@@ -308,9 +299,6 @@ serve(async (req: Request) => {
       error: extractErrorMessage(error),
     });
 
-    return errorResponse(
-      extractErrorMessage(error),
-      getErrorStatusCode(error),
-    );
+    return errorResponse(extractErrorMessage(error), getErrorStatusCode(error));
   }
 });

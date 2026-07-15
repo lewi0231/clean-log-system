@@ -66,6 +66,7 @@ export default function InvoiceTemplateSettings(
   const { locations, loading: locationsLoading } = useLocations();
   const { settings: orgSettings } = useOrganizationSettings();
   const hasLocations = locations && locations.length > 0;
+  const usePredefinedLocations = orgSettings?.use_predefined_locations ?? true;
   const [showPreview, setShowPreview] = useState(false);
 
   // Track saving state per-section for visual feedback
@@ -311,8 +312,13 @@ export default function InvoiceTemplateSettings(
   // Check if address field exists in field configs
   const addressField = fieldConfigs.find((field) => field.field_type === "address");
 
-  // Check if email field exists in field configs
-  const emailField = fieldConfigs.find((field) => field.field_type === "email");
+  const emailFieldConfigs = fieldConfigs.filter((field) => field.field_type === "email");
+  const showLocationEmailSource = usePredefinedLocations && hasLocations;
+  const showFormFieldEmailConfig =
+    emailFieldConfigs.length > 0 &&
+    (serviceAddressConfig.source === "auto" ||
+      serviceAddressConfig.source === "form_fields" ||
+      !usePredefinedLocations);
 
   // Auto-add address field to form_fields if it exists and form_fields is empty
   useEffect(() => {
@@ -328,20 +334,37 @@ export default function InvoiceTemplateSettings(
     }
   }, [addressField, serviceAddressConfig.form_fields]);
 
-  // Auto-set email field for email recipient if it exists and not already set
+  // Migrate deprecated/unimplemented location_contact_email to location_email
   useEffect(() => {
+    if (emailRecipientConfig.location_email_source !== "location_contact_email") return;
+
+    const updated = {
+      ...emailRecipientConfig,
+      location_email_source: "location_email" as const,
+    };
+    setEmailRecipientConfig(updated);
+    saveConfig({ emailRecipientConfig: updated }, "email-source");
+  }, [emailRecipientConfig.location_email_source, emailRecipientConfig, saveConfig]);
+
+  // Auto-set email field for email recipient when applicable and not already set
+  useEffect(() => {
+    const firstEmailField = emailFieldConfigs[0];
     if (
-      emailField &&
-      !emailRecipientConfig.form_field_email &&
-      config?.email_recipient_config?.form_field_email === null
+      !showFormFieldEmailConfig ||
+      !firstEmailField ||
+      emailRecipientConfig.form_field_email ||
+      config?.email_recipient_config?.form_field_email
     ) {
-      setEmailRecipientConfig((prev) => ({
-        ...prev,
-        form_field_email: emailField.id,
-      }));
+      return;
     }
+
+    setEmailRecipientConfig((prev) => ({
+      ...prev,
+      form_field_email: firstEmailField.id,
+    }));
   }, [
-    emailField,
+    emailFieldConfigs,
+    showFormFieldEmailConfig,
     emailRecipientConfig.form_field_email,
     config?.email_recipient_config?.form_field_email,
   ]);
@@ -602,72 +625,108 @@ export default function InvoiceTemplateSettings(
           <CardDescription>Configure how invoice email recipients are determined</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <Label>Location Email Source</Label>
-            <p className="text-sm text-muted-foreground mb-2">
-              When a job has a location, which field should be used for the invoice email?
-            </p>
-            <RadioGroup
-              value={emailRecipientConfig.location_email_source}
-              onValueChange={(value) =>
-                handleEmailRecipientSourceChange(
-                  value as "location_email" | "hierarchy_billing_email" | "location_contact_email"
-                )
-              }
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="location_email" id="email-location" />
-                <Label htmlFor="email-location" className="font-normal cursor-pointer">
-                  Location email (primary location email field)
-                </Label>
+          {showLocationEmailSource ? (
+            <div className="space-y-3">
+              <Label>Location Email Source</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                When a job is linked to a predefined location, which email should receive the
+                invoice?
+              </p>
+              <RadioGroup
+                value={emailRecipientConfig.location_email_source}
+                onValueChange={(value) =>
+                  handleEmailRecipientSourceChange(
+                    value as "location_email" | "hierarchy_billing_email" | "location_contact_email"
+                  )
+                }
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="location_email" id="email-location" />
+                  <Label htmlFor="email-location" className="font-normal cursor-pointer">
+                    Location email (the email on the location record)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="hierarchy_billing_email" id="email-hierarchy" />
+                  <Label htmlFor="email-hierarchy" className="font-normal cursor-pointer">
+                    Hierarchy billing email (from parent company billing address)
+                  </Label>
+                </div>
+              </RadioGroup>
+              <p className="text-xs text-muted-foreground pt-2">
+                Hierarchy billing email is only used when that option is selected. It comes from the
+                parent company&apos;s billing address in the location hierarchy.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg bg-muted/50 border border-muted p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">No predefined locations</p>
+                  <p className="text-sm text-muted-foreground">
+                    {usePredefinedLocations
+                      ? "Add locations in Settings to choose a location-based invoice email source."
+                      : "Workers enter service details on the mobile form instead of picking a location. Invoice emails come from a form field below."}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="hierarchy_billing_email" id="email-hierarchy" />
-                <Label htmlFor="email-hierarchy" className="font-normal cursor-pointer">
-                  Hierarchy billing email (from parent company)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="location_contact_email" id="email-contact" />
-                <Label htmlFor="email-contact" className="font-normal cursor-pointer">
-                  Location contact email (from contact person field)
-                </Label>
-              </div>
-            </RadioGroup>
-            <p className="text-xs text-muted-foreground pt-2">
-              Hierarchy billing email takes precedence if the location belongs to a company with
-              billing information.
-            </p>
-          </div>
+            </div>
+          )}
 
-          <Separator />
+          {showFormFieldEmailConfig && (
+            <>
+              {showLocationEmailSource && <Separator />}
+              <div className="space-y-2">
+                <Label htmlFor="form-field-email">Form Field for Email (No Location)</Label>
+                <Select
+                  value={emailRecipientConfig.form_field_email || "__none__"}
+                  onValueChange={handleFormFieldEmailChange}
+                >
+                  <SelectTrigger id="form-field-email">
+                    <SelectValue placeholder="Select an email field" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None (manual review required)</SelectItem>
+                    {emailFieldConfigs.map((field) => (
+                      <SelectItem key={field.id} value={field.id}>
+                        {field.label} ({field.name})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used when a job has no linked location
+                  {serviceAddressConfig.source === "auto"
+                    ? " (including Auto service address jobs that fall back to form fields)"
+                    : ""}
+                  . Invoices without a valid email will not be auto-sent.
+                </p>
+              </div>
+            </>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="form-field-email">Form Field for Email (No Location)</Label>
-            <Select
-              value={emailRecipientConfig.form_field_email || "__none__"}
-              onValueChange={handleFormFieldEmailChange}
-            >
-              <SelectTrigger id="form-field-email">
-                <SelectValue placeholder="Select a field that contains email" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">None (use default email)</SelectItem>
-                {fieldConfigs
-                  .filter((field) => field.field_type === "text" || field.field_type === "email")
-                  .map((field) => (
-                    <SelectItem key={field.id} value={field.id}>
-                      {field.label} ({field.name})
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              For jobs without a location, select which form field contains the customer email
-              address. Leave empty when there is no form-field email; those invoices will not be
-              auto-sent and may require manual review.
-            </p>
-          </div>
+          {!showFormFieldEmailConfig && emailFieldConfigs.length === 0 && (
+            <div className="rounded-lg bg-muted/50 border border-muted p-4">
+              <p className="text-sm text-muted-foreground">
+                Add an <strong>email</strong> field to your entry form to configure invoice
+                recipients for jobs without a predefined location.
+              </p>
+            </div>
+          )}
+
+          {!showFormFieldEmailConfig &&
+            emailFieldConfigs.length > 0 &&
+            serviceAddressConfig.source === "location" &&
+            usePredefinedLocations && (
+              <div className="rounded-lg bg-muted/50 border border-muted p-4">
+                <p className="text-sm text-muted-foreground">
+                  Form field email is available when Service Address source is <strong>Auto</strong>{" "}
+                  or <strong>Always use form fields</strong>, or when predefined locations are
+                  disabled.
+                </p>
+              </div>
+            )}
         </CardContent>
       </Card>
 
@@ -687,8 +746,8 @@ export default function InvoiceTemplateSettings(
             <div className="space-y-0.5">
               <Label htmlFor="include-option-value">Include Option Values</Label>
               <p className="text-sm text-muted-foreground">
-                Show selected option values (e.g., &quot;Full Detail&quot;) in line item
-                descriptions
+                When on, option selections (e.g., &quot;Full Detail&quot;) appear in line item
+                descriptions. When off, only the field label is shown.
               </p>
             </div>
             <Switch
@@ -721,7 +780,7 @@ export default function InvoiceTemplateSettings(
               )}
               <p id="description-format-help" className="text-xs text-muted-foreground">
                 Use {"{field_label}"} for the field label and {"{option_value}"} for the option
-                value
+                value. Applies only when Include Option Values is on.
               </p>
             </div>
           )}
@@ -730,7 +789,8 @@ export default function InvoiceTemplateSettings(
             <div className="space-y-0.5">
               <Label htmlFor="show-base-price">Show Base Price Separately</Label>
               <p className="text-sm text-muted-foreground">
-                Display base price as a separate line item
+                Show base pricing as its own row. The amount is always included in the job total
+                either way.
               </p>
             </div>
             <Switch

@@ -1500,8 +1500,9 @@ export default function SettingsPage() {
                 <div className="space-y-0.5 flex-1">
                   <Label htmlFor="auto-generate-invoices">Auto-Generate Invoices</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically create invoices in pending review when jobs are completed.
-                    Location-specific auto-generate takes precedence.
+                    Automatically create draft invoices when jobs are completed, for you to review
+                    and send. If you set this on a specific location or company group, that setting
+                    overrides this organisation default.
                   </p>
                 </div>
                 <Switch

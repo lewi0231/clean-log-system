@@ -488,8 +488,11 @@ export interface CompleteOnboardingRequest {
   employee_count: "none" | "1-5" | "6-20" | "21-50" | "50+";
   abn: string;
   has_locations: boolean;
+  /** Soft signal: some sites belong to the same company/client group (introduces hierarchy later). */
+  has_company_client_groups: boolean;
   has_workers: boolean;
-  worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
+  /** Preference only — not used for payroll. `per_job` = output / piece rate. */
+  worker_payment_method: "hourly" | "per_job" | null;
   worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
   invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
   invoice_weekly_day: number | null;

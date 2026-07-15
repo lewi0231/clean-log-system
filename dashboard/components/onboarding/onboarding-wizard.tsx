@@ -42,6 +42,7 @@ export function OnboardingWizard() {
     employee_count: "none",
     abn: "",
     has_locations: false,
+    has_company_client_groups: false,
     has_workers: false,
     worker_payment_method: null,
     worker_payment_frequency: null,
@@ -106,6 +107,7 @@ export function OnboardingWizard() {
         industry_type: data.industry_type,
         employee_count: data.employee_count,
         has_locations: data.has_locations,
+        has_company_client_groups: data.has_company_client_groups,
         has_workers: data.has_workers,
         worker_payment_method: data.worker_payment_method,
         worker_payment_frequency: data.worker_payment_frequency,
@@ -116,7 +118,10 @@ export function OnboardingWizard() {
         has_abn: !!data.abn,
       });
 
-      await invokeTypedEdge("complete-onboarding", data);
+      await invokeTypedEdge("complete-onboarding", {
+        ...data,
+        has_company_client_groups: data.has_locations && data.has_company_client_groups,
+      });
 
       log.info("Onboarding: Completed successfully");
       toast.success("Welcome! Let's get you set up.");
@@ -320,25 +325,55 @@ function Step2BusinessDetails({
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label className="text-base font-semibold">
-              Do you service specific customer locations?
+              Do you visit the same customer sites regularly?
             </Label>
             <p className="text-sm text-muted-foreground">
-              Static sites or recurring customer locations
+              For example offices, homes, or yards you return to — not one-off addresses typed in on
+              each job.
             </p>
           </div>
           <Switch
             checked={data.has_locations}
-            onCheckedChange={(checked) => updateData({ has_locations: checked })}
+            onCheckedChange={(checked) =>
+              updateData({
+                has_locations: checked,
+                has_company_client_groups: checked ? data.has_company_client_groups : false,
+              })
+            }
             className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
           />
         </div>
         {data.has_locations && (
-          <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
-            Great! We&apos;ll help you set up locations after onboarding.
-          </p>
+          <>
+            <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+              We&apos;ll help you set up those locations after onboarding.
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label className="text-base font-semibold">
+                  Do some of those sites belong to the same company or client group?
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  For example multiple sites under one parent company. You can set this up later if
+                  you&apos;re not sure.
+                </p>
+              </div>
+              <Switch
+                checked={data.has_company_client_groups}
+                onCheckedChange={(checked) => updateData({ has_company_client_groups: checked })}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+              />
+            </div>
+            {data.has_company_client_groups && (
+              <p className="text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                After you add locations, you can group them under companies or client groups for
+                shared billing and invoice settings.
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -369,9 +404,22 @@ function Step3WorkerPayment({
 
   return (
     <div className="space-y-6">
+      <div className="rounded-md border border-border bg-muted/40 p-3 space-y-1">
+        <p className="text-sm font-medium">How worker amounts work in Tally</p>
+        <p className="text-sm text-muted-foreground">
+          Tally helps you calculate amounts from your pricing rules so you can export and pay
+          workers yourself (bank, payroll, or another process). Tally does not pay workers or
+          replace payroll.
+        </p>
+      </div>
+
       <div>
-        <Label className="text-base font-semibold">How do you pay workers? *</Label>
-        <p className="text-sm text-muted-foreground mt-1 mb-4">Select the payment method you use</p>
+        <Label className="text-base font-semibold">
+          How do you usually calculate what workers are owed? *
+        </Label>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">
+          This helps us tailor setup tips. It does not configure payroll.
+        </p>
         <RadioGroup
           value={data.worker_payment_method || ""}
           onValueChange={(value) =>
@@ -384,19 +432,13 @@ function Step3WorkerPayment({
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="hourly" id="payment-hourly" />
             <Label htmlFor="payment-hourly" className="font-normal cursor-pointer">
-              By the hour
+              Mostly time-based (by the hour)
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="per_job" id="payment-per-job" />
             <Label htmlFor="payment-per-job" className="font-normal cursor-pointer">
-              Per job completed
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="fixed_salary" id="payment-fixed" />
-            <Label htmlFor="payment-fixed" className="font-normal cursor-pointer">
-              Fixed salary
+              By output / piece rate (e.g. cars washed, rooms cleaned)
             </Label>
           </div>
         </RadioGroup>
@@ -404,10 +446,10 @@ function Step3WorkerPayment({
 
       <div>
         <Label htmlFor="payment-frequency" className="text-base font-semibold">
-          Payment frequency *
+          How often do you settle with workers? *
         </Label>
         <p className="text-sm text-muted-foreground mt-1 mb-4">
-          How often do you pay your workers?
+          Used for payment cycle reminders and exports — not for sending money.
         </p>
         <Select
           value={data.worker_payment_frequency || ""}
@@ -446,7 +488,8 @@ function Step4Invoicing({
           How often do you invoice customers? *
         </Label>
         <p className="text-sm text-muted-foreground mt-1 mb-4">
-          We&apos;ll configure automatic invoice sending based on your preference
+          We&apos;ll use this to set invoice schedule preferences. Invoices are created as drafts
+          for you to review before sending.
         </p>
         <Select
           value={data.invoice_frequency}
@@ -523,16 +566,14 @@ function Step4Invoicing({
       )}
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <Label className="text-base font-semibold">
-              Automatically generate invoices from completed jobs?
+              Create draft invoices automatically when jobs are completed?
             </Label>
             <p className="text-sm text-muted-foreground">
-              If enabled, invoices will be automatically created immediately when jobs are
-              completed. For organizations with location hierarchies, configure this per location.
-              For others, invoices are created in pending review for you to review and send.
-              Location-specific auto-generate takes precedence.
+              You&apos;ll still review and send them. You can change this later in Settings
+              {data.has_locations ? ", including per location if needed" : ""}.
             </p>
           </div>
           <Switch
