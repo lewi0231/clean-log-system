@@ -912,3 +912,51 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/remove-org-sending-domain/deno.json"
 entrypoint = "./functions/remove-org-sending-domain/index.ts"
+
+[functions.send-test-org-sending-domain-email]
+enabled = true
+verify_jwt = false
+import_map = "./functions/send-test-org-sending-domain-email/deno.json"
+entrypoint = "./functions/send-test-org-sending-domain-email/index.ts"
+
+[functions.draft-worker-tax-invoice]
+enabled = true
+verify_jwt = false
+import_map = "./functions/draft-worker-tax-invoice/deno.json"
+entrypoint = "./functions/draft-worker-tax-invoice/index.ts"
+
+[functions.submit-worker-tax-invoice]
+enabled = true
+verify_jwt = false
+import_map = "./functions/submit-worker-tax-invoice/deno.json"
+entrypoint = "./functions/submit-worker-tax-invoice/index.ts"
+
+[functions.list-worker-tax-invoices]
+enabled = true
+verify_jwt = false
+import_map = "./functions/list-worker-tax-invoices/deno.json"
+entrypoint = "./functions/list-worker-tax-invoices/index.ts"
+
+[functions.get-worker-tax-invoice]
+enabled = true
+verify_jwt = false
+import_map = "./functions/get-worker-tax-invoice/deno.json"
+entrypoint = "./functions/get-worker-tax-invoice/index.ts"
+
+[functions.review-worker-tax-invoice]
+enabled = true
+verify_jwt = false
+import_map = "./functions/review-worker-tax-invoice/deno.json"
+entrypoint = "./functions/review-worker-tax-invoice/index.ts"
+
+[functions.update-worker-tax-invoice-status]
+enabled = true
+verify_jwt = false
+import_map = "./functions/update-worker-tax-invoice-status/deno.json"
+entrypoint = "./functions/update-worker-tax-invoice-status/index.ts"
+
+[functions.generate-worker-tax-invoice-pdf]
+enabled = true
+verify_jwt = false
+import_map = "./functions/generate-worker-tax-invoice-pdf/deno.json"
+entrypoint = "./functions/generate-worker-tax-invoice-pdf/index.ts"

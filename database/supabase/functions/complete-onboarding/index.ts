@@ -24,6 +24,7 @@ interface OnboardingData {
   /** Soft signal for post-onboarding hierarchy setup; not required for product features. */
   has_company_client_groups?: boolean;
   has_workers: boolean;
+  workforce_engagement?: "employees" | "contractors" | "both" | null;
   /** Preference only. `per_job` means output/piece rate. Legacy `fixed_salary` may still appear in stored JSON. */
   worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
   worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
@@ -110,48 +111,58 @@ serve(async (req: Request) => {
       throw orgUpdateError;
     }
 
-    // 2. Configure worker payment cycle if applicable
-    if (onboardingData.has_workers && onboardingData.worker_payment_frequency) {
-      // Get or create organization_settings
+    // 2. Configure worker payment cycle + workforce engagement if applicable
+    {
+      const engagement =
+        onboardingData.has_workers && onboardingData.workforce_engagement
+          ? onboardingData.workforce_engagement
+          : "employees";
+
+      if (engagement !== "employees" && engagement !== "contractors" && engagement !== "both") {
+        return errorResponse("workforce_engagement must be employees, contractors, or both", 400);
+      }
+
       const { data: existingSettings } = await supabase
         .from("organization_settings")
         .select("id")
         .eq("organization_id", organizationId)
         .maybeSingle();
 
-      const workerPaymentConfig = {
-        payment_frequency: onboardingData.worker_payment_frequency,
-        payment_day_of_week: 4, // Friday default
-        cut_off_time: "17:00:00",
-        require_approval: true,
-        auto_calculate: false,
+      const settingsPayload: Record<string, unknown> = {
+        workforce_engagement: engagement,
       };
+
+      if (onboardingData.has_workers && onboardingData.worker_payment_frequency) {
+        settingsPayload.worker_payment_cycle_config = {
+          payment_frequency: onboardingData.worker_payment_frequency,
+          payment_day_of_week: 4, // Friday default
+          cut_off_time: "17:00:00",
+          require_approval: true,
+          auto_calculate: false,
+        };
+      }
 
       if (existingSettings) {
         const { error: settingsError } = await supabase
           .from("organization_settings")
-          .update({
-            worker_payment_cycle_config: workerPaymentConfig,
-          })
+          .update(settingsPayload)
           .eq("id", existingSettings.id);
 
         if (settingsError) {
-          logger.error("Failed to update worker payment config", {
+          logger.error("Failed to update worker/engagement settings", {
             error: settingsError,
           });
-          // Don't throw - this is optional
         }
       } else {
         const { error: settingsError } = await supabase.from("organization_settings").insert({
           organization_id: organizationId,
-          worker_payment_cycle_config: workerPaymentConfig,
+          ...settingsPayload,
         });
 
         if (settingsError) {
-          logger.error("Failed to create worker payment config", {
+          logger.error("Failed to create organization_settings", {
             error: settingsError,
           });
-          // Don't throw - this is optional
         }
       }
     }

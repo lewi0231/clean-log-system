@@ -89,10 +89,19 @@ serve(async (req) => {
       role,
     });
 
+    const { data: orgSettings } = await supabase
+      .from("organization_settings")
+      .select("workforce_engagement")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
+    const { normalizeWorkforceEngagement } = await import("../_utils/workforce-engagement.ts");
+
     return jsonResponse({
       organization_id: organizationId,
       organization_user_id: organizationUserId,
       role: role,
+      workforce_engagement: normalizeWorkforceEngagement(orgSettings?.workforce_engagement),
     });
   } catch (error) {
     logger.error("Unhandled error", error);

@@ -32,7 +32,7 @@ serve(async (req) => {
       return errorResponse("Worker ID is required", 400);
     }
 
-    const { id, first_name, last_name, email, phone, active } = body;
+    const { id, first_name, last_name, email, phone, active, engagement_type } = body;
 
     const supabase = createServiceRoleClient();
 
@@ -59,6 +59,7 @@ serve(async (req) => {
       email?: string;
       phone?: string;
       active?: boolean;
+      engagement_type?: string;
     } = {};
 
     if (first_name !== undefined) updateData.first_name = first_name;
@@ -74,6 +75,13 @@ serve(async (req) => {
     if (email !== undefined) updateData.email = email;
     if (phone !== undefined) updateData.phone = phone;
     if (active !== undefined) updateData.active = active;
+    if (engagement_type !== undefined) {
+      const { isWorkerEngagementType } = await import("../_utils/workforce-engagement.ts");
+      if (!isWorkerEngagementType(engagement_type)) {
+        return errorResponse("engagement_type must be employee or contractor", 400);
+      }
+      updateData.engagement_type = engagement_type;
+    }
 
     if (Object.keys(updateData).length === 0) {
       logger.warn("No fields provided for worker update", { worker_id: id });

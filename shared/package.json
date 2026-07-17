@@ -15,6 +15,8 @@
     "./types/field-template": "./types/field-template.ts",
     "./types/validation-rule": "./types/validation-rule.ts",
     "./utils/invoice-line-item-display": "./utils/invoice-line-item-display.ts",
-    "./utils/normalize-email-recipient-config": "./utils/normalize-email-recipient-config.ts"
+    "./utils/normalize-email-recipient-config": "./utils/normalize-email-recipient-config.ts",
+    "./utils/workforce-engagement": "./utils/workforce-engagement.ts",
+    "./utils/worker-tax-invoice": "./utils/worker-tax-invoice.ts"
   }
 }

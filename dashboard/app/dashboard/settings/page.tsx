@@ -4,6 +4,7 @@ import { organizationSettingsKey } from "@/app/query-provider";
 import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import { OrgSendingDomainCard } from "@/components/settings/org-sending-domain-card";
 import { WorkerPayPeriodSettingsCard } from "@/components/settings/worker-pay-period-settings-card";
+import { WorkforceEngagementSettingsCard } from "@/components/settings/workforce-engagement-settings-card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,6 +91,7 @@ export default function SettingsPage() {
     edit_window_minutes: 180,
     custom_email_domain_enabled: false,
     worker_payment_cycle_config: null,
+    workforce_engagement: "employees",
   });
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -157,6 +159,7 @@ export default function SettingsPage() {
           edit_window_minutes: data.settings.edit_window_minutes ?? 180,
           custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
           worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
+          workforce_engagement: data.settings.workforce_engagement ?? "employees",
         });
         setLogoPreview(normalizeLogoUrl(data.settings.logo_url ?? null));
 
@@ -194,6 +197,7 @@ export default function SettingsPage() {
           edit_window_minutes: data.settings.edit_window_minutes ?? 180,
           custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
           worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
+          workforce_engagement: data.settings.workforce_engagement ?? "employees",
         };
         setInitialSettings(initialSnapshot);
         setHasUnsavedChanges(false);
@@ -1936,6 +1940,26 @@ export default function SettingsPage() {
         </TabsContent> */}
 
         <TabsContent value="payment" className="space-y-6">
+          {organizationId && (
+            <WorkforceEngagementSettingsCard
+              organizationId={organizationId}
+              value={settings.workforce_engagement ?? "employees"}
+              onApplied={(s) => {
+                setSettings((prev) => ({
+                  ...prev,
+                  workforce_engagement: s.workforce_engagement ?? "employees",
+                }));
+                setInitialSettings((init) =>
+                  init
+                    ? {
+                        ...init,
+                        workforce_engagement: s.workforce_engagement ?? "employees",
+                      }
+                    : init
+                );
+              }}
+            />
+          )}
           {organizationId && (
             <WorkerPayPeriodSettingsCard
               organizationId={organizationId}

@@ -28,10 +28,13 @@ interface WorkerFormProps {
       email: string;
       phone: string;
       active?: boolean;
+      engagement_type?: "employee" | "contractor";
     },
     workerId?: string
   ) => void | Promise<void>;
   worker?: Worker | null;
+  /** When `both`, show engagement type selector */
+  workforceEngagement?: "employees" | "contractors" | "both";
 }
 
 export default function WorkerForm({
@@ -39,12 +42,16 @@ export default function WorkerForm({
   onOpenChange,
   onSuccess,
   worker,
+  workforceEngagement = "employees",
 }: WorkerFormProps) {
   const [firstName, setFirstName] = useState(worker?.first_name || "");
   const [lastName, setLastName] = useState(worker?.last_name || "");
   const [email, setEmail] = useState(worker?.email || "");
   const [phone, setPhone] = useState(worker?.phone || "");
   const [active, setActive] = useState(worker?.active ?? false);
+  const [engagementType, setEngagementType] = useState<"employee" | "contractor">(
+    worker?.engagement_type === "contractor" ? "contractor" : "employee"
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{
     first_name?: string;
@@ -75,12 +82,7 @@ export default function WorkerForm({
 
       result.error.issues.forEach((issue) => {
         const path = issue.path[0] as string;
-        if (
-          path === "first_name" ||
-          path === "last_name" ||
-          path === "email" ||
-          path === "phone"
-        ) {
+        if (path === "first_name" || path === "last_name" || path === "email" || path === "phone") {
           fieldErrors[path] = issue.message;
         }
       });
@@ -113,10 +115,9 @@ export default function WorkerForm({
         workerId: worker?.id,
       });
 
-      // Include active status in edit mode
       const dataToSend = isEditMode
-        ? { ...validatedData, active }
-        : validatedData;
+        ? { ...validatedData, active, engagement_type: engagementType }
+        : { ...validatedData, engagement_type: engagementType };
 
       await onSuccess(dataToSend, worker?.id);
 
@@ -126,6 +127,7 @@ export default function WorkerForm({
       setEmail("");
       setPhone("");
       setActive(false);
+      setEngagementType("employee");
       setErrors({});
       onOpenChange(false);
     } catch (error) {
@@ -135,13 +137,11 @@ export default function WorkerForm({
           email: error.message.includes("email") ? error.message : undefined,
           phone: error.message.includes("phone") ? error.message : undefined,
           first_name:
-            error.message.includes("first name") ||
-            error.message.includes("first_name")
+            error.message.includes("first name") || error.message.includes("first_name")
               ? error.message
               : undefined,
           last_name:
-            error.message.includes("last name") ||
-            error.message.includes("last_name")
+            error.message.includes("last name") || error.message.includes("last_name")
               ? error.message
               : undefined,
         });
@@ -159,6 +159,7 @@ export default function WorkerForm({
       setEmail(worker?.email || "");
       setPhone(worker?.phone || "");
       setActive(worker?.active ?? false);
+      setEngagementType(worker?.engagement_type === "contractor" ? "contractor" : "employee");
       setErrors({});
     }
   }, [open, worker]);
@@ -169,9 +170,7 @@ export default function WorkerForm({
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Worker" : "Add Worker"}</DialogTitle>
           <DialogDescription>
-            {isEditMode
-              ? "Update worker information."
-              : "Add a new worker to your organization."}
+            {isEditMode ? "Update worker information." : "Add a new worker to your organization."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -192,9 +191,7 @@ export default function WorkerForm({
               aria-invalid={!!errors.first_name}
               required
             />
-            {errors.first_name && (
-              <p className="text-sm text-destructive">{errors.first_name}</p>
-            )}
+            {errors.first_name && <p className="text-sm text-destructive">{errors.first_name}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="last_name">Last Name</Label>
@@ -213,9 +210,7 @@ export default function WorkerForm({
               aria-invalid={!!errors.last_name}
               required
             />
-            {errors.last_name && (
-              <p className="text-sm text-destructive">{errors.last_name}</p>
-            )}
+            {errors.last_name && <p className="text-sm text-destructive">{errors.last_name}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -236,9 +231,7 @@ export default function WorkerForm({
               disabled={isEditMode}
               className={isEditMode ? "bg-muted cursor-not-allowed" : ""}
             />
-            {errors.email && (
-              <p className="text-sm text-destructive">{errors.email}</p>
-            )}
+            {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
             {isEditMode && (
               <p className="text-xs text-muted-foreground">
                 Email cannot be changed after worker creation
@@ -262,10 +255,27 @@ export default function WorkerForm({
               aria-invalid={!!errors.phone}
               required
             />
-            {errors.phone && (
-              <p className="text-sm text-destructive">{errors.phone}</p>
-            )}
+            {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
           </div>
+          {workforceEngagement === "both" && (
+            <div className="space-y-2">
+              <Label htmlFor="engagement_type">Engagement type</Label>
+              <select
+                id="engagement_type"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={engagementType}
+                onChange={(e) =>
+                  setEngagementType(e.target.value === "contractor" ? "contractor" : "employee")
+                }
+              >
+                <option value="employee">Employee</option>
+                <option value="contractor">Contractor</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Contractors can submit tax invoices when that feature is enabled.
+              </p>
+            </div>
+          )}
           {isEditMode && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -294,18 +304,10 @@ export default function WorkerForm({
           )}
         </div>
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button
-            className="cursor-pointer"
-            onClick={handleSubmit}
-            disabled={isLoading}
-          >
+          <Button className="cursor-pointer" onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? "Saving..." : isEditMode ? "Update" : "Create"}
           </Button>
         </DialogFooter>

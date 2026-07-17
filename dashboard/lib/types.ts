@@ -34,7 +34,54 @@ export interface Worker {
   abn: string | null;
   auth_user_id: string | null;
   active: boolean;
+  /** Settlement type for tax-invoice gating when org is `both`. */
+  engagement_type: "employee" | "contractor";
   created_at: string;
+}
+
+export type WorkerTaxInvoiceStatus =
+  | "draft"
+  | "submitted"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "paid";
+
+export interface WorkerTaxInvoiceLine {
+  id: string;
+  invoice_id: string;
+  job_id: string;
+  description: string;
+  amount: number;
+  worker_payment_id: string | null;
+  created_at: string;
+}
+
+export interface WorkerTaxInvoice {
+  id: string;
+  organization_id: string;
+  worker_id: string;
+  invoice_number: string | null;
+  status: WorkerTaxInvoiceStatus;
+  subtotal: number;
+  gst_amount: number | null;
+  total: number;
+  currency: string;
+  calculation_snapshot: Record<string, unknown> | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+  paid_at: string | null;
+  worker?: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    name?: string | null;
+    abn?: string | null;
+  };
+  lines?: WorkerTaxInvoiceLine[];
 }
 
 export type OrganizationUserStatus = "pending" | "active" | "inactive";
@@ -132,6 +179,11 @@ export interface OrganizationSettings {
   custom_email_domain_enabled: boolean;
   /** Worker pay period; null = not configured (Overview uses calendar-month fallback). */
   worker_payment_cycle_config: WorkerPaymentCycleConfig | null;
+  /**
+   * Settlement mode in Tally (not legal employment status):
+   * employees | contractors | both
+   */
+  workforce_engagement: "employees" | "contractors" | "both";
 }
 
 // Job approval workflow types

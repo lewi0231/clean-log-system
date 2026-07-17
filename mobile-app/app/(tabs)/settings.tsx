@@ -1,19 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter, type Href } from "expo-router";
+import { useState } from "react";
 import { Alert, Pressable, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useCurrentWorker } from "@/hooks/use-current-worker";
 import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/hooks/useOrganization";
 import { useTheme } from "@/lib/theme-context";
-import { useState } from "react";
+import { canSubmitTaxInvoice } from "@clean-log/shared/utils/workforce-engagement";
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const { colors } = useTheme();
   const { worker } = useCurrentWorker();
   const { isAdmin } = useUserRole();
+  const { workforceEngagement } = useOrganization();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  const showTaxInvoices = canSubmitTaxInvoice(workforceEngagement, worker?.engagement_type);
 
   const handleLogout = () => {
     Alert.alert(
@@ -39,13 +46,11 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background" edges={["top", "bottom"]}>
       <View className="flex-1">
-        {/* Header */}
         <View className="bg-background px-4 pt-4 pb-3 border-b border-border/50">
           <Text className="text-2xl font-bold text-foreground">Settings</Text>
         </View>
 
         <View className="flex-1 px-4 pt-4">
-          {/* User Section */}
           {user && (
             <View className="bg-card rounded-xl p-4 mb-4">
               <View className="flex-row items-center gap-3">
@@ -77,7 +82,24 @@ export default function SettingsScreen() {
             </View>
           )}
 
-          {/* Notifications Section */}
+          {showTaxInvoices && (
+            <Pressable
+              onPress={() => router.push("/tax-invoices" as Href)}
+              className="bg-card rounded-xl p-4 mb-4 flex-row items-center gap-3 active:opacity-80"
+            >
+              <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center">
+                <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-semibold text-card-foreground">Tax invoices</Text>
+                <Text className="text-sm text-muted-foreground mt-0.5">
+                  Draft and submit invoices for approved jobs
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.mutedForeground} />
+            </Pressable>
+          )}
+
           <View className="bg-card rounded-xl p-4 mb-4">
             <View className="flex-row items-center justify-between">
               <View className="flex-1 mr-4">
@@ -100,7 +122,6 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          {/* Sign Out Button */}
           <View className="mt-auto pb-4">
             <Pressable
               onPress={handleLogout}

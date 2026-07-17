@@ -44,7 +44,7 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    const { first_name, last_name, email, phone, organization_id } = body;
+    const { first_name, last_name, email, phone, organization_id, engagement_type } = body;
 
     // Compute name from first_name + last_name for backward compatibility
     const name = `${first_name} ${last_name}`.trim();
@@ -62,6 +62,32 @@ serve(async (req) => {
         organization_id,
       });
       return errorResponse("You do not have permission to access this organization", 403);
+    }
+
+    const { data: orgSettings } = await supabase
+      .from("organization_settings")
+      .select("workforce_engagement")
+      .eq("organization_id", organization_id)
+      .maybeSingle();
+
+    const { defaultWorkerEngagementForOrg, isWorkerEngagementType, normalizeWorkforceEngagement } =
+      await import("../_utils/workforce-engagement.ts");
+
+    const orgEngagement = normalizeWorkforceEngagement(orgSettings?.workforce_engagement);
+    let resolvedEngagement = defaultWorkerEngagementForOrg(orgEngagement);
+    if (orgEngagement === "both") {
+      if (!isWorkerEngagementType(engagement_type)) {
+        return errorResponse(
+          "engagement_type is required when the organization engages both employees and contractors",
+          400
+        );
+      }
+      resolvedEngagement = engagement_type;
+    } else if (engagement_type !== undefined) {
+      if (!isWorkerEngagementType(engagement_type)) {
+        return errorResponse("engagement_type must be employee or contractor", 400);
+      }
+      resolvedEngagement = engagement_type;
     }
 
     const normalizedEmail = normalizeLookupEmail(email);
@@ -107,6 +133,7 @@ serve(async (req) => {
         email,
         phone,
         active: false,
+        engagement_type: resolvedEngagement ?? "employee",
       })
       .select()
       .single();

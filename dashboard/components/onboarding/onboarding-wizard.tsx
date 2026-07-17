@@ -44,6 +44,7 @@ export function OnboardingWizard() {
     has_locations: false,
     has_company_client_groups: false,
     has_workers: false,
+    workforce_engagement: null,
     worker_payment_method: null,
     worker_payment_frequency: null,
     invoice_frequency: "immediately",
@@ -66,8 +67,12 @@ export function OnboardingWizard() {
         return true; // ABN and locations are optional
       case 3:
         if (data.employee_count === "none") return true;
-        // If they have employees, payment method and frequency are required
-        return data.worker_payment_method !== null && data.worker_payment_frequency !== null;
+        // If they have employees, engagement + payment method and frequency are required
+        return (
+          data.workforce_engagement != null &&
+          data.worker_payment_method !== null &&
+          data.worker_payment_frequency !== null
+        );
       case 4:
         if (data.invoice_frequency === "weekly") {
           return data.invoice_weekly_day !== null;
@@ -411,6 +416,45 @@ function Step3WorkerPayment({
           workers yourself (bank, payroll, or another process). Tally does not pay workers or
           replace payroll.
         </p>
+      </div>
+
+      <div>
+        <Label className="text-base font-semibold">
+          Are your field workers employees, contractors, or both? *
+        </Label>
+        <p className="text-sm text-muted-foreground mt-1 mb-4">
+          This controls how settlement works in Tally (for example, contractor tax invoices). It
+          does not determine employment status for tax, superannuation, or Fair Work purposes. Seek
+          your own advice.
+        </p>
+        <RadioGroup
+          value={data.workforce_engagement || ""}
+          onValueChange={(value) =>
+            updateData({
+              workforce_engagement: value as OnboardingData["workforce_engagement"],
+            })
+          }
+          className="space-y-3"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="employees" id="eng-employees" />
+            <Label htmlFor="eng-employees" className="font-normal cursor-pointer">
+              Employees — we calculate amounts and record pay in Tally
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="contractors" id="eng-contractors" />
+            <Label htmlFor="eng-contractors" className="font-normal cursor-pointer">
+              Contractors — workers can submit tax invoices for completed jobs
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="both" id="eng-both" />
+            <Label htmlFor="eng-both" className="font-normal cursor-pointer">
+              Both — we choose per worker
+            </Label>
+          </div>
+        </RadioGroup>
       </div>
 
       <div>

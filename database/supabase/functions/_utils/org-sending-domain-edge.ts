@@ -22,6 +22,24 @@ export async function isActiveOrgAdmin(
   return data.role === "admin";
 }
 
+/** Active org admin or viewer (org-wide read for tax invoices, etc.). */
+export async function isActiveOrgStaff(
+  supabase: SupabaseClient,
+  organizationId: string,
+  authUserId: string
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("organization_user")
+    .select("role")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", authUserId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error || !data) return false;
+  return data.role === "admin" || data.role === "viewer";
+}
+
 export async function requireOrgAdminFromRequest(
   req: Request,
   organizationId: string,

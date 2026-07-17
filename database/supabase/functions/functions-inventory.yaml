@@ -47,8 +47,10 @@ functions:
   delete-service-pricing-mode: secured
   delete-test-data: secured
   delete-worker: secured
+  draft-worker-tax-invoice: secured
   flag-job: secured_custom
   generate-invoice-pdf: secured
+  generate-worker-tax-invoice-pdf: secured
   get-invoice-details: secured
   get-invoice-public: public
   get-invoice-template-config: secured
@@ -59,6 +61,7 @@ functions:
   get-organization-settings: secured
   get-user-role: identity
   get-worker: public
+  get-worker-tax-invoice: secured
   list-base-pricing: secured
   list-feedback: secured
   list-field-configs: secured
@@ -76,6 +79,7 @@ functions:
   list-pricing-rules: secured
   list-service-pricing-modes: secured
   list-worker-payments: secured
+  list-worker-tax-invoices: secured
   list-workers: secured
   list-workers-and-locations: secured
   manage-worker-rate-card: secured
@@ -90,13 +94,16 @@ functions:
   resend-admin-invitation: secured
   resend-worker-invitation: secured
   resolve-flagged-job: secured_custom
+  review-worker-tax-invoice: secured
   save-worker-payment: secured
   send-feedback-email: secured_custom
   send-invoice-reminder: secured
+  send-test-org-sending-domain-email: secured
   send-worker-remittance-email: secured
   stripe-webhook: public
   submit-beta-feedback: secured
   submit-feedback: public
+  submit-worker-tax-invoice: secured
   update-field-config: secured
   update-field-config-locations: secured
   update-form-section: secured
@@ -110,6 +117,7 @@ functions:
   update-pricing-rule: secured
   update-worker: secured
   update-worker-payment-status: secured
+  update-worker-tax-invoice-status: secured
   upload-organization-logo: secured_custom
   upsert-base-pricing: secured
   upsert-field-pricing: secured
