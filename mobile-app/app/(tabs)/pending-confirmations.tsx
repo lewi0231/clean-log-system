@@ -1,7 +1,11 @@
 import { useCurrentWorker } from "@/hooks/use-current-worker";
+import { usePendingConfirmationsCount } from "@/hooks/use-pending-confirmations-count";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { Drawer } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatSubmissionDataRows } from "@/lib/format-submission-summary";
+import { useTheme } from "@/lib/theme-context";
+import { supabase } from "@/lib/supabase";
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -31,17 +35,22 @@ interface PendingConfirmation {
     name: string;
     confirmation_status: string;
   }>;
-  submission_summary: Record<string, unknown>;
+  submission_data: Record<string, unknown>;
 }
 
 export default function PendingConfirmationsScreen() {
   const { user, session, loading: authLoading } = useAuth();
   const { worker } = useCurrentWorker();
+  const { colors } = useTheme();
+  const { decrementCount, refresh: refreshPendingCount } = usePendingConfirmationsCount();
 
   const [confirmations, setConfirmations] = useState<PendingConfirmation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedConfirmation, setSelectedConfirmation] = useState<PendingConfirmation | null>(
+    null
+  );
 
   // Flag modal state
   const [flagModalVisible, setFlagModalVisible] = useState(false);
@@ -139,7 +148,8 @@ export default function PendingConfirmationsScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchConfirmations();
-  }, [fetchConfirmations]);
+    void refreshPendingCount();
+  }, [fetchConfirmations, refreshPendingCount]);
 
   const handleConfirm = async (jobId: string) => {
     if (!session?.access_token) return;
@@ -161,8 +171,10 @@ export default function PendingConfirmationsScreen() {
         return;
       }
 
-      // Remove from list
+      // Remove from list and update tab badge immediately
       setConfirmations((prev) => prev.filter((c) => c.job_id !== jobId));
+      setSelectedConfirmation((prev) => (prev?.job_id === jobId ? null : prev));
+      decrementCount();
 
       const message = data?.job_approved
         ? "Job has been approved!"
@@ -177,6 +189,7 @@ export default function PendingConfirmationsScreen() {
   };
 
   const handleOpenFlagModal = (jobId: string) => {
+    setSelectedConfirmation(null);
     setSelectedJobId(jobId);
     setFlagReason("");
     setFlagModalVisible(true);
@@ -204,8 +217,9 @@ export default function PendingConfirmationsScreen() {
         return;
       }
 
-      // Remove from list
+      // Remove from list and update tab badge immediately
       setConfirmations((prev) => prev.filter((c) => c.job_id !== selectedJobId));
+      decrementCount();
 
       setFlagModalVisible(false);
       setSelectedJobId(null);
@@ -253,6 +267,66 @@ export default function PendingConfirmationsScreen() {
       minute: "2-digit",
     });
   };
+
+  const selectedSummaryRows = selectedConfirmation
+    ? formatSubmissionDataRows(selectedConfirmation.submission_data)
+    : [];
+
+  const renderWorkerBadges = (confirmation: PendingConfirmation) => (
+    <View className="flex-row flex-wrap gap-2">
+      {confirmation.workers.map((w) => (
+        <View
+          key={w.id}
+          className={`px-2 py-1 rounded-full ${
+            w.confirmation_status === "confirmed"
+              ? "bg-green-100 dark:bg-green-900/30"
+              : w.confirmation_status === "flagged"
+                ? "bg-red-100 dark:bg-red-900/30"
+                : "bg-yellow-100 dark:bg-yellow-900/30"
+          }`}
+        >
+          <Text
+            className={`text-xs font-medium ${
+              w.confirmation_status === "confirmed"
+                ? "text-green-700 dark:text-green-400"
+                : w.confirmation_status === "flagged"
+                  ? "text-red-700 dark:text-red-400"
+                  : "text-yellow-700 dark:text-yellow-400"
+            }`}
+          >
+            {w.id === worker?.id ? "You" : w.name}
+            {w.confirmation_status === "confirmed" && " ✓"}
+            {w.confirmation_status === "flagged" && " ⚠"}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderActionButtons = (jobId: string) => (
+    <View className="flex-row gap-3">
+      <Pressable
+        onPress={() => handleConfirm(jobId)}
+        disabled={isSubmitting}
+        className="flex-1 bg-green-600 py-3 rounded-lg items-center active:opacity-80 disabled:opacity-50"
+      >
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="checkmark" size={18} color="white" />
+          <Text className="text-white font-semibold">Confirm</Text>
+        </View>
+      </Pressable>
+      <Pressable
+        onPress={() => handleOpenFlagModal(jobId)}
+        disabled={isSubmitting}
+        className="flex-1 bg-red-100 dark:bg-red-900/30 py-3 rounded-lg items-center active:opacity-80 disabled:opacity-50"
+      >
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="flag-outline" size={18} color={colors.destructive} />
+          <Text className="text-red-600 dark:text-red-400 font-semibold">Flag Issue</Text>
+        </View>
+      </Pressable>
+    </View>
+  );
 
   // Show skeleton until we've completed the initial fetch (never show empty state before load)
   const isInitialLoad = loading || authLoading;
@@ -308,7 +382,7 @@ export default function PendingConfirmationsScreen() {
         {/* Content */}
         {error ? (
           <View className="flex-1 items-center justify-center px-4">
-            <Ionicons name="alert-circle-outline" size={48} color="rgb(220 38 38)" />
+            <Ionicons name="alert-circle-outline" size={48} color={colors.destructive} />
             <Text className="text-destructive text-center mt-4">{error}</Text>
             <Pressable onPress={onRefresh} className="mt-4 px-4 py-2 bg-primary rounded-lg">
               <Text className="text-primary-foreground font-medium">Try Again</Text>
@@ -336,95 +410,120 @@ export default function PendingConfirmationsScreen() {
                   key={confirmation.job_id}
                   className="bg-card rounded-xl p-4 border border-border/50"
                 >
-                  {/* Header */}
-                  <View className="flex-row justify-between items-start mb-3">
-                    <View className="flex-1">
-                      <Text className="text-base font-semibold text-card-foreground">
-                        {confirmation.location_name || "Unknown Location"}
-                      </Text>
-                      <Text className="text-sm text-muted-foreground mt-0.5">
-                        {formatDate(confirmation.completed_at)}
-                      </Text>
-                    </View>
-                    <View className="bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
-                      <Text className="text-xs font-medium text-yellow-700 dark:text-yellow-400">
-                        ⏱️ {formatTimeUntilAutoApprove(confirmation.auto_approve_at)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Submitted by */}
-                  <View className="flex-row items-center gap-2 mb-3">
-                    <Ionicons name="person-outline" size={14} color="rgb(100 116 139)" />
-                    <Text className="text-sm text-muted-foreground">
-                      Submitted by{" "}
-                      <Text className="font-medium text-foreground">
-                        {confirmation.submitted_by}
-                      </Text>
-                    </Text>
-                  </View>
-
-                  {/* Workers */}
-                  <View className="flex-row flex-wrap gap-2 mb-4">
-                    {confirmation.workers.map((w) => (
-                      <View
-                        key={w.id}
-                        className={`px-2 py-1 rounded-full ${
-                          w.confirmation_status === "confirmed"
-                            ? "bg-green-100 dark:bg-green-900/30"
-                            : w.confirmation_status === "flagged"
-                              ? "bg-red-100 dark:bg-red-900/30"
-                              : "bg-yellow-100 dark:bg-yellow-900/30"
-                        }`}
-                      >
-                        <Text
-                          className={`text-xs font-medium ${
-                            w.confirmation_status === "confirmed"
-                              ? "text-green-700 dark:text-green-400"
-                              : w.confirmation_status === "flagged"
-                                ? "text-red-700 dark:text-red-400"
-                                : "text-yellow-700 dark:text-yellow-400"
-                          }`}
-                        >
-                          {w.id === worker?.id ? "You" : w.name}
-                          {w.confirmation_status === "confirmed" && " ✓"}
-                          {w.confirmation_status === "flagged" && " ⚠"}
+                  <Pressable
+                    onPress={() => setSelectedConfirmation(confirmation)}
+                    className="active:opacity-80"
+                  >
+                    {/* Header */}
+                    <View className="flex-row justify-between items-start mb-3">
+                      <View className="flex-1">
+                        <Text className="text-base font-semibold text-card-foreground">
+                          {confirmation.location_name || "Unknown Location"}
+                        </Text>
+                        <Text className="text-sm text-muted-foreground mt-0.5">
+                          {formatDate(confirmation.completed_at)}
                         </Text>
                       </View>
-                    ))}
-                  </View>
+                      <View className="bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded-full">
+                        <Text className="text-xs font-medium text-yellow-700 dark:text-yellow-400">
+                          ⏱️ {formatTimeUntilAutoApprove(confirmation.auto_approve_at)}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Submitted by */}
+                    <View className="flex-row items-center gap-2 mb-3">
+                      <Ionicons name="person-outline" size={14} color={colors.mutedForeground} />
+                      <Text className="text-sm text-muted-foreground">
+                        Submitted by{" "}
+                        <Text className="font-medium text-foreground">
+                          {confirmation.submitted_by}
+                        </Text>
+                      </Text>
+                    </View>
+
+                    {/* Workers */}
+                    <View className="mb-3">{renderWorkerBadges(confirmation)}</View>
+
+                    <View className="flex-row items-center justify-between py-2 border-t border-border/40">
+                      <Text className="text-sm font-medium text-primary">
+                        View submitted details
+                      </Text>
+                      <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+                    </View>
+                  </Pressable>
 
                   {/* Action buttons */}
-                  <View className="flex-row gap-3">
-                    <Pressable
-                      onPress={() => handleConfirm(confirmation.job_id)}
-                      disabled={isSubmitting}
-                      className="flex-1 bg-green-600 py-3 rounded-lg items-center active:opacity-80 disabled:opacity-50"
-                    >
-                      <View className="flex-row items-center gap-2">
-                        <Ionicons name="checkmark" size={18} color="white" />
-                        <Text className="text-white font-semibold">Confirm</Text>
-                      </View>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => handleOpenFlagModal(confirmation.job_id)}
-                      disabled={isSubmitting}
-                      className="flex-1 bg-red-100 dark:bg-red-900/30 py-3 rounded-lg items-center active:opacity-80 disabled:opacity-50"
-                    >
-                      <View className="flex-row items-center gap-2">
-                        <Ionicons name="flag-outline" size={18} color="rgb(220 38 38)" />
-                        <Text className="text-red-600 dark:text-red-400 font-semibold">
-                          Flag Issue
-                        </Text>
-                      </View>
-                    </Pressable>
-                  </View>
+                  <View className="mt-4">{renderActionButtons(confirmation.job_id)}</View>
                 </View>
               ))}
             </View>
           </ScrollView>
         )}
       </View>
+
+      {/* Submission detail drawer */}
+      <Drawer
+        open={selectedConfirmation !== null}
+        onClose={() => setSelectedConfirmation(null)}
+        title={selectedConfirmation?.location_name || "Job details"}
+        description={
+          selectedConfirmation
+            ? `Submitted ${formatDate(selectedConfirmation.completed_at)}`
+            : undefined
+        }
+        size="large"
+      >
+        {selectedConfirmation ? (
+          <ScrollView
+            className="flex-1 px-4"
+            contentContainerStyle={{ paddingBottom: 24 }}
+            showsVerticalScrollIndicator={false}
+          >
+            {selectedConfirmation.location_address ? (
+              <View className="mb-4">
+                <Text className="text-xs text-muted-foreground mb-1">Location</Text>
+                <Text className="text-sm text-foreground">
+                  {selectedConfirmation.location_address}
+                </Text>
+              </View>
+            ) : null}
+
+            <View className="mb-4">
+              <Text className="text-xs text-muted-foreground mb-1">Submitted by</Text>
+              <Text className="text-sm font-medium text-foreground">
+                {selectedConfirmation.submitted_by}
+              </Text>
+            </View>
+
+            <View className="mb-4">
+              <Text className="text-xs text-muted-foreground mb-2">Workers</Text>
+              {renderWorkerBadges(selectedConfirmation)}
+            </View>
+
+            <View className="mb-3 flex-row items-center justify-between">
+              <Text className="text-sm font-semibold text-foreground">Submitted details</Text>
+              <Text className="text-xs text-yellow-700 dark:text-yellow-400">
+                Auto-confirms in {formatTimeUntilAutoApprove(selectedConfirmation.auto_approve_at)}
+              </Text>
+            </View>
+
+            {selectedSummaryRows.length === 0 ? (
+              <View className="bg-muted/40 rounded-xl p-4 border border-border/50 mb-6">
+                <Text className="text-sm text-muted-foreground text-center">
+                  No field data was stored for this job.
+                </Text>
+              </View>
+            ) : (
+              <View className="bg-card rounded-xl p-4 border border-border/50 mb-6">
+                {selectedSummaryRows}
+              </View>
+            )}
+
+            {renderActionButtons(selectedConfirmation.job_id)}
+          </ScrollView>
+        ) : null}
+      </Drawer>
 
       {/* Flag Modal */}
       <Modal
@@ -444,11 +543,11 @@ export default function PendingConfirmationsScreen() {
               value={flagReason}
               onChangeText={setFlagReason}
               placeholder="e.g., I wasn't at this location on this date..."
-              placeholderTextColor="rgb(100 116 139)"
+              placeholderTextColor={colors.mutedForeground}
               multiline
               numberOfLines={4}
               className="bg-muted p-4 rounded-lg text-foreground mb-4"
-              style={{ minHeight: 100, textAlignVertical: "top" }}
+              style={{ minHeight: 100, textAlignVertical: "top", color: colors.foreground }}
             />
 
             <Text className="text-xs text-muted-foreground mb-4">

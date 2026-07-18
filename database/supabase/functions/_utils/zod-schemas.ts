@@ -345,6 +345,8 @@ export const calculateInvoiceSchema = z.object({
 export const listJobsSchema = z.object({
   organization_id: uuidSchema,
   include_tests: z.boolean().optional(),
+  worker_id: uuidSchema.optional(),
+  mine: z.boolean().optional(),
 });
 
 /**

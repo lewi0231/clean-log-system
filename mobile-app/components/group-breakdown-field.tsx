@@ -1,5 +1,6 @@
 import { Drawer } from "@/components/ui/drawer";
 import { Select, SelectItem } from "@/components/ui/select";
+import { useTheme } from "@/lib/theme-context";
 import { FieldConfig } from "@clean-log/shared/types/field-config";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
@@ -23,6 +24,7 @@ export function GroupedBreakdownField({
   onChange,
   disabled = false,
 }: GroupedBreakdownFieldProps) {
+  const { colors } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -34,9 +36,7 @@ export function GroupedBreakdownField({
   const allowZeroQuantities = validationRules?.allow_zero_quantities ?? false;
 
   // Get available brands (not already selected)
-  const availableBrands = options.filter(
-    (option) => !value.some((item) => item.brand === option)
-  );
+  const availableBrands = options.filter((option) => !value.some((item) => item.brand === option));
 
   const handleAddItem = () => {
     if (!selectedBrand || !quantity) return;
@@ -48,10 +48,7 @@ export function GroupedBreakdownField({
     // Check if we've reached max items
     if (value.length >= maxItems) return;
 
-    const newItems = [
-      ...value,
-      { brand: selectedBrand, quantity: quantityNum },
-    ];
+    const newItems = [...value, { brand: selectedBrand, quantity: quantityNum }];
     onChange(newItems);
     setSelectedBrand("");
     setQuantity("");
@@ -71,9 +68,7 @@ export function GroupedBreakdownField({
     }
 
     onChange(
-      value.map((item) =>
-        item.brand === brand ? { ...item, quantity: newQuantity } : item
-      )
+      value.map((item) => (item.brand === brand ? { ...item, quantity: newQuantity } : item))
     );
   };
 
@@ -87,18 +82,16 @@ export function GroupedBreakdownField({
           {value.map((item) => (
             <View
               key={item.brand}
-              className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 flex-row items-center justify-between"
+              className="bg-card border border-border rounded-xl px-4 py-3.5 flex-row items-center justify-between"
             >
               <View className="flex-1 flex-row items-center justify-between">
-                <Text className="text-base font-medium text-foreground flex-1">
-                  {item.brand}
-                </Text>
+                <Text className="text-base font-medium text-foreground flex-1">{item.brand}</Text>
                 <View className="flex-row items-center gap-3">
-                  {/* Quantity input */}
                   <TextInput
-                    className={`bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-center text-base text-foreground min-w-[60px] ${
+                    className={`bg-muted border border-border rounded-lg px-3 py-2 text-center text-base text-foreground min-w-[60px] ${
                       disabled ? "opacity-50" : ""
                     }`}
+                    style={{ color: colors.foreground }}
                     value={String(item.quantity)}
                     onChangeText={(text) => {
                       const num = text === "" ? 0 : parseInt(text, 10) || 0;
@@ -106,6 +99,7 @@ export function GroupedBreakdownField({
                     }}
                     keyboardType="number-pad"
                     editable={!disabled}
+                    placeholderTextColor={colors.mutedForeground}
                   />
                   {/* Remove button */}
                   <Pressable
@@ -126,25 +120,19 @@ export function GroupedBreakdownField({
       {canAddMore && !disabled && (
         <Pressable
           onPress={() => setDrawerOpen(true)}
-          className="flex-row items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-[#e0e0e0] rounded-xl active:bg-gray-50"
+          className="flex-row items-center justify-center gap-2 py-3 px-4 border-2 border-dashed border-border rounded-xl active:bg-muted"
         >
-          <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
-          <Text className="text-base font-medium text-[#007AFF]">
-            Add Entry
-          </Text>
+          <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+          <Text className="text-base font-medium text-primary">Add Entry</Text>
         </Pressable>
       )}
 
       {/* Validation messages */}
       {value.length < minItems && (
-        <Text className="text-sm text-orange-500">
-          At least {minItems} item(s) required
-        </Text>
+        <Text className="text-sm text-orange-500">At least {minItems} item(s) required</Text>
       )}
       {value.length >= maxItems && (
-        <Text className="text-sm text-gray-500">
-          Maximum {maxItems} item(s) reached
-        </Text>
+        <Text className="text-sm text-muted-foreground">Maximum {maxItems} item(s) reached</Text>
       )}
 
       {/* Add Item Drawer */}
@@ -162,9 +150,7 @@ export function GroupedBreakdownField({
           <View className="space-y-4 ">
             {/* Option Select */}
             <View className="">
-              <Text className="text-base font-semibold mb-2 text-foreground">
-                Option
-              </Text>
+              <Text className="text-base font-semibold mb-2 text-foreground">Option</Text>
               <Select
                 value={selectedBrand}
                 onValueChange={setSelectedBrand}
@@ -181,19 +167,18 @@ export function GroupedBreakdownField({
 
             {/* Quantity Input */}
             <View>
-              <Text className="text-base font-semibold mb-2 text-foreground">
-                Quantity
-              </Text>
+              <Text className="text-base font-semibold mb-2 text-foreground">Quantity</Text>
               <TextInput
-                className="bg-white border-[1.5px] border-[#e0e0e0] rounded-xl px-4 py-3.5 text-base text-foreground"
+                className="bg-card border border-border rounded-xl px-4 py-3.5 text-base text-foreground"
+                style={{ color: colors.foreground }}
                 placeholder="Enter quantity"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.mutedForeground}
                 value={quantity}
                 onChangeText={setQuantity}
                 keyboardType="number-pad"
               />
               {!allowZeroQuantities && (
-                <Text className="text-sm text-gray-500 mt-1">
+                <Text className="text-sm text-muted-foreground mt-1">
                   Zero quantities are not allowed
                 </Text>
               )}
@@ -208,9 +193,9 @@ export function GroupedBreakdownField({
                 parseInt(quantity, 10) < 0 ||
                 (!allowZeroQuantities && parseInt(quantity, 10) === 0)
               }
-              className="bg-blue-500 rounded-xl py-4 px-8 items-center justify-center mt-2 active:bg-blue-600 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
+              className="bg-primary rounded-xl py-4 px-8 items-center justify-center mt-2 active:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100"
             >
-              <Text className="text-white text-lg font-semibold">Add</Text>
+              <Text className="text-primary-foreground text-lg font-semibold">Add</Text>
             </Pressable>
           </View>
         </ScrollView>

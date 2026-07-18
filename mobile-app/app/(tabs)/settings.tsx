@@ -5,10 +5,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useCurrentWorker } from "@/hooks/use-current-worker";
 import { useUserRole } from "@/hooks/use-user-role";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/lib/theme-context";
 import { useState } from "react";
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
+  const { colors } = useTheme();
   const { worker } = useCurrentWorker();
   const { isAdmin } = useUserRole();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -52,9 +54,7 @@ export default function SettingsScreen() {
                     <Text className="text-sm font-semibold text-primary">
                       {(
                         worker?.name ||
-                        (isAdmin && user?.email
-                          ? user.email.split("@")[0]
-                          : "") ||
+                        (isAdmin && user?.email ? user.email.split("@")[0] : "") ||
                         ""
                       )
                         .split(" ")
@@ -64,16 +64,14 @@ export default function SettingsScreen() {
                         .slice(0, 2)}
                     </Text>
                   ) : (
-                    <Ionicons name="person" size={20} color="rgb(37 99 235)" />
+                    <Ionicons name="person" size={20} color={colors.primary} />
                   )}
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-semibold text-card-foreground">
                     {worker?.name || user?.email || "User"}
                   </Text>
-                  <Text className="text-sm text-muted-foreground mt-0.5">
-                    {user.email}
-                  </Text>
+                  <Text className="text-sm text-muted-foreground mt-0.5">{user.email}</Text>
                 </View>
               </View>
             </View>
@@ -106,16 +104,10 @@ export default function SettingsScreen() {
           <View className="mt-auto pb-4">
             <Pressable
               onPress={handleLogout}
-              className="bg-card border border-destructive rounded-xl p-4 flex-row items-center justify-center gap-2 active:opacity-80"
+              className="bg-destructive/10 border border-destructive rounded-xl p-4 flex-row items-center justify-center gap-2 active:opacity-80"
             >
-              <Ionicons
-                name="log-out-outline"
-                size={20}
-                color="rgb(220 38 38)"
-              />
-              <Text className="text-destructive text-base font-semibold">
-                Sign Out
-              </Text>
+              <Ionicons name="log-out-outline" size={20} color={colors.destructive} />
+              <Text className="text-destructive text-base font-semibold">Sign Out</Text>
             </Pressable>
           </View>
         </View>

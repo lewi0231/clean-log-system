@@ -78,19 +78,29 @@ module.exports = {
     ({ addBase }) => {
       addBase({
         ":root": {
-          "--color-primary": "37 99 235", // #2563eb - Vibrant blue
-          "--color-secondary": "226 232 240", // #e2e8f0 - Subtle borders
-          "--color-background": "248 249 250", // #f8f9fa - Light grey background
-          "--color-primary-foreground": "255 255 255", // White text on primary
-          "--color-foreground": "30 41 59", // #1e293b - Dark slate text
-          "--color-destructive": "220 38 38", // #dc2626 - Red for errors
-          "--color-success": "22 163 74", // Green for success
-          "--color-warning": "234 179 8", // Yellow/amber for warnings
-          "--color-info": "37 99 235", // Blue for info (same as primary)
-          "--color-muted": "100 116 139", // #64748b - Grey text
-          "--toggle-active": "37 99 235", // Blue when active
-          "--toggle-border": "229 231 235", // Very subtle border
-          "--border": "229 231 235", // Very subtle borders
+          "--color-primary": "37 99 235",
+          "--color-primary-foreground": "255 255 255",
+          "--color-secondary": "226 232 240",
+          "--color-secondary-foreground": "30 41 59",
+          "--color-background": "248 249 250",
+          "--color-background-foreground": "30 41 59",
+          "--color-foreground": "30 41 59",
+          "--color-foreground-muted": "100 116 139",
+          "--color-muted": "241 245 249",
+          "--color-muted-foreground": "100 116 139",
+          "--color-card": "255 255 255",
+          "--color-card-foreground": "30 41 59",
+          "--color-destructive": "220 38 38",
+          "--color-destructive-foreground": "255 255 255",
+          "--color-success": "22 163 74",
+          "--color-warning": "234 179 8",
+          "--color-info": "37 99 235",
+          "--border": "229 231 235",
+          "--border-foreground": "30 41 59",
+          "--input": "255 255 255",
+          "--input-foreground": "30 41 59",
+          "--toggle-active": "37 99 235",
+          "--toggle-border": "226 232 240",
         },
       });
     },

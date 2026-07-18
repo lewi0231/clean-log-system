@@ -1,6 +1,10 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import {
+  findCrossOrganizationEmailConflict,
+  formatCrossOrgEmailError,
+} from "../_utils/cross-org-email.ts";
+import {
   errorResponse,
   extractErrorMessage,
   getErrorStatusCode,
@@ -80,17 +84,31 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       existingWorker.organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized attempt to update worker", {
         worker_id: id,
         organization_id: existingWorker.organization_id,
       });
-      return errorResponse(
-        "You do not have permission to update this worker",
-        403,
+      return errorResponse("You do not have permission to update this worker", 403);
+    }
+
+    if (email !== undefined) {
+      const crossOrgConflict = await findCrossOrganizationEmailConflict(
+        supabase,
+        email,
+        existingWorker.organization_id
       );
+      if (crossOrgConflict) {
+        logger.warn("Rejected worker email update due to cross-org email conflict", {
+          worker_id: id,
+          organization_id: existingWorker.organization_id,
+          existing_organization_id: crossOrgConflict.existingOrganizationId,
+          existing_as: crossOrgConflict.existingAs,
+        });
+        return errorResponse(formatCrossOrgEmailError(crossOrgConflict), 400);
+      }
     }
 
     const { data: worker, error: workerError } = await supabase
@@ -118,7 +136,7 @@ serve(async (req) => {
     logger.error("Update worker error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to update worker"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

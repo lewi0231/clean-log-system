@@ -1,12 +1,15 @@
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { Location } from "@/types/location";
 import { useEffect, useState } from "react";
 
 export function useLocations(organizationId: string | null) {
+  const { session, loading: authLoading } = useAuth();
   const [locations, setLocations] = useState<Location[]>([]);
 
   useEffect(() => {
-    if (!organizationId) return;
+    const accessToken = session?.access_token;
+    if (!organizationId || authLoading || !accessToken) return;
 
     async function fetchLocations() {
       try {
@@ -14,7 +17,7 @@ export function useLocations(organizationId: string | null) {
           console.log("Locations: Fetching locations for organization", organizationId);
         }
 
-        const { data, error } = await supabase.functions.invoke("list-locations", {
+        const { data, error } = await invokeAuthedFunction("list-locations", accessToken, {
           body: { organization_id: organizationId },
         });
 
@@ -41,7 +44,7 @@ export function useLocations(organizationId: string | null) {
     }
 
     fetchLocations();
-  }, [organizationId]);
+  }, [organizationId, session?.access_token, authLoading]);
 
   return { locations };
 }
