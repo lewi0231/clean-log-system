@@ -50,9 +50,7 @@ export function formatLineItemDescription(
 
   const format = config?.description_format ?? DEFAULT_LINE_ITEM_DISPLAY.description_format;
 
-  return format
-    .replaceAll("{field_label}", fieldLabel)
-    .replaceAll("{option_value}", optionValue);
+  return format.replaceAll("{field_label}", fieldLabel).replaceAll("{option_value}", optionValue);
 }
 
 /**

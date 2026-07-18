@@ -55,10 +55,7 @@ function getServiceRoleKeyFromStatus(): string | null {
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    const patterns = [
-      /service_role key:\s*([^\s\n]+)/i,
-      /service_role_key:\s*([^\s\n]+)/i,
-    ];
+    const patterns = [/service_role key:\s*([^\s\n]+)/i, /service_role_key:\s*([^\s\n]+)/i];
 
     for (const pattern of patterns) {
       const match = output.match(pattern);
@@ -92,7 +89,7 @@ export function getSupabaseClient(): SupabaseClient {
       throw new Error(
         "SUPABASE_SERVICE_ROLE_KEY is required.\n" +
           "Run: cd database && supabase status\n" +
-          "Then set SUPABASE_SERVICE_ROLE_KEY environment variable",
+          "Then set SUPABASE_SERVICE_ROLE_KEY environment variable"
       );
     }
     console.log("Got service role key from supabase status");
@@ -145,9 +142,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
       .from("organization")
       .insert({
         name: `${data.organization.name} (${testId})`,
-        org_code: `${data.organization.org_code}${
-          Date.now().toString(36).slice(-4).toUpperCase()
-        }`,
+        org_code: `${data.organization.org_code}${Date.now().toString(36).slice(-4).toUpperCase()}`,
         use_predefined_locations: data.organization.use_predefined_locations,
         onboarding_completed_at: new Date().toISOString(),
         onboarding_data: {
@@ -171,16 +166,12 @@ export async function seedScenario1(): Promise<SeededDataIds> {
     console.log(`  Created organization: ${org.name} (onboarding complete)`);
 
     // 2. Create organization settings (minimal - currency is stored elsewhere)
-    const { error: settingsError } = await supabase
-      .from("organization_settings")
-      .insert({
-        organization_id: org.id,
-      });
+    const { error: settingsError } = await supabase.from("organization_settings").insert({
+      organization_id: org.id,
+    });
 
     if (settingsError) {
-      console.warn(
-        `  Warning: Failed to create organization settings: ${settingsError.message}`,
-      );
+      console.warn(`  Warning: Failed to create organization settings: ${settingsError.message}`);
     } else {
       console.log("  Created organization settings");
     }
@@ -194,17 +185,16 @@ export async function seedScenario1(): Promise<SeededDataIds> {
     });
 
     // 4. Create admin auth user (bypassing email verification)
-    const { data: adminAuth, error: adminAuthError } = await supabase.auth.admin
-      .createUser({
-        email: data.admin.email.replace("@", `+${testId}@`),
-        password: data.admin.password,
-        email_confirm: true,
-        user_metadata: {
-          role: "admin",
-          first_name: data.admin.first_name,
-          last_name: data.admin.last_name,
-        },
-      });
+    const { data: adminAuth, error: adminAuthError } = await supabase.auth.admin.createUser({
+      email: data.admin.email.replace("@", `+${testId}@`),
+      password: data.admin.password,
+      email_confirm: true,
+      user_metadata: {
+        role: "admin",
+        first_name: data.admin.first_name,
+        last_name: data.admin.last_name,
+      },
+    });
 
     if (adminAuthError) {
       throw new Error(`Failed to create admin user: ${adminAuthError.message}`);
@@ -214,17 +204,14 @@ export async function seedScenario1(): Promise<SeededDataIds> {
     console.log(`  Created admin auth user: ${seededIds.adminEmail}`);
 
     // 5. Create organization_user for admin (no auth_user_id column - auth is handled separately)
-    const { error: orgUserError } = await supabase.from("organization_user")
-      .insert({
-        organization_id: org.id,
-        email: seededIds.adminEmail,
-        role: "admin",
-      });
+    const { error: orgUserError } = await supabase.from("organization_user").insert({
+      organization_id: org.id,
+      email: seededIds.adminEmail,
+      role: "admin",
+    });
 
     if (orgUserError) {
-      throw new Error(
-        `Failed to create organization_user: ${orgUserError.message}`,
-      );
+      throw new Error(`Failed to create organization_user: ${orgUserError.message}`);
     }
     console.log("  Created organization_user for admin");
 
@@ -264,9 +251,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
         .single();
 
       if (locError) {
-        throw new Error(
-          `Failed to create location ${loc.name}: ${locError.message}`,
-        );
+        throw new Error(`Failed to create location ${loc.name}: ${locError.message}`);
       }
       seededIds.locationIds[loc.id] = location.id;
       console.log(`  Created location: ${location.name}`);
@@ -293,9 +278,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
         .single();
 
       if (fieldError) {
-        throw new Error(
-          `Failed to create field config ${field.name}: ${fieldError.message}`,
-        );
+        throw new Error(`Failed to create field config ${field.name}: ${fieldError.message}`);
       }
       seededIds.fieldConfigIds[field.id] = fieldConfig.id;
       console.log(`  Created field config: ${fieldConfig.name}`);
@@ -305,20 +288,17 @@ export async function seedScenario1(): Promise<SeededDataIds> {
     for (const worker of data.workers) {
       // Create auth user for worker
       const workerEmail = worker.email.replace("@", `+${testId}@`);
-      const { data: workerAuth, error: workerAuthError } = await supabase.auth
-        .admin.createUser({
-          email: workerEmail,
-          password: data.testCredentials.defaultPassword,
-          email_confirm: true,
-          user_metadata: {
-            role: "worker",
-          },
-        });
+      const { data: workerAuth, error: workerAuthError } = await supabase.auth.admin.createUser({
+        email: workerEmail,
+        password: data.testCredentials.defaultPassword,
+        email_confirm: true,
+        user_metadata: {
+          role: "worker",
+        },
+      });
 
       if (workerAuthError) {
-        console.warn(
-          `  Warning: Failed to create worker auth: ${workerAuthError.message}`,
-        );
+        console.warn(`  Warning: Failed to create worker auth: ${workerAuthError.message}`);
         continue;
       }
 
@@ -340,7 +320,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
 
       if (workerError) {
         console.warn(
-          `  Warning: Failed to create worker ${worker.first_name}: ${workerError.message}`,
+          `  Warning: Failed to create worker ${worker.first_name}: ${workerError.message}`
         );
         continue;
       }
@@ -353,19 +333,18 @@ export async function seedScenario1(): Promise<SeededDataIds> {
     for (const rule of data.pricingRules) {
       const fieldConfigId = rule.field_config_name
         ? seededIds.fieldConfigIds[
-          Object.keys(seededIds.fieldConfigIds).find((k) =>
-            data.fieldConfigs.find((f) => f.id === k)?.name ===
-              rule.field_config_name
-          ) ?? ""
-        ]
+            Object.keys(seededIds.fieldConfigIds).find(
+              (k) => data.fieldConfigs.find((f) => f.id === k)?.name === rule.field_config_name
+            ) ?? ""
+          ]
         : null;
 
       const locationId = rule.location_name
         ? seededIds.locationIds[
-          Object.keys(seededIds.locationIds).find((k) =>
-            data.locations.find((l) => l.id === k)?.name === rule.location_name
-          ) ?? ""
-        ]
+            Object.keys(seededIds.locationIds).find(
+              (k) => data.locations.find((l) => l.id === k)?.name === rule.location_name
+            ) ?? ""
+          ]
         : null;
 
       const { data: pricingRule, error: priceError } = await supabase
@@ -388,7 +367,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
 
       if (priceError) {
         console.warn(
-          `  Warning: Failed to create pricing rule ${rule.name}: ${priceError.message}`,
+          `  Warning: Failed to create pricing rule ${rule.name}: ${priceError.message}`
         );
         continue;
       }
@@ -422,9 +401,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
 
         // Skip if no valid modifier value
         if (modifierValue <= 0) {
-          console.warn(
-            `  Warning: Skipping rate card ${card.name}: modifier_value must be > 0`,
-          );
+          console.warn(`  Warning: Skipping rate card ${card.name}: modifier_value must be > 0`);
           continue;
         }
 
@@ -443,32 +420,28 @@ export async function seedScenario1(): Promise<SeededDataIds> {
           .single();
 
         if (rateError) {
-          console.warn(
-            `  Warning: Failed to create rate card ${card.name}: ${rateError.message}`,
-          );
+          console.warn(`  Warning: Failed to create rate card ${card.name}: ${rateError.message}`);
           continue;
         }
 
         // Link to field config if specified
         if (card.field_config_name) {
-          const fieldConfigId = seededIds.fieldConfigIds[
-            Object.keys(seededIds.fieldConfigIds).find((k) =>
-              data.fieldConfigs.find((f) => f.id === k)?.name ===
-                card.field_config_name
-            ) ?? ""
-          ];
+          const fieldConfigId =
+            seededIds.fieldConfigIds[
+              Object.keys(seededIds.fieldConfigIds).find(
+                (k) => data.fieldConfigs.find((f) => f.id === k)?.name === card.field_config_name
+              ) ?? ""
+            ];
 
           if (fieldConfigId) {
-            const { error: fieldLinkError } = await supabase
-              .from("worker_rate_card_field")
-              .insert({
-                rate_card_id: rateCard.id,
-                field_config_id: fieldConfigId,
-              });
+            const { error: fieldLinkError } = await supabase.from("worker_rate_card_field").insert({
+              rate_card_id: rateCard.id,
+              field_config_id: fieldConfigId,
+            });
 
             if (fieldLinkError) {
               console.warn(
-                `  Warning: Failed to link field config to rate card: ${fieldLinkError.message}`,
+                `  Warning: Failed to link field config to rate card: ${fieldLinkError.message}`
               );
             }
           }
@@ -492,9 +465,7 @@ export async function seedScenario1(): Promise<SeededDataIds> {
 /**
  * Clean up all Scenario 1 test data
  */
-export async function cleanupScenario1(
-  seededIds: SeededDataIds,
-): Promise<void> {
+export async function cleanupScenario1(seededIds: SeededDataIds): Promise<void> {
   const supabase = getSupabaseClient();
   console.log(`Cleaning up Scenario 1 data (testId: ${seededIds.testId})...`);
 
@@ -503,19 +474,13 @@ export async function cleanupScenario1(
 
     // 1. Rate cards
     if (seededIds.rateCardIds.length > 0) {
-      await supabase.from("worker_rate_card").delete().in(
-        "id",
-        seededIds.rateCardIds,
-      );
+      await supabase.from("worker_rate_card").delete().in("id", seededIds.rateCardIds);
       console.log(`  Deleted ${seededIds.rateCardIds.length} rate cards`);
     }
 
     // 2. Pricing rules
     if (seededIds.pricingRuleIds.length > 0) {
-      await supabase.from("pricing_rule").delete().in(
-        "id",
-        seededIds.pricingRuleIds,
-      );
+      await supabase.from("pricing_rule").delete().in("id", seededIds.pricingRuleIds);
       console.log(`  Deleted ${seededIds.pricingRuleIds.length} pricing rules`);
     }
 
@@ -539,10 +504,7 @@ export async function cleanupScenario1(
     // 4. Field configs
     const fieldConfigIdValues = Object.values(seededIds.fieldConfigIds);
     if (fieldConfigIdValues.length > 0) {
-      await supabase.from("organization_field_configs").delete().in(
-        "id",
-        fieldConfigIdValues,
-      );
+      await supabase.from("organization_field_configs").delete().in("id", fieldConfigIdValues);
       console.log(`  Deleted ${fieldConfigIdValues.length} field configs`);
     }
 
@@ -555,41 +517,32 @@ export async function cleanupScenario1(
 
     // 6. Hierarchy
     if (seededIds.hierarchyNodeId) {
-      await supabase.from("location_hierarchy").delete().eq(
-        "id",
-        seededIds.hierarchyNodeId,
-      );
+      await supabase.from("location_hierarchy").delete().eq("id", seededIds.hierarchyNodeId);
       console.log("  Deleted hierarchy node");
     }
 
     // 7. Organization settings & invoice config
     if (seededIds.organizationId) {
-      await supabase.from("invoice_template_config").delete().eq(
-        "organization_id",
-        seededIds.organizationId,
-      );
-      await supabase.from("organization_settings").delete().eq(
-        "organization_id",
-        seededIds.organizationId,
-      );
+      await supabase
+        .from("invoice_template_config")
+        .delete()
+        .eq("organization_id", seededIds.organizationId);
+      await supabase
+        .from("organization_settings")
+        .delete()
+        .eq("organization_id", seededIds.organizationId);
     }
 
     // 8. Organization user & admin auth
     if (seededIds.adminUserId) {
-      await supabase.from("organization_user").delete().eq(
-        "auth_user_id",
-        seededIds.adminUserId,
-      );
+      await supabase.from("organization_user").delete().eq("auth_user_id", seededIds.adminUserId);
       await supabase.auth.admin.deleteUser(seededIds.adminUserId);
       console.log("  Deleted admin user");
     }
 
     // 9. Organization
     if (seededIds.organizationId) {
-      await supabase.from("organization").delete().eq(
-        "id",
-        seededIds.organizationId,
-      );
+      await supabase.from("organization").delete().eq("id", seededIds.organizationId);
       console.log("  Deleted organization");
     }
 
