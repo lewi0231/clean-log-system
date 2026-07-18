@@ -1,6 +1,10 @@
 # Dependabot — version updates for npm workspaces + GitHub Actions.
-# Security alerts / Dependabot security PRs are enabled on the repo separately
-# (Settings → Code security → Dependabot alerts + security updates).
+# Version-update PRs target `staging` (below). This file must also exist on the
+# default branch (`main`) for Dependabot to load it — promote staging → main
+# after changing this config.
+#
+# Note: Dependabot *security* update PRs always target the default branch
+# (`main`). Prefer a dedicated dependency-cleanup PR to staging for vuln fixes.
 # Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
 
 version: 2

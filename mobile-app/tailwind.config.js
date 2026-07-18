@@ -29,8 +29,7 @@ module.exports = {
         },
         destructive: {
           DEFAULT: "rgb(var(--color-destructive) / <alpha-value>)",
-          foreground:
-            "rgb(var(--color-destructive-foreground) / <alpha-value>)",
+          foreground: "rgb(var(--color-destructive-foreground) / <alpha-value>)",
         },
         success: {
           DEFAULT: "rgb(var(--color-success) / <alpha-value>)",
@@ -67,8 +66,7 @@ module.exports = {
 
         toggle: {
           active: "rgb(var(--toggle-active) / <alpha-value>)",
-          "active-foreground":
-            "rgb(var(--toggle-active-foreground) / <alpha-value>)",
+          "active-foreground": "rgb(var(--toggle-active-foreground) / <alpha-value>)",
           border: "rgb(var(--toggle-border) / <alpha-value>)",
         },
       },
