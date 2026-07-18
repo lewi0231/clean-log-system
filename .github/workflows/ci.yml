@@ -40,9 +40,19 @@ jobs:
         uses: ./.github/actions/setup-pnpm-monorepo
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
         with:
           deno-version: v2.x
+
+      - name: Cache Deno
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cache/deno
+            database/supabase/functions/.deno
+          key: deno-${{ runner.os }}-${{ hashFiles('database/supabase/functions/**/deno.lock', 'database/supabase/functions/**/deno.json*', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            deno-${{ runner.os }}-
 
       - name: Validate Edge Functions inventory (S1 Phase 4)
         run: pnpm validate:functions-inventory
@@ -93,7 +103,8 @@ jobs:
 
       - name: Deno lint (Supabase edge functions)
         run: pnpm lint:edge-functions
-        continue-on-error: true # TODO: Remove once edge function imports are fixed
+        # Soft until Deno import graph lint is fully clean; still surfaces in logs.
+        continue-on-error: true
 
       - name: TypeScript (packages that define typecheck)
         run: pnpm typecheck
@@ -156,6 +167,10 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Informational until Dependabot clears the current high/critical backlog
+    # (pnpm audit --audit-level=high fails today with dozens of transitive findings).
+    # Still runs on every CI so the report is visible; does not gate "CI passed".
+    # Flip to a hard gate by adding this job to ci-required when the audit is clean.
 
     steps:
       - name: Checkout repository
@@ -165,8 +180,35 @@ jobs:
         uses: ./.github/actions/setup-pnpm-monorepo
 
       - name: pnpm audit (high or critical)
-        run: pnpm audit --audit-level=high
         continue-on-error: true
+        run: |
+          if ! pnpm audit --audit-level=high; then
+            echo "::warning::pnpm audit reported high/critical vulnerabilities. Informational only until Dependabot clears the backlog; does not block CI passed."
+            exit 1
+          fi
+
+  # Single required status for branch rules / auto-merge consumers.
+  # Auto-merge (PR → staging) and staging → main promotion both require this job.
+  # When GitHub Pro/public rulesets are available, require check name: "CI passed"
+  ci-required:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests]
+    if: always()
+    steps:
+      - name: Require lint and unit tests to succeed
+        run: |
+          echo "lint-and-build: ${{ needs.lint-and-build.result }}"
+          echo "unit-tests: ${{ needs.unit-tests.result }}"
+          if [ "${{ needs.lint-and-build.result }}" != "success" ]; then
+            echo "::error::lint-and-build did not succeed"
+            exit 1
+          fi
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "::error::unit-tests did not succeed"
+            exit 1
+          fi
+          echo "All required CI jobs succeeded"
 
   e2e-tests:
     name: E2E tests (Playwright + Supabase)
@@ -250,12 +292,13 @@ jobs:
   auto-merge-staging-pr:
     name: Auto-merge (PR → staging)
     runs-on: ubuntu-latest
-    needs: [lint-and-build, unit-tests, security-scan]
+    needs: [ci-required]
     if: >
       github.event_name == 'pull_request' &&
       github.base_ref == 'staging' &&
       github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.ci-required.result == 'success'
     permissions:
       contents: write
       pull-requests: write
@@ -270,13 +313,16 @@ jobs:
             echo "PR #$PR_NUM is $STATE — nothing to merge"
             exit 0
           fi
+          # Prefer --auto (needs Settings → General → Allow auto-merge). Fallback squash merge
+          # only when CI has already passed via needs.ci-required.
           if gh pr merge "$PR_NUM" --auto --squash --repo "${{ github.repository }}" 2>&1; then
             echo "Auto-merge queued for PR #$PR_NUM (merges when required checks pass)"
           elif gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
-            echo "Merged PR #$PR_NUM immediately (--auto unavailable or not needed)"
+            echo "Merged PR #$PR_NUM immediately (CI passed; --auto unavailable)"
           else
-            echo "::error::Could not merge PR #$PR_NUM — verify repo Settings → General → Allow auto-merge,"
-            echo "::error::branch protection (required checks, review rules), and that squash merge is enabled."
+            echo "::error::Could not merge PR #$PR_NUM — enable Allow auto-merge under"
+            echo "::error::Settings → General, ensure squash merge is allowed, and (if on Pro/public)"
+            echo "::error::require the \"CI passed\" check on staging."
             exit 1
           fi
 
@@ -292,8 +338,11 @@ jobs:
   promote-staging-to-main:
     name: Staging → main (promotion PR)
     runs-on: ubuntu-latest
-    needs: [lint-and-build, unit-tests, security-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    needs: [ci-required]
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/staging' &&
+      needs.ci-required.result == 'success'
     permissions:
       contents: read
       pull-requests: write
@@ -432,7 +481,7 @@ jobs:
   notify-failure:
     name: Notify build failure
     runs-on: ubuntu-latest
-    needs: [lint-and-build, unit-tests, security-scan]
+    needs: [lint-and-build, unit-tests, security-scan, ci-required]
     if: failure()
     permissions:
       contents: write
@@ -446,6 +495,7 @@ jobs:
               'lint-and-build': '${{ needs.lint-and-build.result }}',
               'unit-tests': '${{ needs.unit-tests.result }}',
               'security-scan': '${{ needs.security-scan.result }}',
+              'ci-required': '${{ needs.ci-required.result }}',
             };
             const failed = Object.entries(jobResults)
               .filter(([, r]) => r === 'failure')

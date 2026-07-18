@@ -63,9 +63,7 @@ describe("LocationHierarchyManager", () => {
           "No location hierarchy defined yet. Create your first node to get started."
         )
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /create company/i })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /create company/i })).toBeInTheDocument();
     });
 
     it("should render loading state", () => {
@@ -77,9 +75,7 @@ describe("LocationHierarchyManager", () => {
       render(<LocationHierarchyManager />);
 
       // Skeleton should be rendered
-      expect(
-        screen.queryByText("No location hierarchy defined yet")
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("No location hierarchy defined yet")).not.toBeInTheDocument();
     });
 
     it("should render error state", () => {
@@ -90,9 +86,7 @@ describe("LocationHierarchyManager", () => {
 
       render(<LocationHierarchyManager />);
 
-      expect(
-        screen.getByText("Failed to load hierarchy")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Failed to load hierarchy")).toBeInTheDocument();
     });
 
     it("should display node type badges", () => {
@@ -290,7 +284,7 @@ describe("LocationHierarchyManager", () => {
       // Enter name - button should be enabled for company type
       const nameInput = screen.getByLabelText("Name");
       fireEvent.change(nameInput, { target: { value: "New Company" } });
-      
+
       // Company type doesn't require parent, so button should be enabled
       expect(createButton).not.toBeDisabled();
     });
@@ -326,9 +320,7 @@ describe("LocationHierarchyManager", () => {
 
       // Find edit button (it's in a group with hover opacity)
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       if (editButton) {
         fireEvent.click(editButton);
@@ -346,9 +338,7 @@ describe("LocationHierarchyManager", () => {
         name: "Old Name",
         type: "company",
       });
-      mockUpdateNode.mockResolvedValue(
-        createMockLocationHierarchyNode({ name: "New Name" })
-      );
+      mockUpdateNode.mockResolvedValue(createMockLocationHierarchyNode({ name: "New Name" }));
 
       vi.mocked(useLocationHierarchy).mockReturnValue({
         ...defaultHookReturn,
@@ -359,9 +349,7 @@ describe("LocationHierarchyManager", () => {
 
       // Find and click edit button
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       if (editButton) {
         fireEvent.click(editButton);
@@ -404,20 +392,14 @@ describe("LocationHierarchyManager", () => {
 
       // Find delete button
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       if (deleteButton) {
         fireEvent.click(deleteButton);
 
         await waitFor(() => {
-          expect(
-            screen.getByText("Delete Location Node")
-          ).toBeInTheDocument();
-          expect(
-            screen.getByText(/Are you sure/i)
-          ).toBeInTheDocument();
+          expect(screen.getByText("Delete Location Node")).toBeInTheDocument();
+          expect(screen.getByText(/Are you sure/i)).toBeInTheDocument();
           // The node name appears in both the tree and dialog, so use queryAllByText
           const companyTexts = screen.queryAllByText(/Test Company/i);
           expect(companyTexts.length).toBeGreaterThan(0);
@@ -442,9 +424,7 @@ describe("LocationHierarchyManager", () => {
 
       // Find and click delete button
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       if (deleteButton) {
         fireEvent.click(deleteButton);
@@ -478,9 +458,7 @@ describe("LocationHierarchyManager", () => {
 
       // Find and click delete button
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       if (deleteButton) {
         fireEvent.click(deleteButton);
@@ -493,9 +471,7 @@ describe("LocationHierarchyManager", () => {
         fireEvent.click(cancelButton);
 
         await waitFor(() => {
-          expect(
-            screen.queryByText("Delete Location Node")
-          ).not.toBeInTheDocument();
+          expect(screen.queryByText("Delete Location Node")).not.toBeInTheDocument();
         });
 
         expect(mockDeleteNode).not.toHaveBeenCalled();
@@ -515,15 +491,11 @@ describe("LocationHierarchyManager", () => {
       });
 
       // Enable auto-generate
-      const autoGenerateSwitch = screen.getByLabelText(
-        "Auto-Generate Invoices"
-      );
+      const autoGenerateSwitch = screen.getByLabelText(/Auto-Generate Invoices/);
       fireEvent.click(autoGenerateSwitch);
 
       await waitFor(() => {
-        expect(
-          screen.getByLabelText("Generation Frequency")
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Generation Frequency")).toBeInTheDocument();
       });
     });
 
@@ -538,15 +510,11 @@ describe("LocationHierarchyManager", () => {
       });
 
       // Enable auto-generate
-      const autoGenerateSwitch = screen.getByLabelText(
-        "Auto-Generate Invoices"
-      );
+      const autoGenerateSwitch = screen.getByLabelText(/Auto-Generate Invoices/);
       fireEvent.click(autoGenerateSwitch);
 
       await waitFor(() => {
-        expect(
-          screen.getByLabelText("Generation Frequency")
-        ).toBeInTheDocument();
+        expect(screen.getByLabelText("Generation Frequency")).toBeInTheDocument();
       });
 
       // Note: Select component interaction requires more complex setup

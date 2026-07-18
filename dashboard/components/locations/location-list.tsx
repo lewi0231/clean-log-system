@@ -11,10 +11,46 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Location } from "@/lib/types";
+import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
+import { resolveHierarchyBadges } from "@/lib/location-hierarchy-badges";
+import { Location, LocationHierarchyNode } from "@/lib/types";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import LocationForm from "./location-form";
+
+function HierarchyBadges({
+  hierarchyParent,
+  hierarchyParentId,
+  nodes,
+}: {
+  hierarchyParent: Location["hierarchy_parent"];
+  hierarchyParentId: string | null;
+  nodes: LocationHierarchyNode[];
+}) {
+  const badges = resolveHierarchyBadges(hierarchyParent, hierarchyParentId, nodes);
+
+  if (badges.length === 0) {
+    return <div className="text-center">-</div>;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {badges.map((badge) => (
+        <span
+          key={`${badge.kind}-${badge.id}`}
+          className={
+            badge.kind === "company"
+              ? "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300"
+              : "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          }
+          title={badge.kind === "company" ? "Company" : "Region"}
+        >
+          {badge.name}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 interface LocationListProps {
   locations: Location[];
@@ -46,6 +82,7 @@ export default function LocationList({
   onDeleteLocation,
   onUpdateLocation,
 }: LocationListProps) {
+  const { nodes: hierarchyNodes } = useLocationHierarchy();
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [deletingLocation, setDeletingLocation] = useState<Location | null>(null);
@@ -129,18 +166,11 @@ export default function LocationList({
                     </span>
                   </TableCell>
                   <TableCell>
-                    {location.hierarchy_parent ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-primary/10 text-primary">
-                          {location.hierarchy_parent.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {location.hierarchy_parent.type}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-center">-</div>
-                    )}
+                    <HierarchyBadges
+                      hierarchyParent={location.hierarchy_parent}
+                      hierarchyParentId={location.hierarchy_parent_id}
+                      nodes={hierarchyNodes}
+                    />
                   </TableCell>
                   <TableCell>{location.email}</TableCell>
                   <TableCell>{location.address || "-"}</TableCell>

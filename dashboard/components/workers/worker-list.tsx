@@ -41,10 +41,12 @@ interface WorkerListProps {
       email: string;
       phone: string;
       active?: boolean;
+      engagement_type?: "employee" | "contractor";
     }
   ) => Promise<void>;
   onResendInvitation?: (workerId: string) => Promise<void>;
   organizationId?: string | null;
+  workforceEngagement?: "employees" | "contractors" | "both";
 }
 
 export default function WorkerList({
@@ -55,6 +57,7 @@ export default function WorkerList({
   onUpdateWorker,
   onResendInvitation,
   organizationId,
+  workforceEngagement = "employees",
 }: WorkerListProps) {
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -237,6 +240,7 @@ export default function WorkerList({
         }}
         onSuccess={handleFormSuccess}
         worker={editingWorker}
+        workforceEngagement={workforceEngagement}
       />
 
       <ConfirmDestructiveDialog

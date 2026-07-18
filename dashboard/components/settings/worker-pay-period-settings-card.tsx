@@ -1,7 +1,6 @@
 "use client";
 
 import { organizationSettingsKey } from "@/app/query-provider";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,10 +15,17 @@ import { Switch } from "@/components/ui/switch";
 import { log } from "@/lib/logger";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import type { OrganizationSettings, WorkerPaymentCycleConfig } from "@/lib/types";
+import {
+  buildWorkerPaymentCycleConfig,
+  freqFromValue,
+  type PayFrequencyChoice,
+  workerPaymentCycleConfigsEqual,
+} from "@/lib/worker-payment-cycle-form";
 import { isValidIanaTimeZone } from "@/lib/worker-payments/org-pay-period";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 const COMMON_TIMEZONES = [
   "Australia/Adelaide",
@@ -46,8 +52,6 @@ const ISO_DAYS: { value: string; label: string }[] = [
   { value: "7", label: "Sunday" },
 ];
 
-type FrequencyChoice = "none" | "weekly" | "fortnightly" | "monthly";
-
 interface WorkerPayPeriodSettingsCardProps {
   organizationId: string;
   value: WorkerPaymentCycleConfig | null;
@@ -62,13 +66,7 @@ export function WorkerPayPeriodSettingsCard({
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
 
-  const initialFreq: FrequencyChoice = useMemo(() => {
-    const f = value?.payment_frequency;
-    if (f === "weekly" || f === "fortnightly" || f === "monthly") return f;
-    return "none";
-  }, [value]);
-
-  const [frequency, setFrequency] = useState<FrequencyChoice>(initialFreq);
+  const [frequency, setFrequency] = useState<PayFrequencyChoice>(() => freqFromValue(value));
   const [tzIana, setTzIana] = useState(() => value?.timezone?.trim() || "Australia/Adelaide");
   const [paymentDayOfWeek, setPaymentDayOfWeek] = useState(() =>
     String(value?.payment_day_of_week ?? 1)
@@ -80,35 +78,57 @@ export function WorkerPayPeriodSettingsCard({
   const [requireApproval, setRequireApproval] = useState(() => value?.require_approval ?? false);
   const [autoCalculate, setAutoCalculate] = useState(() => value?.auto_calculate ?? false);
 
+  const skipAutosaveRef = useRef(true);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  useEffect(() => {
+    skipAutosaveRef.current = true;
+    setFrequency(freqFromValue(value));
+    setTzIana(value?.timezone?.trim() || "Australia/Adelaide");
+    setPaymentDayOfWeek(String(value?.payment_day_of_week ?? 1));
+    setPaymentDayOfMonth(
+      value?.payment_day_of_month != null ? String(value.payment_day_of_month) : "15"
+    );
+    setCutOffTime(value?.cut_off_time ?? "17:00");
+    setRequireApproval(value?.require_approval ?? false);
+    setAutoCalculate(value?.auto_calculate ?? false);
+    const t = setTimeout(() => {
+      skipAutosaveRef.current = false;
+    }, 0);
+    return () => clearTimeout(t);
+  }, [value]);
+
   const { tzSelectValue, showCustomTz } = useMemo(() => {
     const t = tzIana.trim();
     if (COMMON_TIMEZONES.includes(t)) return { tzSelectValue: t, showCustomTz: false };
     return { tzSelectValue: "__custom__", showCustomTz: true };
   }, [tzIana]);
 
-  const save = async () => {
+  const persist = async () => {
     const tzRaw = tzIana.trim();
+
+    // Incomplete custom timezone while typing — wait (no toast spam)
+    if (frequency !== "none" && showCustomTz && tzRaw === "") {
+      return;
+    }
     if (tzRaw && !isValidIanaTimeZone(tzRaw)) {
-      log.warn("Worker pay period: invalid timezone", { tz: tzRaw });
       return;
     }
 
-    let worker_payment_cycle_config: WorkerPaymentCycleConfig | null = null;
-    if (frequency !== "none") {
-      const dom =
-        paymentDayOfMonth.trim() === ""
-          ? null
-          : Math.min(31, Math.max(1, parseInt(paymentDayOfMonth, 10) || 15));
-      const dow = Math.min(7, Math.max(1, parseInt(paymentDayOfWeek, 10) || 1));
-      worker_payment_cycle_config = {
-        payment_frequency: frequency,
-        payment_day_of_week: dow,
-        payment_day_of_month: dom,
-        cut_off_time: cutOffTime.trim() || null,
-        timezone: tzRaw || null,
-        require_approval: requireApproval,
-        auto_calculate: autoCalculate,
-      };
+    const worker_payment_cycle_config = buildWorkerPaymentCycleConfig({
+      frequency,
+      tzIana,
+      paymentDayOfWeek,
+      paymentDayOfMonth,
+      cutOffTime,
+      requireApproval,
+      autoCalculate,
+    });
+
+    if (workerPaymentCycleConfigsEqual(worker_payment_cycle_config, valueRef.current)) {
+      return;
     }
 
     setSaving(true);
@@ -123,7 +143,7 @@ export function WorkerPayPeriodSettingsCard({
       if (data?.settings) {
         onApplied(data.settings);
       }
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({
         queryKey: organizationSettingsKey(organizationId),
       });
       log.info("Settings: worker pay period updated");
@@ -131,10 +151,34 @@ export function WorkerPayPeriodSettingsCard({
       log.error("Settings: worker pay period save failed", {
         error: e instanceof Error ? e.message : "unknown",
       });
+      toast.error(e instanceof Error ? e.message : "Failed to save payment cycle");
     } finally {
       setSaving(false);
     }
   };
+
+  useEffect(() => {
+    if (skipAutosaveRef.current) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveTimeoutRef.current = null;
+      void persist();
+    }, 800);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- persist reads latest state; deps are the form fields
+  }, [
+    frequency,
+    tzIana,
+    paymentDayOfWeek,
+    paymentDayOfMonth,
+    cutOffTime,
+    requireApproval,
+    autoCalculate,
+    organizationId,
+    showCustomTz,
+  ]);
 
   return (
     <Card id="worker-pay-period">
@@ -142,12 +186,18 @@ export function WorkerPayPeriodSettingsCard({
         <div className="flex items-center gap-2">
           <CalendarRange className="h-5 w-5 text-muted-foreground" />
           <div>
-            <CardTitle>Worker payment cycle</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              Worker payment cycle
+              {saving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+              ) : null}
+            </CardTitle>
             <CardDescription>
               Defines how pay periods are cut for Worker Payments and calculate-dialog presets. For
               week and fortnight, set the day each period <strong>starts</strong> (ISO Mon=1 …
               Sun=7). Monthly uses calendar months (1st–last day) in the timezone below;
-              &quot;payment day of month&quot; is a label for your pay date.
+              &quot;payment day of month&quot; is a label for your pay date. Changes save
+              automatically.
             </CardDescription>
           </div>
         </div>
@@ -155,7 +205,7 @@ export function WorkerPayPeriodSettingsCard({
       <CardContent className="space-y-4 max-w-xl">
         <div className="space-y-2">
           <Label htmlFor="pay-freq">Payment frequency</Label>
-          <Select value={frequency} onValueChange={(v) => setFrequency(v as FrequencyChoice)}>
+          <Select value={frequency} onValueChange={(v) => setFrequency(v as PayFrequencyChoice)}>
             <SelectTrigger id="pay-freq">
               <SelectValue placeholder="Not configured" />
             </SelectTrigger>
@@ -275,17 +325,6 @@ export function WorkerPayPeriodSettingsCard({
             </div>
           </>
         )}
-
-        <Button type="button" onClick={save} disabled={saving}>
-          {saving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving…
-            </>
-          ) : (
-            "Save"
-          )}
-        </Button>
       </CardContent>
     </Card>
   );

@@ -42,10 +42,13 @@ export default function GuidedSetupPage() {
 
     // Step 2: Add Locations (if they service locations)
     if (onboardingData?.has_locations) {
+      const groupsHint = onboardingData?.has_company_client_groups
+        ? " Then group sites under companies or client groups if needed."
+        : "";
       steps.push({
         id: "locations",
         title: "Add Customer Locations",
-        description: "Set up your customer locations for recurring jobs",
+        description: `Set up the sites you return to regularly.${groupsHint}`,
         href: "/dashboard/locations",
         icon: MapPin,
         required: true,

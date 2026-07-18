@@ -6,11 +6,7 @@ import {
   toDisplayStatus,
 } from "../_utils/org-sending-domain-edge.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
-import {
-  errorResponse,
-  handleCors,
-  jsonResponse,
-} from "../_utils/http.ts";
+import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -36,12 +32,7 @@ serve(async (req) => {
     const domain_name = String(body.domain_name).trim().toLowerCase();
 
     const supabase = createServiceRoleClient();
-    const gate = await requireOrgAdminFromRequest(
-      req,
-      organization_id,
-      supabase,
-      body,
-    );
+    const gate = await requireOrgAdminFromRequest(req, organization_id, supabase, body);
     if (!gate.ok) {
       return errorResponse(gate.message, gate.status);
     }
@@ -55,10 +46,7 @@ serve(async (req) => {
       return errorResponse("Organization not found", 404);
     }
     if (!org.custom_email_domain_enabled) {
-      return errorResponse(
-        "Custom email domain is not enabled for this organization",
-        403,
-      );
+      return errorResponse("Custom email domain is not enabled for this organization", 403);
     }
 
     const { data: existingRow, error: exErr } = await supabase
@@ -69,18 +57,15 @@ serve(async (req) => {
     if (exErr) throw exErr;
 
     // Same domain re-submitted: sync from Resend instead of create (idempotent)
-    if (
-      existingRow?.resend_domain_id &&
-      existingRow.domain_name === domain_name
-    ) {
-      const getRes = await fetch(
-        `https://api.resend.com/domains/${existingRow.resend_domain_id}`,
-        { method: "GET", headers: resendHeaders() },
-      );
+    if (existingRow?.resend_domain_id && existingRow.domain_name === domain_name) {
+      const getRes = await fetch(`https://api.resend.com/domains/${existingRow.resend_domain_id}`, {
+        method: "GET",
+        headers: resendHeaders(),
+      });
       const getText = await getRes.text();
       let getJson: { status?: string; records?: unknown } = {};
       try {
-        getJson = getText ? JSON.parse(getText) as typeof getJson : {};
+        getJson = getText ? (JSON.parse(getText) as typeof getJson) : {};
       } catch {
         /* */
       }
@@ -91,7 +76,7 @@ serve(async (req) => {
         });
         return errorResponse(
           "Could not load domain from email provider. Try Remove domain and add it again, or contact support.",
-          502,
+          502
         );
       }
       const resendStatus = (getJson.status as string) || "pending";
@@ -120,8 +105,7 @@ serve(async (req) => {
     }
 
     const previousResendId =
-      existingRow?.resend_domain_id &&
-        existingRow.domain_name !== domain_name
+      existingRow?.resend_domain_id && existingRow.domain_name !== domain_name
         ? existingRow.resend_domain_id
         : null;
 
@@ -134,7 +118,7 @@ serve(async (req) => {
     const text = await res.text();
     let json: { id?: string; status?: string; records?: unknown } = {};
     try {
-      json = text ? JSON.parse(text) as typeof json : {};
+      json = text ? (JSON.parse(text) as typeof json) : {};
     } catch {
       /* keep json empty */
     }
@@ -143,9 +127,27 @@ serve(async (req) => {
         status: res.status,
         body: text.slice(0, 500),
       });
+      const providerMessage =
+        typeof (json as { message?: unknown }).message === "string"
+          ? String((json as { message: string }).message).trim()
+          : "";
+      if (/plan includes \d+ domain/i.test(providerMessage)) {
+        return errorResponse(
+          "Your email provider plan only allows one domain. Upgrade the Resend plan, or remove the existing domain in the Resend dashboard, then try again.",
+          400
+        );
+      }
+      if (/already|exists|in use/i.test(providerMessage)) {
+        return errorResponse(
+          "Unable to register domain with email provider. It may already be in use on this or another Resend account.",
+          400
+        );
+      }
       return errorResponse(
-        "Unable to register domain with email provider. It may already be in use.",
-        400,
+        providerMessage
+          ? `Unable to register domain with email provider: ${providerMessage}`
+          : "Unable to register domain with email provider. Check the domain name and try again.",
+        400
       );
     }
 
@@ -153,24 +155,20 @@ serve(async (req) => {
     const resendStatus = (json.status as string) || "pending";
     const display_status = toDisplayStatus(resendStatus);
 
-    const { error: upsertErr } = await supabase
-      .from("organization_sending_domain")
-      .upsert(
-        {
-          organization_id,
-          resend_domain_id: resendId,
-          domain_name,
-          resend_status: resendStatus,
-          display_status,
-          dns_records_snapshot: json.records
-            ? (json.records as Record<string, unknown>)
-            : null,
-          sending_region: region,
-          enabled: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "organization_id" },
-      );
+    const { error: upsertErr } = await supabase.from("organization_sending_domain").upsert(
+      {
+        organization_id,
+        resend_domain_id: resendId,
+        domain_name,
+        resend_status: resendStatus,
+        display_status,
+        dns_records_snapshot: json.records ? (json.records as Record<string, unknown>) : null,
+        sending_region: region,
+        enabled: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id" }
+    );
     if (upsertErr) {
       logger.error("DB upsert failed after Resend create", upsertErr);
       if (resendId) {
@@ -187,10 +185,10 @@ serve(async (req) => {
     }
 
     if (previousResendId && previousResendId !== resendId) {
-      const delOld = await fetch(
-        `https://api.resend.com/domains/${previousResendId}`,
-        { method: "DELETE", headers: resendHeaders() },
-      );
+      const delOld = await fetch(`https://api.resend.com/domains/${previousResendId}`, {
+        method: "DELETE",
+        headers: resendHeaders(),
+      });
       if (!delOld.ok) {
         const dt = await delOld.text();
         logger.warn("Could not delete previous Resend domain after domain change", {
@@ -211,9 +209,6 @@ serve(async (req) => {
     });
   } catch (e) {
     logger.error("register-org-sending-domain", e);
-    return errorResponse(
-      e instanceof Error ? e.message : "Unexpected error",
-      500,
-    );
+    return errorResponse(e instanceof Error ? e.message : "Unexpected error", 500);
   }
 });

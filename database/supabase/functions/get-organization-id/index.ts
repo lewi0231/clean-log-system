@@ -3,6 +3,7 @@ import { extractAuthToken, getAuthUser, getOrganizationUserByEmail } from "../_u
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { normalizeWorkforceEngagement } from "../_utils/workforce-engagement.ts";
 import { resolveOrganizationId } from "./resolve-organization-id.ts";
 
 serve(async (req) => {
@@ -89,10 +90,17 @@ serve(async (req) => {
       role,
     });
 
+    const { data: orgSettings } = await supabase
+      .from("organization_settings")
+      .select("workforce_engagement")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
     return jsonResponse({
       organization_id: organizationId,
       organization_user_id: organizationUserId,
       role: role,
+      workforce_engagement: normalizeWorkforceEngagement(orgSettings?.workforce_engagement),
     });
   } catch (error) {
     logger.error("Unhandled error", error);

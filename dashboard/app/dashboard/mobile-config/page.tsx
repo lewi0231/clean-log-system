@@ -30,11 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PageHeaderSkeleton } from "@/components/ui/skeleton-loaders";
 import { ErrorState } from "@/components/ui/error-state";
 
@@ -52,16 +48,11 @@ import { getTemplateDescription } from "@/lib/templates";
 import { toast } from "sonner";
 
 export default function MobileConfigPage() {
-  const [advancedOptionsModalOpen, setAdvancedOptionsModalOpen] =
-    useState(false);
+  const [advancedOptionsModalOpen, setAdvancedOptionsModalOpen] = useState(false);
   const [createdClusters, setCreatedClusters] = useState<string[]>([]);
   const queryClient = useQueryClient();
 
-  const {
-    organizationId,
-    loading: orgLoading,
-    error: orgError,
-  } = useOrganization();
+  const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
   const { settings, loading: settingsLoading } = useOrganizationSettings();
   const labels = useModeAwareLabels();
 
@@ -105,12 +96,7 @@ export default function MobileConfigPage() {
   }
 
   if (orgError || !organizationId) {
-    return (
-      <ErrorState
-        message={orgError || "Failed to load organization"}
-        fullScreen
-      />
-    );
+    return <ErrorState message={orgError || "Failed to load organization"} fullScreen />;
   }
 
   return (
@@ -120,12 +106,8 @@ export default function MobileConfigPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">
-                  Mobile Application
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  {labels.mobileConfigDescription}
-                </p>
+                <h1 className="text-3xl font-bold tracking-tight">Mobile Application</h1>
+                <p className="text-muted-foreground mt-2">{labels.mobileConfigDescription}</p>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -183,18 +165,15 @@ export default function MobileConfigPage() {
             onUpdateSection={handleUpdateSection}
             onDeleteSection={handleDeleteSection}
             onReorderSections={handleReorderSections}
-            createdClusters={createdClusters}
             organizationId={organizationId}
+            onOpenFieldGroupSettings={() => setAdvancedOptionsModalOpen(true)}
           />
         )}
       </div>
 
       {/* Advanced Options Modal */}
-      <Dialog
-        open={advancedOptionsModalOpen}
-        onOpenChange={setAdvancedOptionsModalOpen}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={advancedOptionsModalOpen} onOpenChange={setAdvancedOptionsModalOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-2">
               <DialogTitle>Field Group Settings</DialogTitle>
@@ -203,31 +182,26 @@ export default function MobileConfigPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/20"
+                    className="h-6 w-6 rounded-full"
+                    aria-label="How field groups work"
                   >
-                    <HelpCircle className="w-4 h-4 text-indigo-500" />
+                    <HelpCircle className="w-4 h-4 text-muted-foreground" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80" align="start">
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-indigo-900 dark:text-indigo-200">
-                      How it works?
-                    </h4>
-                    <p className="text-sm text-indigo-700/80 dark:text-indigo-300/80 leading-relaxed">
-                      Workers will see these options in a single-select dropdown
-                      menu. When they select an option, only the fields assigned
-                      to that option will be visible to them.
-                    </p>
-                    <p className="text-sm text-indigo-700/80 dark:text-indigo-300/80 leading-relaxed">
-                      This helps reduce clutter and ensures workers only fill
-                      out relevant data for their specific task.
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm">How it works</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      Workers see these as a single-select dropdown. When they pick an option, only
+                      fields assigned to that option are shown — so they only fill what applies to
+                      their task.
                     </p>
                   </div>
                 </PopoverContent>
               </Popover>
             </div>
             <DialogDescription>
-              Configure how workers select specific task options in the field
+              Options workers can choose between on mobile (one at a time)
             </DialogDescription>
           </DialogHeader>
           <MutuallyExclusiveGroupManager
@@ -235,28 +209,21 @@ export default function MobileConfigPage() {
             onUpdateField={handleUpdateFieldConfig}
             createdClusters={createdClusters}
             onCreatedClustersChange={setCreatedClusters}
-            defaultExclusiveGroupLabel={
-              settings?.default_exclusive_group_label || null
-            }
+            defaultExclusiveGroupLabel={settings?.default_exclusive_group_label || null}
             onUpdateDefaultExclusiveGroupLabel={async (label) => {
               if (!organizationId) return;
               try {
-                await invokeEdgeFunction<{ success?: boolean }>(
-                  "update-organization-settings",
-                  {
-                    organization_id: organizationId,
-                    default_exclusive_group_label: label,
-                  },
-                );
+                await invokeEdgeFunction<{ success?: boolean }>("update-organization-settings", {
+                  organization_id: organizationId,
+                  default_exclusive_group_label: label,
+                });
                 toast.success("Field group label updated");
               } catch (err) {
                 log.error("MobileConfig: Failed to update group label", {
                   message: err instanceof Error ? err.message : "Unknown error",
                 });
                 toast.error(
-                  err instanceof Error
-                    ? err.message
-                    : "Failed to update field group label",
+                  err instanceof Error ? err.message : "Failed to update field group label"
                 );
                 throw err;
               }
@@ -281,9 +248,8 @@ export default function MobileConfigPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Reset to Template?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will replace all your current field configurations with the
-              template fields. This action cannot be undone. Your existing
-              fields will be archived.
+              This will replace all your current field configurations with the template fields. This
+              action cannot be undone. Your existing fields will be archived.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-4 py-4">
@@ -305,9 +271,7 @@ export default function MobileConfigPage() {
               >
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-4 w-4 text-primary" />
-                  <div className="font-semibold text-sm">
-                    Service-Based Template
-                  </div>
+                  <div className="font-semibold text-sm">Service-Based Template</div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {getTemplateDescription("service_based")}
@@ -330,9 +294,7 @@ export default function MobileConfigPage() {
               >
                 <div className="flex items-center gap-2 mb-2">
                   <Package className="h-4 w-4 text-primary" />
-                  <div className="font-semibold text-sm">
-                    Resource Tracking Template
-                  </div>
+                  <div className="font-semibold text-sm">Resource Tracking Template</div>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {getTemplateDescription("resource_tracking")}

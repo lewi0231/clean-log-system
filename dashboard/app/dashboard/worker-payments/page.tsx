@@ -1,5 +1,6 @@
 "use client";
 
+import { organizationSettingsKey } from "@/app/query-provider";
 import { PricingScopeProvider } from "@/components/pricing/pricing-scope-context";
 import { Button } from "@/components/ui/button";
 import { ContextualHelp } from "@/components/ui/contextual-help";
@@ -9,10 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CalculatePaymentDialog from "@/components/worker-payments/calculate-payment-dialog";
 import PaymentHistoryList from "@/components/worker-payments/payment-history-list";
 import RateCardManager from "@/components/worker-payments/rate-card-manager";
+import TaxInvoiceQueue from "@/components/worker-payments/tax-invoice-queue";
 import WorkerPaymentSummary from "@/components/worker-payments/worker-payment-summary";
 import { useFieldConfigs } from "@/hooks/use-field-configs";
 import { useJobs } from "@/hooks/use-jobs";
 import { useOrganizationCurrency } from "@/hooks/use-organization-currency";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkerPaymentHistory } from "@/hooks/use-worker-payment-history";
 import { useWorkerPayments } from "@/hooks/use-worker-payments";
 import useOrganization from "@/hooks/useOrganization";
@@ -21,14 +24,14 @@ import {
   WorkerPaymentService,
   type SaveWorkerPaymentResult,
 } from "@/lib/services/worker-payment.service";
+import { canAdminSeeTaxInvoiceQueue } from "@clean-log/shared/utils/workforce-engagement";
+import { useQueryClient } from "@tanstack/react-query";
 import { Calculator } from "lucide-react";
 import Link from "next/link";
-import { organizationSettingsKey } from "@/app/query-provider";
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 export default function WorkerPaymentsPage() {
-  const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
+  const { organizationId, userRole, loading: orgLoading, error: orgError } = useOrganization();
   const { fieldConfigs } = useFieldConfigs();
 
   if (orgLoading) {
@@ -49,7 +52,11 @@ export default function WorkerPaymentsPage() {
 
   return (
     <PricingScopeProvider fieldConfigs={fieldConfigs}>
-      <WorkerPaymentsPageContent organizationId={organizationId} fieldConfigs={fieldConfigs} />
+      <WorkerPaymentsPageContent
+        organizationId={organizationId}
+        fieldConfigs={fieldConfigs}
+        isAdmin={userRole === "admin"}
+      />
     </PricingScopeProvider>
   );
 }
@@ -57,14 +64,18 @@ export default function WorkerPaymentsPage() {
 interface WorkerPaymentsPageContentProps {
   organizationId: string | null;
   fieldConfigs: import("@clean-log/shared/types").FieldConfig[];
+  isAdmin: boolean;
 }
 
 function WorkerPaymentsPageContent({
   organizationId,
   fieldConfigs,
+  isAdmin,
 }: WorkerPaymentsPageContentProps) {
   const queryClient = useQueryClient();
   const { jobs } = useJobs();
+  const { settings } = useOrganizationSettings();
+  const [hasTaxInvoiceHistory, setHasTaxInvoiceHistory] = useState(false);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -75,7 +86,11 @@ function WorkerPaymentsPageContent({
   const { addPayment } = useWorkerPaymentHistory(jobs);
   const [isCalculateDialogOpen, setIsCalculateDialogOpen] = useState(false);
 
-  // Get jobs with workers
+  const showTaxInvoicesTab = canAdminSeeTaxInvoiceQueue(
+    settings?.workforce_engagement,
+    hasTaxInvoiceHistory
+  );
+
   const jobsWithWorkers = jobs.filter((job) => job.workers.length > 0);
 
   const handleCalculatePayments = async (
@@ -183,6 +198,11 @@ function WorkerPaymentsPageContent({
           <TabsTrigger value="rate-cards" className="cursor-pointer">
             Rate Cards
           </TabsTrigger>
+          {showTaxInvoicesTab && (
+            <TabsTrigger value="tax-invoices" className="cursor-pointer">
+              Tax invoices
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="summary" className="space-y-6">
@@ -196,7 +216,24 @@ function WorkerPaymentsPageContent({
         <TabsContent value="rate-cards" className="space-y-6">
           <RateCardManager fieldConfigs={fieldConfigs} />
         </TabsContent>
+
+        {showTaxInvoicesTab && organizationId && (
+          <TabsContent value="tax-invoices" className="space-y-6">
+            <TaxInvoiceQueue
+              organizationId={organizationId}
+              isAdmin={isAdmin}
+              onHistoryPresenceChange={setHasTaxInvoiceHistory}
+            />
+          </TabsContent>
+        )}
       </Tabs>
+
+      {!showTaxInvoicesTab && organizationId && (
+        <TaxInvoiceHistoryProbe
+          organizationId={organizationId}
+          onHistoryPresenceChange={setHasTaxInvoiceHistory}
+        />
+      )}
 
       <CalculatePaymentDialog
         open={isCalculateDialogOpen}
@@ -206,4 +243,32 @@ function WorkerPaymentsPageContent({
       />
     </>
   );
+}
+
+/** Lightweight list call so employees-mode orgs still unlock the tab when history exists. */
+function TaxInvoiceHistoryProbe({
+  organizationId,
+  onHistoryPresenceChange,
+}: {
+  organizationId: string;
+  onHistoryPresenceChange: (hasRows: boolean) => void;
+}) {
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { WorkerTaxInvoiceService } =
+          await import("@/lib/services/worker-tax-invoice.service");
+        const rows = await WorkerTaxInvoiceService.list(organizationId);
+        if (!cancelled) onHistoryPresenceChange(rows.length > 0);
+      } catch {
+        /* ignore — tab stays hidden until engagement allows it */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [organizationId, onHistoryPresenceChange]);
+
+  return null;
 }

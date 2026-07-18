@@ -1,6 +1,7 @@
 import PaymentLinkButton from "@/components/invoicing/payment-link-button";
 import { usePaymentLink } from "@/hooks/use-payment-link";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/hooks/use-payment-link");
@@ -9,6 +10,12 @@ vi.mock("@/lib/logger", () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+  },
+}));
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
   },
 }));
 
@@ -179,8 +186,6 @@ describe("PaymentLinkButton", () => {
       createPaymentLink: mockCreatePaymentLinkFn,
       refetch: vi.fn(),
     });
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-
     Object.defineProperty(window, "location", {
       writable: true,
       value: { origin: "http://localhost:3000" },
@@ -192,12 +197,13 @@ describe("PaymentLinkButton", () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Failed to create payment link")
+      expect(toast.error).toHaveBeenCalledWith(
+        "Failed to create payment link",
+        expect.objectContaining({
+          description: expect.stringContaining("Failed to create link"),
+        })
       );
     });
-
-    alertSpy.mockRestore();
   });
 
   it("should be disabled when disabled prop is true", () => {

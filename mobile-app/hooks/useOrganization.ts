@@ -6,6 +6,9 @@ import { useAuth } from "./useAuth";
 export function useOrganization() {
   const { user, session, loading: authLoading } = useAuth();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [workforceEngagement, setWorkforceEngagement] = useState<
+    "employees" | "contractors" | "both"
+  >("employees");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const fetchedUserIdRef = useRef<string | null>(null);
@@ -89,6 +92,12 @@ export function useOrganization() {
             });
           }
           setOrganizationId(data.organization_id);
+          const eng = data.workforce_engagement;
+          if (eng === "contractors" || eng === "both" || eng === "employees") {
+            setWorkforceEngagement(eng);
+          } else {
+            setWorkforceEngagement("employees");
+          }
           fetchedUserIdRef.current = fetchKey;
         } else {
           if (__DEV__) {
@@ -115,5 +124,5 @@ export function useOrganization() {
     // re-fetching when the user object reference changes but the data hasn't
   }, [user?.id, user?.email, authLoading, session?.access_token]);
 
-  return { organizationId, loading, error };
+  return { organizationId, workforceEngagement, loading, error };
 }

@@ -24,10 +24,7 @@ export function isValidEmail(email: string): boolean {
 }
 
 export interface InvoiceEmailRecipientConfig {
-  location_email_source:
-    | "location_email"
-    | "hierarchy_billing_email"
-    | "location_contact_email";
+  location_email_source: "location_email" | "hierarchy_billing_email";
   form_field_email: string | null;
   /** @deprecated No longer used; fallback removed. Kept for backward compatibility. */
   default_email?: string | null;
@@ -53,17 +50,11 @@ export interface HierarchyNode {
 /**
  * Get email from hierarchy metadata billing address
  */
-function getHierarchyBillingEmail(
-  hierarchyNode: HierarchyNode | null,
-): string | null {
+function getHierarchyBillingEmail(hierarchyNode: HierarchyNode | null): string | null {
   if (!hierarchyNode || !hierarchyNode.metadata) return null;
 
   const billingAddress = hierarchyNode.metadata.billing_address;
-  if (
-    !billingAddress ||
-    typeof billingAddress !== "object" ||
-    !("email" in billingAddress)
-  ) {
+  if (!billingAddress || typeof billingAddress !== "object" || !("email" in billingAddress)) {
     return null;
   }
 
@@ -81,7 +72,7 @@ export async function getInvoiceEmailRecipient(
   supabase: SupabaseClient,
   job: JobContext,
   config: InvoiceEmailRecipientConfig,
-  fieldConfigMap?: Map<string, { name: string }>,
+  fieldConfigMap?: Map<string, { name: string }>
 ): Promise<string | null> {
   // If job has location_id
   if (job.location_id && job.location) {
@@ -113,11 +104,8 @@ export async function getInvoiceEmailRecipient(
       }
     }
 
-    // Check location contact email (if stored separately - would need schema change)
-    // For now, this would require a contact_email field on location
-    // if (config.location_email_source === "location_contact_email") {
-    //   // Would need location.contact_email field
-    // }
+    // location_contact_email was never implemented (contact_person is a name, not email).
+    // Deprecated: configs are coerced to location_email on read/write.
   }
 
   // If job has no location_id, check form fields
@@ -157,17 +145,12 @@ export async function getInvoiceEmailRecipients(
   supabase: SupabaseClient,
   jobs: JobContext[],
   config: InvoiceEmailRecipientConfig,
-  fieldConfigMap?: Map<string, { name: string }>,
+  fieldConfigMap?: Map<string, { name: string }>
 ): Promise<string[]> {
   const emailSet = new Set<string>();
 
   for (const job of jobs) {
-    const email = await getInvoiceEmailRecipient(
-      supabase,
-      job,
-      config,
-      fieldConfigMap,
-    );
+    const email = await getInvoiceEmailRecipient(supabase, job, config, fieldConfigMap);
     if (email) {
       emailSet.add(email);
     }
@@ -179,9 +162,7 @@ export async function getInvoiceEmailRecipients(
 /**
  * First name for "Hello …" from location contact_person (first matching job).
  */
-export function greetingFirstNameFromJobContexts(
-  jobs: JobContext[],
-): string | null {
+export function greetingFirstNameFromJobContexts(jobs: JobContext[]): string | null {
   for (const job of jobs) {
     const raw = job.location?.contact_person;
     if (raw && typeof raw === "string") {

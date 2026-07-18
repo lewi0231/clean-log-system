@@ -36,6 +36,7 @@ describe("useCurrentWorker", () => {
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
+      workforceEngagement: "employees",
       loading: false,
       error: null,
     });
@@ -63,6 +64,7 @@ describe("useCurrentWorker", () => {
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: null,
+      workforceEngagement: "employees",
       loading: false,
       error: null,
     });
@@ -103,6 +105,7 @@ describe("useCurrentWorker", () => {
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
+      workforceEngagement: "employees",
       loading: false,
       error: null,
     });
@@ -152,6 +155,7 @@ describe("useCurrentWorker", () => {
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
+      workforceEngagement: "employees",
       loading: false,
       error: null,
     });
@@ -187,6 +191,7 @@ describe("useCurrentWorker", () => {
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
+      workforceEngagement: "employees",
       loading: false,
       error: null,
     });
@@ -253,6 +258,7 @@ describe("useCurrentWorker", () => {
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
+      workforceEngagement: "employees",
       loading: false,
       error: null,
     });

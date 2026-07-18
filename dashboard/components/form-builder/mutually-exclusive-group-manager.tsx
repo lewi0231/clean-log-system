@@ -16,18 +16,7 @@ import {
 } from "@/components/ui/select";
 import { log } from "@/lib/logger";
 import { FieldConfig } from "@clean-log/shared";
-import {
-  Check,
-  CheckCircleIcon,
-  ChevronDown,
-  ChevronRight,
-  Edit,
-  HelpCircle,
-  Info,
-  Plus,
-  Smartphone,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, HelpCircle, Plus, Smartphone, X } from "lucide-react";
 import React, { useMemo, useState } from "react";
 
 interface MutuallyExclusiveGroupManagerProps {
@@ -250,382 +239,264 @@ export function MutuallyExclusiveGroupManager({
   // Calculate total options count
   const totalOptionsCount = allClusters.length;
 
-  // If in modal, render single column layout with mobile preview moved
+  const createOptionForm = (
+    <div className="rounded-lg border p-3 bg-muted/30 space-y-3">
+      <div>
+        <Label className="text-sm font-medium">
+          {totalOptionsCount === 0 ? "Create an option" : "New option"}
+        </Label>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {totalOptionsCount === 0
+            ? "Workers pick one option; only fields assigned to that option are shown."
+            : "Give it a name, then assign fields with + or in field settings."}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={newClusterName}
+          onChange={(e) => setNewClusterName(e.target.value)}
+          placeholder="e.g. Warehouse, Simple Toggle"
+          className="flex-1"
+          autoFocus={totalOptionsCount === 0 || showCreateForm}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              handleCreateCluster();
+            } else if (e.key === "Escape" && totalOptionsCount > 0) {
+              setShowCreateForm(false);
+              setNewClusterName("");
+            }
+          }}
+        />
+        <Button
+          onClick={handleCreateCluster}
+          disabled={!newClusterName.trim()}
+          size="sm"
+          className="cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          Create
+        </Button>
+      </div>
+      {totalOptionsCount > 0 && showCreateForm ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="cursor-pointer"
+          onClick={() => {
+            setShowCreateForm(false);
+            setNewClusterName("");
+          }}
+        >
+          Cancel
+        </Button>
+      ) : null}
+    </div>
+  );
+
+  // Compact modal layout — empty state is create-first (no tall empty illustration)
   if (isInModal) {
     return (
-      <div className="space-y-6 py-4">
-        {/* Configuration Section */}
-        <div className="space-y-6">
-          {/* Dropdown Label Section */}
-          {hasDefaultExclusiveGroup && onUpdateDefaultExclusiveGroupLabel && (
-            <Card>
-              <CardContent className="py-2 px-4">
-                <Label className=" font-semibold mb-2 flex items-center gap-2">
-                  {/* <Info className="w-4 h-4 text-muted-foreground" /> */}
-                  Dropdown Label
-                </Label>
-                <p className="text-xs text-muted-foreground mb-4">
-                  This text appears as the prompt for the question in the mobile app.
-                </p>
-                <div className="relative">
-                  {editingDefaultLabel ? (
-                    <div className="flex gap-2">
-                      <Input
-                        value={defaultLabelValue}
-                        onChange={(e) => setDefaultLabelValue(e.target.value)}
-                        placeholder="e.g., Select tracking method, Choose an option"
-                        className="flex-1"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            handleSaveDefaultLabel();
-                          } else if (e.key === "Escape") {
-                            handleCancelDefaultLabel();
-                          }
-                        }}
-                      />
-                      <Button onClick={handleSaveDefaultLabel} size="sm">
-                        Save
-                      </Button>
-                      <Button onClick={handleCancelDefaultLabel} variant="outline" size="sm">
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Input
-                        value={defaultExclusiveGroupLabel || "Select an option"}
-                        readOnly
-                        className="pr-16"
-                      />
-                      <Button
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-primary font-medium text-sm hover:underline cursor-pointer"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingDefaultLabel(true)}
-                      >
-                        <Edit /> Edit
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Available Options Section */}
-          <Card>
-            <CardHeader className="px-4 py-2 border-b bg-muted/30 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckCircleIcon className="bg-linear-to-brary" />
-
-                <CardTitle className="text-base">Available Options</CardTitle>
-              </div>
-              {totalOptionsCount > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="bg-muted text-muted-foreground px-2.5 py-0.5 text-xs font-semibold"
-                >
-                  {totalOptionsCount} Total
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="px-4 py-2 space-y-4">
-              {totalOptionsCount > 0 && (
-                <p className="text-sm text-muted-foreground mb-4 italic">
-                  Workers can only select one of these options at a time.
-                </p>
-              )}
-
-              {/* Empty State */}
-              {totalOptionsCount === 0 && createdClusters.length === 0 && (
-                <div className="flex flex-col items-center justify-center min-h-[500px] text-center">
-                  {/* Illustration */}
-                  <div className="w-64 h-48 bg-linear-to-br from-indigo-100 to-slate-100 dark:from-indigo-900/20 dark:to-slate-900 rounded-3xl mb-8 flex items-center justify-center relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-20 dark:opacity-10 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-primary via-transparent to-transparent"></div>
-
-                    <div className="relative flex flex-col items-center">
-                      <div className="w-32 h-20 bg-white dark:bg-slate-700 rounded-lg shadow-lg flex flex-col p-3 space-y-2 transform -rotate-3 border border-slate-100 dark:border-slate-600">
-                        <div className="w-full h-2 bg-slate-100 dark:bg-slate-600 rounded"></div>
-                        <div className="w-2/3 h-2 bg-slate-100 dark:bg-slate-600 rounded"></div>
-                      </div>
-                      <div className="w-32 h-20 bg-white dark:bg-slate-700 rounded-lg shadow-xl flex flex-col p-3 space-y-2 transform rotate-6 -mt-10 border border-slate-100 dark:border-slate-600">
-                        <div className="w-full h-2 bg-primary/20 rounded"></div>
-                        <div className="w-2/3 h-2 bg-primary/20 rounded"></div>
-                        <div className="self-end mt-auto">
-                          <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <h3 className="text-2xl font-bold mb-2">No options created yet</h3>
-                  <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                    Define the choices workers can select from. Each option can be assigned specific
-                    fields to streamline their workflow.
-                  </p>
-                  {!showCreateForm ? (
-                    <Button
-                      onClick={() => setShowCreateForm(true)}
-                      className="bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-8 rounded-full flex items-center space-x-2 shadow-lg shadow-primary/20"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Create First Option</span>
-                    </Button>
-                  ) : (
-                    <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
-                      <div className="bg-muted/50 p-4 rounded-xl border space-y-4">
-                        <div className="text-left">
-                          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
-                            Option Name
-                          </Label>
-                          <Input
-                            value={newClusterName}
-                            onChange={(e) => setNewClusterName(e.target.value)}
-                            placeholder="e.g., Simple Toggle, Warehouse, Detailed..."
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                handleCreateCluster();
-                              } else if (e.key === "Escape") {
-                                setShowCreateForm(false);
-                                setNewClusterName("");
-                              }
-                            }}
-                            autoFocus
-                          />
-                        </div>
-                        <div className="flex gap-3">
-                          <Button
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => {
-                              setShowCreateForm(false);
-                              setNewClusterName("");
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            className="flex-1"
-                            onClick={handleCreateCluster}
-                            disabled={!newClusterName.trim()}
-                          >
-                            Save Option
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Populated State - Options List */}
-              {totalOptionsCount > 0 && (
-                <div className="space-y-4">
-                  {allClusters.map((cluster) => {
-                    const clusterFields = cluster.fieldIds
-                      .map((fieldId) => fields.find((f) => f.id === fieldId))
-                      .filter((f): f is FieldConfig => f !== undefined);
-
-                    // Determine if this is the "selected" option (first one for now, or could be based on some state)
-                    const isSelected = false; // Could be based on some selection state
-
-                    return (
-                      <div
-                        key={cluster.id}
-                        className="group border border-slate-200 dark:border-slate-800 rounded-lg p-4 hover:border-primary/50 transition-all bg-white dark:bg-slate-900/50 flex items-start justify-between"
-                      >
-                        <div className="flex gap-4 flex-1">
-                          <div className="mt-1">
-                            <div
-                              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                                isSelected
-                                  ? "border-primary"
-                                  : "border-slate-300 dark:border-slate-600 group-hover:border-primary"
-                              }`}
-                            >
-                              {/* Show dot if selected, or on hover if not selected */}
-                              {isSelected ? (
-                                <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>
-                              ) : (
-                                <div className="w-2.5 h-2.5 rounded-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="font-bold">{cluster.displayName}</span>
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] uppercase tracking-wider font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded"
-                              >
-                                {cluster.fieldIds.length}{" "}
-                                {cluster.fieldIds.length === 1 ? "Field" : "Fields Assigned"}
-                              </Badge>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {clusterFields.map((field) => (
-                                <Badge
-                                  key={field.id}
-                                  variant="outline"
-                                  className="text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 px-2 py-1 rounded-md flex items-center gap-1.5 group"
-                                >
-                                  <span>{field.label}</span>
-                                  <button
-                                    onClick={() => {
-                                      // Use requestAnimationFrame to batch the update with the next paint
-                                      // This reduces jitter by ensuring smooth state transitions
-                                      requestAnimationFrame(() => {
-                                        // Optimistic update happens immediately in the hook
-                                        // Don't await to prevent UI jitter
-                                        // Wrap in Promise.resolve - onUpdateField may return void
-                                        Promise.resolve(
-                                          onUpdateField(field.id, {
-                                            mutually_exclusive_group: null,
-                                            group_cluster: null,
-                                          })
-                                        ).catch((err) => {
-                                          log.error("Failed to remove field from option:", err);
-                                        });
-                                      });
-                                    }}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full p-0.5 -mr-1"
-                                    aria-label={`Remove ${field.label} from option`}
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {/* Add Field Button */}
-                          {availableFields.length > 0 && (
-                            <Popover
-                              open={fieldSelectionOpen === cluster.id}
-                              onOpenChange={(open) =>
-                                setFieldSelectionOpen(open ? cluster.id : null)
-                              }
-                            >
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-slate-400 hover:text-primary transition-colors"
-                                  onClick={() => setFieldSelectionOpen(cluster.id)}
-                                >
-                                  <Plus className="w-4 h-4" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64" align="end">
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-semibold">
-                                    Add Field to Option
-                                  </Label>
-                                  <p className="text-xs text-muted-foreground mb-2">
-                                    Select a field to add to this option
-                                  </p>
-                                  <div className="max-h-48 overflow-y-auto space-y-1">
-                                    {availableFields.map((field) => (
-                                      <Button
-                                        key={field.id}
-                                        variant="ghost"
-                                        className="w-full justify-start text-sm h-auto py-2"
-                                        onClick={() =>
-                                          handleAddFieldToCluster(cluster.id, field.id)
-                                        }
-                                      >
-                                        {field.label}
-                                      </Button>
-                                    ))}
-                                  </div>
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                          )}
-                          {/* Delete Button */}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-slate-400 hover:text-red-500 transition-colors"
-                            onClick={() => handleDeleteCluster(DEFAULT_EXCLUSIVE_GROUP, cluster.id)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Add New Option Button */}
-                  <Button
-                    variant="outline"
-                    className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg text-slate-500 dark:text-slate-400 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all font-medium"
-                    onClick={() => setShowCreateForm(true)}
-                  >
-                    <Plus className="w-5 h-5" />
-                    Add New Option
-                  </Button>
-                </div>
-              )}
-
-              {/* Create Form (shown when Add New Option is clicked in populated state) */}
-              {showCreateForm && totalOptionsCount > 0 && (
-                <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-                  <div className="text-left">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 block">
-                      Option Name
-                    </Label>
-                    <Input
-                      value={newClusterName}
-                      onChange={(e) => setNewClusterName(e.target.value)}
-                      placeholder="e.g., Simple Toggle, Warehouse, Detailed..."
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleCreateCluster();
-                        } else if (e.key === "Escape") {
-                          setShowCreateForm(false);
-                          setNewClusterName("");
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        setShowCreateForm(false);
-                        setNewClusterName("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={handleCreateCluster}
-                      disabled={!newClusterName.trim()}
-                    >
-                      Save Option
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Info Box */}
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 rounded-lg flex gap-3">
-            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-800 dark:text-blue-300">
-              To add a new option, create it above, then assign fields to it in their individual
-              settings. The option will appear active once fields are linked.
+      <div className="space-y-4">
+        {hasDefaultExclusiveGroup && onUpdateDefaultExclusiveGroupLabel ? (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Dropdown label</Label>
+            <p className="text-xs text-muted-foreground">
+              Prompt shown above the options on mobile.
             </p>
+            {editingDefaultLabel ? (
+              <div className="flex gap-2">
+                <Input
+                  value={defaultLabelValue}
+                  onChange={(e) => setDefaultLabelValue(e.target.value)}
+                  placeholder="e.g. Select tracking method"
+                  className="flex-1"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void handleSaveDefaultLabel();
+                    } else if (e.key === "Escape") {
+                      handleCancelDefaultLabel();
+                    }
+                  }}
+                />
+                <Button
+                  onClick={() => void handleSaveDefaultLabel()}
+                  size="sm"
+                  className="cursor-pointer"
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={handleCancelDefaultLabel}
+                  variant="outline"
+                  size="sm"
+                  className="cursor-pointer"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <Input
+                  value={defaultExclusiveGroupLabel || "Select an option"}
+                  readOnly
+                  className="pr-16"
+                />
+                <Button
+                  className="absolute right-1 top-1/2 -translate-y-1/2 cursor-pointer"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingDefaultLabel(true)}
+                >
+                  <Edit className="w-3.5 h-3.5 mr-1" />
+                  Edit
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
+        ) : null}
+
+        {totalOptionsCount === 0 ? (
+          createOptionForm
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium">Options</p>
+                <p className="text-xs text-muted-foreground">
+                  Workers can select only one at a time.
+                </p>
+              </div>
+              <Badge variant="secondary" className="text-xs shrink-0">
+                {totalOptionsCount}
+              </Badge>
+            </div>
+
+            <div className="space-y-2">
+              {allClusters.map((cluster) => {
+                const clusterFields = cluster.fieldIds
+                  .map((fieldId) => fields.find((f) => f.id === fieldId))
+                  .filter((f): f is FieldConfig => f !== undefined);
+
+                return (
+                  <div
+                    key={cluster.id}
+                    className="group rounded-lg border p-3 flex items-start justify-between gap-2 hover:border-primary/40 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">{cluster.displayName}</span>
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          {cluster.fieldIds.length}{" "}
+                          {cluster.fieldIds.length === 1 ? "field" : "fields"}
+                        </Badge>
+                      </div>
+                      {clusterFields.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {clusterFields.map((field) => (
+                            <Badge
+                              key={field.id}
+                              variant="outline"
+                              className="text-xs font-normal gap-1 pr-1"
+                            >
+                              <span>{field.label}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  requestAnimationFrame(() => {
+                                    Promise.resolve(
+                                      onUpdateField(field.id, {
+                                        mutually_exclusive_group: null,
+                                        group_cluster: null,
+                                      })
+                                    ).catch((err) => {
+                                      log.error("Failed to remove field from option:", err);
+                                    });
+                                  });
+                                }}
+                                className="rounded-full p-0.5 hover:bg-muted cursor-pointer"
+                                aria-label={`Remove ${field.label} from option`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {availableFields.length > 0 ? (
+                        <Popover
+                          open={fieldSelectionOpen === cluster.id}
+                          onOpenChange={(open) => setFieldSelectionOpen(open ? cluster.id : null)}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 cursor-pointer"
+                              aria-label={`Add field to ${cluster.displayName}`}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64" align="end">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Add field</Label>
+                              <p className="text-xs text-muted-foreground">
+                                Select a field for this option
+                              </p>
+                              <div className="max-h-48 overflow-y-auto space-y-1">
+                                {availableFields.map((field) => (
+                                  <Button
+                                    key={field.id}
+                                    variant="ghost"
+                                    className="w-full justify-start text-sm h-auto py-2 cursor-pointer"
+                                    onClick={() => handleAddFieldToCluster(cluster.id, field.id)}
+                                  >
+                                    {field.label}
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : null}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer"
+                        aria-label={`Delete ${cluster.displayName}`}
+                        onClick={() =>
+                          void handleDeleteCluster(DEFAULT_EXCLUSIVE_GROUP, cluster.id)
+                        }
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {showCreateForm ? (
+              createOptionForm
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full border-dashed cursor-pointer"
+                onClick={() => setShowCreateForm(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add option
+              </Button>
+            )}
+          </div>
+        )}
+
+        <p className="text-xs text-muted-foreground">
+          Tip: create options here, then assign fields with + or from each field&apos;s settings.
+        </p>
       </div>
     );
   }

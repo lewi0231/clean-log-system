@@ -1,16 +1,12 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { usePaymentLink } from "@/hooks/use-payment-link";
 import { log } from "@/lib/logger";
 import { CreditCard, ExternalLink, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface PaymentLinkButtonProps {
   invoiceId: string;
@@ -27,8 +23,7 @@ export default function PaymentLinkButton({
   disabled = false,
   onLinkCreated,
 }: PaymentLinkButtonProps) {
-  const { paymentLink, loading, error, createPaymentLink } =
-    usePaymentLink(invoiceId);
+  const { paymentLink, loading, error, createPaymentLink } = usePaymentLink(invoiceId);
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreateAndOpen = async () => {
@@ -53,14 +48,11 @@ export default function PaymentLinkButton({
         onLinkCreated(link.url);
       }
     } catch (err) {
-      log.error("Failed to create payment link", {
-        error: err instanceof Error ? err.message : "Unknown error",
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      log.error("Failed to create payment link", { error: msg });
+      toast.error("Failed to create payment link", {
+        description: msg,
       });
-      alert(
-        `Failed to create payment link: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
     } finally {
       setIsCreating(false);
     }

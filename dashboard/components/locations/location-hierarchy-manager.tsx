@@ -542,10 +542,12 @@ export default function LocationHierarchyManager() {
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
-                  <Label htmlFor="auto-generate-enabled">Auto-Generate Invoices</Label>
+                  <Label htmlFor="auto-generate-enabled">Auto-Generate Invoices (scheduled)</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically create invoices from completed jobs for locations in this
-                    hierarchy node based on a schedule
+                    Batch-create draft invoices on a schedule for jobs under this node. This is
+                    separate from Settings → Invoicing → Auto-Generate (which creates a draft as
+                    soon as each job completes). When scheduled auto-generate is on here, it takes
+                    over for these locations and suppresses the immediate org setting.
                   </p>
                 </div>
                 <Switch

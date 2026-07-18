@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: staging-sync-main
+  cancel-in-progress: true
+
 permissions:
   contents: write
   pull-requests: write
@@ -16,6 +20,7 @@ jobs:
   sync-staging:
     name: Sync staging branch with main
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     env:
       GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}

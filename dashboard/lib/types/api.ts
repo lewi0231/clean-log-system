@@ -18,6 +18,7 @@ export interface CreateWorkerRequest {
   last_name: string;
   email: string;
   phone: string;
+  engagement_type?: "employee" | "contractor";
 }
 
 /** Result of create-worker edge function (includes email delivery flags). */
@@ -34,6 +35,7 @@ export interface UpdateWorkerRequest {
   email?: string;
   phone?: string;
   active?: boolean;
+  engagement_type?: "employee" | "contractor";
 }
 
 export interface DeleteWorkerRequest {
@@ -372,6 +374,20 @@ export interface RegisterOrgSendingDomainResponse {
   reusedExisting?: boolean;
 }
 
+/** `send-test-org-sending-domain-email` */
+export interface SendTestOrgSendingDomainEmailRequest {
+  organization_id: string;
+}
+
+export interface SendTestOrgSendingDomainEmailResponse {
+  success: boolean;
+  to: string;
+  from: string;
+  domain_name: string;
+  email_id?: string | null;
+  skipped?: boolean;
+}
+
 // Field Pricing API
 export interface ListFieldPricingRequest {
   organization_id: string;
@@ -488,8 +504,16 @@ export interface CompleteOnboardingRequest {
   employee_count: "none" | "1-5" | "6-20" | "21-50" | "50+";
   abn: string;
   has_locations: boolean;
+  /** Soft signal: some sites belong to the same company/client group (introduces hierarchy later). */
+  has_company_client_groups: boolean;
   has_workers: boolean;
-  worker_payment_method: "hourly" | "per_job" | "fixed_salary" | null;
+  /**
+   * Settlement mode in Tally (not legal classification).
+   * Required when has_workers / employee_count !== none.
+   */
+  workforce_engagement?: "employees" | "contractors" | "both" | null;
+  /** Preference only — not used for payroll. `per_job` = output / piece rate. */
+  worker_payment_method: "hourly" | "per_job" | null;
   worker_payment_frequency: "weekly" | "fortnightly" | "monthly" | null;
   invoice_frequency: "immediately" | "daily" | "weekly" | "monthly";
   invoice_weekly_day: number | null;
@@ -524,9 +548,85 @@ import type {
   ServiceAddressConfig,
   ServicePricingMode,
   Worker,
+  WorkerTaxInvoice,
 } from "../types";
 
 // API Error Response
 export interface ApiErrorResponse {
   error: string;
+}
+
+// Worker Tax Invoice API
+export interface DraftWorkerTaxInvoiceRequest {
+  organization_id: string;
+  job_ids: string[];
+}
+
+export interface DraftWorkerTaxInvoiceResponse {
+  success?: boolean;
+  invoice?: WorkerTaxInvoice;
+}
+
+export interface SubmitWorkerTaxInvoiceRequest {
+  organization_id: string;
+  invoice_id: string;
+}
+
+export interface SubmitWorkerTaxInvoiceResponse {
+  success?: boolean;
+  invoice?: WorkerTaxInvoice;
+}
+
+export interface ListWorkerTaxInvoicesRequest {
+  organization_id: string;
+  worker_id?: string;
+}
+
+export interface ListWorkerTaxInvoicesResponse {
+  success?: boolean;
+  invoices?: WorkerTaxInvoice[];
+}
+
+export interface GetWorkerTaxInvoiceRequest {
+  organization_id: string;
+  invoice_id: string;
+}
+
+export interface GetWorkerTaxInvoiceResponse {
+  success?: boolean;
+  invoice?: WorkerTaxInvoice;
+}
+
+export interface ReviewWorkerTaxInvoiceRequest {
+  organization_id: string;
+  invoice_id: string;
+  action: "approve" | "reject";
+  review_notes?: string | null;
+}
+
+export interface ReviewWorkerTaxInvoiceResponse {
+  success?: boolean;
+  invoice?: WorkerTaxInvoice;
+}
+
+export interface UpdateWorkerTaxInvoiceStatusRequest {
+  organization_id: string;
+  invoice_id: string;
+  action: "cancel" | "mark_paid";
+}
+
+export interface UpdateWorkerTaxInvoiceStatusResponse {
+  success?: boolean;
+  invoice?: WorkerTaxInvoice;
+}
+
+export interface GenerateWorkerTaxInvoicePdfRequest {
+  organization_id: string;
+  invoice_id: string;
+}
+
+export interface GenerateWorkerTaxInvoicePdfResponse {
+  success?: boolean;
+  html?: string;
+  invoice_number?: string | null;
 }

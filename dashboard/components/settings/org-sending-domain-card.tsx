@@ -16,10 +16,12 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  Mail,
   RefreshCw,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 type SendingDomainRow = {
   id: string;
@@ -36,6 +38,9 @@ const DISPLAY_LABEL: Record<string, string> = {
   error: "Error",
   disabled: "Disabled",
 };
+
+const PENDING_STATUSES = new Set(["pending_setup", "pending_dns"]);
+const AUTO_POLL_MS = 45_000;
 
 interface DnsRecord {
   name: string;
@@ -68,6 +73,14 @@ const RECORD_EXPLANATIONS: Record<string, string> = {
   SPF: "Tells email servers which services can send mail on your behalf.",
   MX: "Handles bounce and complaint feedback from email providers.",
 };
+
+function formatCheckedAt(date: Date): string {
+  return date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
 
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -112,6 +125,7 @@ function DnsRecordRow({ record, domainName }: { record: DnsRecord; domainName: s
   const fullHostname = record.name.endsWith(domainName)
     ? record.name
     : `${record.name}.${domainName}`;
+  const nameLooksRelative = !record.name.endsWith(domainName) && !record.name.includes(".");
 
   return (
     <div className="border rounded-lg p-3 space-y-2 bg-card">
@@ -135,8 +149,19 @@ function DnsRecordRow({ record, domainName }: { record: DnsRecord; domainName: s
           <div className="min-w-0 flex-1">
             <span className="text-xs text-muted-foreground block">Host / Name</span>
             <code className="text-xs break-all">{fullHostname}</code>
+            {nameLooksRelative || record.name !== fullHostname ? (
+              <span className="text-[10px] text-muted-foreground block mt-0.5">
+                Copy uses provider name <code className="text-[10px]">{record.name}</code> — some
+                panels want that relative form, not the full hostname.
+              </span>
+            ) : null}
           </div>
-          <CopyButton value={record.name} label="host" />
+          <div className="flex flex-col gap-0.5 shrink-0">
+            <CopyButton value={record.name} label="host" />
+            {record.name !== fullHostname ? (
+              <CopyButton value={fullHostname} label="full host" />
+            ) : null}
+          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 bg-muted/50 rounded px-2 py-1">
@@ -185,6 +210,8 @@ function DnsRecordsGuide({ snapshot, domainName }: { snapshot: unknown; domainNa
 
   if (records.length === 0) return null;
 
+  const apexHint = domainName.split(".").slice(-2).join(".");
+
   return (
     <div className="space-y-4">
       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -192,16 +219,26 @@ function DnsRecordsGuide({ snapshot, domainName }: { snapshot: unknown; domainNa
         <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
           <li>Log in to your domain registrar or DNS provider</li>
           <li>
-            Navigate to DNS settings for{" "}
-            <strong>{domainName.split(".").slice(-2).join(".")}</strong>
+            Navigate to DNS settings for <strong>{apexHint}</strong>
           </li>
           <li>Add each record below using the Copy buttons</li>
-          <li>Save changes and wait for propagation (up to 48 hours)</li>
+          <li>Save changes and wait for propagation (often minutes; up to 48 hours)</li>
           <li>
-            Click <strong>Check DNS</strong> to verify — or we&apos;ll notify you when it&apos;s
-            ready
+            Click <strong>Check DNS</strong> to verify — or we&apos;ll recheck automatically while
+            this page is open
           </li>
         </ol>
+        <ul className="mt-3 text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
+          <li>
+            <strong>Cloudflare:</strong> set each record to DNS only (grey cloud), not proxied
+            (orange cloud).
+          </li>
+          <li>
+            <strong>Host / Name:</strong> some panels want the relative name (e.g.{" "}
+            <code className="text-[10px]">resend._domainkey</code>
+            ), others want the full hostname. Use the matching Copy button if both are shown.
+          </li>
+        </ul>
       </div>
 
       <div className="space-y-3">
@@ -263,8 +300,11 @@ export function OrgSendingDomainCard({
   const [loading, setLoading] = useState(isAdmin);
   const [row, setRow] = useState<SendingDomainRow | null>(null);
   const [domainInput, setDomainInput] = useState("");
-  const [busy, setBusy] = useState<null | "register" | "refresh" | "remove">(null);
+  const [busy, setBusy] = useState<null | "register" | "refresh" | "remove" | "test">(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
+  const prevDisplayStatusRef = useRef<string | null>(null);
+  const refreshInFlightRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!isAdmin) {
@@ -299,6 +339,73 @@ export function OrgSendingDomainCard({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!row) {
+      prevDisplayStatusRef.current = null;
+      return;
+    }
+    const prev = prevDisplayStatusRef.current;
+    if (prev && prev !== "verified" && row.display_status === "verified") {
+      toast.success("Domain verified", {
+        description: `Emails can send from addresses like invoices@${row.domain_name}`,
+      });
+    }
+    prevDisplayStatusRef.current = row.display_status;
+  }, [row]);
+
+  const refreshStatus = useCallback(
+    async (opts: { announce: boolean }) => {
+      if (refreshInFlightRef.current) return;
+      refreshInFlightRef.current = true;
+      if (opts.announce) {
+        setActionError(null);
+        setBusy("refresh");
+      }
+      try {
+        const result = await invokeTypedEdge("refresh-org-sending-domain-status", {
+          organization_id: organizationId,
+        });
+        setLastCheckedAt(new Date());
+        await load();
+        if (opts.announce) {
+          if (result.display_status === "error") {
+            toast.error("DNS check reported an error", {
+              description: "Review the records below or try again shortly.",
+            });
+          } else if (result.display_status !== "verified") {
+            toast.message("Still waiting for DNS", {
+              description:
+                "Records may take a few minutes to propagate. We will keep checking while this page is open.",
+            });
+          }
+          // Verified: success toast comes from the display_status transition effect.
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Request failed";
+        if (opts.announce) {
+          setActionError(msg);
+          toast.error("Could not check DNS", { description: msg });
+        }
+        log.warn("refresh-org-sending-domain-status failed (user action)", { error: msg });
+      } finally {
+        refreshInFlightRef.current = false;
+        if (opts.announce) setBusy(null);
+      }
+    },
+    [organizationId, load]
+  );
+
+  useEffect(() => {
+    if (!isAdmin || !entitled || !row) return;
+    if (!PENDING_STATUSES.has(row.display_status)) return;
+
+    const id = window.setInterval(() => {
+      void refreshStatus({ announce: false });
+    }, AUTO_POLL_MS);
+
+    return () => window.clearInterval(id);
+  }, [isAdmin, entitled, row?.display_status, row?.id, refreshStatus]);
 
   if (!isAdmin) {
     const roleLabel =
@@ -357,10 +464,27 @@ export function OrgSendingDomainCard({
             administrator can add DNS records and verify the domain once enabled.
           </p>
           {supportEmail ? (
-            <Button variant="outline" size="sm" className="w-fit" asChild>
-              <a href={`mailto:${supportEmail}?subject=${mailSubject}`}>Email support</a>
-            </Button>
-          ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="w-fit cursor-pointer" asChild>
+                <a href={`mailto:${supportEmail}?subject=${mailSubject}`}>Email support</a>
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                Or write to{" "}
+                <a
+                  className="font-medium text-foreground underline underline-offset-2"
+                  href={`mailto:${supportEmail}?subject=${mailSubject}`}
+                >
+                  {supportEmail}
+                </a>
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Ask your account administrator to enable Pro email domain, or set{" "}
+              <code className="text-xs">NEXT_PUBLIC_SUPPORT_EMAIL</code> so this card can open a
+              mail client.
+            </p>
+          )}
         </CardContent>
       </Card>
     );
@@ -376,28 +500,16 @@ export function OrgSendingDomainCard({
         organization_id: organizationId,
         domain_name: name,
       });
+      setLastCheckedAt(new Date());
       await load();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Request failed";
-      setActionError(msg);
-      log.warn("register-org-sending-domain failed (user action)", { error: msg });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setActionError(null);
-    setBusy("refresh");
-    try {
-      await invokeTypedEdge("refresh-org-sending-domain-status", {
-        organization_id: organizationId,
+      toast.message("Domain registered", {
+        description: "Add the DNS records below, then click Check DNS.",
       });
-      await load();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed";
       setActionError(msg);
-      log.warn("refresh-org-sending-domain-status failed (user action)", { error: msg });
+      toast.error("Could not register domain", { description: msg });
+      log.warn("register-org-sending-domain failed (user action)", { error: msg });
     } finally {
       setBusy(null);
     }
@@ -411,15 +523,47 @@ export function OrgSendingDomainCard({
       await invokeTypedEdge("remove-org-sending-domain", {
         organization_id: organizationId,
       });
+      setLastCheckedAt(null);
       await load();
+      toast.message("Domain removed");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Request failed";
       setActionError(msg);
+      toast.error("Could not remove domain", { description: msg });
       log.warn("remove-org-sending-domain failed (user action)", { error: msg });
     } finally {
       setBusy(null);
     }
   };
+
+  const handleSendTest = async () => {
+    setActionError(null);
+    setBusy("test");
+    try {
+      const result = await invokeTypedEdge("send-test-org-sending-domain-email", {
+        organization_id: organizationId,
+      });
+      if (result.skipped) {
+        toast.message("Test email skipped (local SKIP_EMAIL_SENDING)", {
+          description: `Would send from ${result.from} to ${result.to}`,
+        });
+      } else {
+        toast.success("Test email sent", {
+          description: `Sent to ${result.to} from ${result.from}`,
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Request failed";
+      setActionError(msg);
+      toast.error("Could not send test email", { description: msg });
+      log.warn("send-test-org-sending-domain-email failed (user action)", { error: msg });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const isVerified = row?.display_status === "verified";
+  const exampleFrom = row ? `invoices@${row.domain_name}` : "";
 
   return (
     <Card>
@@ -427,7 +571,7 @@ export function OrgSendingDomainCard({
         <CardTitle>Email &amp; domain</CardTitle>
         <CardDescription>
           Register a domain with our email provider, add the DNS records shown below, then wait for
-          verification. We check automatically every few hours and will notify you when it&apos;s
+          verification. We recheck automatically while this page is open, and notify you when it is
           ready.
         </CardDescription>
       </CardHeader>
@@ -466,25 +610,62 @@ export function OrgSendingDomainCard({
           </div>
         </div>
 
+        {row && isVerified && (
+          <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-200">
+              <CheckCircle2 className="h-4 w-4" />
+              Domain verified and ready
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Outbound mail will use addresses on <code className="text-xs">{row.domain_name}</code>
+              , for example <code className="text-xs">{exampleFrom}</code>.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => void handleSendTest()}
+              disabled={busy !== null}
+            >
+              {busy === "test" ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Mail className="h-4 w-4 mr-1" />
+              )}
+              Send test email to me
+            </Button>
+          </div>
+        )}
+
         {row && (
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium">Status</span>
               <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs">
-                {row.display_status === "verified" && (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                )}
+                {isVerified && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
                 {DISPLAY_LABEL[row.display_status] ?? row.display_status}
               </span>
               <span className="text-xs text-muted-foreground">(Resend: {row.resend_status})</span>
+              {lastCheckedAt && (
+                <span className="text-xs text-muted-foreground">
+                  Last checked {formatCheckedAt(lastCheckedAt)}
+                </span>
+              )}
+              {PENDING_STATUSES.has(row.display_status) && (
+                <span className="text-xs text-muted-foreground">
+                  Auto-checking every {AUTO_POLL_MS / 1000}s
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => void handleRefresh()}
+                onClick={() => void refreshStatus({ announce: true })}
                 disabled={busy !== null}
+                className="cursor-pointer"
               >
                 {busy === "refresh" ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-1" />
@@ -499,7 +680,7 @@ export function OrgSendingDomainCard({
                 size="sm"
                 onClick={() => void handleRemove()}
                 disabled={busy !== null}
-                className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                className="text-destructive border-destructive/50 hover:bg-destructive/10 cursor-pointer"
               >
                 {busy === "remove" ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-1" />
@@ -509,7 +690,20 @@ export function OrgSendingDomainCard({
                 Remove domain
               </Button>
             </div>
-            <DnsRecordsGuide snapshot={row.dns_records_snapshot} domainName={row.domain_name} />
+            {!isVerified && (
+              <DnsRecordsGuide snapshot={row.dns_records_snapshot} domainName={row.domain_name} />
+            )}
+            {isVerified && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-muted-foreground">Show DNS records</summary>
+                <div className="mt-3">
+                  <DnsRecordsGuide
+                    snapshot={row.dns_records_snapshot}
+                    domainName={row.domain_name}
+                  />
+                </div>
+              </details>
+            )}
           </div>
         )}
       </CardContent>

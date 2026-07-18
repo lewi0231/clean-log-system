@@ -9,6 +9,7 @@ import {
   getDefaultInvoiceTemplateConfig,
 } from "../_utils/invoice-template-defaults.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { normalizeEmailRecipientConfig } from "../_utils/normalize-email-recipient-config.ts";
 import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -74,7 +75,9 @@ serve(async (req) => {
         bill_to_fields: config.bill_to_fields ?? [],
         service_address_config: config.service_address_config ?? DEFAULT_SERVICE_ADDRESS_CONFIG,
         billing_address_config: config.billing_address_config ?? DEFAULT_BILLING_ADDRESS_CONFIG,
-        email_recipient_config: config.email_recipient_config ?? DEFAULT_EMAIL_RECIPIENT_CONFIG,
+        email_recipient_config: normalizeEmailRecipientConfig(
+          config.email_recipient_config ?? DEFAULT_EMAIL_RECIPIENT_CONFIG
+        ),
         line_item_display: config.line_item_display ?? DEFAULT_LINE_ITEM_DISPLAY,
         created_at: config.created_at,
         updated_at: config.updated_at,

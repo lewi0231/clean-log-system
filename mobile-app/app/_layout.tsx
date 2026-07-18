@@ -25,6 +25,8 @@ function AppNavigation() {
           <>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="job/[id]" />
+            <Stack.Screen name="tax-invoices/index" />
+            <Stack.Screen name="tax-invoices/create" />
             <Stack.Screen
               name="modal"
               options={{
