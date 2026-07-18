@@ -1,27 +1,75 @@
 /**
- * Shared helpers for worker tax invoice eligibility and active-line checks.
- * Pure rules live in shared/utils/worker-tax-invoice.ts
+ * Worker tax invoice helpers for Deno Edge Functions.
+ * Pure rules keep in sync with shared/utils/worker-tax-invoice.ts
+ * (Edge runtime cannot import files outside database/supabase/functions/).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  filterActiveTaxInvoiceConflicts,
-  normalizeTaxInvoiceJobIds,
-  MAX_TAX_INVOICE_JOBS,
-  ACTIVE_TI_STATUSES,
-  canCancelTaxInvoiceStatus,
-  isActiveTaxInvoiceStatus,
-  roundTaxInvoiceAmount,
-} from "../../../shared/utils/worker-tax-invoice.ts";
 
-export {
-  MAX_TAX_INVOICE_JOBS,
-  ACTIVE_TI_STATUSES,
-  canCancelTaxInvoiceStatus,
-  isActiveTaxInvoiceStatus,
-  normalizeTaxInvoiceJobIds,
-  filterActiveTaxInvoiceConflicts,
-  roundTaxInvoiceAmount,
+export const MAX_TAX_INVOICE_JOBS = 100;
+export const ACTIVE_TI_STATUSES = ["draft", "submitted", "approved", "paid"] as const;
+export const CANCELLABLE_TI_STATUSES = ["draft", "submitted", "approved"] as const;
+
+export function isActiveTaxInvoiceStatus(status: string): boolean {
+  return (ACTIVE_TI_STATUSES as readonly string[]).includes(status);
+}
+
+export function canCancelTaxInvoiceStatus(status: string): boolean {
+  return (CANCELLABLE_TI_STATUSES as readonly string[]).includes(status);
+}
+
+export function normalizeTaxInvoiceJobIds(
+  jobIds: unknown
+): { ok: true; jobIds: string[] } | { ok: false; message: string } {
+  if (!Array.isArray(jobIds)) {
+    return { ok: false, message: "job_ids must be an array" };
+  }
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const raw of jobIds) {
+    if (typeof raw !== "string" || raw.trim().length === 0) {
+      return { ok: false, message: "job_ids must be non-empty strings" };
+    }
+    const id = raw.trim();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    normalized.push(id);
+  }
+  if (normalized.length === 0) {
+    return { ok: false, message: "Select at least one job" };
+  }
+  if (normalized.length > MAX_TAX_INVOICE_JOBS) {
+    return { ok: false, message: `At most ${MAX_TAX_INVOICE_JOBS} jobs per tax invoice` };
+  }
+  return { ok: true, jobIds: normalized };
+}
+
+export type TaxInvoiceConflictCandidate = {
+  job_id: string;
+  invoice_id: string;
+  worker_id: string;
+  status: string;
 };
+
+export function filterActiveTaxInvoiceConflicts(
+  candidates: TaxInvoiceConflictCandidate[],
+  workerId: string,
+  excludeInvoiceId?: string
+): string[] {
+  const conflicts: string[] = [];
+  for (const row of candidates) {
+    if (row.worker_id !== workerId) continue;
+    if (excludeInvoiceId && row.invoice_id === excludeInvoiceId) continue;
+    if (isActiveTaxInvoiceStatus(row.status)) {
+      conflicts.push(row.job_id);
+    }
+  }
+  return conflicts;
+}
+
+export function roundTaxInvoiceAmount(amount: number): number {
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round(amount * 100) / 100;
+}
 
 export async function assertJobsEligibleForWorker(
   supabase: SupabaseClient,

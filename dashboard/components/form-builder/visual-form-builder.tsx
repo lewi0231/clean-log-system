@@ -5,7 +5,6 @@ import React, { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -29,8 +28,6 @@ import {
   AlignLeft,
   Calendar,
   CheckSquare,
-  ChevronDown,
-  ChevronRight,
   Clock,
   GripVertical,
   Hash,
@@ -45,8 +42,8 @@ import {
   Trash2,
   Type,
 } from "lucide-react";
-import { ConditionalLogicEditor } from "./conditional-logic-editor";
 import { FieldConfigDialog } from "./field-config-dialog";
+import { LocationRestrictionPicker } from "./location-restriction-picker";
 import { MobileDevicePreview } from "./mobile-device-preview";
 import { SectionEditor } from "./section-editor";
 
@@ -70,9 +67,6 @@ const FIELD_TYPES: {
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 
-// Single implicit mutually exclusive group for all clusters
-const DEFAULT_EXCLUSIVE_GROUP = "default_exclusive_group";
-
 interface VisualFormBuilderProps {
   fields: FieldConfig[];
   sections: FormSectionWithFields[];
@@ -94,8 +88,8 @@ interface VisualFormBuilderProps {
   ) => void | Promise<void>;
   onDeleteSection: (sectionId: string) => void | Promise<void>;
   onReorderSections: (sectionIds: string[]) => void | Promise<void>;
-  createdClusters?: string[];
   organizationId: string | null;
+  onOpenFieldGroupSettings?: () => void;
 }
 
 export function VisualFormBuilder({
@@ -109,13 +103,12 @@ export function VisualFormBuilder({
   onUpdateSection,
   onDeleteSection,
   onReorderSections,
-  createdClusters = [],
   organizationId,
+  onOpenFieldGroupSettings,
 }: VisualFormBuilderProps) {
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [draggedSectionField, setDraggedSectionField] = useState<string | null>(null);
   const [fieldOrder, setFieldOrder] = useState<string[]>(() => fields.map((f) => f.id));
-  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<Map<string, boolean>>(new Map());
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
   /** Increment when opening the add-field dialog so FieldConfigDialog remounts with fresh state. */
   const [fieldDialogSession, setFieldDialogSession] = useState(0);
@@ -495,7 +488,7 @@ export function VisualFormBuilder({
                 onUpdateField={onUpdateField}
                 onReorderFields={onReorderFields}
                 organizationId={organizationId}
-                createdClusters={createdClusters}
+                onOpenFieldGroupSettings={onOpenFieldGroupSettings}
               />
             </CardContent>
           </Card>
@@ -829,7 +822,12 @@ export function VisualFormBuilder({
                                   }}
                                 >
                                   <PopoverTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                      aria-label={`Field settings for ${field.label}`}
+                                    >
                                       <Settings className="w-4 h-4" />
                                     </Button>
                                   </PopoverTrigger>
@@ -982,221 +980,44 @@ export function VisualFormBuilder({
                                             </Label>
                                           </div>
                                           {restrictToLocationsMap.get(field.id) && (
-                                            <div className="space-y-2 pl-6 border-l-2 border-muted">
-                                              {locations.length === 0 ? (
-                                                <p className="text-xs text-muted-foreground">
-                                                  No locations available
-                                                </p>
-                                              ) : (
-                                                <div className="space-y-2 max-h-48 overflow-y-auto">
-                                                  {locations
-                                                    .filter((loc) => loc.active)
-                                                    .map((location) => (
-                                                      <div
-                                                        key={location.id}
-                                                        className="flex items-center space-x-2"
-                                                      >
-                                                        <input
-                                                          type="checkbox"
-                                                          id={`visual-location-${field.id}-${location.id}`}
-                                                          checked={(
-                                                            locationRestrictionsMap.get(field.id) ||
-                                                            []
-                                                          ).includes(location.id)}
-                                                          onChange={(e) => {
-                                                            const currentIds =
-                                                              locationRestrictionsMap.get(
-                                                                field.id
-                                                              ) || [];
-                                                            if (e.target.checked) {
-                                                              setLocationRestrictionsMap((prev) => {
-                                                                const next = new Map(prev);
-                                                                next.set(field.id, [
-                                                                  ...currentIds,
-                                                                  location.id,
-                                                                ]);
-                                                                return next;
-                                                              });
-                                                            } else {
-                                                              setLocationRestrictionsMap((prev) => {
-                                                                const next = new Map(prev);
-                                                                next.set(
-                                                                  field.id,
-                                                                  currentIds.filter(
-                                                                    (id) => id !== location.id
-                                                                  )
-                                                                );
-                                                                return next;
-                                                              });
-                                                            }
-                                                          }}
-                                                          className="h-4 w-4 rounded border-gray-300"
-                                                        />
-                                                        <Label
-                                                          htmlFor={`visual-location-${field.id}-${location.id}`}
-                                                          className="text-xs font-normal cursor-pointer"
-                                                        >
-                                                          {location.name}
-                                                        </Label>
-                                                      </div>
-                                                    ))}
-                                                </div>
-                                              )}
+                                            <div className="pl-6 border-l-2 border-muted">
+                                              <LocationRestrictionPicker
+                                                locations={locations}
+                                                selectedIds={
+                                                  locationRestrictionsMap.get(field.id) || []
+                                                }
+                                                onChange={(ids) => {
+                                                  setLocationRestrictionsMap((prev) => {
+                                                    const next = new Map(prev);
+                                                    next.set(field.id, ids);
+                                                    return next;
+                                                  });
+                                                }}
+                                                idPrefix={`visual-location-${field.id}`}
+                                                emptyMessage="No locations available"
+                                              />
                                             </div>
                                           )}
                                         </div>
                                       )}
 
-                                      {/* Advanced Section */}
-                                      <Collapsible
-                                        open={advancedSectionsOpen.get(field.id) || false}
-                                        onOpenChange={(open) => {
-                                          setAdvancedSectionsOpen((prev) => {
-                                            const next = new Map(prev);
-                                            next.set(field.id, open);
-                                            return next;
-                                          });
-                                        }}
-                                      >
-                                        <CollapsibleTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full justify-between"
+                                      <p className="text-[11px] text-muted-foreground rounded-lg border p-3 bg-muted/20">
+                                        Need this field mutually exclusive with another? Open{" "}
+                                        {onOpenFieldGroupSettings ? (
+                                          <button
+                                            type="button"
+                                            className="font-medium text-primary hover:underline cursor-pointer"
+                                            onClick={() => onOpenFieldGroupSettings()}
                                           >
-                                            <span className="text-xs">Advanced Options</span>
-                                            {advancedSectionsOpen.get(field.id) ? (
-                                              <ChevronDown className="w-3 h-3" />
-                                            ) : (
-                                              <ChevronRight className="w-3 h-3" />
-                                            )}
-                                          </Button>
-                                        </CollapsibleTrigger>
-                                        <CollapsibleContent className="space-y-4 pt-2 pl-4 border-l-2 border-muted bg-muted/20 rounded-r-md">
-                                          {/* Mutually Exclusive Cluster */}
-                                          <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
-                                            <Label className="text-xs">
-                                              Mutually Exclusive Cluster
-                                            </Label>
-                                            <p className="text-[11px] text-muted-foreground">
-                                              Assign this field to a cluster where only one option
-                                              can be selected at a time. All clusters share a single
-                                              implicit group behind the scenes.
-                                            </p>
-                                            {(() => {
-                                              // Get all clusters from all fields AND created clusters
-                                              const clustersFromFields = Array.from(
-                                                new Set(
-                                                  fields
-                                                    .map((f) => f.group_cluster)
-                                                    .filter((c): c is string => Boolean(c))
-                                                )
-                                              );
-                                              // Combine with created clusters that haven't been assigned yet
-                                              const allClusters = Array.from(
-                                                new Set([...clustersFromFields, ...createdClusters])
-                                              ).sort();
-
-                                              // Convert cluster ID to display name
-                                              const getClusterDisplayName = (clusterId: string) => {
-                                                return clusterId
-                                                  .split("_")
-                                                  .map(
-                                                    (word) =>
-                                                      word.charAt(0).toUpperCase() + word.slice(1)
-                                                  )
-                                                  .join(" ");
-                                              };
-
-                                              return (
-                                                <div className="space-y-2">
-                                                  <Select
-                                                    value={field.group_cluster || "none"}
-                                                    onValueChange={(value: string) => {
-                                                      if (value === "none") {
-                                                        handleUpdateField(field.id, {
-                                                          mutually_exclusive_group: null,
-                                                          group_cluster: null,
-                                                        });
-                                                      } else {
-                                                        handleUpdateField(field.id, {
-                                                          mutually_exclusive_group:
-                                                            DEFAULT_EXCLUSIVE_GROUP,
-                                                          group_cluster: value,
-                                                        });
-                                                      }
-                                                    }}
-                                                  >
-                                                    <SelectTrigger>
-                                                      <SelectValue placeholder="Select existing cluster" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="none">
-                                                        No cluster
-                                                      </SelectItem>
-                                                      {allClusters.map((clusterId) => (
-                                                        <SelectItem
-                                                          key={clusterId}
-                                                          value={clusterId}
-                                                        >
-                                                          {getClusterDisplayName(clusterId)}
-                                                        </SelectItem>
-                                                      ))}
-                                                    </SelectContent>
-                                                  </Select>
-                                                  <Input
-                                                    value={
-                                                      field.group_cluster
-                                                        ? getClusterDisplayName(field.group_cluster)
-                                                        : ""
-                                                    }
-                                                    onChange={(e) => {
-                                                      // Allow typing freely; apply on blur
-                                                      if (!e.target.value) {
-                                                        handleUpdateField(field.id, {
-                                                          mutually_exclusive_group: null,
-                                                          group_cluster: null,
-                                                        });
-                                                      }
-                                                    }}
-                                                    onBlur={(e) => {
-                                                      const clusterName = e.target.value.trim();
-                                                      if (clusterName) {
-                                                        const clusterId = clusterName
-                                                          .toLowerCase()
-                                                          .replace(/[^a-z0-9]+/g, "_")
-                                                          .replace(/^_|_$/g, "");
-
-                                                        handleUpdateField(field.id, {
-                                                          mutually_exclusive_group:
-                                                            DEFAULT_EXCLUSIVE_GROUP,
-                                                          group_cluster: clusterId,
-                                                        });
-                                                      }
-                                                    }}
-                                                    placeholder={
-                                                      allClusters.length > 0
-                                                        ? "Or type new cluster name"
-                                                        : "Type cluster name (e.g., Simple Toggle)"
-                                                    }
-                                                  />
-                                                </div>
-                                              );
-                                            })()}
-                                          </div>
-
-                                          {/* Conditional Logic */}
-                                          <ConditionalLogicEditor
-                                            field={field}
-                                            allFields={fields}
-                                            onChange={(logic) =>
-                                              handleUpdateField(field.id, {
-                                                conditional_logic: logic,
-                                              })
-                                            }
-                                          />
-                                        </CollapsibleContent>
-                                      </Collapsible>
+                                            Field Group Settings
+                                          </button>
+                                        ) : (
+                                          <span className="font-medium text-primary">
+                                            Field Group Settings
+                                          </span>
+                                        )}{" "}
+                                        to configure that.
+                                      </p>
                                     </div>
                                   </PopoverContent>
                                 </Popover>
@@ -1252,6 +1073,7 @@ export function VisualFormBuilder({
           existingFieldNames={fields.map((f) => f.name)}
           onSave={handleSaveFieldFromDialog}
           organizationId={organizationId}
+          onOpenFieldGroupSettings={onOpenFieldGroupSettings}
         />
       )}
     </div>

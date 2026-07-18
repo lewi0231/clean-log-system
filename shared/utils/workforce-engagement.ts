@@ -1,6 +1,8 @@
 /**
  * Workforce engagement helpers for contractor tax-invoice gating.
- * Canonical implementation — Deno re-exports via functions/_utils/workforce-engagement.ts
+ * Canonical for dashboard/mobile. Deno Edge copy lives at
+ * database/supabase/functions/_utils/workforce-engagement.ts (must stay in sync —
+ * Edge runtime cannot import outside functions/).
  */
 
 export const WORKFORCE_ENGAGEMENT_VALUES = ["employees", "contractors", "both"] as const;
@@ -14,8 +16,7 @@ export const WORKFORCE_ENGAGEMENT_DISCLAIMER =
 
 export function isWorkforceEngagement(value: unknown): value is WorkforceEngagement {
   return (
-    typeof value === "string" &&
-    (WORKFORCE_ENGAGEMENT_VALUES as readonly string[]).includes(value)
+    typeof value === "string" && (WORKFORCE_ENGAGEMENT_VALUES as readonly string[]).includes(value)
   );
 }
 
@@ -37,7 +38,7 @@ export function normalizeWorkerEngagementType(value: unknown): WorkerEngagementT
 /** Mobile / worker: may submit a tax invoice */
 export function canSubmitTaxInvoice(
   orgEngagement: WorkforceEngagement | string | null | undefined,
-  workerEngagement: WorkerEngagementType | string | null | undefined,
+  workerEngagement: WorkerEngagementType | string | null | undefined
 ): boolean {
   const org = normalizeWorkforceEngagement(orgEngagement);
   const worker = normalizeWorkerEngagementType(workerEngagement);
@@ -49,7 +50,7 @@ export function canSubmitTaxInvoice(
 /** Admin dashboard: show Tax invoices queue */
 export function canAdminSeeTaxInvoiceQueue(
   orgEngagement: WorkforceEngagement | string | null | undefined,
-  hasHistoricalTaxInvoices = false,
+  hasHistoricalTaxInvoices = false
 ): boolean {
   const org = normalizeWorkforceEngagement(orgEngagement);
   if (org === "contractors" || org === "both") return true;
@@ -58,7 +59,7 @@ export function canAdminSeeTaxInvoiceQueue(
 
 /** Default engagement_type when creating a worker */
 export function defaultWorkerEngagementForOrg(
-  orgEngagement: WorkforceEngagement,
+  orgEngagement: WorkforceEngagement
 ): WorkerEngagementType | null {
   if (orgEngagement === "employees") return "employee";
   if (orgEngagement === "contractors") return "contractor";

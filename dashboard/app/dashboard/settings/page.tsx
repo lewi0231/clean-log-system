@@ -42,11 +42,12 @@ import { getRatingConfigPreset, RATING_DIMENSION_LABELS } from "@/lib/constants/
 import { BusinessMode, OrganizationSettings, SupportedCurrency } from "@/lib/types";
 import type { RatingConfigType } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { DollarSign, ExternalLink, Loader2, Save, Upload, X } from "lucide-react";
+import { DollarSign, ExternalLink, Upload, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { organizationId, userRole, loading: orgLoading, error: orgError } = useOrganization();
@@ -103,9 +104,6 @@ export default function SettingsPage() {
     message: string;
   }>({ open: false, title: "", message: "" });
 
-  // Track unsaved changes and saving state
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [initialSettings, setInitialSettings] = useState<OrganizationSettings | null>(null);
 
   const fetchSettings = async () => {
@@ -200,7 +198,6 @@ export default function SettingsPage() {
           workforce_engagement: data.settings.workforce_engagement ?? "employees",
         };
         setInitialSettings(initialSnapshot);
-        setHasUnsavedChanges(false);
       }
     } catch (err) {
       log.error("Settings: Failed to fetch organization settings", {
@@ -216,40 +213,6 @@ export default function SettingsPage() {
       });
     }
   };
-
-  // Track changes to bank transfer settings
-  useEffect(() => {
-    if (!initialSettings) return;
-
-    const hasBankTransferChanges =
-      settings.bank_transfer_bsb !== initialSettings.bank_transfer_bsb ||
-      settings.bank_transfer_account_number !== initialSettings.bank_transfer_account_number ||
-      settings.bank_transfer_account_name !== initialSettings.bank_transfer_account_name ||
-      settings.show_bank_transfer_on_invoices !== initialSettings.show_bank_transfer_on_invoices;
-
-    setHasUnsavedChanges(hasBankTransferChanges);
-  }, [
-    settings.bank_transfer_bsb,
-    settings.bank_transfer_account_number,
-    settings.bank_transfer_account_name,
-    settings.show_bank_transfer_on_invoices,
-    initialSettings,
-  ]);
-
-  // Warn user if they try to leave with unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [hasUnsavedChanges]);
 
   const normalizeLogoUrl = (url: string | null): string | null => {
     if (!url) return null;
@@ -1071,105 +1034,93 @@ export default function SettingsPage() {
     }
   };
 
-  const handleShowBankTransferChange = (enabled: boolean) => {
-    // Just update local state - will be saved with other bank transfer settings
+  const applyBankTransferSettings = (updated: OrganizationSettings) => {
     setSettings((prev) => ({
       ...prev,
-      show_bank_transfer_on_invoices: enabled,
+      bank_transfer_bsb: updated.bank_transfer_bsb ?? null,
+      bank_transfer_account_number: updated.bank_transfer_account_number ?? null,
+      bank_transfer_account_name: updated.bank_transfer_account_name ?? null,
+      show_bank_transfer_on_invoices: updated.show_bank_transfer_on_invoices ?? true,
     }));
-  };
-
-  // Save all bank transfer settings together
-  const handleSaveBankTransferSettings = async () => {
-    if (!organizationId) return;
-
-    // Validate BSB format if provided
-    if (settings.bank_transfer_bsb && settings.bank_transfer_bsb.trim()) {
-      const trimmedBsb = settings.bank_transfer_bsb.trim();
-      if (!/^\d{3}-\d{3}$/.test(trimmedBsb)) {
-        setErrorDialog({
-          open: true,
-          title: "Validation Error",
-          message: "BSB must be in format XXX-XXX (e.g., 123-456)",
-        });
-        return;
-      }
-    }
-
-    // Validate account number if provided
-    if (settings.bank_transfer_account_number && settings.bank_transfer_account_number.trim()) {
-      const trimmedAccount = settings.bank_transfer_account_number.trim();
-      if (
-        !/^\d+$/.test(trimmedAccount) ||
-        trimmedAccount.length < 6 ||
-        trimmedAccount.length > 10
-      ) {
-        setErrorDialog({
-          open: true,
-          title: "Validation Error",
-          message: "Account number must be 6-10 digits",
-        });
-        return;
-      }
-    }
-
-    setSaving(true);
-    try {
-      // Never log bank details; only log presence flags.
-      log.info("Settings: Saving bank transfer settings", {
-        hasBsb: !!settings.bank_transfer_bsb?.trim(),
-        hasAccountNumber: !!settings.bank_transfer_account_number?.trim(),
-        hasAccountName: !!settings.bank_transfer_account_name?.trim(),
-        showOnInvoices: settings.show_bank_transfer_on_invoices,
-      });
-
-      const data = await invokeTypedEdge("update-organization-settings", {
-        organization_id: organizationId,
-        bank_transfer_bsb: settings.bank_transfer_bsb?.trim() || null,
-        bank_transfer_account_number: settings.bank_transfer_account_number?.trim() || null,
-        bank_transfer_account_name: settings.bank_transfer_account_name?.trim() || null,
-        show_bank_transfer_on_invoices: settings.show_bank_transfer_on_invoices,
-      });
-
-      const updated = data.settings;
-      if (updated) {
-        setSettings((prev) => ({
-          ...prev,
-          bank_transfer_bsb: updated.bank_transfer_bsb ?? null,
-          bank_transfer_account_number: updated.bank_transfer_account_number ?? null,
-          bank_transfer_account_name: updated.bank_transfer_account_name ?? null,
-          show_bank_transfer_on_invoices: updated.show_bank_transfer_on_invoices ?? true,
-        }));
-
-        // Update initial settings to mark as saved
-        if (initialSettings) {
-          setInitialSettings({
-            ...initialSettings,
+    setInitialSettings((init) =>
+      init
+        ? {
+            ...init,
             bank_transfer_bsb: updated.bank_transfer_bsb ?? null,
             bank_transfer_account_number: updated.bank_transfer_account_number ?? null,
             bank_transfer_account_name: updated.bank_transfer_account_name ?? null,
             show_bank_transfer_on_invoices: updated.show_bank_transfer_on_invoices ?? true,
-          });
-        }
-        setHasUnsavedChanges(false);
-      }
+          }
+        : init
+    );
+  };
 
-      log.info("Settings: Bank transfer settings saved successfully");
+  const handleShowBankTransferChange = async (enabled: boolean) => {
+    if (!organizationId) return;
+    const previous = settings.show_bank_transfer_on_invoices;
+    setSettings((prev) => ({
+      ...prev,
+      show_bank_transfer_on_invoices: enabled,
+    }));
+    try {
+      const data = await invokeTypedEdge("update-organization-settings", {
+        organization_id: organizationId,
+        show_bank_transfer_on_invoices: enabled,
+      });
+      if (data.settings) applyBankTransferSettings(data.settings);
+      toast.success("Bank transfer display updated");
     } catch (err) {
-      log.error("Settings: Failed to save bank transfer settings", {
+      setSettings((prev) => ({
+        ...prev,
+        show_bank_transfer_on_invoices: previous,
+      }));
+      log.error("Settings: Failed to update bank transfer display", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       setErrorDialog({
         open: true,
-        title: "Save Failed",
+        title: "Update Failed",
         message:
           err instanceof Error
             ? err.message
-            : "Failed to save bank transfer settings. Please try again.",
+            : "Failed to update bank transfer display. Please try again.",
       });
-    } finally {
-      setSaving(false);
     }
+  };
+
+  const handleBankTransferBsbSave = async (value: string) => {
+    if (!organizationId) return;
+    const digits = value.replace(/\D/g, "").slice(0, 6);
+    // Incomplete while typing — wait; empty clears the stored value
+    if (digits.length > 0 && digits.length < 6) return;
+    const trimmed = digits.length === 0 ? null : `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      bank_transfer_bsb: trimmed,
+    });
+    if (data.settings) applyBankTransferSettings(data.settings);
+  };
+
+  const handleBankTransferAccountNumberSave = async (value: string) => {
+    if (!organizationId) return;
+    const trimmed = value.replace(/\D/g, "").slice(0, 10);
+    // Incomplete while typing — wait; empty clears the stored value
+    if (trimmed.length > 0 && trimmed.length < 6) return;
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      bank_transfer_account_number: trimmed || null,
+    });
+    if (data.settings) applyBankTransferSettings(data.settings);
+  };
+
+  const handleBankTransferAccountNameSave = async (value: string) => {
+    if (!organizationId) return;
+    const trimmed = value.trim();
+    const data = await invokeTypedEdge("update-organization-settings", {
+      organization_id: organizationId,
+      bank_transfer_account_name: trimmed || null,
+    });
+    if (data.settings) applyBankTransferSettings(data.settings);
   };
 
   useEffect(() => {
@@ -1504,9 +1455,10 @@ export default function SettingsPage() {
                 <div className="space-y-0.5 flex-1">
                   <Label htmlFor="auto-generate-invoices">Auto-Generate Invoices</Label>
                   <p className="text-sm text-muted-foreground">
-                    Automatically create draft invoices when jobs are completed, for you to review
-                    and send. If you set this on a specific location or company group, that setting
-                    overrides this organisation default.
+                    Create a draft invoice as soon as a job is completed (for review before
+                    sending). Location hierarchy can instead use a scheduled batch for specific
+                    company groups; when that schedule is enabled, it overrides this immediate
+                    setting for those locations.
                   </p>
                 </div>
                 <Switch
@@ -1986,7 +1938,8 @@ export default function SettingsPage() {
               <CardTitle>Bank Transfer</CardTitle>
               <CardDescription>
                 Add your bank account details to display on invoices for manual payment processing.
-                Payments via bank transfer require manual status updates.
+                Changes save automatically. Payments via bank transfer require manual status
+                updates.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -2002,78 +1955,80 @@ export default function SettingsPage() {
                 </div>
                 <Switch
                   checked={settings.show_bank_transfer_on_invoices}
-                  onCheckedChange={handleShowBankTransferChange}
+                  onCheckedChange={(checked) => void handleShowBankTransferChange(checked)}
                   className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                 />
               </div>
 
               {settings.show_bank_transfer_on_invoices && (
                 <div className="space-y-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-bsb-pay">BSB</Label>
-                    <Input
-                      id="bank-transfer-bsb-pay"
-                      value={settings.bank_transfer_bsb || ""}
-                      onChange={(e) => {
-                        let value = e.target.value;
-                        const digits = value.replace(/\D/g, "");
-                        if (digits.length <= 3) {
-                          value = digits;
-                        } else if (digits.length <= 6) {
-                          value = `${digits.slice(0, 3)}-${digits.slice(3)}`;
-                        } else {
-                          value = `${digits.slice(0, 3)}-${digits.slice(3, 6)}`;
-                        }
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_bsb: value,
-                        }));
-                      }}
-                      placeholder="123-456"
-                      maxLength={7}
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">Format: XXX-XXX (e.g., 123-456)</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-number-pay">Account Number</Label>
-                    <Input
-                      id="bank-transfer-account-number-pay"
-                      type="text"
-                      inputMode="numeric"
-                      value={settings.bank_transfer_account_number || ""}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_account_number: e.target.value.replace(/\D/g, ""),
-                        }))
+                  <AutoSaveInput
+                    id="bank-transfer-bsb-pay"
+                    label="BSB"
+                    value={settings.bank_transfer_bsb}
+                    onSave={async (value) => {
+                      try {
+                        await handleBankTransferBsbSave(value);
+                      } catch (err) {
+                        setErrorDialog({
+                          open: true,
+                          title: "Validation Error",
+                          message:
+                            err instanceof Error
+                              ? err.message
+                              : "BSB must be in format XXX-XXX (e.g., 123-456)",
+                        });
+                        throw err;
                       }
-                      placeholder="987654321"
-                      maxLength={10}
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">6-10 digits</p>
-                  </div>
+                    }}
+                    normalizeValue={(val) => {
+                      const digits = val.replace(/\D/g, "").slice(0, 6);
+                      if (digits.length <= 3) return digits;
+                      return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+                    }}
+                    placeholder="123-456"
+                    maxLength={7}
+                    className="max-w-xs"
+                    description="Format: XXX-XXX (e.g., 123-456)"
+                  />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="bank-transfer-account-name-pay">Account Name (Optional)</Label>
-                    <Input
-                      id="bank-transfer-account-name-pay"
-                      value={settings.bank_transfer_account_name || ""}
-                      onChange={(e) =>
-                        setSettings((prev) => ({
-                          ...prev,
-                          bank_transfer_account_name: e.target.value,
-                        }))
+                  <AutoSaveInput
+                    id="bank-transfer-account-number-pay"
+                    label="Account Number"
+                    type="text"
+                    inputMode="numeric"
+                    value={settings.bank_transfer_account_number}
+                    onSave={async (value) => {
+                      try {
+                        await handleBankTransferAccountNumberSave(value);
+                      } catch (err) {
+                        setErrorDialog({
+                          open: true,
+                          title: "Validation Error",
+                          message:
+                            err instanceof Error
+                              ? err.message
+                              : "Account number must be 6-10 digits",
+                        });
+                        throw err;
                       }
-                      placeholder="Account Holder Name"
-                      className="max-w-xs"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Name associated with the bank account
-                    </p>
-                  </div>
+                    }}
+                    normalizeValue={(val) => val.replace(/\D/g, "").slice(0, 10)}
+                    placeholder="987654321"
+                    maxLength={10}
+                    className="max-w-xs"
+                    description="6-10 digits"
+                  />
+
+                  <AutoSaveInput
+                    id="bank-transfer-account-name-pay"
+                    label="Account Name (Optional)"
+                    value={settings.bank_transfer_account_name}
+                    onSave={handleBankTransferAccountNameSave}
+                    placeholder="Account Holder Name"
+                    className="max-w-xs"
+                    description="Name associated with the bank account"
+                  />
 
                   <div className="rounded-lg bg-muted/50 border border-muted p-3">
                     <p className="text-sm text-muted-foreground">
@@ -2083,29 +2038,6 @@ export default function SettingsPage() {
                       payments.
                     </p>
                   </div>
-
-                  {hasUnsavedChanges && (
-                    <div className="flex items-center justify-between pt-4 border-t">
-                      <p className="text-sm text-muted-foreground">You have unsaved changes</p>
-                      <Button
-                        onClick={handleSaveBankTransferSettings}
-                        disabled={saving}
-                        className="cursor-pointer"
-                      >
-                        {saving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Save Bank Transfer Settings
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
             </CardContent>

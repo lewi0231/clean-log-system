@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { workersLocationsKey } from "@/app/query-provider";
@@ -14,22 +14,12 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 
 /**
- * Hook to subscribe to real-time worker changes.
- * Automatically invalidates the workers-locations React Query cache
- * when worker records are inserted, updated, or deleted.
- *
- * This enables real-time updates when:
- * - A worker accepts an invitation (status → active)
- * - A worker is created or deleted
- * - Worker details are modified
- *
- * If you see CHANNEL_ERROR in the console, the Realtime WebSocket may be dropping
- * (dev HMR, network, or Supabase limits). Workers list also refetches on window focus
- * and tab visibility (see useWorkersAndLocations). Set NEXT_PUBLIC_DEBUG_REALTIME=true
- * for verbose payload logging.
+ * Subscribe to real-time worker changes and refetch the workers-locations cache.
+ * Matches jobs realtime (refetchQueries) and notifications (CHANNEL_ERROR debounce).
  */
 export function useRealtimeWorkers(organizationId: string | null) {
   const queryClient = useQueryClient();
+  const lastChannelErrorWarnAtRef = useRef(0);
 
   useEffect(() => {
     if (!organizationId) {
@@ -44,12 +34,20 @@ export function useRealtimeWorkers(organizationId: string | null) {
     });
     logRealtimeDebug("workers", "subscribing", { channelName, organizationId });
 
+    let debouncedRefetch: ReturnType<typeof setTimeout> | null = null;
+
+    const refetchWorkers = () => {
+      void queryClient.refetchQueries({
+        queryKey: workersLocationsKey(organizationId),
+      });
+    };
+
     const channel = supabase
       .channel(channelName)
       .on(
         "postgres_changes",
         {
-          event: "*", // INSERT, UPDATE, DELETE
+          event: "*",
           schema: "public",
           table: "worker",
           filter: `organization_id=eq.${organizationId}`,
@@ -65,11 +63,7 @@ export function useRealtimeWorkers(organizationId: string | null) {
             new: payload.new,
             old: payload.old,
           });
-
-          void queryClient.invalidateQueries({
-            queryKey: workersLocationsKey(organizationId),
-            refetchType: "active",
-          });
+          refetchWorkers();
         }
       )
       .subscribe((status, err) => {
@@ -77,20 +71,30 @@ export function useRealtimeWorkers(organizationId: string | null) {
         if (status === "SUBSCRIBED") {
           log.debug("Realtime: workers channel subscribed", { channel: channelName });
         } else if (status === "CHANNEL_ERROR") {
-          log.warn("Realtime: workers CHANNEL_ERROR (WebSocket/channel issue)", {
-            channel: channelName,
-            errorSerialized: err != null ? String(err) : "undefined",
-            hint: "List may still refresh on window focus. Enable NEXT_PUBLIC_DEBUG_REALTIME=true for details.",
-          });
+          const now = Date.now();
+          if (now - lastChannelErrorWarnAtRef.current > 20_000) {
+            lastChannelErrorWarnAtRef.current = now;
+            log.warn("Realtime: workers CHANNEL_ERROR (WebSocket/channel issue)", {
+              channel: channelName,
+              errorSerialized: err != null ? String(err) : "undefined",
+              hint: "Debounced refetch scheduled. Enable NEXT_PUBLIC_DEBUG_REALTIME=true for details.",
+            });
+          }
           if (isRealtimeDebugEnabled()) {
             log.warn("Realtime: workers raw err", { err });
           }
+          if (debouncedRefetch) clearTimeout(debouncedRefetch);
+          debouncedRefetch = setTimeout(() => {
+            debouncedRefetch = null;
+            refetchWorkers();
+          }, 1500);
         } else {
           log.debug("Realtime: workers channel status", { status, channel: channelName });
         }
       });
 
     return () => {
+      if (debouncedRefetch) clearTimeout(debouncedRefetch);
       log.debug("Realtime: Cleaning up workers subscription", {
         channel: channelName,
       });

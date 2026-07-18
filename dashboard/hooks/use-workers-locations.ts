@@ -35,6 +35,7 @@ export function useWorkersAndLocations() {
     placeholderData: (previous) => previous,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
+    refetchOnMount: "always",
   });
 
   const invalidateCache = () => {

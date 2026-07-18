@@ -3,6 +3,7 @@ import { extractAuthToken, getAuthUser, getOrganizationUserByEmail } from "../_u
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { normalizeWorkforceEngagement } from "../_utils/workforce-engagement.ts";
 import { resolveOrganizationId } from "./resolve-organization-id.ts";
 
 serve(async (req) => {
@@ -94,8 +95,6 @@ serve(async (req) => {
       .select("workforce_engagement")
       .eq("organization_id", organizationId)
       .maybeSingle();
-
-    const { normalizeWorkforceEngagement } = await import("../_utils/workforce-engagement.ts");
 
     return jsonResponse({
       organization_id: organizationId,

@@ -164,8 +164,8 @@ export function OnboardingWizard() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
+      <Card className="w-full max-w-2xl max-h-[min(90vh,900px)] flex flex-col overflow-hidden">
+        <CardHeader className="shrink-0">
           <div className="space-y-2">
             <CardTitle className="text-2xl">Welcome to Tally Runner</CardTitle>
             <CardDescription>
@@ -182,8 +182,10 @@ export function OnboardingWizard() {
             <Progress value={progress} />
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">{renderStep()}</CardContent>
-        <CardFooter className="flex justify-between">
+        <CardContent className="space-y-6 flex-1 overflow-y-auto min-h-0">
+          {renderStep()}
+        </CardContent>
+        <CardFooter className="flex justify-between shrink-0 border-t bg-card">
           <Button
             variant="outline"
             onClick={handleBack}
@@ -275,25 +277,25 @@ function Step1BusinessBasics({
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="1-5" id="employees-1-5" />
             <Label htmlFor="employees-1-5" className="font-normal cursor-pointer">
-              1-5 employees
+              1-5
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="6-20" id="employees-6-20" />
             <Label htmlFor="employees-6-20" className="font-normal cursor-pointer">
-              6-20 employees
+              6-20
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="21-50" id="employees-21-50" />
             <Label htmlFor="employees-21-50" className="font-normal cursor-pointer">
-              21-50 employees
+              21-50
             </Label>
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="50+" id="employees-50" />
             <Label htmlFor="employees-50" className="font-normal cursor-pointer">
-              50+ employees
+              50+
             </Label>
           </div>
         </RadioGroup>

@@ -1,7 +1,6 @@
 "use client";
 
 import { organizationSettingsKey } from "@/app/query-provider";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -14,7 +13,7 @@ import {
 } from "@clean-log/shared/utils/workforce-engagement";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 interface WorkforceEngagementSettingsCardProps {
@@ -32,12 +31,17 @@ export function WorkforceEngagementSettingsCard({
   const [engagement, setEngagement] = useState<WorkforceEngagement>(value);
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    setEngagement(value);
+  }, [value]);
+
+  const persist = async (next: WorkforceEngagement) => {
+    if (next === value) return;
     setSaving(true);
     try {
       const data = await invokeTypedEdge("update-organization-settings", {
         organization_id: organizationId,
-        workforce_engagement: engagement,
+        workforce_engagement: next,
       });
       if (data.settings) {
         onApplied(data.settings);
@@ -48,6 +52,7 @@ export function WorkforceEngagementSettingsCard({
       const msg = e instanceof Error ? e.message : "Failed to save";
       log.warn("workforce engagement save failed", { error: msg });
       toast.error(msg);
+      setEngagement(value);
     } finally {
       setSaving(false);
     }
@@ -59,18 +64,24 @@ export function WorkforceEngagementSettingsCard({
         <CardTitle className="flex items-center gap-2 text-base">
           <Users className="h-4 w-4" />
           Workforce engagement
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
         </CardTitle>
         <CardDescription>
           How field workers settle amounts in Tally. Changing this does not delete existing
-          contractor tax invoices.
+          contractor tax invoices. Changes save automatically.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-xs text-muted-foreground">{WORKFORCE_ENGAGEMENT_DISCLAIMER}</p>
         <RadioGroup
           value={engagement}
-          onValueChange={(v) => setEngagement(v as WorkforceEngagement)}
+          onValueChange={(v) => {
+            const next = v as WorkforceEngagement;
+            setEngagement(next);
+            void persist(next);
+          }}
           className="space-y-3"
+          disabled={saving}
         >
           <div className="flex items-start space-x-2">
             <RadioGroupItem value="employees" id="set-eng-employees" className="mt-1" />
@@ -101,15 +112,6 @@ export function WorkforceEngagementSettingsCard({
             </Label>
           </div>
         </RadioGroup>
-        <Button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={saving || engagement === value}
-          className="cursor-pointer"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-          Save engagement
-        </Button>
       </CardContent>
     </Card>
   );

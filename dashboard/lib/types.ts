@@ -115,6 +115,12 @@ export interface Location {
     id: string;
     name: string;
     type: "company" | "region";
+    parent_id?: string | null;
+    parent?: {
+      id: string;
+      name: string;
+      type: "company" | "region";
+    } | null;
   } | null;
   pricing_mode?: "field_based" | "fixed_price";
   fixed_customer_price?: number | null;

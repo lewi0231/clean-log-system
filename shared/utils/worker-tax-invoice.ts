@@ -1,6 +1,8 @@
 /**
  * Pure helpers for worker tax-invoice eligibility and status rules.
- * Deno edges re-export / mirror via functions/_utils/worker-tax-invoice.ts
+ * Canonical for dashboard tests. Deno Edge copy lives at
+ * database/supabase/functions/_utils/worker-tax-invoice.ts (must stay in sync —
+ * Edge runtime cannot import outside functions/).
  */
 
 export const MAX_TAX_INVOICE_JOBS = 100;
@@ -23,7 +25,7 @@ export function canCancelTaxInvoiceStatus(status: string): boolean {
  * Returns normalized ids or an error message.
  */
 export function normalizeTaxInvoiceJobIds(
-  jobIds: unknown,
+  jobIds: unknown
 ): { ok: true; jobIds: string[] } | { ok: false; message: string } {
   if (!Array.isArray(jobIds)) {
     return { ok: false, message: "job_ids must be an array" };
@@ -59,7 +61,7 @@ export type TaxInvoiceConflictCandidate = {
 export function filterActiveTaxInvoiceConflicts(
   candidates: TaxInvoiceConflictCandidate[],
   workerId: string,
-  excludeInvoiceId?: string,
+  excludeInvoiceId?: string
 ): string[] {
   const conflicts: string[] = [];
   for (const row of candidates) {

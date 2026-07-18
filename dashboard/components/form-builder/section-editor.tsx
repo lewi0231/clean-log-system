@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -29,12 +28,10 @@ import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
 import { FieldConfig, FieldType, FormSectionWithFields } from "@clean-log/shared";
 import {
   AlignLeft,
   Calendar,
-  Check,
   CheckSquare,
   ChevronDown,
   ChevronRight,
@@ -54,7 +51,7 @@ import {
   Type,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ConditionalLogicEditor } from "./conditional-logic-editor";
+import { LocationRestrictionPicker } from "./location-restriction-picker";
 
 interface SectionEditorProps {
   sections: FormSectionWithFields[];
@@ -72,8 +69,8 @@ interface SectionEditorProps {
   onReorderFields?: (fieldIds: string[]) => Promise<void>;
   onSectionFieldDragStart?: (fieldId: string) => void;
   onSectionFieldDragEnd?: () => void;
-  createdClusters?: string[];
   organizationId: string | null;
+  onOpenFieldGroupSettings?: () => void;
 }
 
 interface SectionFormData {
@@ -102,9 +99,6 @@ const FIELD_TYPES: {
   { type: "grouped_breakdown", icon: Layers, label: "Grouped" },
 ];
 
-// Single implicit mutually exclusive group for all clusters
-const DEFAULT_EXCLUSIVE_GROUP = "default_exclusive_group";
-
 export function SectionEditor({
   sections,
   fields,
@@ -119,8 +113,8 @@ export function SectionEditor({
   onReorderFields,
   onSectionFieldDragStart,
   onSectionFieldDragEnd,
-  createdClusters = [],
   organizationId,
+  onOpenFieldGroupSettings,
 }: SectionEditorProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<FormSectionWithFields | null>(null);
@@ -189,7 +183,6 @@ export function SectionEditor({
     });
   }, [sections]);
 
-  const [advancedSectionsOpen, setAdvancedSectionsOpen] = useState<Map<string, boolean>>(new Map());
   // Local state for text inputs to prevent re-render issues during typing
   const [optionsInputValues, setOptionsInputValues] = useState<Map<string, string>>(new Map());
   const [labelInputValues, setLabelInputValues] = useState<Map<string, string>>(new Map());
@@ -1100,314 +1093,43 @@ export function SectionEditor({
                                                   </Label>
                                                 </div>
                                                 {restrictToLocationsMap.get(field.id) && (
-                                                  <div className="space-y-2 pl-6 border-l-2 border-muted">
-                                                    {locations.length === 0 ? (
-                                                      <p className="text-xs text-muted-foreground">
-                                                        No locations available. Create locations
-                                                        first.
-                                                      </p>
-                                                    ) : (
-                                                      <div className="rounded-md border border-input bg-transparent shadow-sm">
-                                                        <div className="max-h-48 overflow-y-auto p-2">
-                                                          {locations
-                                                            .filter((loc) => loc.active)
-                                                            .map((location) => {
-                                                              const isSelected = (
-                                                                locationRestrictionsMap.get(
-                                                                  field.id
-                                                                ) || []
-                                                              ).includes(location.id);
-                                                              return (
-                                                                <div
-                                                                  key={location.id}
-                                                                  className={cn(
-                                                                    "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                                                                    isSelected && "bg-accent/50"
-                                                                  )}
-                                                                  onClick={() => {
-                                                                    const currentIds =
-                                                                      locationRestrictionsMap.get(
-                                                                        field.id
-                                                                      ) || [];
-                                                                    if (isSelected) {
-                                                                      setLocationRestrictionsMap(
-                                                                        (prev) => {
-                                                                          const next = new Map(
-                                                                            prev
-                                                                          );
-                                                                          next.set(
-                                                                            field.id,
-                                                                            currentIds.filter(
-                                                                              (id) =>
-                                                                                id !== location.id
-                                                                            )
-                                                                          );
-                                                                          return next;
-                                                                        }
-                                                                      );
-                                                                    } else {
-                                                                      setLocationRestrictionsMap(
-                                                                        (prev) => {
-                                                                          const next = new Map(
-                                                                            prev
-                                                                          );
-                                                                          next.set(field.id, [
-                                                                            ...currentIds,
-                                                                            location.id,
-                                                                          ]);
-                                                                          return next;
-                                                                        }
-                                                                      );
-                                                                    }
-                                                                  }}
-                                                                >
-                                                                  <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                                                                    {isSelected && (
-                                                                      <Check className="h-4 w-4 text-primary" />
-                                                                    )}
-                                                                  </span>
-                                                                  <Label
-                                                                    htmlFor={`section-location-${field.id}-${location.id}`}
-                                                                    className="text-xs font-normal cursor-pointer flex-1"
-                                                                  >
-                                                                    {location.name}
-                                                                  </Label>
-                                                                  <input
-                                                                    type="checkbox"
-                                                                    id={`section-location-${field.id}-${location.id}`}
-                                                                    checked={isSelected}
-                                                                    onChange={(e) => {
-                                                                      const currentIds =
-                                                                        locationRestrictionsMap.get(
-                                                                          field.id
-                                                                        ) || [];
-                                                                      if (e.target.checked) {
-                                                                        setLocationRestrictionsMap(
-                                                                          (prev) => {
-                                                                            const next = new Map(
-                                                                              prev
-                                                                            );
-                                                                            next.set(field.id, [
-                                                                              ...currentIds,
-                                                                              location.id,
-                                                                            ]);
-                                                                            return next;
-                                                                          }
-                                                                        );
-                                                                      } else {
-                                                                        setLocationRestrictionsMap(
-                                                                          (prev) => {
-                                                                            const next = new Map(
-                                                                              prev
-                                                                            );
-                                                                            next.set(
-                                                                              field.id,
-                                                                              currentIds.filter(
-                                                                                (id) =>
-                                                                                  id !== location.id
-                                                                              )
-                                                                            );
-                                                                            return next;
-                                                                          }
-                                                                        );
-                                                                      }
-                                                                    }}
-                                                                    className="sr-only"
-                                                                    aria-hidden="true"
-                                                                  />
-                                                                </div>
-                                                              );
-                                                            })}
-                                                        </div>
-                                                      </div>
-                                                    )}
+                                                  <div className="pl-6 border-l-2 border-muted">
+                                                    <LocationRestrictionPicker
+                                                      locations={locations}
+                                                      selectedIds={
+                                                        locationRestrictionsMap.get(field.id) || []
+                                                      }
+                                                      onChange={(ids) => {
+                                                        setLocationRestrictionsMap((prev) => {
+                                                          const next = new Map(prev);
+                                                          next.set(field.id, ids);
+                                                          return next;
+                                                        });
+                                                      }}
+                                                      idPrefix={`section-location-${field.id}`}
+                                                    />
                                                   </div>
                                                 )}
                                               </div>
                                             )}
 
-                                            {/* Advanced Section */}
-                                            <Collapsible
-                                              open={advancedSectionsOpen.get(field.id) || false}
-                                              onOpenChange={(open) => {
-                                                setAdvancedSectionsOpen((prev) => {
-                                                  const next = new Map(prev);
-                                                  next.set(field.id, open);
-                                                  return next;
-                                                });
-                                              }}
-                                            >
-                                              <CollapsibleTrigger asChild>
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="w-full justify-between cursor-pointer"
+                                            <p className="text-[11px] text-muted-foreground rounded-lg border p-3 bg-muted/20">
+                                              Need this field mutually exclusive with another? Open{" "}
+                                              {onOpenFieldGroupSettings ? (
+                                                <button
+                                                  type="button"
+                                                  className="font-medium text-primary hover:underline cursor-pointer"
+                                                  onClick={() => onOpenFieldGroupSettings()}
                                                 >
-                                                  <span className="text-xs">Advanced Options</span>
-                                                  {advancedSectionsOpen.get(field.id) ? (
-                                                    <ChevronDown className="w-3 h-3" />
-                                                  ) : (
-                                                    <ChevronRight className="w-3 h-3" />
-                                                  )}
-                                                </Button>
-                                              </CollapsibleTrigger>
-                                              <CollapsibleContent className="space-y-4 pt-2 pl-4 border-l-2 border-muted bg-muted/20 rounded-r-md">
-                                                {/* Mutually Exclusive Cluster */}
-                                                <div className="space-y-2 rounded-lg border p-3 bg-muted/30">
-                                                  <div className="flex items-start justify-between gap-2">
-                                                    <div className="flex-1">
-                                                      <Label className="text-xs">
-                                                        Mutually Exclusive Cluster
-                                                      </Label>
-                                                      <p className="text-[11px] text-muted-foreground mt-1">
-                                                        Assign this field to a cluster where only
-                                                        one option can be selected at a time. All
-                                                        clusters share a single implicit group
-                                                        behind the scenes.
-                                                      </p>
-                                                    </div>
-                                                  </div>
-                                                  <p className="text-[11px] text-muted-foreground italic">
-                                                    💡 Need to create a new cluster name? Click the{" "}
-                                                    <span className="font-medium text-primary">
-                                                      Field Group Settings
-                                                    </span>{" "}
-                                                    button at the top of the page to create option
-                                                    names first.
-                                                  </p>
-                                                  {(() => {
-                                                    // Get all clusters from all fields AND created clusters
-                                                    const clustersFromFields = Array.from(
-                                                      new Set(
-                                                        fields
-                                                          .map((f) => f.group_cluster)
-                                                          .filter((c): c is string => Boolean(c))
-                                                      )
-                                                    );
-                                                    // Combine with created clusters that haven't been assigned yet
-                                                    const allClusters = Array.from(
-                                                      new Set([
-                                                        ...clustersFromFields,
-                                                        ...createdClusters,
-                                                      ])
-                                                    ).sort();
-
-                                                    // Convert cluster ID to display name
-                                                    const getClusterDisplayName = (
-                                                      clusterId: string
-                                                    ) => {
-                                                      return clusterId
-                                                        .split("_")
-                                                        .map(
-                                                          (word) =>
-                                                            word.charAt(0).toUpperCase() +
-                                                            word.slice(1)
-                                                        )
-                                                        .join(" ");
-                                                    };
-
-                                                    return (
-                                                      <div className="space-y-2">
-                                                        <Select
-                                                          value={field.group_cluster || "none"}
-                                                          onValueChange={async (value: string) => {
-                                                            if (!onUpdateField) return;
-                                                            if (value === "none") {
-                                                              await onUpdateField(field.id, {
-                                                                mutually_exclusive_group: null,
-                                                                group_cluster: null,
-                                                              });
-                                                            } else {
-                                                              await onUpdateField(field.id, {
-                                                                mutually_exclusive_group:
-                                                                  DEFAULT_EXCLUSIVE_GROUP,
-                                                                group_cluster: value,
-                                                              });
-                                                            }
-                                                          }}
-                                                        >
-                                                          <SelectTrigger>
-                                                            <SelectValue placeholder="Select existing cluster" />
-                                                          </SelectTrigger>
-                                                          <SelectContent>
-                                                            <SelectItem value="none">
-                                                              No cluster
-                                                            </SelectItem>
-                                                            {allClusters.map((clusterId) => (
-                                                              <SelectItem
-                                                                key={clusterId}
-                                                                value={clusterId}
-                                                              >
-                                                                {getClusterDisplayName(clusterId)}
-                                                              </SelectItem>
-                                                            ))}
-                                                          </SelectContent>
-                                                        </Select>
-                                                        <Input
-                                                          value={
-                                                            field.group_cluster
-                                                              ? getClusterDisplayName(
-                                                                  field.group_cluster
-                                                                )
-                                                              : ""
-                                                          }
-                                                          onChange={async (e) => {
-                                                            // Allow typing freely; apply on blur
-                                                            if (!e.target.value && onUpdateField) {
-                                                              const result = onUpdateField(
-                                                                field.id,
-                                                                {
-                                                                  mutually_exclusive_group: null,
-                                                                  group_cluster: null,
-                                                                }
-                                                              );
-                                                              if (result instanceof Promise) {
-                                                                await result;
-                                                              }
-                                                            }
-                                                          }}
-                                                          onBlur={async (e) => {
-                                                            if (!onUpdateField) return;
-                                                            const clusterName =
-                                                              e.target.value.trim();
-                                                            if (clusterName) {
-                                                              const clusterId = clusterName
-                                                                .toLowerCase()
-                                                                .replace(/[^a-z0-9]+/g, "_")
-                                                                .replace(/^_|_$/g, "");
-
-                                                              await onUpdateField(field.id, {
-                                                                mutually_exclusive_group:
-                                                                  DEFAULT_EXCLUSIVE_GROUP,
-                                                                group_cluster: clusterId,
-                                                              });
-                                                            }
-                                                          }}
-                                                          placeholder={
-                                                            allClusters.length > 0
-                                                              ? "Or type new cluster name"
-                                                              : "Type cluster name (e.g., Simple Toggle)"
-                                                          }
-                                                        />
-                                                      </div>
-                                                    );
-                                                  })()}
-                                                </div>
-
-                                                {/* Conditional Logic */}
-                                                <ConditionalLogicEditor
-                                                  field={field}
-                                                  allFields={fields}
-                                                  onChange={async (logic) => {
-                                                    if (onUpdateField) {
-                                                      await onUpdateField(field.id, {
-                                                        conditional_logic: logic,
-                                                      });
-                                                    }
-                                                  }}
-                                                />
-                                              </CollapsibleContent>
-                                            </Collapsible>
+                                                  Field Group Settings
+                                                </button>
+                                              ) : (
+                                                <span className="font-medium text-primary">
+                                                  Field Group Settings
+                                                </span>
+                                              )}{" "}
+                                              to configure that.
+                                            </p>
                                           </div>
                                         </PopoverContent>
                                       </Popover>

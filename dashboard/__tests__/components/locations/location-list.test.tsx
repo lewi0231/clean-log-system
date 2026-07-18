@@ -3,15 +3,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createMockLocation,
-  createMockLocationHierarchyNode,
-} from "../../lib/fixtures";
+import { createMockLocation, createMockLocationHierarchyNode } from "../../lib/fixtures";
 
-// Mock useLocationHierarchy since LocationForm uses it
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockHierarchyNodes = vi.hoisted(() => [] as any[]);
+
 vi.mock("@/hooks/use-location-hierarchy", () => ({
   useLocationHierarchy: () => ({
-    nodes: [],
+    nodes: mockHierarchyNodes,
     loading: false,
     error: null,
     refetch: vi.fn(),
@@ -30,9 +29,7 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
@@ -53,6 +50,7 @@ describe("LocationList", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHierarchyNodes.length = 0;
   });
 
   describe("Rendering", () => {
@@ -74,9 +72,7 @@ describe("LocationList", () => {
       render(<LocationList {...defaultProps} />, { wrapper: createWrapper() });
 
       expect(
-        screen.getByText(
-          "No locations found. Add your first location to get started."
-        )
+        screen.getByText("No locations found. Add your first location to get started.")
       ).toBeInTheDocument();
     });
 
@@ -90,14 +86,11 @@ describe("LocationList", () => {
     });
 
     it("should render error state", () => {
-      render(
-        <LocationList {...defaultProps} error="Failed to load locations" />,
-        { wrapper: createWrapper() }
-      );
+      render(<LocationList {...defaultProps} error="Failed to load locations" />, {
+        wrapper: createWrapper(),
+      });
 
-      expect(
-        screen.getByText("Error: Failed to load locations")
-      ).toBeInTheDocument();
+      expect(screen.getByText("Error: Failed to load locations")).toBeInTheDocument();
     });
 
     it("should display location details", () => {
@@ -120,21 +113,39 @@ describe("LocationList", () => {
       expect(screen.getByText("1234567890")).toBeInTheDocument();
     });
 
-    it("should display hierarchy parent badge", () => {
-      const hierarchyParent = createMockLocationHierarchyNode({
+    it("should display company and region badges when assigned to a region", () => {
+      const company = createMockLocationHierarchyNode({
+        id: "company-1",
+        name: "Test Company",
+        type: "company",
+        parent_id: null,
+      });
+      const region = createMockLocationHierarchyNode({
+        id: "region-1",
         name: "Test Region",
         type: "region",
+        parent_id: company.id,
       });
+      mockHierarchyNodes.push(company, region);
+
       const location = createMockLocation({
-        hierarchy_parent: hierarchyParent,
+        hierarchy_parent_id: region.id,
+        hierarchy_parent: {
+          id: region.id,
+          name: region.name,
+          type: "region",
+          parent_id: company.id,
+          parent: { id: company.id, name: company.name, type: "company" },
+        },
       });
 
       render(<LocationList {...defaultProps} locations={[location]} />, {
         wrapper: createWrapper(),
       });
 
+      expect(screen.getByText("Test Company")).toBeInTheDocument();
       expect(screen.getByText("Test Region")).toBeInTheDocument();
-      expect(screen.getByText("region")).toBeInTheDocument();
+      expect(screen.queryByText("region")).not.toBeInTheDocument();
     });
 
     it("should display hyphen when no hierarchy parent", () => {
@@ -197,9 +208,7 @@ describe("LocationList", () => {
 
       // Edit button is an icon button - find it by the pencil icon
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       expect(editButton).toBeDefined();
       if (editButton) {
@@ -221,9 +230,7 @@ describe("LocationList", () => {
 
       // Delete button is an icon button - find it by the trash icon
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       expect(deleteButton).toBeDefined();
       if (deleteButton) {
@@ -231,13 +238,9 @@ describe("LocationList", () => {
 
         // Delete confirmation dialog should appear
         await waitFor(() => {
-          expect(
-            screen.getByText(/Are you sure/i)
-          ).toBeInTheDocument();
+          expect(screen.getByText(/Are you sure/i)).toBeInTheDocument();
         });
-        expect(
-          screen.getByText(/This action cannot be undone/i)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/This action cannot be undone/i)).toBeInTheDocument();
         // Location name appears in both table and dialog, so use queryAllByText
         const locationTexts = screen.queryAllByText(/Test Location/i);
         expect(locationTexts.length).toBeGreaterThan(0);
@@ -254,9 +257,7 @@ describe("LocationList", () => {
 
       // Delete button is an icon button - find it by the trash icon
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       expect(deleteButton).toBeDefined();
       if (deleteButton) {
@@ -284,9 +285,7 @@ describe("LocationList", () => {
 
       // Delete button is an icon button - find it by the trash icon
       const deleteButtons = screen.getAllByRole("button");
-      const deleteButton = deleteButtons.find((btn) =>
-        btn.querySelector('svg[class*="trash"]')
-      );
+      const deleteButton = deleteButtons.find((btn) => btn.querySelector('svg[class*="trash"]'));
 
       expect(deleteButton).toBeDefined();
       if (deleteButton) {
@@ -334,9 +333,7 @@ describe("LocationList", () => {
 
       // Edit button is an icon button - find it by the pencil icon
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       expect(editButton).toBeDefined();
       if (editButton) {
@@ -359,9 +356,7 @@ describe("LocationList", () => {
 
       // Edit button is an icon button - find it by the pencil icon
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       expect(editButton).toBeDefined();
       if (editButton) {
@@ -397,9 +392,7 @@ describe("LocationList", () => {
 
       // Edit button is an icon button - find it by the pencil icon
       const editButtons = screen.getAllByRole("button");
-      const editButton = editButtons.find((btn) =>
-        btn.querySelector('svg[class*="pencil"]')
-      );
+      const editButton = editButtons.find((btn) => btn.querySelector('svg[class*="pencil"]'));
 
       expect(editButton).toBeDefined();
       if (editButton) {
