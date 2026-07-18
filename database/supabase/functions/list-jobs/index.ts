@@ -1,9 +1,11 @@
 import { serve } from "server";
+import { extractAuthToken, getAuthUser, resolveOrganizationWorkerId } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { listJobsSchema, validateRequest } from "../_utils/zod-schemas.ts";
+import { mergeParticipatingJobIds, resolveListJobsWorkerScope } from "./scoping.ts";
 import type { Worker } from "../types.ts";
 
 // Extended types for confirmation workflow
@@ -46,9 +48,11 @@ serve(async (req) => {
       return errorResponse(validation.error, 400);
     }
 
-    const { organization_id, include_tests } = validation.data as {
+    const { organization_id, include_tests, worker_id, mine } = validation.data as {
       organization_id: string;
       include_tests?: boolean;
+      worker_id?: string;
+      mine?: boolean;
     };
 
     const supabase = createServiceRoleClient();
@@ -61,6 +65,79 @@ serve(async (req) => {
         });
       }
       return orgGate.response;
+    }
+
+    let scopedJobIds: string[] | null = null;
+
+    const token = extractAuthToken(req);
+    const authUser = token ? await getAuthUser(token) : null;
+    const callerWorkerId = authUser?.id
+      ? await resolveOrganizationWorkerId(
+          supabase,
+          organization_id,
+          authUser.id,
+          authUser.user_metadata
+        )
+      : null;
+
+    const scope = resolveListJobsWorkerScope({
+      mine,
+      workerId: worker_id ?? null,
+      callerWorkerId,
+    });
+
+    if (!scope.ok) {
+      return errorResponse(scope.message, scope.status);
+    }
+
+    const effectiveWorkerId = scope.effectiveWorkerId;
+
+    if (mine && !effectiveWorkerId) {
+      return jsonResponse({
+        success: true,
+        jobs: [],
+      });
+    }
+
+    if (effectiveWorkerId) {
+      const { data: workerRow, error: workerError } = await supabase
+        .from("worker")
+        .select("id")
+        .eq("id", effectiveWorkerId)
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      if (workerError) throw workerError;
+      if (!workerRow) {
+        return errorResponse("Worker not found in this organization", 404);
+      }
+
+      const { data: workerJobRows, error: workerJobsError } = await supabase
+        .from("job_worker")
+        .select("job_id")
+        .eq("worker_id", effectiveWorkerId);
+
+      if (workerJobsError) throw workerJobsError;
+
+      const { data: submittedJobs, error: submittedJobsError } = await supabase
+        .from("job")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .eq("submitted_by_worker_id", effectiveWorkerId);
+
+      if (submittedJobsError) throw submittedJobsError;
+
+      scopedJobIds = mergeParticipatingJobIds(
+        workerJobRows?.map((row) => row.job_id) ?? [],
+        submittedJobs?.map((job) => job.id) ?? []
+      );
+
+      if (scopedJobIds.length === 0) {
+        return jsonResponse({
+          success: true,
+          jobs: [],
+        });
+      }
     }
 
     // Fetch jobs with location info, invoice data, and approval status
@@ -104,6 +181,10 @@ serve(async (req) => {
       `
       )
       .eq("organization_id", organization_id);
+
+    if (scopedJobIds) {
+      query = query.in("id", scopedJobIds);
+    }
 
     // Exclude test jobs by default
     if (!include_tests) {

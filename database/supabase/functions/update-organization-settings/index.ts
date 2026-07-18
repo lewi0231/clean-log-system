@@ -3,10 +3,8 @@ import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import {
-  validateBusinessMode,
-  validateRequiredFields,
-} from "../_utils/validation.ts";
+import { validateBusinessMode, validateRequiredFields } from "../_utils/validation.ts";
+import { isWorkforceEngagement } from "../_utils/workforce-engagement.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -53,6 +51,7 @@ serve(async (req) => {
       gst_rate_percent,
       edit_window_minutes,
       worker_payment_cycle_config,
+      workforce_engagement,
     } = body;
 
     const supabase = createServiceRoleClient();
@@ -61,13 +60,10 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
     }
 
     const updateData: Record<string, unknown> = {};
@@ -81,7 +77,7 @@ serve(async (req) => {
       if (!validateBusinessMode(business_mode)) {
         return errorResponse(
           "Invalid business_mode. Must be 'service_based' or 'resource_tracking'",
-          400,
+          400
         );
       }
       updateData.business_mode = business_mode;
@@ -116,15 +112,12 @@ serve(async (req) => {
     }
 
     if (primary_contact_phone !== undefined) {
-      updateData.primary_contact_phone = primary_contact_phone === ""
-        ? null
-        : primary_contact_phone.trim();
+      updateData.primary_contact_phone =
+        primary_contact_phone === "" ? null : primary_contact_phone.trim();
     }
 
     if (business_address !== undefined) {
-      updateData.business_address = business_address === ""
-        ? null
-        : business_address.trim();
+      updateData.business_address = business_address === "" ? null : business_address.trim();
     }
 
     if (invoice_send_immediately !== undefined) {
@@ -136,19 +129,13 @@ serve(async (req) => {
 
     if (feedback_email_send_immediately !== undefined) {
       if (typeof feedback_email_send_immediately !== "boolean") {
-        return errorResponse(
-          "feedback_email_send_immediately must be a boolean",
-          400,
-        );
+        return errorResponse("feedback_email_send_immediately must be a boolean", 400);
       }
-      updateData.feedback_email_send_immediately =
-        feedback_email_send_immediately;
+      updateData.feedback_email_send_immediately = feedback_email_send_immediately;
     }
 
     if (stripe_account_id !== undefined) {
-      updateData.stripe_account_id = stripe_account_id === ""
-        ? null
-        : stripe_account_id;
+      updateData.stripe_account_id = stripe_account_id === "" ? null : stripe_account_id;
     }
 
     if (payment_provider !== undefined) {
@@ -157,12 +144,8 @@ serve(async (req) => {
         const validProviders = ["stripe"]; // TODO: Add more providers as they're implemented
         if (!validProviders.includes(payment_provider.trim().toLowerCase())) {
           return errorResponse(
-            `Invalid payment provider. Must be one of: ${
-              validProviders.join(
-                ", ",
-              )
-            }`,
-            400,
+            `Invalid payment provider. Must be one of: ${validProviders.join(", ")}`,
+            400
           );
         }
         updateData.payment_provider = payment_provider.trim().toLowerCase();
@@ -176,7 +159,7 @@ serve(async (req) => {
       if (!validCurrencies.includes(currency)) {
         return errorResponse(
           `Invalid currency. Must be one of: ${validCurrencies.join(", ")}`,
-          400,
+          400
         );
       }
       updateData.currency = currency;
@@ -188,31 +171,20 @@ serve(async (req) => {
 
     if (default_exclusive_group_label !== undefined) {
       updateData.default_exclusive_group_label =
-        default_exclusive_group_label === ""
-          ? null
-          : default_exclusive_group_label;
+        default_exclusive_group_label === "" ? null : default_exclusive_group_label;
     }
 
     if (rating_config !== undefined) {
       // Validate rating_config structure
       if (typeof rating_config !== "object" || rating_config === null) {
-        return errorResponse(
-          "rating_config must be an object with 'type' and 'dimensions'",
-          400,
-        );
+        return errorResponse("rating_config must be an object with 'type' and 'dimensions'", 400);
       }
       if (!("type" in rating_config) || !("dimensions" in rating_config)) {
-        return errorResponse(
-          "rating_config must have 'type' and 'dimensions' properties",
-          400,
-        );
+        return errorResponse("rating_config must have 'type' and 'dimensions' properties", 400);
       }
       const validTypes = ["single", "three_dimensions", "rater"];
       if (!validTypes.includes(rating_config.type)) {
-        return errorResponse(
-          `rating_config.type must be one of: ${validTypes.join(", ")}`,
-          400,
-        );
+        return errorResponse(`rating_config.type must be one of: ${validTypes.join(", ")}`, 400);
       }
       if (!Array.isArray(rating_config.dimensions)) {
         return errorResponse("rating_config.dimensions must be an array", 400);
@@ -223,10 +195,7 @@ serve(async (req) => {
     // Handle auto_generate_invoices_immediately (stored in organization_settings table)
     if (auto_generate_invoices_immediately !== undefined) {
       if (typeof auto_generate_invoices_immediately !== "boolean") {
-        return errorResponse(
-          "auto_generate_invoices_immediately must be a boolean",
-          400,
-        );
+        return errorResponse("auto_generate_invoices_immediately must be a boolean", 400);
       }
 
       // Get or create organization_settings record
@@ -240,8 +209,7 @@ serve(async (req) => {
         const { error: settingsError } = await supabase
           .from("organization_settings")
           .update({
-            auto_generate_invoices_immediately:
-              auto_generate_invoices_immediately,
+            auto_generate_invoices_immediately: auto_generate_invoices_immediately,
           })
           .eq("id", existingSettings.id);
 
@@ -252,13 +220,10 @@ serve(async (req) => {
           // Don't throw - continue with other updates
         }
       } else {
-        const { error: settingsError } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id,
-            auto_generate_invoices_immediately:
-              auto_generate_invoices_immediately,
-          });
+        const { error: settingsError } = await supabase.from("organization_settings").insert({
+          organization_id,
+          auto_generate_invoices_immediately: auto_generate_invoices_immediately,
+        });
 
         if (settingsError) {
           logger.error("Failed to create auto_generate_invoices_immediately", {
@@ -278,34 +243,23 @@ serve(async (req) => {
     ) {
       // Validate BSB format if provided (Australian format: XXX-XXX)
       if (bank_transfer_bsb !== undefined && bank_transfer_bsb !== null) {
-        const trimmedBsb = typeof bank_transfer_bsb === "string"
-          ? bank_transfer_bsb.trim()
-          : "";
+        const trimmedBsb = typeof bank_transfer_bsb === "string" ? bank_transfer_bsb.trim() : "";
         if (trimmedBsb && !/^\d{3}-\d{3}$/.test(trimmedBsb)) {
-          return errorResponse(
-            "BSB must be in format XXX-XXX (e.g., 123-456)",
-            400,
-          );
+          return errorResponse("BSB must be in format XXX-XXX (e.g., 123-456)", 400);
         }
       }
 
       // Validate account number if provided
-      if (
-        bank_transfer_account_number !== undefined &&
-        bank_transfer_account_number !== null
-      ) {
-        const trimmedAccount = typeof bank_transfer_account_number === "string"
-          ? bank_transfer_account_number.trim()
-          : "";
+      if (bank_transfer_account_number !== undefined && bank_transfer_account_number !== null) {
+        const trimmedAccount =
+          typeof bank_transfer_account_number === "string"
+            ? bank_transfer_account_number.trim()
+            : "";
         if (
           trimmedAccount &&
-          (!/^\d+$/.test(trimmedAccount) || trimmedAccount.length < 6 ||
-            trimmedAccount.length > 10)
+          (!/^\d+$/.test(trimmedAccount) || trimmedAccount.length < 6 || trimmedAccount.length > 10)
         ) {
-          return errorResponse(
-            "Account number must be 6-10 digits",
-            400,
-          );
+          return errorResponse("Account number must be 6-10 digits", 400);
         }
       }
 
@@ -326,36 +280,27 @@ serve(async (req) => {
       }
       if (bank_transfer_account_number !== undefined) {
         settingsUpdate.bank_transfer_account_number =
-          typeof bank_transfer_account_number === "string" &&
-            bank_transfer_account_number.trim()
+          typeof bank_transfer_account_number === "string" && bank_transfer_account_number.trim()
             ? bank_transfer_account_number.trim()
             : null;
       }
       if (bank_transfer_account_name !== undefined) {
         settingsUpdate.bank_transfer_account_name =
-          typeof bank_transfer_account_name === "string" &&
-            bank_transfer_account_name.trim()
+          typeof bank_transfer_account_name === "string" && bank_transfer_account_name.trim()
             ? bank_transfer_account_name.trim()
             : null;
       }
       if (show_bank_transfer_on_invoices !== undefined) {
         if (typeof show_bank_transfer_on_invoices !== "boolean") {
-          return errorResponse(
-            "show_bank_transfer_on_invoices must be a boolean",
-            400,
-          );
+          return errorResponse("show_bank_transfer_on_invoices must be a boolean", 400);
         }
-        settingsUpdate.show_bank_transfer_on_invoices =
-          show_bank_transfer_on_invoices;
+        settingsUpdate.show_bank_transfer_on_invoices = show_bank_transfer_on_invoices;
       }
 
       if (default_invoice_due_days !== undefined) {
         const days = Number(default_invoice_due_days);
         if (isNaN(days) || days < 1 || days > 365) {
-          return errorResponse(
-            "default_invoice_due_days must be a number between 1 and 365",
-            400,
-          );
+          return errorResponse("default_invoice_due_days must be a number between 1 and 365", 400);
         }
         settingsUpdate.default_invoice_due_days = days;
       }
@@ -363,10 +308,7 @@ serve(async (req) => {
       if (edit_window_minutes !== undefined) {
         const minutes = Number(edit_window_minutes);
         if (isNaN(minutes) || minutes < 15 || minutes > 1440) {
-          return errorResponse(
-            "edit_window_minutes must be a number between 15 and 1440",
-            400,
-          );
+          return errorResponse("edit_window_minutes must be a number between 15 and 1440", 400);
         }
         settingsUpdate.edit_window_minutes = minutes;
       }
@@ -384,12 +326,10 @@ serve(async (req) => {
           // Don't throw - continue with other updates
         }
       } else {
-        const { error: settingsError } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id,
-            ...settingsUpdate,
-          });
+        const { error: settingsError } = await supabase.from("organization_settings").insert({
+          organization_id,
+          ...settingsUpdate,
+        });
 
         if (settingsError) {
           logger.error("Failed to create bank transfer settings", {
@@ -409,10 +349,7 @@ serve(async (req) => {
       if (gst_rate_percent !== undefined) {
         const rate = Number(gst_rate_percent);
         if (isNaN(rate) || rate < 0 || rate > 100) {
-          return errorResponse(
-            "gst_rate_percent must be a number between 0 and 100",
-            400,
-          );
+          return errorResponse("gst_rate_percent must be a number between 0 and 100", 400);
         }
       }
 
@@ -449,12 +386,10 @@ serve(async (req) => {
           logger.error("Failed to update GST settings", { error: gstError });
         }
       } else {
-        const { error: gstError } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id,
-            ...gstUpdate,
-          });
+        const { error: gstError } = await supabase.from("organization_settings").insert({
+          organization_id,
+          ...gstUpdate,
+        });
 
         if (gstError) {
           logger.error("Failed to create organization_settings with GST", {
@@ -466,49 +401,36 @@ serve(async (req) => {
 
     // Handle worker pay period config (organization_settings.worker_payment_cycle_config JSONB)
     if (worker_payment_cycle_config !== undefined) {
-      if (
-        worker_payment_cycle_config !== null &&
-        typeof worker_payment_cycle_config !== "object"
-      ) {
-        return errorResponse(
-          "worker_payment_cycle_config must be an object or null",
-          400,
-        );
+      if (worker_payment_cycle_config !== null && typeof worker_payment_cycle_config !== "object") {
+        return errorResponse("worker_payment_cycle_config must be an object or null", 400);
       }
 
       if (worker_payment_cycle_config !== null) {
         const cfg = worker_payment_cycle_config as Record<string, unknown>;
         const freq = cfg.payment_frequency;
-        if (
-          freq != null &&
-          freq !== "weekly" && freq !== "fortnightly" && freq !== "monthly"
-        ) {
+        if (freq != null && freq !== "weekly" && freq !== "fortnightly" && freq !== "monthly") {
           return errorResponse(
             "worker_payment_cycle_config.payment_frequency must be weekly, fortnightly, or monthly",
-            400,
+            400
           );
         }
         const dow = cfg.payment_day_of_week;
         if (dow != null) {
           const n = Number(dow);
-          if (
-            isNaN(n) || !Number.isInteger(n) || n < 1 || n > 7
-          ) {
+          if (isNaN(n) || !Number.isInteger(n) || n < 1 || n > 7) {
             return errorResponse(
               "worker_payment_cycle_config.payment_day_of_week must be 1–7 (ISO: Mon=1 … Sun=7)",
-              400,
+              400
             );
           }
         }
         const dom = cfg.payment_day_of_month;
         if (dom != null) {
           const n = Number(dom);
-          if (
-            isNaN(n) || !Number.isInteger(n) || n < 1 || n > 31
-          ) {
+          if (isNaN(n) || !Number.isInteger(n) || n < 1 || n > 31) {
             return errorResponse(
               "worker_payment_cycle_config.payment_day_of_month must be 1–31",
-              400,
+              400
             );
           }
         }
@@ -519,13 +441,13 @@ serve(async (req) => {
           } catch {
             return errorResponse(
               "worker_payment_cycle_config.timezone must be a valid IANA time zone",
-              400,
+              400
             );
           }
         } else if (tz != null && typeof tz !== "string") {
           return errorResponse(
             "worker_payment_cycle_config.timezone must be a string or null",
-            400,
+            400
           );
         }
       }
@@ -550,17 +472,52 @@ serve(async (req) => {
           });
         }
       } else {
-        const { error: payErr } = await supabase
-          .from("organization_settings")
-          .insert({
-            organization_id,
-            worker_payment_cycle_config,
-          });
+        const { error: payErr } = await supabase.from("organization_settings").insert({
+          organization_id,
+          worker_payment_cycle_config,
+        });
 
         if (payErr) {
           logger.error("Failed to create organization_settings with pay period", {
             error: payErr,
           });
+        }
+      }
+    }
+
+    // Handle workforce_engagement (organization_settings)
+    if (workforce_engagement !== undefined) {
+      if (!isWorkforceEngagement(workforce_engagement)) {
+        return errorResponse("workforce_engagement must be employees, contractors, or both", 400);
+      }
+
+      const { data: existingEngagementSettings } = await supabase
+        .from("organization_settings")
+        .select("id")
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+
+      if (existingEngagementSettings) {
+        const { error: engErr } = await supabase
+          .from("organization_settings")
+          .update({ workforce_engagement })
+          .eq("id", existingEngagementSettings.id);
+
+        if (engErr) {
+          logger.error("Failed to update workforce_engagement", { error: engErr });
+          return errorResponse("Failed to update workforce engagement", 500);
+        }
+      } else {
+        const { error: engErr } = await supabase.from("organization_settings").insert({
+          organization_id,
+          workforce_engagement,
+        });
+
+        if (engErr) {
+          logger.error("Failed to create organization_settings with workforce_engagement", {
+            error: engErr,
+          });
+          return errorResponse("Failed to save workforce engagement", 500);
         }
       }
     }
@@ -573,7 +530,7 @@ serve(async (req) => {
         .update(updateData)
         .eq("id", organization_id)
         .select(
-          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label"
         )
         .single();
 
@@ -584,7 +541,7 @@ serve(async (req) => {
       const { data: orgData, error: fetchError } = await supabase
         .from("organization")
         .select(
-          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label",
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label"
         )
         .eq("id", organization_id)
         .single();
@@ -597,7 +554,7 @@ serve(async (req) => {
     const { data: orgSettings, error: orgSettingsError } = await supabase
       .from("organization_settings")
       .select(
-        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes, worker_payment_cycle_config",
+        "auto_generate_invoices_immediately, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, show_bank_transfer_on_invoices, default_invoice_due_days, gst_registered, gst_inclusive, gst_rate_percent, edit_window_minutes, worker_payment_cycle_config, workforce_engagement"
       )
       .eq("organization_id", organization_id)
       .maybeSingle();
@@ -616,13 +573,11 @@ serve(async (req) => {
     };
     if (organization?.rating_config) {
       try {
-        const parsed = typeof organization.rating_config === "string"
-          ? JSON.parse(organization.rating_config)
-          : organization.rating_config;
-        if (
-          parsed && typeof parsed === "object" && "type" in parsed &&
-          "dimensions" in parsed
-        ) {
+        const parsed =
+          typeof organization.rating_config === "string"
+            ? JSON.parse(organization.rating_config)
+            : organization.rating_config;
+        if (parsed && typeof parsed === "object" && "type" in parsed && "dimensions" in parsed) {
           ratingConfig = parsed;
         }
       } catch {
@@ -634,47 +589,38 @@ serve(async (req) => {
       success: true,
       settings: {
         name: organization?.name ?? "",
-        use_predefined_locations: organization?.use_predefined_locations ??
-          true,
+        use_predefined_locations: organization?.use_predefined_locations ?? true,
         business_mode: organization?.business_mode ?? "service_based",
         abn: organization?.abn ?? null,
         logo_url: organization?.logo_url ?? null,
         primary_contact_email: organization?.primary_contact_email ?? null,
         primary_contact_phone: organization?.primary_contact_phone ?? null,
         business_address: organization?.business_address ?? null,
-        invoice_send_immediately: organization?.invoice_send_immediately ??
-          false,
-        feedback_email_send_immediately:
-          organization?.feedback_email_send_immediately ?? false,
+        invoice_send_immediately: organization?.invoice_send_immediately ?? false,
+        feedback_email_send_immediately: organization?.feedback_email_send_immediately ?? false,
         rating_config: ratingConfig,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
         currency: organization?.currency ?? "AUD",
         locale: organization?.locale ?? "en-AU",
-        default_exclusive_group_label:
-          organization?.default_exclusive_group_label ?? null,
+        default_exclusive_group_label: organization?.default_exclusive_group_label ?? null,
         auto_generate_invoices_immediately:
           orgSettings?.auto_generate_invoices_immediately ?? false,
         bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
-        bank_transfer_account_number:
-          orgSettings?.bank_transfer_account_number ?? null,
-        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ??
-          null,
-        show_bank_transfer_on_invoices:
-          orgSettings?.show_bank_transfer_on_invoices ?? true,
+        bank_transfer_account_number: orgSettings?.bank_transfer_account_number ?? null,
+        bank_transfer_account_name: orgSettings?.bank_transfer_account_name ?? null,
+        show_bank_transfer_on_invoices: orgSettings?.show_bank_transfer_on_invoices ?? true,
         default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
         gst_registered: orgSettings?.gst_registered ?? false,
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
         edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
-        worker_payment_cycle_config:
-          orgSettings?.worker_payment_cycle_config ?? null,
+        worker_payment_cycle_config: orgSettings?.worker_payment_cycle_config ?? null,
+        workforce_engagement: orgSettings?.workforce_engagement ?? "employees",
       },
     });
   } catch (error) {
     logger.error("Update organization settings error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to update organization settings",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to update organization settings");
   }
 });

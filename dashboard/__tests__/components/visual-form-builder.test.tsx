@@ -241,7 +241,7 @@ describe("VisualFormBuilder", () => {
     expect(screen.getByText("Cluster: simple_servicing")).toBeInTheDocument();
   });
 
-  it("exposes advanced options including conditional logic controls", () => {
+  it("points field settings to Field Group Settings for mutual exclusion", () => {
     const fields = [
       createMockFieldConfig({ id: "field-1", label: "Primary Field" }),
       createMockFieldConfig({ id: "field-2", label: "Secondary Field" }),
@@ -260,14 +260,18 @@ describe("VisualFormBuilder", () => {
         onUpdateSection={mockOnUpdateSection}
         onDeleteSection={mockOnDeleteSection}
         onReorderSections={mockOnReorderSections}
+        onOpenFieldGroupSettings={vi.fn()}
       />,
       { wrapper: createWrapper() }
     );
 
-    const advancedButtons = screen.getAllByText("Advanced Options");
-    fireEvent.click(advancedButtons[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Field settings for Primary Field/i }));
 
-    expect(screen.getByText("Mutually Exclusive Cluster")).toBeInTheDocument();
-    expect(screen.getByText("Conditional Visibility")).toBeInTheDocument();
+    expect(screen.getAllByText(/mutually exclusive with another/i).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("button", { name: /^Field Group Settings$/i }).length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Conditional Visibility")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced Options")).not.toBeInTheDocument();
   });
 });

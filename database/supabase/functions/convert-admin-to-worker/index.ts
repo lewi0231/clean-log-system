@@ -1,5 +1,11 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  findCrossOrganizationEmailConflict,
+  findWorkerAuthUserInOtherOrganization,
+  formatCrossOrgEmailError,
+  formatWorkerAuthUserConflictError,
+} from "../_utils/cross-org-email.ts";
 import { loadEnvIfLocal } from "../_utils/env.ts";
 import {
   errorResponse,
@@ -19,7 +25,7 @@ await loadEnvIfLocal();
 /**
  * Convert an admin/viewer dashboard user to also be a worker
  * This allows them to use the mobile app with their existing credentials.
- * 
+ *
  * Key behavior:
  * - The same auth_user_id is used for both organization_user and worker records
  * - No new password or invitation needed - they use existing credentials
@@ -39,10 +45,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const validation = validateRequiredFields(body, [
-      "organization_user_id",
-      "organization_id",
-    ]);
+    const validation = validateRequiredFields(body, ["organization_user_id", "organization_id"]);
 
     if (!validation.valid) {
       logger.warn("Missing required fields for admin to worker conversion", {
@@ -59,16 +62,13 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized attempt to convert admin to worker", {
         organization_id,
       });
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
     }
 
     // Get the organization user
@@ -92,7 +92,7 @@ serve(async (req) => {
       });
       return errorResponse(
         "User must accept their invitation and activate their account before becoming a worker",
-        400,
+        400
       );
     }
 
@@ -122,11 +122,41 @@ serve(async (req) => {
       });
     }
 
+    const crossOrgConflict = await findCrossOrganizationEmailConflict(
+      supabase,
+      orgUser.email,
+      organization_id
+    );
+    if (crossOrgConflict) {
+      logger.warn("Rejected admin-to-worker conversion due to cross-org email conflict", {
+        organization_id,
+        organization_user_id,
+        existing_organization_id: crossOrgConflict.existingOrganizationId,
+        existing_as: crossOrgConflict.existingAs,
+      });
+      return errorResponse(formatCrossOrgEmailError(crossOrgConflict), 400);
+    }
+
+    const authUserConflict = await findWorkerAuthUserInOtherOrganization(
+      supabase,
+      orgUser.auth_user_id,
+      organization_id
+    );
+    if (authUserConflict) {
+      logger.warn("Rejected admin-to-worker conversion due to linked worker elsewhere", {
+        organization_id,
+        organization_user_id,
+        existing_organization_id: authUserConflict.existingOrganizationId,
+      });
+      return errorResponse(formatWorkerAuthUserConflictError(authUserConflict), 400);
+    }
+
     // Create worker record with same auth_user_id
     // Worker is immediately active since they're already authenticated
-    const workerName = orgUser.first_name && orgUser.last_name
-      ? `${orgUser.first_name} ${orgUser.last_name}`
-      : orgUser.email.split("@")[0];
+    const workerName =
+      orgUser.first_name && orgUser.last_name
+        ? `${orgUser.first_name} ${orgUser.last_name}`
+        : orgUser.email.split("@")[0];
 
     const { data: newWorker, error: createError } = await supabase
       .from("worker")
@@ -184,8 +214,7 @@ serve(async (req) => {
       organization_id: organization_id,
       type: "worker_created",
       title: "Team Member Now a Worker",
-      message:
-        `${workerName} can now use the mobile app to submit jobs.`,
+      message: `${workerName} can now use the mobile app to submit jobs.`,
       related_entity_type: "worker",
       related_entity_id: newWorker.id,
     });
@@ -202,8 +231,7 @@ serve(async (req) => {
 
     return jsonResponse({
       success: true,
-      message:
-        "User can now use the mobile app with their existing login credentials",
+      message: "User can now use the mobile app with their existing login credentials",
       worker: {
         id: newWorker.id,
         name: newWorker.name,
@@ -215,7 +243,7 @@ serve(async (req) => {
     logger.error("Convert admin to worker error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to convert user to worker"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

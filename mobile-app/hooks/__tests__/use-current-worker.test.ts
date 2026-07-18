@@ -2,13 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { useCurrentWorker } from "../use-current-worker";
 
-// Mock dependencies
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    functions: {
-      invoke: vi.fn(),
-    },
-  },
+vi.mock("@/lib/invoke-authed-function", () => ({
+  invokeAuthedFunction: vi.fn(),
 }));
 
 vi.mock("../useAuth", () => ({
@@ -19,9 +14,13 @@ vi.mock("../useOrganization", () => ({
   useOrganization: vi.fn(),
 }));
 
-const { supabase } = await import("@/lib/supabase");
+const { invokeAuthedFunction } = await import("@/lib/invoke-authed-function");
 const { useAuth } = await import("../useAuth");
 const { useOrganization } = await import("../useOrganization");
+
+const mockSession = {
+  access_token: "test-access-token",
+} as const;
 
 describe("useCurrentWorker", () => {
   beforeEach(() => {
@@ -31,14 +30,15 @@ describe("useCurrentWorker", () => {
   it("should return null when user is not authenticated", async () => {
     vi.mocked(useAuth).mockReturnValue({
       user: null,
+      session: null,
       loading: false,
       signOut: vi.fn(),
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
-      organizationName: "Test Org",
+      workforceEngagement: "employees",
       loading: false,
-      refetch: vi.fn(),
+      error: null,
     });
 
     const { result } = renderHook(() => useCurrentWorker());
@@ -58,14 +58,15 @@ describe("useCurrentWorker", () => {
         aud: "authenticated",
         created_at: new Date().toISOString(),
       },
+      session: mockSession,
       loading: false,
       signOut: vi.fn(),
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: null,
-      organizationName: null,
+      workforceEngagement: "employees",
       loading: false,
-      refetch: vi.fn(),
+      error: null,
     });
 
     const { result } = renderHook(() => useCurrentWorker());
@@ -98,16 +99,17 @@ describe("useCurrentWorker", () => {
 
     vi.mocked(useAuth).mockReturnValue({
       user: mockUser,
+      session: mockSession,
       loading: false,
       signOut: vi.fn(),
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
-      organizationName: "Test Org",
+      workforceEngagement: "employees",
       loading: false,
-      refetch: vi.fn(),
+      error: null,
     });
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(invokeAuthedFunction).mockResolvedValue({
       data: {
         workers: [mockWorker],
       },
@@ -121,7 +123,7 @@ describe("useCurrentWorker", () => {
     });
 
     expect(result.current.worker).toEqual(mockWorker);
-    expect(supabase.functions.invoke).toHaveBeenCalledWith("list-workers", {
+    expect(invokeAuthedFunction).toHaveBeenCalledWith("list-workers", mockSession.access_token, {
       body: { organization_id: "org-123" },
     });
   });
@@ -147,16 +149,17 @@ describe("useCurrentWorker", () => {
 
     vi.mocked(useAuth).mockReturnValue({
       user: mockUser,
+      session: mockSession,
       loading: false,
       signOut: vi.fn(),
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
-      organizationName: "Test Org",
+      workforceEngagement: "employees",
       loading: false,
-      refetch: vi.fn(),
+      error: null,
     });
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(invokeAuthedFunction).mockResolvedValue({
       data: {
         workers: [inactiveWorker],
       },
@@ -182,16 +185,17 @@ describe("useCurrentWorker", () => {
 
     vi.mocked(useAuth).mockReturnValue({
       user: mockUser,
+      session: mockSession,
       loading: false,
       signOut: vi.fn(),
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
-      organizationName: "Test Org",
+      workforceEngagement: "employees",
       loading: false,
-      refetch: vi.fn(),
+      error: null,
     });
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(invokeAuthedFunction).mockResolvedValue({
       data: null,
       error: { message: "Network error" },
     });
@@ -248,16 +252,17 @@ describe("useCurrentWorker", () => {
 
     vi.mocked(useAuth).mockReturnValue({
       user: mockUser,
+      session: mockSession,
       loading: false,
       signOut: vi.fn(),
     });
     vi.mocked(useOrganization).mockReturnValue({
       organizationId: "org-123",
-      organizationName: "Test Org",
+      workforceEngagement: "employees",
       loading: false,
-      refetch: vi.fn(),
+      error: null,
     });
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(invokeAuthedFunction).mockResolvedValue({
       data: { workers },
       error: null,
     });

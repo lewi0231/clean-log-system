@@ -34,15 +34,8 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    const {
-      name,
-      email,
-      address,
-      contact_person,
-      phone,
-      organization_id,
-      hierarchy_parent_id,
-    } = body;
+    const { name, email, address, contact_person, phone, organization_id, hierarchy_parent_id } =
+      body;
 
     const supabase = createServiceRoleClient();
 
@@ -50,16 +43,13 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized attempt to create location", {
         organization_id,
       });
-      return errorResponse(
-        "You do not have permission to access this organization",
-        403,
-      );
+      return errorResponse("You do not have permission to access this organization", 403);
     }
 
     // Validate hierarchy_parent_id if provided
@@ -75,10 +65,7 @@ serve(async (req) => {
       }
 
       if (parentNode.organization_id !== organization_id) {
-        return errorResponse(
-          "Hierarchy parent belongs to a different organization",
-          400,
-        );
+        return errorResponse("Hierarchy parent belongs to a different organization", 400);
       }
     }
 
@@ -95,14 +82,22 @@ serve(async (req) => {
         hierarchy_parent_id: hierarchy_parent_id || null,
         active: true,
       })
-      .select(`
+      .select(
+        `
         *,
         hierarchy_parent:hierarchy_parent_id (
           id,
           name,
-          type
+          type,
+          parent_id,
+          parent:parent_id (
+            id,
+            name,
+            type
+          )
         )
-      `)
+      `
+      )
       .single();
 
     if (locationError) {
@@ -127,7 +122,7 @@ serve(async (req) => {
     logger.error("Create location error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to create location"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

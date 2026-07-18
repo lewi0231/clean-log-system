@@ -1,5 +1,5 @@
 import { serve } from "server";
-import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
+import { extractAuthToken, getAuthUser, resolveWorkerIdForAuthUser } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -36,8 +36,12 @@ serve(async (req) => {
       return errorResponse("User not found", 401);
     }
 
-    // Get worker ID from auth user metadata
-    const workerId = authUser.user_metadata?.worker_id;
+    // Resolve worker from JWT (metadata first, then auth_user_id fallback)
+    const workerId = await resolveWorkerIdForAuthUser(
+      supabase,
+      authUser.id,
+      authUser.user_metadata
+    );
     if (!workerId) {
       logger.warn("User is not a worker", { userId: authUser.id });
       return errorResponse("Only workers can view pending confirmations", 403);
@@ -49,7 +53,8 @@ serve(async (req) => {
     // and the job is still in pending status
     const { data: pendingJobs, error: fetchError } = await supabase
       .from("job_worker")
-      .select(`
+      .select(
+        `
         job_id,
         confirmation_status,
         job:job_id (
@@ -73,7 +78,8 @@ serve(async (req) => {
             email
           )
         )
-      `)
+      `
+      )
       .eq("worker_id", workerId)
       .eq("confirmation_status", "pending");
 
@@ -99,25 +105,32 @@ serve(async (req) => {
     });
 
     // Get all workers on each job for display
-    const jobIds = activeJobs.map((pj) => {
-      const job = Array.isArray(pj.job) ? pj.job[0] : pj.job;
-      return job?.id;
-    }).filter(Boolean) as string[];
+    const jobIds = activeJobs
+      .map((pj) => {
+        const job = Array.isArray(pj.job) ? pj.job[0] : pj.job;
+        return job?.id;
+      })
+      .filter(Boolean) as string[];
 
     const { data: allJobWorkers } = await supabase
       .from("job_worker")
-      .select(`
+      .select(
+        `
         job_id,
         worker:worker_id (
           id,
           name
         ),
         confirmation_status
-      `)
+      `
+      )
       .in("job_id", jobIds);
 
     // Group workers by job_id
-    const workersByJobId = new Map<string, Array<{ id: string; name: string; confirmation_status: string }>>();
+    const workersByJobId = new Map<
+      string,
+      Array<{ id: string; name: string; confirmation_status: string }>
+    >();
     (allJobWorkers || []).forEach((jw) => {
       const worker = Array.isArray(jw.worker) ? jw.worker[0] : jw.worker;
       if (!worker) return;
@@ -133,27 +146,28 @@ serve(async (req) => {
     });
 
     // Format response
-    const pendingConfirmations = activeJobs.map((pj) => {
-      const job = Array.isArray(pj.job) ? pj.job[0] : pj.job;
-      if (!job) return null;
+    const pendingConfirmations = activeJobs
+      .map((pj) => {
+        const job = Array.isArray(pj.job) ? pj.job[0] : pj.job;
+        if (!job) return null;
 
-      const location = Array.isArray(job.location) ? job.location[0] : job.location;
-      const submitter = Array.isArray(job.submitter) ? job.submitter[0] : job.submitter;
+        const location = Array.isArray(job.location) ? job.location[0] : job.location;
+        const submitter = Array.isArray(job.submitter) ? job.submitter[0] : job.submitter;
 
-      return {
-        job_id: job.id,
-        location_name: location?.name || null,
-        location_address: location?.address || null,
-        completed_at: job.completed_at,
-        created_at: job.created_at,
-        auto_approve_at: job.auto_approve_at,
-        submitted_by: submitter?.name || "Unknown",
-        submitted_by_worker_id: job.submitted_by_worker_id,
-        workers: workersByJobId.get(job.id) || [],
-        // Extract a summary of submission data for preview
-        submission_summary: extractSubmissionSummary(job.submission_data),
-      };
-    }).filter(Boolean);
+        return {
+          job_id: job.id,
+          location_name: location?.name || null,
+          location_address: location?.address || null,
+          completed_at: job.completed_at,
+          created_at: job.created_at,
+          auto_approve_at: job.auto_approve_at,
+          submitted_by: submitter?.name || "Unknown",
+          submitted_by_worker_id: job.submitted_by_worker_id,
+          workers: workersByJobId.get(job.id) || [],
+          submission_data: job.submission_data ?? {},
+        };
+      })
+      .filter(Boolean);
 
     logger.debug("Found pending confirmations", {
       workerId,
@@ -172,33 +186,3 @@ serve(async (req) => {
     );
   }
 });
-
-/**
- * Extract a summary of submission data for preview in the confirmation list.
- * Returns a simplified object with key fields for display.
- */
-function extractSubmissionSummary(submissionData: Record<string, unknown> | null): Record<string, unknown> {
-  if (!submissionData) return {};
-
-  const summary: Record<string, unknown> = {};
-
-  // Include start_time and finish_time if present
-  if (submissionData.start_time) {
-    summary.start_time = submissionData.start_time;
-  }
-  if (submissionData.finish_time) {
-    summary.finish_time = submissionData.finish_time;
-  }
-
-  // Include any fields that look like counts or totals
-  for (const [key, value] of Object.entries(submissionData)) {
-    if (
-      typeof value === "number" ||
-      (typeof value === "string" && key.toLowerCase().includes("count"))
-    ) {
-      summary[key] = value;
-    }
-  }
-
-  return summary;
-}

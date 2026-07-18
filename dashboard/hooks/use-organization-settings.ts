@@ -50,6 +50,7 @@ async function fetchOrganizationSettings(organizationId: string): Promise<Organi
     edit_window_minutes: data.settings.edit_window_minutes ?? 180,
     custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
     worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
+    workforce_engagement: data.settings.workforce_engagement ?? "employees",
   };
 }
 

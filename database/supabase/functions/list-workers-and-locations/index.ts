@@ -47,7 +47,13 @@ serve(async (req) => {
           hierarchy_parent:hierarchy_parent_id (
             id,
             name,
-            type
+            type,
+            parent_id,
+            parent:parent_id (
+              id,
+              name,
+              type
+            )
           )
         `
         )

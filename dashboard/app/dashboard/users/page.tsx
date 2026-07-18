@@ -13,6 +13,7 @@ import OrganizationUserList from "@/components/users/organization-user-list";
 import WorkerForm from "@/components/workers/worker-form";
 import WorkerList from "@/components/workers/worker-list";
 import { useOrganizationUsers } from "@/hooks/use-organization-users";
+import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { useWorkers } from "@/hooks/use-workers";
 import useOrganization from "@/hooks/useOrganization";
 import { Plus } from "lucide-react";
@@ -22,6 +23,8 @@ import { toast } from "sonner";
 
 export default function UsersPage() {
   const { organizationId, loading: orgLoading, error: orgError } = useOrganization();
+  const { settings } = useOrganizationSettings();
+  const workforceEngagement = settings?.workforce_engagement ?? "employees";
   const {
     organizationUsers,
     loading: orgUsersLoading,
@@ -49,6 +52,7 @@ export default function UsersPage() {
     last_name: string;
     email: string;
     phone: string;
+    engagement_type?: "employee" | "contractor";
   }) => {
     if (!organizationId) return;
     try {
@@ -78,6 +82,7 @@ export default function UsersPage() {
       email: string;
       phone: string;
       active?: boolean;
+      engagement_type?: "employee" | "contractor";
     }
   ) => {
     await updateWorker({
@@ -279,6 +284,7 @@ export default function UsersPage() {
               await resendInvitation(workerId, organizationId);
             }}
             organizationId={organizationId}
+            workforceEngagement={workforceEngagement}
           />
         </TabsContent>
       </Tabs>
@@ -286,6 +292,7 @@ export default function UsersPage() {
       <WorkerForm
         open={isWorkerFormOpen}
         onOpenChange={setIsWorkerFormOpen}
+        workforceEngagement={workforceEngagement}
         onSuccess={async (workerData, workerId) => {
           if (workerId) {
             await handleUpdateWorker(workerId, workerData);

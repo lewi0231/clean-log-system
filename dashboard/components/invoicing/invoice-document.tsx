@@ -12,6 +12,10 @@ import {
 } from "@/components/ui/table";
 import { TAX_INVOICE_THRESHOLD_AUD } from "@/lib/constants/invoice-constants";
 import { formatAbn } from "@/lib/utils/format-abn";
+import {
+  formatLineItemDescription,
+  shouldShowBasePriceSeparately,
+} from "@/lib/utils/invoice-line-item-display";
 import { format } from "date-fns";
 import Image from "next/image";
 import React, { useState } from "react";
@@ -405,7 +409,10 @@ export function InvoiceDocument({
                       {job.location?.name && ` - ${job.location.name}`}
                     </TableCell>
                   </TableRow>
-                  {calc.base_price > 0 && (
+                  {shouldShowBasePriceSeparately(
+                    calc.base_price,
+                    templateConfig?.line_item_display
+                  ) && (
                     <TableRow>
                       <TableCell>Base Price</TableCell>
                       <TableCell className="text-right">1</TableCell>
@@ -418,19 +425,7 @@ export function InvoiceDocument({
                     </TableRow>
                   )}
                   {calc.line_items.map((item, i) => {
-                    let desc = item.field_label;
-                    if (
-                      templateConfig?.line_item_display?.include_option_value &&
-                      item.option_value
-                    ) {
-                      const fmt =
-                        templateConfig.line_item_display.description_format ??
-                        "{field_label}: {option_value}";
-                      desc = fmt
-                        .replace("{field_label}", item.field_label)
-                        .replace("{option_value}", item.option_value!);
-                    } else if (item.option_value)
-                      desc = `${item.field_label}: ${item.option_value}`;
+                    const desc = formatLineItemDescription(item, templateConfig?.line_item_display);
                     return (
                       <TableRow key={`${job.id}-${item.field_config_id}-${i}`}>
                         <TableCell>{desc}</TableCell>

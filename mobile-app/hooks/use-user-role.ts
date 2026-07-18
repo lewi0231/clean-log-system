@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { useEffect, useState } from "react";
 import { useAuth } from "./useAuth";
 import { useOrganization } from "./useOrganization";
@@ -6,29 +6,27 @@ import { useOrganization } from "./useOrganization";
 export type UserRole = "admin" | "worker" | null;
 
 export function useUserRole() {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const { organizationId } = useOrganization();
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !organizationId) {
+    let cancelled = false;
+
+    if (authLoading || !user?.id || !organizationId || !session?.access_token) {
       setRole(null);
       setLoading(false);
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
 
     async function fetchUserRole() {
-      if (!user || !organizationId) {
-        setRole(null);
-        setLoading(false);
-        return;
-      }
-
       try {
-        // Call edge function to get user role
-        const { data: roleData, error: roleError } = await supabase.functions.invoke(
+        const { data: roleData, error: roleError } = await invokeAuthedFunction(
           "get-user-role",
+          session.access_token,
           {
             body: {
               organization_id: organizationId,
@@ -36,15 +34,15 @@ export function useUserRole() {
           }
         );
 
+        if (cancelled) return;
+
         if (roleError) {
-          console.error("User Role: Error fetching role", roleError);
           setRole(null);
           setLoading(false);
           return;
         }
 
         if (roleData?.role) {
-          // Map admin/viewer to "admin", worker to "worker"
           const mappedRole = roleData.user_type === "admin" ? "admin" : roleData.role;
           if (__DEV__) {
             console.log("User Role: Found", {
@@ -64,17 +62,20 @@ export function useUserRole() {
           setRole(null);
         }
         setLoading(false);
-      } catch (err) {
-        console.error("User Role: Failed to fetch", {
-          error: err instanceof Error ? err.message : "Unknown error",
-        });
+      } catch {
+        if (cancelled) return;
         setRole(null);
         setLoading(false);
       }
     }
 
-    fetchUserRole();
-  }, [user, organizationId]);
+    setLoading(true);
+    void fetchUserRole();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, organizationId, authLoading, session?.access_token]);
 
   return {
     role,

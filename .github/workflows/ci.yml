@@ -40,9 +40,19 @@ jobs:
         uses: ./.github/actions/setup-pnpm-monorepo
 
       - name: Setup Deno
-        uses: denoland/setup-deno@v2
+        uses: denoland/setup-deno@e95548e56dfa95d4e1a28d6f422fafe75c4c26fb # v2.0.3
         with:
           deno-version: v2.x
+
+      - name: Cache Deno
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.cache/deno
+            database/supabase/functions/.deno
+          key: deno-${{ runner.os }}-${{ hashFiles('database/supabase/functions/**/deno.lock', 'database/supabase/functions/**/deno.json*', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            deno-${{ runner.os }}-
 
       - name: Validate Edge Functions inventory (S1 Phase 4)
         run: pnpm validate:functions-inventory
@@ -93,7 +103,8 @@ jobs:
 
       - name: Deno lint (Supabase edge functions)
         run: pnpm lint:edge-functions
-        continue-on-error: true # TODO: Remove once edge function imports are fixed
+        # Soft until Deno import graph lint is fully clean; still surfaces in logs.
+        continue-on-error: true
 
       - name: TypeScript (packages that define typecheck)
         run: pnpm typecheck
@@ -156,6 +167,10 @@ jobs:
     name: Security audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Informational until Dependabot clears the current high/critical backlog
+    # (pnpm audit --audit-level=high fails today with dozens of transitive findings).
+    # Still runs on every CI so the report is visible; does not gate "CI passed".
+    # Flip to a hard gate by adding this job to ci-required when the audit is clean.
 
     steps:
       - name: Checkout repository
@@ -165,8 +180,35 @@ jobs:
         uses: ./.github/actions/setup-pnpm-monorepo
 
       - name: pnpm audit (high or critical)
-        run: pnpm audit --audit-level=high
         continue-on-error: true
+        run: |
+          if ! pnpm audit --audit-level=high; then
+            echo "::warning::pnpm audit reported high/critical vulnerabilities. Informational only until Dependabot clears the backlog; does not block CI passed."
+            exit 1
+          fi
+
+  # Single required status for branch rules / auto-merge consumers.
+  # Auto-merge (PR → staging) and staging → main promotion both require this job.
+  # When GitHub Pro/public rulesets are available, require check name: "CI passed"
+  ci-required:
+    name: CI passed
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, unit-tests]
+    if: always()
+    steps:
+      - name: Require lint and unit tests to succeed
+        run: |
+          echo "lint-and-build: ${{ needs.lint-and-build.result }}"
+          echo "unit-tests: ${{ needs.unit-tests.result }}"
+          if [ "${{ needs.lint-and-build.result }}" != "success" ]; then
+            echo "::error::lint-and-build did not succeed"
+            exit 1
+          fi
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "::error::unit-tests did not succeed"
+            exit 1
+          fi
+          echo "All required CI jobs succeeded"
 
   e2e-tests:
     name: E2E tests (Playwright + Supabase)
@@ -243,57 +285,135 @@ jobs:
         run: supabase stop
 
   # Merge after CI passes for PRs targeting `staging`.
-  # We do this inside CI instead of a separate workflow_run workflow because:
-  # - workflow_run only uses the workflow file from the default branch, so fixes on
-  #   feature branches do not apply until merged to default.
-  # - Resolving the PR from workflow_run.head_sha via the commits API is unreliable.
+  # Uses PIPELINE_TOKEN when set so the resulting push to staging can trigger CI
+  # (GITHUB_TOKEN merges do not fire new workflow runs).
+  #
+  # Also opens/refreshes the staging → main promotion PR in this job so promotion
+  # still happens even if the post-merge staging push workflow is skipped.
   auto-merge-staging-pr:
     name: Auto-merge (PR → staging)
     runs-on: ubuntu-latest
-    needs: [lint-and-build, unit-tests, security-scan]
+    needs: [ci-required]
     if: >
       github.event_name == 'pull_request' &&
       github.base_ref == 'staging' &&
       github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.ci-required.result == 'success'
     permissions:
       contents: write
       pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
     steps:
-      - name: Queue or perform squash merge
+      - name: Require PIPELINE_TOKEN for reliable follow-on CI
+        run: |
+          if [ -z "${{ secrets.PIPELINE_TOKEN }}" ]; then
+            echo "::warning::PIPELINE_TOKEN is not set. Merge will use GITHUB_TOKEN,"
+            echo "::warning::so the staging push will not start CI. This job will still"
+            echo "::warning::open/refresh the staging → main promotion PR after merge."
+          fi
+
+      - name: Squash-merge into staging
+        id: merge
         run: |
           PR_NUM=${{ github.event.pull_request.number }}
           STATE=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json state --jq '.state')
           if [ "$STATE" != "OPEN" ]; then
             echo "PR #$PR_NUM is $STATE — nothing to merge"
+            echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if gh pr merge "$PR_NUM" --auto --squash --repo "${{ github.repository }}" 2>&1; then
-            echo "Auto-merge queued for PR #$PR_NUM (merges when required checks pass)"
-          elif gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
-            echo "Merged PR #$PR_NUM immediately (--auto unavailable or not needed)"
+          # Immediate squash after CI passed. Avoid --auto when Allow auto-merge is off
+          # (it can report success without a reliable follow-on push).
+          if gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
+            echo "Merged PR #$PR_NUM into staging"
+            echo "merged=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::Could not merge PR #$PR_NUM — verify repo Settings → General → Allow auto-merge,"
-            echo "::error::branch protection (required checks, review rules), and that squash merge is enabled."
+            echo "::error::Could not merge PR #$PR_NUM. Ensure squash merge is allowed"
+            echo "::error::and PIPELINE_TOKEN (if set) has contents + pull-requests write."
             exit 1
           fi
 
-  # When staging moves forward (e.g. after a PR merge), open or refresh staging → main.
-  # Implemented here instead of workflow_run so the logic runs from the branch that was
-  # pushed and does not depend on the completing workflow metadata (event/head_branch).
+      - name: Open or refresh staging → main promotion PR
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          set -euo pipefail
+          REPO="${{ github.repository }}"
+          CI_RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Staging tip may take a moment to update after merge.
+          for i in 1 2 3 4 5; do
+            STAGING_SHA=$(gh api "repos/$REPO/git/ref/heads/staging" --jq .object.sha)
+            MAIN_SHA=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+            if [ "$STAGING_SHA" != "$MAIN_SHA" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+          EXISTING=$(gh pr list --base main --head staging --state open --repo "$REPO" \
+            --json number --jq '.[0].number // empty')
+
+          if [ -n "$EXISTING" ]; then
+            gh pr comment "$EXISTING" --repo "$REPO" \
+              --body "**Staging updated** after merge of #${{ github.event.pull_request.number }}. [CI run]($CI_RUN_URL)."
+            echo "Refreshed existing promotion PR #$EXISTING"
+            exit 0
+          fi
+
+          # Compare via API (no checkout needed).
+          AHEAD=$(gh api "repos/$REPO/compare/main...staging" --jq '.ahead_by')
+          if [ "$AHEAD" = "0" ]; then
+            echo "staging is not ahead of main — no promotion PR"
+            exit 0
+          fi
+
+          FILES=$(gh api "repos/$REPO/compare/main...staging" --jq '[.files[].filename] | length')
+          set +e
+          PR_URL=$(gh pr create \
+            --base main \
+            --head staging \
+            --repo "$REPO" \
+            --title "Staging → main ($FILES files)" \
+            --body "$(cat <<EOF
+          ## Promotion to main
+
+          Opened after feature PR #${{ github.event.pull_request.number }} merged into staging.
+
+          Review and merge manually when ready for production.
+
+          **CI run:** $CI_RUN_URL
+
+          **Ahead of main:** $AHEAD commit(s), ~$FILES file(s).
+
+          ---
+          *Job: \`auto-merge-staging-pr\` in \`.github/workflows/ci.yml\`*
+          EOF
+          )" 2>&1)
+          CREATE_EXIT=$?
+          set -e
+          if [ "$CREATE_EXIT" -ne 0 ]; then
+            echo "$PR_URL"
+            echo "::error::Could not create staging → main PR. Set PIPELINE_TOKEN (PAT with"
+            echo "::error::contents + pull-requests) or enable Actions permission to create PRs."
+            exit 1
+          fi
+          echo "Created promotion PR: $PR_URL"
+
+  # When staging moves forward via a non-Actions push (or PIPELINE_TOKEN merge that
+  # retriggers workflows), open or refresh staging → main after CI passes.
+  # Does NOT auto-merge into main — promotion PRs are reviewed manually.
   #
-  # PR create/merge via GITHUB_TOKEN requires either:
-  # - Repo: Settings → Actions → General → Workflow permissions → enable
-  #   "Allow GitHub Actions to create and approve pull requests", OR
-  # - A repo secret PIPELINE_TOKEN (classic PAT: repo scope; or fine-grained PAT with
-  #   Contents + Pull requests read/write on this repository).
+  # Requires PIPELINE_TOKEN (or Actions "create pull requests" permission) for PR create.
   promote-staging-to-main:
     name: Staging → main (promotion PR)
     runs-on: ubuntu-latest
-    needs: [lint-and-build, unit-tests, security-scan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/staging'
+    needs: [ci-required]
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/staging' &&
+      needs.ci-required.result == 'success'
     permissions:
       contents: read
       pull-requests: write
@@ -353,7 +473,6 @@ jobs:
           fi
 
       - name: Create promotion PR
-        id: create_pr
         if: steps.existing_pr.outputs.exists == 'false' && steps.details.outputs.has_changes == 'true'
         run: |
           FILE_COUNT=${{ steps.details.outputs.file_count }}
@@ -369,6 +488,8 @@ jobs:
           ## Promotion to main
 
           **CI succeeded** on staging: [workflow run]($CI_RUN_URL)
+
+          Review and merge manually when ready for production.
 
           **Scope:** ~$FILE_COUNT file(s).
 
@@ -389,37 +510,12 @@ jobs:
 
           if [ "$CREATE_EXIT" -ne 0 ]; then
             echo "$PR_URL"
-            echo "::error::GitHub refused PR creation (createPullRequest). Enable \"Allow GitHub Actions to create and approve pull requests\" under Settings → Actions → General → Workflow permissions, or set repo secret PIPELINE_TOKEN (PAT with repo / pull-requests+contents access)."
+            echo "::error::GitHub refused PR creation. Set repo secret PIPELINE_TOKEN (PAT with"
+            echo "::error::contents + pull-requests) or enable Actions permission to create PRs."
             exit 1
           fi
 
           echo "promotion PR: $PR_URL"
-          PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-          echo "pr_number=$PR_NUM" >> $GITHUB_OUTPUT
-
-      - name: Enable auto-merge on new promotion PR (--merge)
-        if: steps.existing_pr.outputs.exists == 'false' && steps.details.outputs.has_changes == 'true'
-        run: |
-          PR_NUM=${{ steps.create_pr.outputs.pr_number }}
-          if gh pr merge "$PR_NUM" --auto --merge --repo "${{ github.repository }}" 2>&1; then
-            echo "auto-merge enabled on PR #$PR_NUM"
-          elif gh pr merge "$PR_NUM" --merge --repo "${{ github.repository }}" 2>&1; then
-            echo "merged PR #$PR_NUM immediately"
-          else
-            echo "PR created — enable Allow auto-merge or adjust branch protection if merge failed"
-          fi
-
-      - name: Re-enable auto-merge on existing promotion PR
-        if: steps.existing_pr.outputs.exists == 'true'
-        run: |
-          PR_NUM=${{ steps.existing_pr.outputs.pr_number }}
-          if gh pr merge "$PR_NUM" --auto --merge --repo "${{ github.repository }}" 2>&1; then
-            echo "auto-merge on PR #$PR_NUM"
-          elif gh pr merge "$PR_NUM" --merge --repo "${{ github.repository }}" 2>&1; then
-            echo "merged PR #$PR_NUM immediately"
-          else
-            echo "could not change merge state on PR #$PR_NUM"
-          fi
 
       - name: Comment on existing promotion PR
         if: steps.existing_pr.outputs.exists == 'true'
@@ -432,7 +528,7 @@ jobs:
   notify-failure:
     name: Notify build failure
     runs-on: ubuntu-latest
-    needs: [lint-and-build, unit-tests, security-scan]
+    needs: [lint-and-build, unit-tests, security-scan, ci-required]
     if: failure()
     permissions:
       contents: write
@@ -446,6 +542,7 @@ jobs:
               'lint-and-build': '${{ needs.lint-and-build.result }}',
               'unit-tests': '${{ needs.unit-tests.result }}',
               'security-scan': '${{ needs.security-scan.result }}',
+              'ci-required': '${{ needs.ci-required.result }}',
             };
             const failed = Object.entries(jobResults)
               .filter(([, r]) => r === 'failure')

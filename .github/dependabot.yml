@@ -1,0 +1,71 @@
+# Dependabot — version updates for npm workspaces + GitHub Actions.
+# Version-update PRs target `staging` (below). This file must also exist on the
+# default branch (`main`) for Dependabot to load it — promote staging → main
+# after changing this config.
+#
+# Note: Dependabot *security* update PRs always target the default branch
+# (`main`). Prefer a dedicated dependency-cleanup PR to staging for vuln fixes.
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  # Root + workspace packages (pnpm lockfile)
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Australia/Adelaide
+    open-pull-requests-limit: 10
+    target-branch: staging
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: "chore(deps)"
+    rebase-strategy: auto
+    # Keep PRs small enough that CI (lint + Vitest) stays meaningful
+    versioning-strategy: increase
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-minor-patch:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # Major framework upgrades need a deliberate migration PR
+      - dependency-name: next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+      - dependency-name: expo
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions used in workflows / composite actions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Australia/Adelaide
+    open-pull-requests-limit: 5
+    target-branch: staging
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "chore(ci)"
+    rebase-strategy: auto
+    groups:
+      actions:
+        patterns:
+          - "*"

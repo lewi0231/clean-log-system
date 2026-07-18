@@ -17,6 +17,7 @@ export const createMockWorker = (overrides?: Partial<Worker>): Worker => ({
   abn: null,
   auth_user_id: null,
   active: true,
+  engagement_type: "employee",
   created_at: "2024-01-01T00:00:00Z",
   ...overrides,
 });

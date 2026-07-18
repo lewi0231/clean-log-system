@@ -1,14 +1,22 @@
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/hooks/useAuth";
+import { invokeAuthedFunction } from "@/lib/invoke-authed-function";
 import { OrganizationSettings } from "@clean-log/shared/types/organization-settings";
 import { useEffect, useState } from "react";
 
 export function useOrganizationSettings(organizationId: string | null) {
+  const { session, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<OrganizationSettings | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!organizationId) return;
+    const accessToken = session?.access_token;
+    if (!organizationId || authLoading || !accessToken) {
+      if (!authLoading) {
+        setLoading(false);
+      }
+      return;
+    }
 
     const fetchSettings = async () => {
       if (__DEV__) {
@@ -16,12 +24,12 @@ export function useOrganizationSettings(organizationId: string | null) {
       }
 
       try {
-        const { data, error: fetchError } = await supabase.functions.invoke(
-          "get-organization-settings",
-          {
-            body: { organization_id: organizationId },
-          }
-        );
+        setLoading(true);
+        const { data, error: fetchError } = await invokeAuthedFunction<{
+          settings?: OrganizationSettings;
+        }>("get-organization-settings", accessToken, {
+          body: { organization_id: organizationId },
+        });
 
         if (fetchError) {
           console.error("🏢 Organization Settings: Error fetching", fetchError);
@@ -49,8 +57,8 @@ export function useOrganizationSettings(organizationId: string | null) {
       }
     };
 
-    fetchSettings();
-  }, [organizationId]);
+    void fetchSettings();
+  }, [organizationId, session?.access_token, authLoading]);
 
   return { settings, loading, error };
 }

@@ -19,9 +19,7 @@ export function extractAuthToken(req: Request): string | null {
 /**
  * Get authenticated user from token
  */
-export async function getAuthUser(
-  token: string,
-): Promise<{
+export async function getAuthUser(token: string): Promise<{
   id: string;
   email?: string;
   user_metadata?: Record<string, unknown>;
@@ -60,7 +58,7 @@ export async function getAuthUser(
  */
 export async function getOrganizationIdFromAdmin(
   supabase: SupabaseClient,
-  email: string,
+  email: string
 ): Promise<string | null> {
   const normalizedEmail = email.trim().toLowerCase();
   const { data: orgUser, error: orgUserError } = await supabase
@@ -84,7 +82,7 @@ export async function getOrganizationIdFromAdmin(
 export async function getOrganizationUserByEmail(
   supabase: SupabaseClient,
   email: string,
-  organizationId?: string,
+  organizationId?: string
 ): Promise<{ id: string; organization_id: string; role: string } | null> {
   const normalizedEmail = email.trim().toLowerCase();
   let query = supabase
@@ -110,7 +108,7 @@ export async function getOrganizationUserByEmail(
  */
 export async function getOrganizationIdFromWorker(
   supabase: SupabaseClient,
-  authUserId: string,
+  authUserId: string
 ): Promise<string | null> {
   const { data: worker, error: workerError } = await supabase
     .from("worker")
@@ -126,11 +124,85 @@ export async function getOrganizationIdFromWorker(
 }
 
 /**
+ * Resolve the worker row id for an authenticated org member (metadata first, then auth_user_id).
+ */
+export async function resolveOrganizationWorkerId(
+  supabase: SupabaseClient,
+  organizationId: string,
+  authUserId: string,
+  userMetadata?: Record<string, unknown> | null
+): Promise<string | null> {
+  const metadataWorkerId = userMetadata?.worker_id;
+  if (typeof metadataWorkerId === "string" && metadataWorkerId.length > 0) {
+    const { data: metadataWorker, error: metadataWorkerError } = await supabase
+      .from("worker")
+      .select("id")
+      .eq("id", metadataWorkerId)
+      .eq("organization_id", organizationId)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (!metadataWorkerError && metadataWorker) {
+      return metadataWorker.id;
+    }
+  }
+
+  const { data: worker, error: workerError } = await supabase
+    .from("worker")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("auth_user_id", authUserId)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (workerError || !worker) {
+    return null;
+  }
+
+  return worker.id;
+}
+
+/**
+ * Resolve worker id for an auth user without requiring organization context.
+ * Used by worker-scoped endpoints that infer participation from JWT alone.
+ */
+export async function resolveWorkerIdForAuthUser(
+  supabase: SupabaseClient,
+  authUserId: string,
+  userMetadata?: Record<string, unknown> | null
+): Promise<string | null> {
+  const metadataWorkerId = userMetadata?.worker_id;
+  if (typeof metadataWorkerId === "string" && metadataWorkerId.length > 0) {
+    const { data: metadataWorker, error: metadataWorkerError } = await supabase
+      .from("worker")
+      .select("id")
+      .eq("id", metadataWorkerId)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (!metadataWorkerError && metadataWorker) {
+      return metadataWorker.id;
+    }
+  }
+
+  const { data: worker, error: workerError } = await supabase
+    .from("worker")
+    .select("id")
+    .eq("auth_user_id", authUserId)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (workerError || !worker) {
+    return null;
+  }
+
+  return worker.id;
+}
+
+/**
  * Get organization ID from user (tries both admin and worker strategies)
  */
-export async function getOrganizationIdFromUser(
-  req: Request,
-): Promise<string | null> {
+export async function getOrganizationIdFromUser(req: Request): Promise<string | null> {
   const supabase = createServiceRoleClient();
 
   // Try to get token
@@ -181,7 +253,7 @@ export async function verifyOrganizationMembership(
   supabase: SupabaseClient,
   organizationId: string,
   userEmail?: string | null,
-  authUserId?: string | null,
+  authUserId?: string | null
 ): Promise<boolean> {
   // Try admin membership by email (case-insensitive)
   if (userEmail) {
@@ -223,7 +295,7 @@ export async function getOrganizationUserIdForPaidBy(
   supabase: SupabaseClient,
   organizationId: string,
   authUserId: string | null,
-  userEmail: string | null,
+  userEmail: string | null
 ): Promise<string | null> {
   if (authUserId) {
     const { data, error } = await supabase
@@ -257,7 +329,7 @@ export async function verifyOrganizationMembershipFromRequest(
   req: Request,
   organizationId: string,
   supabase: SupabaseClient,
-  body?: Record<string, unknown> | null,
+  body?: Record<string, unknown> | null
 ): Promise<{ userId: string | null; userEmail: string | null } | null> {
   // Extract user from auth token
   let userId: string | null = null;
@@ -283,7 +355,7 @@ export async function verifyOrganizationMembershipFromRequest(
       supabase,
       organizationId,
       userEmail,
-      userId,
+      userId
     );
 
     if (!isMember) {

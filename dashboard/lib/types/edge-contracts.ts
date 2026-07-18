@@ -69,6 +69,22 @@ import type {
   ResolveFlaggedJobResponse,
   SendFeedbackEmailRequest,
   SendFeedbackEmailResponse,
+  SendTestOrgSendingDomainEmailRequest,
+  SendTestOrgSendingDomainEmailResponse,
+  DraftWorkerTaxInvoiceRequest,
+  DraftWorkerTaxInvoiceResponse,
+  SubmitWorkerTaxInvoiceRequest,
+  SubmitWorkerTaxInvoiceResponse,
+  ListWorkerTaxInvoicesRequest,
+  ListWorkerTaxInvoicesResponse,
+  GetWorkerTaxInvoiceRequest,
+  GetWorkerTaxInvoiceResponse,
+  ReviewWorkerTaxInvoiceRequest,
+  ReviewWorkerTaxInvoiceResponse,
+  UpdateWorkerTaxInvoiceStatusRequest,
+  UpdateWorkerTaxInvoiceStatusResponse,
+  GenerateWorkerTaxInvoicePdfRequest,
+  GenerateWorkerTaxInvoicePdfResponse,
   UpdateInvoiceTemplateConfigRequest,
   UpdateInvoiceTemplateConfigResponse,
   UpdateJobRequest,
@@ -251,6 +267,10 @@ export interface EdgeContracts {
     body: SendFeedbackEmailRequest;
     response: SendFeedbackEmailResponse;
   };
+  "send-test-org-sending-domain-email": {
+    body: SendTestOrgSendingDomainEmailRequest;
+    response: SendTestOrgSendingDomainEmailResponse;
+  };
   "update-invoice-template-config": {
     body: UpdateInvoiceTemplateConfigRequest;
     response: UpdateInvoiceTemplateConfigResponse;
@@ -280,5 +300,33 @@ export interface EdgeContracts {
   "upsert-service-pricing-mode": {
     body: UpsertServicePricingModeRequest;
     response: UpsertServicePricingModeResponse;
+  };
+  "draft-worker-tax-invoice": {
+    body: DraftWorkerTaxInvoiceRequest;
+    response: DraftWorkerTaxInvoiceResponse;
+  };
+  "submit-worker-tax-invoice": {
+    body: SubmitWorkerTaxInvoiceRequest;
+    response: SubmitWorkerTaxInvoiceResponse;
+  };
+  "list-worker-tax-invoices": {
+    body: ListWorkerTaxInvoicesRequest;
+    response: ListWorkerTaxInvoicesResponse;
+  };
+  "get-worker-tax-invoice": {
+    body: GetWorkerTaxInvoiceRequest;
+    response: GetWorkerTaxInvoiceResponse;
+  };
+  "review-worker-tax-invoice": {
+    body: ReviewWorkerTaxInvoiceRequest;
+    response: ReviewWorkerTaxInvoiceResponse;
+  };
+  "update-worker-tax-invoice-status": {
+    body: UpdateWorkerTaxInvoiceStatusRequest;
+    response: UpdateWorkerTaxInvoiceStatusResponse;
+  };
+  "generate-worker-tax-invoice-pdf": {
+    body: GenerateWorkerTaxInvoicePdfRequest;
+    response: GenerateWorkerTaxInvoicePdfResponse;
   };
 }

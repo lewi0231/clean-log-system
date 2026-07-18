@@ -1,5 +1,5 @@
-import { ThemedText } from "@/components/themed-text";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/theme-context";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -44,8 +45,7 @@ export default function LoginScreen() {
       setIsLoading(false);
       router.replace("/(tabs)");
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : (error as string);
+      const errorMessage = error instanceof Error ? error.message : (error as string);
       Alert.alert("Error", errorMessage);
       setIsLoading(false);
     }
@@ -70,24 +70,18 @@ export default function LoginScreen() {
         >
           <View className="w-full max-w-sm self-center gap-5">
             <View className="items-center mb-2">
-              <ThemedText
-                type="title"
-                className="text-3xl font-bold text-center mb-2"
-              >
+              <Text className="text-3xl font-bold text-center mb-2 text-foreground">
                 Tally Runner
-              </ThemedText>
-              <ThemedText
-                type="subtitle"
-                className="text-base text-center mb-8 text-muted-foreground"
-              >
+              </Text>
+              <Text className="text-base text-center mb-8 text-muted-foreground">
                 Sign in to continue
-              </ThemedText>
+              </Text>
             </View>
 
             <TextInput
               className="bg-card border border-border rounded-xl px-4 py-3.5 text-base text-foreground"
               placeholder="Email"
-              placeholderTextColor="rgb(var(--color-muted-foreground))"
+              placeholderTextColor={colors.mutedForeground}
               value={email}
               onChangeText={setEmail}
               autoCapitalize="none"
@@ -99,7 +93,7 @@ export default function LoginScreen() {
             <TextInput
               className="bg-card border border-border rounded-xl px-4 py-3.5 text-base text-foreground"
               placeholder="Password"
-              placeholderTextColor="rgb(var(--color-muted-foreground))"
+              placeholderTextColor={colors.mutedForeground}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -112,17 +106,13 @@ export default function LoginScreen() {
               onPress={handleLogin}
               disabled={isLoading}
               className={`bg-primary rounded-xl py-4 px-8 items-center justify-center mt-2 min-h-[52px] shadow-lg ${
-                isLoading
-                  ? "opacity-70"
-                  : "active:opacity-90 active:scale-[0.98]"
+                isLoading ? "opacity-70" : "active:opacity-90 active:scale-[0.98]"
               }`}
             >
               {isLoading ? (
-                <ActivityIndicator color="rgb(var(--color-primary-foreground))" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text className="text-primary-foreground text-lg font-semibold">
-                  Sign In
-                </Text>
+                <Text className="text-primary-foreground text-lg font-semibold">Sign In</Text>
               )}
             </Pressable>
           </View>

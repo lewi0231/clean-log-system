@@ -1,14 +1,10 @@
 import { serve } from "server";
-import {
-  extractAuthToken,
-  getAuthUser,
-  getOrganizationIdFromAdmin,
-  getOrganizationIdFromWorker,
-  getOrganizationUserByEmail,
-} from "../_utils/auth.ts";
+import { extractAuthToken, getAuthUser, getOrganizationUserByEmail } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
+import { normalizeWorkforceEngagement } from "../_utils/workforce-engagement.ts";
+import { resolveOrganizationId } from "./resolve-organization-id.ts";
 
 serve(async (req) => {
   const logger = createLogger(req, { functionName: "get-organization-id" });
@@ -20,10 +16,12 @@ serve(async (req) => {
 
     // Parse body first (can only be read once)
     let email: string | null = null;
+    let preferWorker = false;
     try {
       const body = await req.json();
       email = (body.email as string) || null;
-      logger.debug("Parsed body email presence", { hasEmail: !!email });
+      preferWorker = body.prefer_worker === true;
+      logger.debug("Parsed body", { hasEmail: !!email, preferWorker });
     } catch {
       logger.debug("No JSON body or failed to parse");
     }
@@ -54,24 +52,16 @@ serve(async (req) => {
     // Use email from body, or fall back to auth email
     const lookupEmail = email || authEmail;
 
-    // Strategy 1: Try admin user by email
-    let organizationId: string | null = null;
-    if (lookupEmail) {
-      organizationId = await getOrganizationIdFromAdmin(supabase, lookupEmail);
-      logger.debug("Admin lookup attempted", {
-        hasLookupEmail: true,
-        foundOrganizationId: !!organizationId,
-      });
-    }
+    const organizationId = await resolveOrganizationId(supabase, {
+      lookupEmail,
+      authUserId,
+      preferWorker,
+    });
 
-    // Strategy 2: Try worker by auth_user_id
-    if (!organizationId && authUserId) {
-      organizationId = await getOrganizationIdFromWorker(supabase, authUserId);
-      logger.debug("Worker lookup attempted", {
-        authUserId,
-        foundOrganizationId: !!organizationId,
-      });
-    }
+    logger.debug("Organization resolution completed", {
+      preferWorker,
+      foundOrganizationId: !!organizationId,
+    });
 
     if (!organizationId) {
       logger.warn("Organization not found");
@@ -83,11 +73,7 @@ serve(async (req) => {
     let role: string | null = null;
 
     if (lookupEmail) {
-      const orgUser = await getOrganizationUserByEmail(
-        supabase,
-        lookupEmail,
-        organizationId,
-      );
+      const orgUser = await getOrganizationUserByEmail(supabase, lookupEmail, organizationId);
       if (orgUser) {
         organizationUserId = orgUser.id;
         role = orgUser.role;
@@ -104,15 +90,20 @@ serve(async (req) => {
       role,
     });
 
+    const { data: orgSettings } = await supabase
+      .from("organization_settings")
+      .select("workforce_engagement")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+
     return jsonResponse({
       organization_id: organizationId,
       organization_user_id: organizationUserId,
       role: role,
+      workforce_engagement: normalizeWorkforceEngagement(orgSettings?.workforce_engagement),
     });
   } catch (error) {
     logger.error("Unhandled error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to get organization ID",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to get organization ID");
   }
 });

@@ -3,10 +3,7 @@ import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-import {
-  getInvoiceDetailsSchema,
-  validateRequest,
-} from "../_utils/zod-schemas.ts";
+import { getInvoiceDetailsSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
 serve(async (req) => {
   const logger = createLogger(req, { functionName: "get-invoice-details" });
@@ -47,7 +44,7 @@ serve(async (req) => {
             )
           )
         )
-        `,
+        `
       )
       .eq("id", invoice_id)
       .maybeSingle();
@@ -63,13 +60,10 @@ serve(async (req) => {
       req,
       invoice.organization_id,
       supabase,
-      rawBody as Record<string, unknown>,
+      rawBody as Record<string, unknown>
     );
     if (!membershipCheck) {
-      return errorResponse(
-        "You do not have permission to access this invoice",
-        403,
-      );
+      return errorResponse("You do not have permission to access this invoice", 403);
     }
 
     // Extract job IDs from invoice_job relationships
@@ -86,21 +80,29 @@ serve(async (req) => {
       return errorResponse("Invoice has no associated jobs", 404);
     }
 
-    // Call calculate-invoice function to get line items and calculations
-    // Pass email for nested function auth (service role key doesn't carry user context)
-    const { data: calculationData, error: calcError } = await supabase.functions
-      .invoke("calculate-invoice", {
-        body: {
-          organization_id: invoice.organization_id,
-          job_ids: jobIds,
-          email: membershipCheck.userEmail, // Pass verified email for nested auth
-        },
-      });
+    // Prefer immutable calculation snapshot (matches amounts at creation).
+    // Fall back to live calculate-invoice for legacy invoices without a snapshot.
+    let calculation = invoice.calculation_snapshot ?? null;
 
-    if (calcError) throw calcError;
+    if (!calculation) {
+      const { data: calculationData, error: calcError } = await supabase.functions.invoke(
+        "calculate-invoice",
+        {
+          body: {
+            organization_id: invoice.organization_id,
+            job_ids: jobIds,
+            email: membershipCheck.userEmail,
+          },
+        }
+      );
 
-    if (!calculationData || !calculationData.calculation) {
-      return errorResponse("Failed to calculate invoice details", 500);
+      if (calcError) throw calcError;
+
+      if (!calculationData || !calculationData.calculation) {
+        return errorResponse("Failed to calculate invoice details", 500);
+      }
+
+      calculation = calculationData.calculation;
     }
 
     // Fetch invoice template config (or create default if doesn't exist)
@@ -120,13 +122,7 @@ serve(async (req) => {
         bill_to_fields: [],
         service_address_config: {
           source: "auto",
-          location_fields: [
-            "name",
-            "address",
-            "contact_person",
-            "email",
-            "phone",
-          ],
+          location_fields: ["name", "address", "contact_person", "email", "phone"],
         },
         billing_address_config: {
           enabled: false,
@@ -156,13 +152,7 @@ serve(async (req) => {
         bill_to_fields: billToFields,
         service_address_config: configData.service_address_config ?? {
           source: "auto",
-          location_fields: [
-            "name",
-            "address",
-            "contact_person",
-            "email",
-            "phone",
-          ],
+          location_fields: ["name", "address", "contact_person", "email", "phone"],
         },
         billing_address_config: configData.billing_address_config ?? {
           enabled: false,
@@ -183,13 +173,7 @@ serve(async (req) => {
         bill_to_fields: [],
         service_address_config: {
           source: "auto",
-          location_fields: [
-            "name",
-            "address",
-            "contact_person",
-            "email",
-            "phone",
-          ],
+          location_fields: ["name", "address", "contact_person", "email", "phone"],
         },
         billing_address_config: {
           enabled: false,
@@ -243,14 +227,12 @@ serve(async (req) => {
     return jsonResponse({
       success: true,
       invoice: invoice,
-      calculation: calculationData.calculation,
+      calculation,
       template_config: templateConfig,
       hierarchy_metadata: hierarchyMetadata,
     });
   } catch (error) {
     logger.error("Get invoice details error", error);
-    return errorResponse(
-      error instanceof Error ? error : "Failed to get invoice details",
-    );
+    return errorResponse(error instanceof Error ? error : "Failed to get invoice details");
   }
 });

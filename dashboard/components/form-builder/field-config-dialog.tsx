@@ -21,18 +21,18 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { LocationRestrictionPicker } from "@/components/form-builder/location-restriction-picker";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
 import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
-import { cn } from "@/lib/utils";
 import {
   type FieldConfig,
   type FieldType,
   type FormSectionWithFields,
   type ValidationRules,
 } from "@clean-log/shared";
-import { Check, GitBranch, Settings, Shield, Sliders } from "lucide-react";
+import { Settings, Shield, Sliders } from "lucide-react";
 import { useRef, useState } from "react";
 
 interface FieldConfigDialogProps {
@@ -48,6 +48,7 @@ interface FieldConfigDialogProps {
     >
   ) => Promise<void>;
   organizationId: string | null;
+  onOpenFieldGroupSettings?: () => void;
 }
 
 const FIELD_TYPE_LABELS: Record<FieldType, string> = {
@@ -123,6 +124,7 @@ export function FieldConfigDialog({
   existingFieldNames,
   onSave,
   organizationId,
+  onOpenFieldGroupSettings,
 }: FieldConfigDialogProps) {
   const [activeTab, setActiveTab] = useState("general");
   const [label, setLabel] = useState("");
@@ -354,70 +356,34 @@ export function FieldConfigDialog({
           </p>
 
           {restrictToLocations && (
-            <div className="space-y-2">
-              {locations.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No locations available. Create locations first.
-                </p>
-              ) : (
-                <div className="rounded-md border border-input bg-background shadow-sm">
-                  <div className="max-h-48 overflow-y-auto p-2">
-                    {locations
-                      .filter((loc) => loc.active)
-                      .map((location) => {
-                        const isSelected = selectedLocationIds.includes(location.id);
-                        return (
-                          <div
-                            key={location.id}
-                            className={cn(
-                              "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
-                              isSelected && "bg-accent/50"
-                            )}
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedLocationIds(
-                                  selectedLocationIds.filter((id) => id !== location.id)
-                                );
-                              } else {
-                                setSelectedLocationIds([...selectedLocationIds, location.id]);
-                              }
-                            }}
-                          >
-                            <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                              {isSelected && <Check className="h-4 w-4 text-primary" />}
-                            </span>
-                            <Label
-                              htmlFor={`dialog-location-${location.id}`}
-                              className="text-sm font-normal cursor-pointer flex-1"
-                            >
-                              {location.name}
-                            </Label>
-                            <input
-                              type="checkbox"
-                              id={`dialog-location-${location.id}`}
-                              checked={isSelected}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedLocationIds([...selectedLocationIds, location.id]);
-                                } else {
-                                  setSelectedLocationIds(
-                                    selectedLocationIds.filter((id) => id !== location.id)
-                                  );
-                                }
-                              }}
-                              className="sr-only"
-                              aria-hidden="true"
-                            />
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-            </div>
+            <LocationRestrictionPicker
+              locations={locations}
+              selectedIds={selectedLocationIds}
+              onChange={setSelectedLocationIds}
+              idPrefix="dialog-location"
+            />
           )}
         </div>
       )}
+
+      <p className="text-xs text-muted-foreground rounded-lg border p-3 bg-muted/20">
+        Need this field to be mutually exclusive with another? Configure that in{" "}
+        {onOpenFieldGroupSettings ? (
+          <button
+            type="button"
+            className="font-medium text-primary hover:underline cursor-pointer"
+            onClick={() => {
+              onOpenChange(false);
+              onOpenFieldGroupSettings();
+            }}
+          >
+            Field Group Settings
+          </button>
+        ) : (
+          <span className="font-medium text-primary">Field Group Settings</span>
+        )}
+        .
+      </p>
     </div>
   );
 
@@ -572,19 +538,6 @@ export function FieldConfigDialog({
     </div>
   );
 
-  const logicBlock = (
-    <div className="space-y-2 text-sm text-muted-foreground">
-      <p>
-        <strong>Show when</strong> (conditional logic) links this field to answers in other fields —
-        for example, only show &quot;Extra services&quot; when &quot;Add-ons?&quot; is yes.
-      </p>
-      <p>
-        After you add this field, open it from the form list and use <strong>field settings</strong>{" "}
-        to configure conditions. That keeps dependencies on fields that already exist in your form.
-      </p>
-    </div>
-  );
-
   const advancedBlock = (
     <div className="space-y-4">
       {fieldType === "select" && (
@@ -655,10 +608,6 @@ export function FieldConfigDialog({
               <Shield className="h-4 w-4 shrink-0" />
               Validation
             </TabsTrigger>
-            <TabsTrigger value="logic" className="justify-start gap-2 cursor-pointer">
-              <GitBranch className="h-4 w-4 shrink-0" />
-              Logic
-            </TabsTrigger>
             <TabsTrigger value="advanced" className="justify-start gap-2 cursor-pointer">
               <Sliders className="h-4 w-4 shrink-0" />
               Advanced
@@ -671,9 +620,6 @@ export function FieldConfigDialog({
             </TabsContent>
             <TabsContent value="validation" className="mt-0 space-y-0">
               {validationBlock}
-            </TabsContent>
-            <TabsContent value="logic" className="mt-0 space-y-0">
-              {logicBlock}
             </TabsContent>
             <TabsContent value="advanced" className="mt-0 space-y-0">
               {advancedBlock}

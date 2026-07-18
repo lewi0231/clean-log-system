@@ -19,18 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { useLocationHierarchy } from "@/hooks/use-location-hierarchy";
 import { log } from "@/lib/logger";
 import type { LocationHierarchyNode } from "@/lib/types";
 import { locationSchema } from "@/lib/validations";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Info } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -52,7 +45,7 @@ interface LocationFormProps {
       fixed_worker_payment?: number | null;
       fixed_price_currency?: string | null;
     },
-    locationId?: string,
+    locationId?: string
   ) => void | Promise<void>;
   location?: {
     id: string;
@@ -106,7 +99,7 @@ export default function LocationForm({
       fixed_worker_payment: undefined,
       fixed_price_currency: undefined,
     }),
-    [location],
+    [location]
   );
 
   const form = useForm<LocationFormValues>({
@@ -148,9 +141,7 @@ export default function LocationForm({
     };
 
     // Start with root nodes (no parent)
-    hierarchyNodes
-      .filter((n) => !n.parent_id)
-      .forEach((root) => addNode(root, 0));
+    hierarchyNodes.filter((n) => !n.parent_id).forEach((root) => addNode(root, 0));
 
     return options;
   }, [hierarchyNodes]);
@@ -195,20 +186,12 @@ export default function LocationForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {isEditMode ? "Edit Location" : "Add Location"}
-          </DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Location" : "Add Location"}</DialogTitle>
           <DialogDescription>
-            {isEditMode
-              ? "Update location information."
-              : "Add a new location."}
+            {isEditMode ? "Update location information." : "Add a new location."}
           </DialogDescription>
         </DialogHeader>
-        <form
-          className="space-y-4 py-4"
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-        >
+        <form className="space-y-4 py-4" onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -248,9 +231,7 @@ export default function LocationForm({
               required
             />
             {errors.address?.message && (
-              <p className="text-sm text-destructive">
-                {errors.address.message}
-              </p>
+              <p className="text-sm text-destructive">{errors.address.message}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -264,9 +245,7 @@ export default function LocationForm({
               required
             />
             {errors.contact_person?.message && (
-              <p className="text-sm text-destructive">
-                {errors.contact_person.message}
-              </p>
+              <p className="text-sm text-destructive">{errors.contact_person.message}</p>
             )}
           </div>
           <div className="space-y-2">
@@ -284,27 +263,20 @@ export default function LocationForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="hierarchy_parent">
-              Region / Company (Optional)
-            </Label>
+            <Label htmlFor="hierarchy_parent">Region / Company (Optional)</Label>
             {hierarchyOptions.length > 0 ? (
               <>
                 <Select
                   value={hierarchyParentId || "none"}
                   onValueChange={(value) =>
-                    setValue(
-                      "hierarchy_parent_id",
-                      value === "none" ? null : value,
-                    )
+                    setValue("hierarchy_parent_id", value === "none" ? null : value)
                   }
                 >
                   <SelectTrigger id="hierarchy_parent">
                     <SelectValue placeholder="Select region for pricing..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">
-                      No region (org default)
-                    </SelectItem>
+                    <SelectItem value="none">No region (org default)</SelectItem>
                     {hierarchyOptions.map(({ node, indent }) => (
                       <SelectItem key={node.id} value={node.id}>
                         {"  ".repeat(indent)}
@@ -314,8 +286,7 @@ export default function LocationForm({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Assign this location to a region or company for regional
-                  pricing rules.
+                  Assign this location to a region or company for regional pricing rules.
                 </p>
               </>
             ) : (
@@ -340,8 +311,8 @@ export default function LocationForm({
                   Active Status
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Inactive locations won&apos;t appear as options in the mobile
-                  app but will remain in the location list.
+                  Inactive locations won&apos;t appear as options in the mobile app but will remain
+                  in the location list.
                 </p>
               </div>
               <Switch
@@ -353,76 +324,6 @@ export default function LocationForm({
             </div>
           )}
 
-          {/* Pricing Information */}
-          <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg border border-muted">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="mt-0.5 cursor-pointer"
-                    aria-label="Pricing information"
-                  >
-                    <Info className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent
-                  side="right"
-                  className="max-w-sm bg-popover text-popover-foreground border border-border"
-                >
-                  <div className="space-y-2">
-                    <p className="font-medium text-popover-foreground">
-                      Pricing Configuration
-                    </p>
-                    <p className="text-sm text-popover-foreground">
-                      This location uses <strong>field-based pricing</strong>.
-                      Prices are calculated from your field configurations and
-                      pricing rules set in the{" "}
-                      <Link
-                        href="/dashboard/pricing"
-                        className="text-primary hover:underline font-medium"
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      >
-                        Pricing page
-                      </Link>
-                      .
-                    </p>
-                    <p className="text-sm text-popover-foreground/90">
-                      You can set location-specific pricing rules by selecting
-                      this location in the Pricing page&apos;s scope selector.
-                    </p>
-                    <p className="text-xs text-popover-foreground/80 pt-2 border-t border-border">
-                      For a full explanation of field-based pricing, see{" "}
-                      <Link
-                        href="/dashboard/help#field-based-pricing"
-                        className="text-primary hover:underline font-medium"
-                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                      >
-                        Help & FAQ
-                      </Link>
-                      . Fixed pricing per location may be available in a future
-                      update.
-                    </p>
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <div className="flex-1 space-y-1">
-              <p className="text-sm font-medium">Pricing</p>
-              <p className="text-xs text-muted-foreground">
-                This location uses field-based pricing. Find out more about what
-                field-based pricing is and how to configure it{" "}
-                <Link
-                  href="/dashboard/help#field-based-pricing"
-                  className="font-medium text-primary hover:underline"
-                >
-                  here
-                </Link>
-                .
-              </p>
-            </div>
-          </div>
-
           <DialogFooter>
             <Button
               type="button"
@@ -432,11 +333,7 @@ export default function LocationForm({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              className="cursor-pointer"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" className="cursor-pointer" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : isEditMode ? "Update" : "Create"}
             </Button>
           </DialogFooter>

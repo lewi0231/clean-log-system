@@ -34,16 +34,7 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    const {
-      id,
-      name,
-      email,
-      address,
-      contact_person,
-      phone,
-      hierarchy_parent_id,
-      active,
-    } = body;
+    const { id, name, email, address, contact_person, phone, hierarchy_parent_id, active } = body;
 
     const supabase = createServiceRoleClient();
 
@@ -66,17 +57,14 @@ serve(async (req) => {
     const membershipCheck = await verifyOrganizationMembershipFromRequest(
       req,
       existingLocation.organization_id,
-      supabase,
+      supabase
     );
     if (!membershipCheck) {
       logger.warn("Unauthorized attempt to update location", {
         location_id: id,
         organization_id: existingLocation.organization_id,
       });
-      return errorResponse(
-        "You do not have permission to update this location",
-        403,
-      );
+      return errorResponse("You do not have permission to update this location", 403);
     }
 
     // Validate hierarchy_parent_id if provided
@@ -98,10 +86,7 @@ serve(async (req) => {
           location_org_id: existingLocation.organization_id,
           parent_org_id: parentNode.organization_id,
         });
-        return errorResponse(
-          "Hierarchy parent belongs to a different organization",
-          400,
-        );
+        return errorResponse("Hierarchy parent belongs to a different organization", 400);
       }
     }
 
@@ -123,14 +108,22 @@ serve(async (req) => {
       .from("location")
       .update(updateData)
       .eq("id", id)
-      .select(`
+      .select(
+        `
         *,
         hierarchy_parent:hierarchy_parent_id (
           id,
           name,
-          type
+          type,
+          parent_id,
+          parent:parent_id (
+            id,
+            name,
+            type
+          )
         )
-      `)
+      `
+      )
       .single();
 
     if (locationError) {
@@ -151,7 +144,7 @@ serve(async (req) => {
     logger.error("Update location error", error);
     return errorResponse(
       extractErrorMessage(error, "Failed to update location"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });
