@@ -285,8 +285,8 @@ jobs:
         run: supabase stop
 
   # Merge after CI passes for PRs targeting `staging`.
-  # Uses PIPELINE_TOKEN when set so the resulting push to staging can trigger CI
-  # (GITHUB_TOKEN merges do not fire new workflow runs).
+  # Uses PIPELINE_TOKEN (Production environment secret) so the resulting push to
+  # staging can trigger CI (GITHUB_TOKEN merges do not fire new workflow runs).
   #
   # Also opens/refreshes the staging → main promotion PR in this job so promotion
   # still happens even if the post-merge staging push workflow is skipped.
@@ -294,6 +294,8 @@ jobs:
     name: Auto-merge (PR → staging)
     runs-on: ubuntu-latest
     needs: [ci-required]
+    # Environment secrets are only available when the job declares the environment.
+    environment: Production
     if: >
       github.event_name == 'pull_request' &&
       github.base_ref == 'staging' &&
@@ -309,9 +311,9 @@ jobs:
       - name: Require PIPELINE_TOKEN for reliable follow-on CI
         run: |
           if [ -z "${{ secrets.PIPELINE_TOKEN }}" ]; then
-            echo "::warning::PIPELINE_TOKEN is not set. Merge will use GITHUB_TOKEN,"
-            echo "::warning::so the staging push will not start CI. This job will still"
-            echo "::warning::open/refresh the staging → main promotion PR after merge."
+            echo "::warning::PIPELINE_TOKEN is not set on the Production environment."
+            echo "::warning::Merge will use GITHUB_TOKEN, so the staging push will not"
+            echo "::warning::start CI. This job will still open/refresh the promotion PR."
           fi
 
       - name: Squash-merge into staging
@@ -405,11 +407,13 @@ jobs:
   # retriggers workflows), open or refresh staging → main after CI passes.
   # Does NOT auto-merge into main — promotion PRs are reviewed manually.
   #
-  # Requires PIPELINE_TOKEN (or Actions "create pull requests" permission) for PR create.
+  # Requires PIPELINE_TOKEN on the Production environment (or Actions "create pull
+  # requests" permission) for PR create.
   promote-staging-to-main:
     name: Staging → main (promotion PR)
     runs-on: ubuntu-latest
     needs: [ci-required]
+    environment: Production
     if: >
       github.event_name == 'push' &&
       github.ref == 'refs/heads/staging' &&
@@ -510,8 +514,8 @@ jobs:
 
           if [ "$CREATE_EXIT" -ne 0 ]; then
             echo "$PR_URL"
-            echo "::error::GitHub refused PR creation. Set repo secret PIPELINE_TOKEN (PAT with"
-            echo "::error::contents + pull-requests) or enable Actions permission to create PRs."
+            echo "::error::GitHub refused PR creation. Set Production env secret PIPELINE_TOKEN"
+            echo "::error::(PAT: contents + pull-requests) or enable Actions permission to create PRs."
             exit 1
           fi
 

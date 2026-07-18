@@ -21,6 +21,8 @@ jobs:
     name: Sync staging branch with main
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # PIPELINE_TOKEN lives on the Production environment (not a repo-level secret).
+    environment: Production
 
     env:
       GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
