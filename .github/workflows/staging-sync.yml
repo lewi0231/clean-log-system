@@ -21,9 +21,9 @@ jobs:
     name: Sync staging branch with main
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
+    # Free private repos: use GITHUB_TOKEN (environment secrets are ignored on Free).
     env:
-      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Checkout repository

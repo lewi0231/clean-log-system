@@ -285,11 +285,17 @@ jobs:
         run: supabase stop
 
   # Merge after CI passes for PRs targeting `staging`.
-  # Uses PIPELINE_TOKEN when set so the resulting push to staging can trigger CI
-  # (GITHUB_TOKEN merges do not fire new workflow runs).
   #
-  # Also opens/refreshes the staging → main promotion PR in this job so promotion
-  # still happens even if the post-merge staging push workflow is skipped.
+  # Free / private-repo constraints:
+  # - GitHub "Allow auto-merge" + required checks need Pro/public rulesets.
+  # - Environment secrets are ignored on Free private repos.
+  # - GITHUB_TOKEN can squash-merge ordinary PRs, but CANNOT merge PRs that
+  #   change `.github/workflows/*` (needs a PAT with the `workflow` scope).
+  # - GITHUB_TOKEN merges also do not start new push workflows.
+  #
+  # So we: try squash-merge with GITHUB_TOKEN; on workflow-permission blocks,
+  # comment and succeed (manual merge). After a successful merge, dispatch CI
+  # on staging and open/refresh the staging → main promotion PR.
   auto-merge-staging-pr:
     name: Auto-merge (PR → staging)
     runs-on: ubuntu-latest
@@ -303,36 +309,74 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     env:
-      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Require PIPELINE_TOKEN for reliable follow-on CI
-        run: |
-          if [ -z "${{ secrets.PIPELINE_TOKEN }}" ]; then
-            echo "::warning::PIPELINE_TOKEN is not set. Merge will use GITHUB_TOKEN,"
-            echo "::warning::so the staging push will not start CI. This job will still"
-            echo "::warning::open/refresh the staging → main promotion PR after merge."
-          fi
-
       - name: Squash-merge into staging
         id: merge
         run: |
+          set -euo pipefail
           PR_NUM=${{ github.event.pull_request.number }}
-          STATE=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json state --jq '.state')
+          REPO="${{ github.repository }}"
+          STATE=$(gh pr view "$PR_NUM" --repo "$REPO" --json state --jq '.state')
           if [ "$STATE" != "OPEN" ]; then
             echo "PR #$PR_NUM is $STATE — nothing to merge"
             echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          # Immediate squash after CI passed. Avoid --auto when Allow auto-merge is off
-          # (it can report success without a reliable follow-on push).
-          if gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
+
+          set +e
+          MERGE_OUT=$(gh pr merge "$PR_NUM" --squash --repo "$REPO" 2>&1)
+          MERGE_EXIT=$?
+          set -e
+          echo "$MERGE_OUT"
+
+          if [ "$MERGE_EXIT" -eq 0 ]; then
             echo "Merged PR #$PR_NUM into staging"
             echo "merged=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "merged=false" >> "$GITHUB_OUTPUT"
+
+          # GITHUB_TOKEN cannot modify workflow files via mergePullRequest.
+          if echo "$MERGE_OUT" | grep -qiE 'workflows permission|workflow `?\.github/workflows'; then
+            gh pr comment "$PR_NUM" --repo "$REPO" --body "$(cat <<EOF
+          ✅ **CI passed**, but Actions cannot auto-merge this PR.
+
+          Reason: the diff updates \`.github/workflows/\` files, and \`GITHUB_TOKEN\` lacks the \`workflow\` scope.
+
+          **Please squash-merge manually** (Merge pull request → Squash and merge). After merge, staging CI / the promotion PR will continue as usual for non-workflow changes; for workflow-only follow-ups, re-run or wait for the next feature PR.
+
+          ---
+          *Job: \`auto-merge-staging-pr\`*
+          EOF
+          )"
+            echo "::notice::CI passed; manual merge required (workflow file changes)."
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUM" --repo "$REPO" --body "$(cat <<EOF
+          ✅ **CI passed**, but auto-merge into staging failed:
+
+          \`\`\`
+          $MERGE_OUT
+          \`\`\`
+
+          Please squash-merge manually if the PR looks good.
+          EOF
+          )"
+          echo "::warning::Auto-merge failed; left a PR comment. Not failing CI."
+          exit 0
+
+      - name: Trigger staging CI (GITHUB_TOKEN merges skip push workflows)
+        if: steps.merge.outputs.merged == 'true'
+        run: |
+          if gh workflow run "CI" --ref staging --repo "${{ github.repository }}" 2>&1; then
+            echo "Dispatched CI workflow on staging"
           else
-            echo "::error::Could not merge PR #$PR_NUM. Ensure squash merge is allowed"
-            echo "::error::and PIPELINE_TOKEN (if set) has contents + pull-requests write."
-            exit 1
+            echo "::warning::Could not dispatch CI on staging — promotion PR step still runs."
           fi
 
       - name: Open or refresh staging → main promotion PR
@@ -395,30 +439,27 @@ jobs:
           set -e
           if [ "$CREATE_EXIT" -ne 0 ]; then
             echo "$PR_URL"
-            echo "::error::Could not create staging → main PR. Set PIPELINE_TOKEN (PAT with"
-            echo "::error::contents + pull-requests) or enable Actions permission to create PRs."
+            echo "::error::Could not create staging → main PR. Enable Settings → Actions → General →"
+            echo "::error::Workflow permissions → \"Allow GitHub Actions to create and approve pull requests\"."
             exit 1
           fi
           echo "Created promotion PR: $PR_URL"
 
-  # When staging moves forward via a non-Actions push (or PIPELINE_TOKEN merge that
-  # retriggers workflows), open or refresh staging → main after CI passes.
+  # When staging CI succeeds (push or workflow_dispatch), open/refresh staging → main.
   # Does NOT auto-merge into main — promotion PRs are reviewed manually.
-  #
-  # Requires PIPELINE_TOKEN (or Actions "create pull requests" permission) for PR create.
   promote-staging-to-main:
     name: Staging → main (promotion PR)
     runs-on: ubuntu-latest
     needs: [ci-required]
     if: >
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       github.ref == 'refs/heads/staging' &&
       needs.ci-required.result == 'success'
     permissions:
       contents: read
       pull-requests: write
     env:
-      GH_TOKEN: ${{ secrets.PIPELINE_TOKEN || secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Deep checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
@@ -510,8 +551,8 @@ jobs:
 
           if [ "$CREATE_EXIT" -ne 0 ]; then
             echo "$PR_URL"
-            echo "::error::GitHub refused PR creation. Set repo secret PIPELINE_TOKEN (PAT with"
-            echo "::error::contents + pull-requests) or enable Actions permission to create PRs."
+            echo "::error::GitHub refused PR creation. Enable Settings → Actions → General →"
+            echo "::error::Workflow permissions → \"Allow GitHub Actions to create and approve pull requests\"."
             exit 1
           fi
 
