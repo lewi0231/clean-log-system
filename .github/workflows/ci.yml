@@ -289,10 +289,13 @@ jobs:
   # Free / private-repo constraints:
   # - GitHub "Allow auto-merge" + required checks need Pro/public rulesets.
   # - Environment secrets are ignored on Free private repos.
-  # - GITHUB_TOKEN can squash-merge, but that push does not start new workflows.
+  # - GITHUB_TOKEN can squash-merge ordinary PRs, but CANNOT merge PRs that
+  #   change `.github/workflows/*` (needs a PAT with the `workflow` scope).
+  # - GITHUB_TOKEN merges also do not start new push workflows.
   #
-  # So we: squash-merge with GITHUB_TOKEN, then workflow_dispatch CI on staging,
-  # and open/refresh the staging → main promotion PR from this job.
+  # So we: try squash-merge with GITHUB_TOKEN; on workflow-permission blocks,
+  # comment and succeed (manual merge). After a successful merge, dispatch CI
+  # on staging and open/refresh the staging → main promotion PR.
   auto-merge-staging-pr:
     name: Auto-merge (PR → staging)
     runs-on: ubuntu-latest
@@ -313,21 +316,59 @@ jobs:
       - name: Squash-merge into staging
         id: merge
         run: |
+          set -euo pipefail
           PR_NUM=${{ github.event.pull_request.number }}
-          STATE=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json state --jq '.state')
+          REPO="${{ github.repository }}"
+          STATE=$(gh pr view "$PR_NUM" --repo "$REPO" --json state --jq '.state')
           if [ "$STATE" != "OPEN" ]; then
             echo "PR #$PR_NUM is $STATE — nothing to merge"
             echo "merged=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if gh pr merge "$PR_NUM" --squash --repo "${{ github.repository }}" 2>&1; then
+
+          set +e
+          MERGE_OUT=$(gh pr merge "$PR_NUM" --squash --repo "$REPO" 2>&1)
+          MERGE_EXIT=$?
+          set -e
+          echo "$MERGE_OUT"
+
+          if [ "$MERGE_EXIT" -eq 0 ]; then
             echo "Merged PR #$PR_NUM into staging"
             echo "merged=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Could not merge PR #$PR_NUM. Ensure squash merge is allowed under"
-            echo "::error::Settings → General, and Actions has contents + pull-requests write."
-            exit 1
+            exit 0
           fi
+
+          echo "merged=false" >> "$GITHUB_OUTPUT"
+
+          # GITHUB_TOKEN cannot modify workflow files via mergePullRequest.
+          if echo "$MERGE_OUT" | grep -qiE 'workflows permission|workflow `?\.github/workflows'; then
+            gh pr comment "$PR_NUM" --repo "$REPO" --body "$(cat <<EOF
+          ✅ **CI passed**, but Actions cannot auto-merge this PR.
+
+          Reason: the diff updates \`.github/workflows/\` files, and \`GITHUB_TOKEN\` lacks the \`workflow\` scope.
+
+          **Please squash-merge manually** (Merge pull request → Squash and merge). After merge, staging CI / the promotion PR will continue as usual for non-workflow changes; for workflow-only follow-ups, re-run or wait for the next feature PR.
+
+          ---
+          *Job: \`auto-merge-staging-pr\`*
+          EOF
+          )"
+            echo "::notice::CI passed; manual merge required (workflow file changes)."
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUM" --repo "$REPO" --body "$(cat <<EOF
+          ✅ **CI passed**, but auto-merge into staging failed:
+
+          \`\`\`
+          $MERGE_OUT
+          \`\`\`
+
+          Please squash-merge manually if the PR looks good.
+          EOF
+          )"
+          echo "::warning::Auto-merge failed; left a PR comment. Not failing CI."
+          exit 0
 
       - name: Trigger staging CI (GITHUB_TOKEN merges skip push workflows)
         if: steps.merge.outputs.merged == 'true'
