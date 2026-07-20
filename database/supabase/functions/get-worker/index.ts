@@ -7,6 +7,11 @@ import { serve } from "server";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
+import {
+  defaultWorkerEngagementForOrg,
+  normalizeWorkforceEngagement,
+  normalizeWorkerEngagementType,
+} from "../_utils/workforce-engagement.ts";
 
 serve(async (req) => {
   const logger = createLogger(req, { functionName: "get-worker" });
@@ -26,7 +31,7 @@ serve(async (req) => {
     // Fetch invitation with worker details
     const { data: invitation, error: inviteError } = await supabase
       .from("worker_invitation")
-      .select("*, worker(id, name, email, organization_id)")
+      .select("*, worker(id, name, email, organization_id, engagement_type)")
       .eq("id", token)
       .single();
 
@@ -64,6 +69,33 @@ serve(async (req) => {
       );
     }
 
+    const worker = invitation.worker as {
+      id: string;
+      name?: string;
+      email?: string;
+      organization_id: string;
+      engagement_type?: string | null;
+    } | null;
+
+    if (!worker?.id || !worker.organization_id) {
+      return errorResponse("Invitation is missing worker details", 400);
+    }
+
+    const organizationId = worker.organization_id;
+
+    let workforceEngagement = normalizeWorkforceEngagement(null);
+    const { data: orgSettings } = await supabase
+      .from("organization_settings")
+      .select("workforce_engagement")
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    workforceEngagement = normalizeWorkforceEngagement(orgSettings?.workforce_engagement);
+
+    const engagementType =
+      worker.engagement_type != null
+        ? normalizeWorkerEngagementType(worker.engagement_type)
+        : (defaultWorkerEngagementForOrg(workforceEngagement) ?? "employee");
+
     // Return invitation details (without sensitive info)
     return jsonResponse({
       success: true,
@@ -71,6 +103,8 @@ serve(async (req) => {
         id: invitation.id,
         worker_email: invitation.worker_email,
         expires_at: invitation.expires_at,
+        workforce_engagement: workforceEngagement,
+        engagement_type: engagementType,
         worker: invitation.worker,
       },
     });

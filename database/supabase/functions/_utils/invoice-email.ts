@@ -78,7 +78,14 @@ export async function getInvoiceEmailRecipient(
   if (job.location_id && job.location) {
     const location = job.location;
 
-    // Check hierarchy billing email first if configured
+    const locationEmailOrNull = (): string | null => {
+      if (!location.email) return null;
+      const locationEmail = location.email.trim();
+      return isValidEmail(locationEmail) ? locationEmail : null;
+    };
+
+    // Prefer hierarchy billing email when configured; fall back to location email
+    // if hierarchy is missing or has no valid billing email.
     if (config.location_email_source === "hierarchy_billing_email") {
       if (location.hierarchy_parent_id) {
         const { data: hierarchyNode } = await supabase
@@ -94,14 +101,12 @@ export async function getInvoiceEmailRecipient(
           }
         }
       }
+
+      return locationEmailOrNull();
     }
 
-    // Check location email
-    if (config.location_email_source === "location_email" && location.email) {
-      const locationEmail = location.email.trim();
-      if (isValidEmail(locationEmail)) {
-        return locationEmail;
-      }
+    if (config.location_email_source === "location_email") {
+      return locationEmailOrNull();
     }
 
     // location_contact_email was never implemented (contact_person is a name, not email).

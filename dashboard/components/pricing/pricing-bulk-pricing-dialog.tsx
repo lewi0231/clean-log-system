@@ -22,12 +22,19 @@ import { DollarSign } from "lucide-react";
 import { useMemo, useState } from "react";
 import { parsePriceString } from "@/lib/pricing-utils";
 
-export interface BulkYardOptionPrice {
+/** Sentinel Select value for org-wide (All yards) defaults. */
+export const BULK_PRICING_ALL_YARDS = "__all_yards__";
+
+export interface BulkOptionPrice {
   customerPrice: string;
   workerPrice: string;
 }
 
-interface PricingBulkYardOverrideDialogProps {
+export type BulkPricingScope =
+  | { type: "all-yards" }
+  | { type: "yard"; locationId: string; locationName: string };
+
+interface PricingBulkPricingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   fieldLabel: string;
@@ -37,25 +44,24 @@ interface PricingBulkYardOverrideDialogProps {
   showBothContexts: boolean;
   saving?: boolean;
   onSave: (
-    locationId: string,
-    locationName: string,
-    pricesByOption: Record<string, BulkYardOptionPrice>,
+    scope: BulkPricingScope,
+    pricesByOption: Record<string, BulkOptionPrice>,
     validUntil: string
   ) => Promise<boolean>;
 }
 
-interface BulkYardOverrideFormProps {
+interface BulkPricingFormProps {
   fieldLabel: string;
   options: string[];
   sortedLocations: Array<{ id: string; name: string }>;
   hasWorkers: boolean;
   showBothContexts: boolean;
   saving: boolean;
-  onSave: PricingBulkYardOverrideDialogProps["onSave"];
+  onSave: PricingBulkPricingDialogProps["onSave"];
   onClose: () => void;
 }
 
-function BulkYardOverrideForm({
+function BulkPricingForm({
   fieldLabel,
   options,
   sortedLocations,
@@ -64,17 +70,20 @@ function BulkYardOverrideForm({
   saving,
   onSave,
   onClose,
-}: BulkYardOverrideFormProps) {
-  const [locationId, setLocationId] = useState("");
+}: BulkPricingFormProps) {
+  const [scopeValue, setScopeValue] = useState(BULK_PRICING_ALL_YARDS);
   const [validUntil, setValidUntil] = useState("");
   const [customerPrice, setCustomerPrice] = useState("");
   const [workerPrice, setWorkerPrice] = useState("");
 
-  const handleSave = async () => {
-    const loc = sortedLocations.find((l) => l.id === locationId);
-    if (!loc) return;
+  const isAllYards = scopeValue === BULK_PRICING_ALL_YARDS;
+  const selectedYard = sortedLocations.find((l) => l.id === scopeValue);
+  const scopeReady = Boolean(scopeValue);
 
-    const pricesByOption: Record<string, BulkYardOptionPrice> = {};
+  const handleSave = async () => {
+    if (!scopeValue) return;
+
+    const pricesByOption: Record<string, BulkOptionPrice> = {};
     for (const opt of options) {
       pricesByOption[opt] = {
         customerPrice,
@@ -82,8 +91,24 @@ function BulkYardOverrideForm({
       };
     }
 
+    let scope: BulkPricingScope;
+    if (isAllYards) {
+      scope = { type: "all-yards" };
+    } else if (!selectedYard) {
+      return;
+    } else {
+      scope = {
+        type: "yard",
+        locationId: selectedYard.id,
+        locationName: selectedYard.name,
+      };
+    }
+
+    // Valid until only applies to yard overrides
+    const until = isAllYards ? "" : validUntil;
+
     try {
-      const saved = await onSave(locationId, loc.name, pricesByOption, validUntil);
+      const saved = await onSave(scope, pricesByOption, until);
       if (saved) {
         onClose();
       }
@@ -92,27 +117,33 @@ function BulkYardOverrideForm({
     }
   };
 
-  const locationName = sortedLocations.find((l) => l.id === locationId)?.name;
-  const canSave = Boolean(locationId && parsePriceString(customerPrice) !== undefined);
+  const canSave = Boolean(scopeReady && parsePriceString(customerPrice) !== undefined);
+
+  const applyLabel = isAllYards
+    ? "Apply as All yards default"
+    : selectedYard
+      ? `Apply to ${selectedYard.name}`
+      : "Apply pricing";
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Bulk yard override</DialogTitle>
+        <DialogTitle>Bulk pricing</DialogTitle>
         <DialogDescription>
-          Apply the same pricing to all {options.length} options in <strong>{fieldLabel}</strong>{" "}
-          for one yard.
+          Apply the same price to all {options.length} options in <strong>{fieldLabel}</strong> —
+          either as the All yards default or as a yard override.
         </DialogDescription>
       </DialogHeader>
 
       <div className="space-y-4 py-2">
         <div className="space-y-2">
-          <Label>Yard</Label>
-          <Select value={locationId} onValueChange={setLocationId}>
+          <Label>Apply to</Label>
+          <Select value={scopeValue} onValueChange={setScopeValue}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select yard" />
+              <SelectValue placeholder="Choose scope" />
             </SelectTrigger>
             <SelectContent position="popper" sideOffset={4}>
+              <SelectItem value={BULK_PRICING_ALL_YARDS}>All yards (default)</SelectItem>
               {sortedLocations.map((loc) => (
                 <SelectItem key={loc.id} value={loc.id}>
                   {loc.name}
@@ -120,9 +151,16 @@ function BulkYardOverrideForm({
               ))}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            {isAllYards
+              ? "Sets the default price used when no yard override exists."
+              : scopeReady
+                ? "Overrides the All yards default for this yard only."
+                : "Use All yards when every option shares the same default price."}
+          </p>
         </div>
 
-        {locationId && (
+        {scopeReady && (
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -163,19 +201,21 @@ function BulkYardOverrideForm({
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="bulk-valid-until">Valid until (optional)</Label>
-              <Input
-                id="bulk-valid-until"
-                type="date"
-                value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
-                disabled={saving}
-              />
-              <p className="text-xs text-muted-foreground">
-                After this date, prices revert to the default for each option.
-              </p>
-            </div>
+            {!isAllYards && (
+              <div className="space-y-2">
+                <Label htmlFor="bulk-valid-until">Valid until (optional)</Label>
+                <Input
+                  id="bulk-valid-until"
+                  type="date"
+                  value={validUntil}
+                  onChange={(e) => setValidUntil(e.target.value)}
+                  disabled={saving}
+                />
+                <p className="text-xs text-muted-foreground">
+                  After this date, prices revert to the All yards default for each option.
+                </p>
+              </div>
+            )}
 
             <div className="rounded-md bg-muted/50 px-3 py-2">
               <p className="text-xs text-muted-foreground">
@@ -195,14 +235,14 @@ function BulkYardOverrideForm({
           Cancel
         </Button>
         <Button onClick={handleSave} disabled={!canSave || saving}>
-          {saving ? "Saving..." : locationName ? `Apply to ${locationName}` : "Apply override"}
+          {saving ? "Saving..." : applyLabel}
         </Button>
       </DialogFooter>
     </>
   );
 }
 
-export function PricingBulkYardOverrideDialog({
+export function PricingBulkPricingDialog({
   open,
   onOpenChange,
   fieldLabel,
@@ -212,7 +252,7 @@ export function PricingBulkYardOverrideDialog({
   showBothContexts,
   saving = false,
   onSave,
-}: PricingBulkYardOverrideDialogProps) {
+}: PricingBulkPricingDialogProps) {
   const sortedLocations = useMemo(
     () => [...availableLocations].sort((a, b) => a.name.localeCompare(b.name)),
     [availableLocations]
@@ -222,7 +262,7 @@ export function PricingBulkYardOverrideDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         {open && (
-          <BulkYardOverrideForm
+          <BulkPricingForm
             fieldLabel={fieldLabel}
             options={options}
             sortedLocations={sortedLocations}

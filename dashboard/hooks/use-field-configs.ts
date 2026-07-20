@@ -1,8 +1,9 @@
 "use client";
 
+import { fieldConfigsKey } from "@/app/query-provider";
 import { FieldConfigsService } from "@/lib/services";
 import type { FieldConfig } from "@clean-log/shared/types";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import useOrganization from "./useOrganization";
 
 interface UseFieldConfigsResult {
@@ -16,50 +17,34 @@ interface UseFieldConfigsOptions {
   locationId?: string | null;
 }
 
-export function useFieldConfigs(
-  options?: UseFieldConfigsOptions
-): UseFieldConfigsResult {
+export function useFieldConfigs(options?: UseFieldConfigsOptions): UseFieldConfigsResult {
   const { organizationId } = useOrganization();
-  const [fieldConfigs, setFieldConfigs] = useState<FieldConfig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const locationId = options?.locationId;
+  const locationId = options?.locationId ?? null;
 
-  const fetchFieldConfigs = async () => {
-    if (!organizationId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const configs = await FieldConfigsService.list({
+  const query = useQuery({
+    queryKey: fieldConfigsKey(organizationId, locationId),
+    enabled: !!organizationId,
+    queryFn: async () => {
+      if (!organizationId) {
+        return [] as FieldConfig[];
+      }
+      return FieldConfigsService.list({
         organization_id: organizationId,
         location_id: locationId || undefined,
       });
-
-      setFieldConfigs(configs);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch field configs"
-      );
-      setFieldConfigs([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchFieldConfigs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, locationId]);
+    },
+    staleTime: 5 * 60 * 1000,
+    // Keep last result visible while refetching (avoids empty flash on revisit)
+    placeholderData: (previous) => previous,
+  });
 
   return {
-    fieldConfigs,
-    loading,
-    error,
-    refetch: fetchFieldConfigs,
+    fieldConfigs: query.data ?? [],
+    // isLoading = pending + fetching. Disabled queries (no org) are pending+idle → not loading.
+    loading: query.isLoading,
+    error: query.error instanceof Error ? query.error.message : null,
+    refetch: async () => {
+      await query.refetch();
+    },
   };
 }

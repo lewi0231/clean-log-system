@@ -1,0 +1,35 @@
+diff --git a/dist/runtime/components.js b/dist/runtime/components.js
+index 8835a2d9705857c11ed70b242266f9790542d408..e45a495bfeca796d75944819df4747a2c70eceda 100644
+--- a/dist/runtime/components.js
++++ b/dist/runtime/components.js
+@@ -5,7 +5,8 @@ const react_native_1 = require("react-native");
+ const api_1 = require("./api");
+ (0, api_1.cssInterop)(react_native_1.Image, { className: "style" });
+ (0, api_1.cssInterop)(react_native_1.Pressable, { className: "style" });
+-(0, api_1.cssInterop)(react_native_1.SafeAreaView, { className: "style" });
++// Skip react-native SafeAreaView (deprecated getter). Registered via
++// react-native-safe-area-context below.
+ (0, api_1.cssInterop)(react_native_1.Switch, { className: "style" });
+ (0, api_1.cssInterop)(react_native_1.Text, { className: "style" });
+ (0, api_1.cssInterop)(react_native_1.TouchableHighlight, { className: "style" });
+diff --git a/src/runtime/components.ts b/src/runtime/components.ts
+index c46327efce7f8e6268a4de4cd2ff86cdc90268fa..4dbc1f8b552cb015db8d89b6e4813964873dea12 100644
+--- a/src/runtime/components.ts
++++ b/src/runtime/components.ts
+@@ -7,7 +7,6 @@ import {
+   ImageBackground,
+   KeyboardAvoidingView,
+   Pressable,
+-  SafeAreaView,
+   ScrollView,
+   StatusBar,
+   Switch,
+@@ -24,7 +23,7 @@ import { cssInterop, remapProps } from "./api";
+ 
+ cssInterop(Image, { className: "style" });
+ cssInterop(Pressable, { className: "style" });
+-cssInterop(SafeAreaView, { className: "style" });
++// Skip react-native SafeAreaView (deprecated). Use safe-area-context below.
+ cssInterop(Switch, { className: "style" });
+ cssInterop(Text, { className: "style" });
+ cssInterop(TouchableHighlight, { className: "style" });

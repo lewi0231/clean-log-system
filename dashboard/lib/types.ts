@@ -181,6 +181,8 @@ export interface OrganizationSettings {
   gst_rate_percent: number;
   // Job approval workflow settings
   edit_window_minutes: number;
+  /** Hours before colleague-pending jobs auto-approve (1–168). Default 24. */
+  colleague_confirmation_timeout_hours: number;
   /** Entitlement: send from org-owned domain (Resend). Server-side only until migration applied. */
   custom_email_domain_enabled: boolean;
   /** Worker pay period; null = not configured (Overview uses calendar-month fallback). */

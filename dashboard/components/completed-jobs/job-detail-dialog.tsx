@@ -35,6 +35,7 @@ import {
 import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import EditJobDialog from "./edit-job-dialog";
+import JobStatusBadge from "./job-status-badge";
 
 interface JobDetailDialogProps {
   open: boolean;
@@ -418,11 +419,13 @@ export default function JobDetailDialog({
                 <DialogDescription>
                   Completed on {new Date(job.completed_at).toLocaleString()}
                 </DialogDescription>
-                {jobStatus && (
-                  <Badge variant={jobStatus.variant} className="mt-2">
-                    {jobStatus.label}
-                  </Badge>
-                )}
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <JobStatusBadge
+                    status={job.approval_status || "approved"}
+                    autoApproveAt={job.auto_approve_at}
+                  />
+                  {jobStatus && <Badge variant={jobStatus.variant}>{jobStatus.label}</Badge>}
+                </div>
               </div>
               {isAdmin && (
                 <div className="flex gap-2">
@@ -527,7 +530,15 @@ export default function JobDetailDialog({
                     {job.workers.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {job.workers.map((worker) => (
-                          <span key={worker.id}>{worker.name}</span>
+                          <span key={worker.id}>
+                            {worker.name}
+                            {worker.confirmation_status === "pending" && (
+                              <span className="text-muted-foreground"> (pending)</span>
+                            )}
+                            {worker.confirmation_status === "flagged" && (
+                              <span className="text-destructive"> (flagged)</span>
+                            )}
+                          </span>
                         ))}
                       </div>
                     ) : (

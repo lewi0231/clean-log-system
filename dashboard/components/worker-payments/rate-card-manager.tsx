@@ -56,16 +56,27 @@ type RateCardFormData = {
   field_config_ids: string[];
 };
 
-const emptyFormData: RateCardFormData = {
-  worker_id: "",
-  modifier_type: "flat",
-  modifier_value: "",
-  effective_from: new Date().toISOString().split("T")[0],
-  effective_to: "",
-  role_title: "",
-  notes: "",
-  field_config_ids: [],
-};
+function createEmptyFormData(): RateCardFormData {
+  return {
+    worker_id: "",
+    modifier_type: "flat",
+    modifier_value: "",
+    effective_from: new Date().toISOString().split("T")[0],
+    effective_to: "",
+    role_title: "",
+    notes: "",
+    field_config_ids: [],
+  };
+}
+
+function workerDisplayName(worker: {
+  name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+}): string {
+  const fromParts = [worker.first_name, worker.last_name].filter(Boolean).join(" ").trim();
+  return fromParts || worker.name?.trim() || "Unnamed worker";
+}
 
 const modifierTypeLabels: Record<ModifierType, string> = {
   per_unit: "Per Unit Bonus",
@@ -97,10 +108,13 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<WorkerRateCard | null>(null);
-  const [formData, setFormData] = useState<RateCardFormData>(emptyFormData);
+  // Pass the factory directly (lazy useState init) so Fast Refresh remounts cleanly
+  // after renames — avoids stale closures referencing a removed `emptyFormData`.
+  const [formData, setFormData] = useState<RateCardFormData>(createEmptyFormData);
   const [saving, setSaving] = useState(false);
 
   const activeRateCards = rateCards.filter((card) => card.is_active);
+  const selectableWorkers = workers.filter((worker) => worker.active !== false && !!worker.id);
 
   // Filter to numeric fields that could be used for per-unit bonuses
   const numericFieldConfigs = fieldConfigs.filter(
@@ -109,7 +123,7 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
 
   const handleOpenCreate = () => {
     setEditingCard(null);
-    setFormData(emptyFormData);
+    setFormData(createEmptyFormData());
     setIsDialogOpen(true);
   };
 
@@ -129,8 +143,16 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
   };
 
   const handleSave = async () => {
-    if (!formData.worker_id || !formData.modifier_value) {
-      toast.error("Please fill in required fields");
+    const missing: string[] = [];
+    if (!formData.worker_id) missing.push("Worker");
+    if (!formData.modifier_value.trim()) missing.push("Amount / modifier value");
+    if (!formData.effective_from) missing.push("Effective from");
+    if (formData.modifier_type === "per_unit" && formData.field_config_ids.length === 0) {
+      missing.push("Applies to fields");
+    }
+
+    if (missing.length > 0) {
+      toast.error(`Please fill in: ${missing.join(", ")}`);
       return;
     }
 
@@ -145,11 +167,8 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
       return;
     }
 
-    // Validate per_unit type has at least one field selected
-    if (formData.modifier_type === "per_unit" && formData.field_config_ids.length === 0) {
-      toast.error("Please select at least one field for per-unit bonus");
-      return;
-    }
+    // Blank effective-to means open-ended (no end date)
+    const effectiveTo = formData.effective_to.trim() ? formData.effective_to.trim() : null;
 
     setSaving(true);
     try {
@@ -159,9 +178,9 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
           modifier_type: formData.modifier_type,
           modifier_value: modifierValue,
           effective_from: formData.effective_from,
-          effective_to: formData.effective_to || null,
-          role_title: formData.role_title || null,
-          notes: formData.notes || null,
+          effective_to: effectiveTo,
+          role_title: formData.role_title.trim() || null,
+          notes: formData.notes.trim() || null,
           field_config_ids: formData.modifier_type === "per_unit" ? formData.field_config_ids : [],
         });
         toast.success("Rate card updated");
@@ -171,15 +190,15 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
           modifier_type: formData.modifier_type,
           modifier_value: modifierValue,
           effective_from: formData.effective_from,
-          effective_to: formData.effective_to || null,
-          role_title: formData.role_title || null,
-          notes: formData.notes || null,
+          effective_to: effectiveTo,
+          role_title: formData.role_title.trim() || null,
+          notes: formData.notes.trim() || null,
           field_config_ids: formData.modifier_type === "per_unit" ? formData.field_config_ids : [],
         });
         toast.success("Rate card created");
       }
       setIsDialogOpen(false);
-      setFormData(emptyFormData);
+      setFormData(createEmptyFormData());
       setEditingCard(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to save rate card");
@@ -385,19 +404,26 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
                 Worker <span className="text-destructive">*</span>
               </Label>
               <Select
-                value={formData.worker_id}
-                onValueChange={(value) => setFormData({ ...formData, worker_id: value })}
+                // Radix rejects controlled value="" — use undefined so selection sticks.
+                value={formData.worker_id || undefined}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, worker_id: value }))}
                 disabled={!!editingCard}
               >
                 <SelectTrigger id="worker" className="cursor-pointer">
                   <SelectValue placeholder="Select a worker" />
                 </SelectTrigger>
                 <SelectContent>
-                  {workers.map((worker) => (
-                    <SelectItem key={worker.id} value={worker.id}>
-                      {worker.first_name} {worker.last_name}
-                    </SelectItem>
-                  ))}
+                  {selectableWorkers.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">
+                      No active workers available
+                    </div>
+                  ) : (
+                    selectableWorkers.map((worker) => (
+                      <SelectItem key={worker.id} value={worker.id}>
+                        {workerDisplayName(worker)}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -409,11 +435,11 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
               <Select
                 value={formData.modifier_type}
                 onValueChange={(value) =>
-                  setFormData({
-                    ...formData,
+                  setFormData((prev) => ({
+                    ...prev,
                     modifier_type: value as ModifierType,
-                    field_config_ids: value !== "per_unit" ? [] : formData.field_config_ids,
-                  })
+                    field_config_ids: value !== "per_unit" ? [] : prev.field_config_ids,
+                  }))
                 }
               >
                 <SelectTrigger id="modifier-type" className="cursor-pointer">
@@ -466,7 +492,9 @@ export default function RateCardManager({ fieldConfigs }: RateCardManagerProps) 
                         : "0.00"
                 }
                 value={formData.modifier_value}
-                onChange={(e) => setFormData({ ...formData, modifier_value: e.target.value })}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, modifier_value: e.target.value }))
+                }
               />
               {formData.modifier_type === "multiplier" && (
                 <p className="text-xs text-muted-foreground">

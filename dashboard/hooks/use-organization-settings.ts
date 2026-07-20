@@ -48,6 +48,7 @@ async function fetchOrganizationSettings(organizationId: string): Promise<Organi
     gst_inclusive: data.settings.gst_inclusive ?? true,
     gst_rate_percent: data.settings.gst_rate_percent ?? 10,
     edit_window_minutes: data.settings.edit_window_minutes ?? 180,
+    colleague_confirmation_timeout_hours: data.settings.colleague_confirmation_timeout_hours ?? 24,
     custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
     worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
     workforce_engagement: data.settings.workforce_engagement ?? "employees",

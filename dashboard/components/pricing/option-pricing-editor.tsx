@@ -6,9 +6,10 @@ import {
   type YardOverrideDraft,
 } from "@/components/pricing/pricing-scope-controls";
 import {
-  PricingBulkYardOverrideDialog,
-  type BulkYardOptionPrice,
-} from "@/components/pricing/pricing-bulk-yard-override-dialog";
+  PricingBulkPricingDialog,
+  type BulkOptionPrice,
+  type BulkPricingScope,
+} from "@/components/pricing/pricing-bulk-pricing-dialog";
 import {
   PricingScopeSaveDialog,
   type MultiYardOverrideSummaryRow,
@@ -46,7 +47,7 @@ interface OptionPricingEditorProps {
   effectiveAt?: string | null;
   organizationId: string | null;
   disabled?: boolean;
-  /** Show bulk yard override for all options in this field */
+  /** Show bulk pricing action for all options in this field */
   showBulkOverride?: boolean;
 }
 
@@ -389,10 +390,9 @@ export default function OptionPricingEditor({
 
   const hasUnpricedOptions = pricedCount < options.length;
 
-  const handleBulkYardOverrideSave = async (
-    locationId: string,
-    _locationName: string,
-    pricesByOption: Record<string, BulkYardOptionPrice>,
+  const handleBulkPricingSave = async (
+    scope: BulkPricingScope,
+    pricesByOption: Record<string, BulkOptionPrice>,
     validUntil: string
   ): Promise<boolean> => {
     setOverrideSaving(true);
@@ -406,7 +406,10 @@ export default function OptionPricingEditor({
         return false;
       }
 
-      if (validUntil) {
+      const isAllYards = scope.type === "all-yards";
+      const locationId = isAllYards ? null : scope.locationId;
+
+      if (!isAllYards && validUntil) {
         for (const optionValue of options) {
           const org = getOrgDefaultPrices(optionValue);
           if (org.customerNum == null) {
@@ -418,7 +421,8 @@ export default function OptionPricingEditor({
         }
       }
 
-      const expirationDate = validUntil || null;
+      // Org defaults do not use valid-until; yard overrides may.
+      const expirationDate = isAllYards ? null : validUntil || null;
 
       for (const optionValue of options) {
         await upsertCustomerPricing(fieldConfig.id, optionValue, customerPrice, {
@@ -441,14 +445,17 @@ export default function OptionPricingEditor({
       }
 
       await Promise.all([refetchCustomerPricing(), refetchWorkerPricing()]);
-      toast.success("Bulk yard overrides saved");
+      if (isAllYards) {
+        setEditingPrices({});
+      }
+      toast.success(isAllYards ? "Bulk All yards defaults saved" : "Bulk yard overrides saved");
       return true;
     } catch (err) {
-      log.error("Failed to save bulk yard overrides", {
+      log.error("Failed to save bulk pricing", {
         error: err instanceof Error ? err.message : "Unknown error",
         fieldConfigId: fieldConfig.id,
       });
-      toast.error("Failed to save bulk yard overrides");
+      toast.error("Failed to save bulk pricing");
       return false;
     } finally {
       setOverrideSaving(false);
@@ -485,7 +492,8 @@ export default function OptionPricingEditor({
           <div>
             <h3 className="text-lg font-semibold">{displayLabel}</h3>
             <p className="text-sm text-muted-foreground">
-              All yards default — use per-option or bulk overrides for specific yards
+              Set All yards defaults per option, or use bulk pricing for the same price across all
+              options
             </p>
           </div>
           {showBulkOverride && !disabled && (
@@ -498,7 +506,7 @@ export default function OptionPricingEditor({
               disabled={overrideSaving}
             >
               <Layers className="h-3.5 w-3.5" />
-              Bulk yard override
+              Bulk pricing
             </Button>
           )}
         </div>
@@ -732,7 +740,7 @@ export default function OptionPricingEditor({
       )}
 
       {showBulkOverride && (
-        <PricingBulkYardOverrideDialog
+        <PricingBulkPricingDialog
           open={bulkDialogOpen}
           onOpenChange={setBulkDialogOpen}
           fieldLabel={displayLabel}
@@ -741,7 +749,7 @@ export default function OptionPricingEditor({
           hasWorkers={hasWorkers}
           showBothContexts={showBothContexts}
           saving={overrideSaving}
-          onSave={handleBulkYardOverrideSave}
+          onSave={handleBulkPricingSave}
         />
       )}
     </div>

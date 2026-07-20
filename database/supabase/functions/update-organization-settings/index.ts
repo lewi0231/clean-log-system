@@ -50,6 +50,7 @@ serve(async (req) => {
       gst_inclusive,
       gst_rate_percent,
       edit_window_minutes,
+      colleague_confirmation_timeout_hours,
       worker_payment_cycle_config,
       workforce_engagement,
     } = body;
@@ -172,6 +173,17 @@ serve(async (req) => {
     if (default_exclusive_group_label !== undefined) {
       updateData.default_exclusive_group_label =
         default_exclusive_group_label === "" ? null : default_exclusive_group_label;
+    }
+
+    if (colleague_confirmation_timeout_hours !== undefined) {
+      const hours = Number(colleague_confirmation_timeout_hours);
+      if (isNaN(hours) || hours < 1 || hours > 168) {
+        return errorResponse(
+          "colleague_confirmation_timeout_hours must be a number between 1 and 168",
+          400
+        );
+      }
+      updateData.colleague_confirmation_timeout_hours = hours;
     }
 
     if (rating_config !== undefined) {
@@ -530,7 +542,7 @@ serve(async (req) => {
         .update(updateData)
         .eq("id", organization_id)
         .select(
-          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label"
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, colleague_confirmation_timeout_hours"
         )
         .single();
 
@@ -541,7 +553,7 @@ serve(async (req) => {
       const { data: orgData, error: fetchError } = await supabase
         .from("organization")
         .select(
-          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label"
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, colleague_confirmation_timeout_hours"
         )
         .eq("id", organization_id)
         .single();
@@ -615,6 +627,8 @@ serve(async (req) => {
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
         edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
+        colleague_confirmation_timeout_hours:
+          organization?.colleague_confirmation_timeout_hours ?? 24,
         worker_payment_cycle_config: orgSettings?.worker_payment_cycle_config ?? null,
         workforce_engagement: orgSettings?.workforce_engagement ?? "employees",
       },

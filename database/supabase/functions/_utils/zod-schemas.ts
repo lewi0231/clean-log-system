@@ -415,6 +415,23 @@ export const listRateCardsSchema = z.object({
 /**
  * Schema for creating a worker rate card
  */
+/** YYYY-MM-DD or null; empty string → null (open-ended). Omitted stays omitted. */
+const optionalDateOrNullSchema = z.preprocess(
+  (value) => (value === "" ? null : value),
+  z.string().date().nullable().optional()
+);
+
+/** Non-empty title or null; empty string → null. Omitted stays omitted. */
+const optionalTitleOrNullSchema = z.preprocess(
+  (value) => (value === "" ? null : value),
+  z.string().min(1).nullable().optional()
+);
+
+const optionalNotesOrNullSchema = z.preprocess(
+  (value) => (value === "" ? null : value),
+  z.string().nullable().optional()
+);
+
 export const createRateCardSchema = z.object({
   action: z.literal("create"),
   organization_id: uuidSchema,
@@ -423,9 +440,9 @@ export const createRateCardSchema = z.object({
   modifier_value: positiveNumberSchema,
   currency: currencyCodeSchema.optional(),
   effective_from: z.string().date().optional(),
-  effective_to: z.string().date().nullable().optional(),
-  role_title: z.string().min(1).nullable().optional(),
-  notes: z.string().nullable().optional(),
+  effective_to: optionalDateOrNullSchema,
+  role_title: optionalTitleOrNullSchema,
+  notes: optionalNotesOrNullSchema,
   field_config_ids: z.array(uuidSchema).optional(),
 });
 
@@ -439,10 +456,10 @@ export const updateRateCardSchema = z.object({
   modifier_type: modifierTypeSchema.optional(),
   modifier_value: positiveNumberSchema.optional(),
   effective_from: z.string().date().optional(),
-  effective_to: z.string().date().nullable().optional(),
-  role_title: z.string().min(1).nullable().optional(),
+  effective_to: optionalDateOrNullSchema,
+  role_title: optionalTitleOrNullSchema,
   is_active: z.boolean().optional(),
-  notes: z.string().nullable().optional(),
+  notes: optionalNotesOrNullSchema,
   field_config_ids: z.array(uuidSchema).optional(),
 });
 
