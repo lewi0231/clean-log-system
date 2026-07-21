@@ -8,18 +8,14 @@ inputs:
     description: Node.js major version line
     required: false
     default: "20"
-  pnpm-version:
-    description: pnpm version (major line or exact)
-    required: false
-    default: "9"
 
 runs:
   using: composite
   steps:
+    # Do not pass `version` here — package.json `packageManager` is the single
+    # source of truth. pnpm/action-setup errors if both are set.
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
-      with:
-        version: ${{ inputs.pnpm-version }}
 
     - name: Setup Node.js
       uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

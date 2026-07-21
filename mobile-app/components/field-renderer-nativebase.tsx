@@ -537,14 +537,17 @@ export function FieldRendererNativeBase({
             </Text>
           </View>
           <View
-            className={`bg-card border rounded-xl px-4 py-3 flex-row items-center justify-between h-12 ${
+            className={`bg-card border rounded-xl px-4 py-3 flex-row items-center justify-between min-h-[48px] ${
               isInvalid ? "border-destructive" : "border-border"
             }`}
           >
-            <View className="flex-1">
-              {config.description && (
-                <Text className="text-xs text-muted-foreground">{config.description}</Text>
-              )}
+            <View className="flex-1 pr-3">
+              <Text className="text-base text-card-foreground">
+                {Boolean(value) ? "Yes" : "No"}
+              </Text>
+              {config.description ? (
+                <Text className="text-xs text-muted-foreground mt-0.5">{config.description}</Text>
+              ) : null}
             </View>
             <Switch
               value={Boolean(value)}
@@ -553,6 +556,7 @@ export function FieldRendererNativeBase({
               thumbColor="#ffffff"
               disabled={disabled}
               style={{ opacity: disabled ? 0.5 : 1 }}
+              accessibilityLabel={`${config.label}: ${Boolean(value) ? "Yes" : "No"}`}
             />
           </View>
           {error && <Text className="text-sm text-destructive mt-1">{error}</Text>}

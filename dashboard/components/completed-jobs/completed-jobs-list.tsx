@@ -17,6 +17,7 @@ import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import { CheckCircle2 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import JobDetailDialog from "./job-detail-dialog";
+import JobStatusBadge from "./job-status-badge";
 
 interface CompletedJobsListProps {
   jobs: Job[];
@@ -430,15 +431,21 @@ export default function CompletedJobsList({
                   }}
                 >
                   <TableCell>
-                    <Badge
-                      variant={
-                        getJobInvoiceStatus(job).status === "invoice_created"
-                          ? "secondary"
-                          : "outline"
-                      }
-                    >
-                      {getJobInvoiceStatus(job).label}
-                    </Badge>
+                    <div className="flex flex-col gap-1 items-start">
+                      <JobStatusBadge
+                        status={job.approval_status || "approved"}
+                        autoApproveAt={job.auto_approve_at}
+                      />
+                      <Badge
+                        variant={
+                          getJobInvoiceStatus(job).status === "invoice_created"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {getJobInvoiceStatus(job).label}
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell className="mx-auto">
                     <div className="flex flex-col gap-1">
@@ -466,7 +473,15 @@ export default function CompletedJobsList({
                     {job.workers.length > 0 ? (
                       <div className="flex flex-col gap-1">
                         {job.workers.map((worker) => (
-                          <span key={worker.id}>{worker.name}</span>
+                          <span key={worker.id}>
+                            {worker.name}
+                            {worker.confirmation_status === "pending" && (
+                              <span className="text-muted-foreground"> (pending)</span>
+                            )}
+                            {worker.confirmation_status === "flagged" && (
+                              <span className="text-destructive"> (flagged)</span>
+                            )}
+                          </span>
                         ))}
                       </div>
                     ) : (

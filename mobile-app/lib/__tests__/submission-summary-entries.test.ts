@@ -49,6 +49,52 @@ describe("buildSubmissionSummaryEntries", () => {
 
     expect(entries).toEqual([{ kind: "field", label: "Section a › Item count", value: "2" }]);
   });
+
+  it("keeps shared start/finish when worker_times is an empty array", () => {
+    const entries = buildSubmissionSummaryEntries({
+      start_time: "2026-07-20T01:00:00.000Z",
+      finish_time: "2026-07-20T05:00:00.000Z",
+      worker_times: [],
+    });
+
+    expect(entries.some((e) => e.kind === "field" && e.label === "Start time")).toBe(true);
+    expect(entries.some((e) => e.kind === "worker_times")).toBe(false);
+  });
+
+  it("renders worker_times and hides shared start/finish when present", () => {
+    const entries = buildSubmissionSummaryEntries(
+      {
+        start_time: "2026-07-20T01:00:00.000Z",
+        finish_time: "2026-07-20T05:00:00.000Z",
+        worker_times: [
+          {
+            worker_id: "w1",
+            start_time: "2026-07-20T01:00:00.000Z",
+            finish_time: "2026-07-20T03:00:00.000Z",
+          },
+          {
+            worker_id: "w2",
+            start_time: "2026-07-20T02:00:00.000Z",
+            finish_time: "2026-07-20T05:00:00.000Z",
+          },
+        ],
+      },
+      { workerNameById: { w1: "Abe", w2: "Charlie" } }
+    );
+
+    expect(entries.some((e) => e.kind === "field" && e.label === "Start time")).toBe(false);
+    expect(entries.some((e) => e.kind === "field" && e.label === "Finish time")).toBe(false);
+
+    const times = entries.find((e) => e.kind === "worker_times");
+    expect(times).toMatchObject({
+      kind: "worker_times",
+      label: "Work times",
+      items: [
+        { workerLabel: "Abe", start: expect.any(String), finish: expect.any(String) },
+        { workerLabel: "Charlie", start: expect.any(String), finish: expect.any(String) },
+      ],
+    });
+  });
 });
 
 describe("getSubmitterNameForJob", () => {

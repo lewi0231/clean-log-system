@@ -24,13 +24,13 @@ describe("JobStatusBadge", () => {
     it("should render pending badge", () => {
       render(<JobStatusBadge status="pending" />);
 
-      expect(screen.getByText("Pending")).toBeInTheDocument();
+      expect(screen.getByText("Pending confirmation")).toBeInTheDocument();
     });
 
     it("should render with yellow background class", () => {
       render(<JobStatusBadge status="pending" />);
 
-      const badge = screen.getByText("Pending").closest("div");
+      const badge = screen.getByText("Pending confirmation").closest("div");
       expect(badge).toHaveClass("bg-yellow-500");
     });
 
@@ -40,7 +40,7 @@ describe("JobStatusBadge", () => {
       render(<JobStatusBadge status="pending" autoApproveAt={autoApproveAt} />);
 
       // Badge should be wrapped in tooltip trigger (has data-state attribute)
-      const badge = screen.getByText("Pending").closest("div");
+      const badge = screen.getByText("Pending confirmation").closest("div");
       expect(badge).toHaveAttribute("data-state");
     });
 
@@ -48,7 +48,7 @@ describe("JobStatusBadge", () => {
       render(<JobStatusBadge status="pending" />);
 
       // Badge should exist
-      const badge = screen.getByText("Pending").closest("div");
+      const badge = screen.getByText("Pending confirmation").closest("div");
       expect(badge).toBeInTheDocument();
     });
   });
@@ -96,7 +96,7 @@ describe("JobStatusBadge", () => {
     it("should apply custom className", () => {
       render(<JobStatusBadge status="pending" className="my-custom-class" />);
 
-      const badge = screen.getByText("Pending").closest("div");
+      const badge = screen.getByText("Pending confirmation").closest("div");
       expect(badge).toHaveClass("my-custom-class");
     });
   });
@@ -106,7 +106,7 @@ describe("JobStatusBadge", () => {
       render(<JobStatusBadge status="pending" />);
 
       // The icon is an SVG inside the badge
-      const badge = screen.getByText("Pending").closest("div");
+      const badge = screen.getByText("Pending confirmation").closest("div");
       const svg = badge?.querySelector("svg");
       expect(svg).toBeInTheDocument();
     });

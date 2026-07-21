@@ -1,6 +1,7 @@
+import { isInvalidRefreshTokenError } from "@/lib/is-invalid-refresh-token-error";
 import { supabase } from "@/lib/supabase";
 import { purgeStaleSupabaseAuthStorage } from "@/lib/purge-stale-supabase-auth-storage";
-import { Session, User } from "@supabase/supabase-js";
+import { AuthError, Session, User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
 import {
   createContext,
@@ -22,12 +23,50 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function clearInvalidLocalSession(reason: string): Promise<void> {
+  if (__DEV__) {
+    console.log("🔐 Auth: Clearing invalid local session", { reason });
+  }
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch (signOutError) {
+    if (__DEV__) {
+      console.warn("🔐 Auth: Local signOut failed after invalid refresh token", signOutError);
+    }
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const currentUserIdRef = useRef<string | null>(null);
+
+  const applySession = useCallback((currentSession: Session | null) => {
+    const sessionUser = currentSession?.user ?? null;
+    const sessionUserId = sessionUser?.id ?? null;
+
+    setSession(currentSession);
+
+    // Always clear user when session is gone (avoids stale user with null session).
+    if (!sessionUser) {
+      setUser(null);
+      currentUserIdRef.current = null;
+      return;
+    }
+
+    if (sessionUserId !== currentUserIdRef.current) {
+      if (__DEV__) {
+        console.log("🔐 Auth: User authenticated", {
+          userId: sessionUser.id,
+          email: sessionUser.email,
+        });
+      }
+      setUser(sessionUser);
+      currentUserIdRef.current = sessionUserId;
+    }
+  }, []);
 
   const signOut = useCallback(async () => {
     currentUserIdRef.current = null;
@@ -48,6 +87,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function bootstrap() {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
       await purgeStaleSupabaseAuthStorage(supabaseUrl);
+
+      // Resolve session after purge so a dead refresh token doesn't race auth init.
+      const { data, error } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (error && isInvalidRefreshTokenError(error)) {
+        await clearInvalidLocalSession(error.message);
+        applySession(null);
+        setLoading(false);
+        return;
+      }
+
+      if (error instanceof AuthError && __DEV__) {
+        console.warn("🔐 Auth: getSession error", error.message);
+      }
+
+      applySession(data.session ?? null);
+      setLoading(false);
     }
 
     void bootstrap();
@@ -65,28 +122,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      const sessionUser = currentSession?.user ?? null;
-      const sessionUserId = sessionUser?.id ?? null;
-
-      setSession(currentSession);
-
-      if (sessionUserId !== currentUserIdRef.current) {
-        if (sessionUser) {
-          if (__DEV__) {
-            console.log("🔐 Auth: User authenticated", {
-              userId: sessionUser.id,
-              email: sessionUser.email,
-              event,
-            });
-          }
-        } else if (event !== "INITIAL_SESSION" && __DEV__) {
-          console.log("🔐 Auth: User signed out", { event });
-        }
-
-        setUser(sessionUser);
-        currentUserIdRef.current = sessionUserId;
+      // Auto-refresh can fail asynchronously; treat as signed out.
+      if (event === "TOKEN_REFRESHED" && !currentSession) {
+        void clearInvalidLocalSession("TOKEN_REFRESHED without session");
       }
 
+      if (!currentSession && event !== "INITIAL_SESSION" && __DEV__) {
+        console.log("🔐 Auth: User signed out", { event });
+      }
+
+      applySession(currentSession);
       setLoading(false);
     });
 
@@ -94,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applySession]);
 
   const value = useMemo(
     () => ({ user, session, loading, signOut }),

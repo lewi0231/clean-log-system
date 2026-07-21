@@ -32,9 +32,7 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
   Wrapper.displayName = "QueryClientWrapper";
 
@@ -239,5 +237,48 @@ describe("useFieldConfigMutations", () => {
     await waitFor(() => {
       expect(onRefetch).toHaveBeenCalled();
     });
+  });
+
+  it("invalidates field-configs cache after create settles (Pricing sync)", async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, "invalidateQueries");
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    const { result } = renderHook(
+      () =>
+        useFieldConfigMutations({
+          organizationId: "org-1",
+          fieldConfigs: [],
+          onRefetch: async () => {},
+        }),
+      { wrapper: createWrapper() }
+    );
+
+    act(() => {
+      result.current.handleAdd({
+        name: "priced_field",
+        label: "Priced Field",
+        field_type: "number",
+        description: null,
+        required: false,
+        validation_rules: null,
+        options: null,
+        mutually_exclusive_group: null,
+        group_cluster: null,
+        section_id: null,
+        conditional_logic: null,
+        order_position: 0,
+      });
+    });
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: ["field-configs", "org-1"] })
+      );
+    });
+
+    invalidateSpy.mockRestore();
   });
 });

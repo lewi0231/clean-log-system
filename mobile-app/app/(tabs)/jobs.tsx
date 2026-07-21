@@ -201,7 +201,7 @@ export default function JobsScreen() {
         return (
           <View className="bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded-full">
             <Text className="text-xs font-medium text-yellow-700 dark:text-yellow-400">
-              Pending
+              Pending confirmation
             </Text>
           </View>
         );

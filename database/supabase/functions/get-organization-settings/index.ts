@@ -35,7 +35,7 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, custom_email_domain_enabled"
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, custom_email_domain_enabled, colleague_confirmation_timeout_hours"
       )
       .eq("id", organization_id)
       .single();
@@ -109,6 +109,8 @@ serve(async (req) => {
         gst_inclusive: orgSettings?.gst_inclusive ?? true,
         gst_rate_percent: orgSettings?.gst_rate_percent ?? 10,
         edit_window_minutes: orgSettings?.edit_window_minutes ?? 180,
+        colleague_confirmation_timeout_hours:
+          organization?.colleague_confirmation_timeout_hours ?? 24,
         worker_payment_cycle_config: orgSettings?.worker_payment_cycle_config ?? null,
         workforce_engagement: orgSettings?.workforce_engagement ?? "employees",
       },

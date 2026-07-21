@@ -3,6 +3,7 @@ import {
   canSubmitTaxInvoice,
   defaultWorkerEngagementForOrg,
   normalizeWorkforceEngagement,
+  requiresContractorTaxDetails,
 } from "@clean-log/shared/utils/workforce-engagement";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +19,15 @@ describe("canSubmitTaxInvoice", () => {
 
   it.each(cases)("org=%s worker=%s → %s", (org, worker, expected) => {
     expect(canSubmitTaxInvoice(org, worker)).toBe(expected);
+  });
+});
+
+describe("requiresContractorTaxDetails", () => {
+  it("matches canSubmitTaxInvoice (ABN/address for contractors only)", () => {
+    expect(requiresContractorTaxDetails("employees", "employee")).toBe(false);
+    expect(requiresContractorTaxDetails("contractors", "contractor")).toBe(true);
+    expect(requiresContractorTaxDetails("both", "employee")).toBe(false);
+    expect(requiresContractorTaxDetails("both", "contractor")).toBe(true);
   });
 });
 

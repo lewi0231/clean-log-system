@@ -60,10 +60,10 @@ export default withSentryConfig(nextConfig, {
   widenClientFileUpload: true,
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  tunnelRoute: "/monitoring",
+  // Disabled in local Turbopack dev — tunnel injection into instrumentation-edge has been
+  // crashing with "module factory is not available". Production still uses /monitoring.
+  // Middleware also excludes this path (see middleware.ts matcher).
+  tunnelRoute: process.env.NODE_ENV === "production" ? "/monitoring" : undefined,
 
   webpack: {
     // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)

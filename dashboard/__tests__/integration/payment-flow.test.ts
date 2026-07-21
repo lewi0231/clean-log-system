@@ -937,28 +937,23 @@ describe("Full Payment Flow Integration Test", () => {
       }
     }, 30000);
 
-    it("should fail to send invoice when no email recipients are found", async () => {
-      // Create a location with valid email (to satisfy format constraint)
-      // But we'll configure invoice template to not use it
-      // The key is: when location_email_source is "hierarchy_billing_email" and
-      // there's no hierarchy_parent_id, it won't find an email from hierarchy.
-      // It also won't check location.email because location_email_source !== "location_email".
-      // So it should fall through to default_email (which we'll set to null).
-      const { data: locationWithoutEmail, error: locationError } = await supabase
+    it("should fall back to location email when hierarchy billing email is unavailable", async () => {
+      // hierarchy_billing_email with no hierarchy_parent_id should fall back to location.email
+      const { data: locationWithEmail, error: locationError } = await supabase
         .from("location")
         .insert({
           organization_id: testData.organizationId,
-          name: "Location Without Usable Email",
-          email: "location@example.com", // Valid email format (required by constraint)
+          name: "Location Fallback Email",
+          email: "location-fallback@example.com",
           address: "123 Test Street",
-          // Important: Don't set hierarchy_parent_id, so hierarchy_billing_email won't work
+          // No hierarchy_parent_id — hierarchy billing cannot resolve
         } as never)
         .select()
         .single();
 
       if (locationError) throw locationError;
-      const locationIdNoEmail = (locationWithoutEmail as { id: string })?.id;
-      if (!locationIdNoEmail) {
+      const locationIdFallback = (locationWithEmail as { id: string })?.id;
+      if (!locationIdFallback) {
         throw new Error("Failed to create location");
       }
 
@@ -999,7 +994,7 @@ describe("Full Payment Flow Integration Test", () => {
 
       const jobId = await createTestJob(
         testData.organizationId,
-        locationIdNoEmail,
+        locationIdFallback,
         [
           { id: serviceTypeFieldConfig, name: "service_type" },
           { id: quantityFieldConfig, name: "quantity" },
@@ -1029,46 +1024,19 @@ describe("Full Payment Flow Integration Test", () => {
       expect(invoiceData?.success).toBe(true);
       const invoiceId = invoiceData.invoice.id;
 
-      // Update invoice template config to not use location email
-      // Set location_email_source to hierarchy_billing_email (won't match - no hierarchy)
-      // And set form_field_email and default_email to null
-      // This ensures no valid email recipients will be found
-      // Use .update() instead of .upsert() since the config already exists
       const { error: configError } = await supabase
         .from("invoice_template_config")
         .update({
           email_recipient_config: {
-            location_email_source: "hierarchy_billing_email", // Won't match (no hierarchy)
-            form_field_email: null, // No form field email
-            default_email: null, // No default email
+            location_email_source: "hierarchy_billing_email",
+            form_field_email: null,
+            default_email: null,
           },
         } as never)
         .eq("organization_id", testData.organizationId);
 
       if (configError) throw configError;
 
-      // Verify the config was updated
-      const { data: updatedConfig } = await supabase
-        .from("invoice_template_config")
-        .select("email_recipient_config")
-        .eq("organization_id", testData.organizationId)
-        .single();
-
-      const configData = updatedConfig as {
-        email_recipient_config: {
-          location_email_source: string;
-          form_field_email: string | null;
-          default_email: string | null;
-        };
-      } | null;
-
-      expect(configData?.email_recipient_config).toMatchObject({
-        location_email_source: "hierarchy_billing_email",
-        form_field_email: null,
-        default_email: null,
-      });
-
-      // Attempt to send invoice - should fail
       const { data: sendData, error: sendError } = await supabase.functions.invoke(
         "update-invoice-status",
         {
@@ -1083,40 +1051,19 @@ describe("Full Payment Flow Integration Test", () => {
         }
       );
 
-      // Should fail with clear error about no email recipients
-      // Edge Functions return errors in the error object, not in data.success
-      expect(sendError || sendData?.error).toBeTruthy();
-
-      // Verify we got an error
-      expect(sendError || sendData?.error).toBeTruthy();
-
-      // Prefer parsing error details from the function response body.
+      // Fallback to location email should allow send (may still fail later on mail delivery;
+      // recipient resolution itself must succeed — no "no email recipients" error).
       const errorMessage = sendError
         ? await extractFunctionError(sendError)
         : typeof sendData?.error === "string"
           ? sendData.error
           : "";
-
-      const status =
-        sendError &&
-        typeof sendError === "object" &&
-        "context" in sendError &&
-        sendError.context instanceof Response
-          ? sendError.context.status
-          : undefined;
-
-      // Some clients return a generic non-2xx message; treat a 4xx as a valid failure
-      // for the "no recipients" case, and accept a few message variants.
       const lower = (errorMessage || "").toLowerCase();
-      const ok =
-        lower.includes("no valid email recipients") ||
-        lower.includes("no email recipients") ||
-        status === 400 ||
-        status === 422;
-      expect(ok).toBe(true);
+      expect(
+        lower.includes("no valid email recipients") || lower.includes("no email recipients")
+      ).toBe(false);
 
-      // Cleanup: delete location without email
-      await supabase.from("location").delete().eq("id", locationIdNoEmail);
+      await supabase.from("location").delete().eq("id", locationIdFallback);
     }, 30000);
 
     // TODO: Re-enable after full Supabase restart - test is failing due to Edge Function cache

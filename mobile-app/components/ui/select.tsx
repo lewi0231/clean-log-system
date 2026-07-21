@@ -69,8 +69,7 @@ const Select = React.forwardRef<View, SelectProps>(
   ) => {
     const [open, setOpen] = React.useState(false);
     const [selectedValue, setSelectedValue] = React.useState(value);
-    const [selectedLabel, setSelectedLabel] =
-      React.useState<React.ReactNode>("");
+    const [selectedLabel, setSelectedLabel] = React.useState<React.ReactNode>("");
 
     React.useEffect(() => {
       if (value !== selectedValue) {
@@ -87,10 +86,7 @@ const Select = React.forwardRef<View, SelectProps>(
 
         const childElement = child as React.ReactElement<any>;
 
-        if (
-          childElement.type === SelectItem &&
-          childElement.props.value === selectedValue
-        ) {
+        if (childElement.type === SelectItem && childElement.props.value === selectedValue) {
           setSelectedLabel(childElement.props.children);
           found = true;
           return;
@@ -140,9 +136,7 @@ const Select = React.forwardRef<View, SelectProps>(
             disabled && "opacity-50",
             Platform.OS === "ios" ? "ios:shadow-sm" : "android:elevation-1",
             // Default padding if not specified in triggerClassName
-            !triggerClassName?.includes("pl-") &&
-              !triggerClassName?.includes("px-") &&
-              "pl-3 pr-3",
+            !triggerClassName?.includes("pl-") && !triggerClassName?.includes("px-") && "pl-3 pr-3",
             triggerClassName
           )}
         >
@@ -153,9 +147,7 @@ const Select = React.forwardRef<View, SelectProps>(
             )}
             numberOfLines={1}
           >
-            {selectedValue && selectedLabel
-              ? selectedLabel
-              : placeholder || "Select an option"}
+            {selectedValue && selectedLabel ? selectedLabel : placeholder || "Select an option"}
           </Text>
 
           <Ionicons
@@ -178,9 +170,12 @@ const Select = React.forwardRef<View, SelectProps>(
             closeOnBackdropPress={true}
           >
             <ScrollView
-              className="px-1 pt-2 pb-6"
+              className="px-1 pt-2"
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 48 }}
               keyboardShouldPersistTaps="handled"
               nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
             >
               {children}
             </ScrollView>
@@ -239,9 +234,7 @@ const SelectItem = React.forwardRef<typeof Pressable, SelectItemProps>(
         <Text
           className={cn(
             "text-base",
-            isSelected
-              ? "text-secondary-foreground font-medium"
-              : "text-foreground"
+            isSelected ? "text-secondary-foreground font-medium" : "text-foreground"
           )}
         >
           {children}
@@ -260,10 +253,7 @@ const SelectLabel = React.forwardRef<Text, SelectLabelProps>(
     return (
       <Text
         ref={ref}
-        className={cn(
-          "px-3 py-2 text-sm font-semibold text-foreground",
-          className
-        )}
+        className={cn("px-3 py-2 text-sm font-semibold text-foreground", className)}
         {...props}
       >
         {children}
@@ -276,13 +266,7 @@ SelectLabel.displayName = "SelectLabel";
 
 const SelectSeparator = React.forwardRef<View, SelectSeparatorProps>(
   ({ className, ...props }, ref) => {
-    return (
-      <View
-        ref={ref}
-        className={cn("h-px bg-muted mx-2 my-1", className)}
-        {...props}
-      />
-    );
+    return <View ref={ref} className={cn("h-px bg-muted mx-2 my-1", className)} {...props} />;
   }
 );
 

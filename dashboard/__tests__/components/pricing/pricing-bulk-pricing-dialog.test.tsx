@@ -1,4 +1,7 @@
-import { PricingBulkYardOverrideDialog } from "@/components/pricing/pricing-bulk-yard-override-dialog";
+import {
+  BULK_PRICING_ALL_YARDS,
+  PricingBulkPricingDialog,
+} from "@/components/pricing/pricing-bulk-pricing-dialog";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,7 +15,10 @@ vi.mock("@/components/ui/select", () => ({
     onValueChange: (value: string) => void;
     value: string;
   }) => (
-    <div data-testid="yard-select" data-value={value}>
+    <div data-testid="scope-select" data-value={value}>
+      <button type="button" onClick={() => onValueChange(BULK_PRICING_ALL_YARDS)}>
+        Select All yards
+      </button>
       <button type="button" onClick={() => onValueChange("loc-1")}>
         Select Hillcrest
       </button>
@@ -27,7 +33,7 @@ vi.mock("@/components/ui/select", () => ({
   ),
 }));
 
-describe("PricingBulkYardOverrideDialog", () => {
+describe("PricingBulkPricingDialog", () => {
   const defaultProps = {
     open: true,
     onOpenChange: vi.fn(),
@@ -40,40 +46,33 @@ describe("PricingBulkYardOverrideDialog", () => {
     onSave: vi.fn().mockResolvedValue(true),
   };
 
-  it("disables apply until yard and valid customer price are provided", async () => {
-    render(<PricingBulkYardOverrideDialog {...defaultProps} />);
+  it("defaults to All yards and enables apply once customer price is valid", async () => {
+    render(<PricingBulkPricingDialog {...defaultProps} />);
 
-    expect(screen.getByRole("button", { name: /apply override/i })).toBeDisabled();
-
-    fireEvent.click(screen.getByRole("button", { name: /select hillcrest/i }));
+    expect(screen.getByRole("button", { name: /apply as all yards default/i })).toBeDisabled();
+    expect(screen.queryByLabelText(/valid until/i)).not.toBeInTheDocument();
 
     const customerInput = await screen.findByLabelText(/customer price/i);
     fireEvent.change(customerInput, { target: { value: "12.50" } });
 
-    expect(screen.getByRole("button", { name: /apply to hillcrest/i })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /apply as all yards default/i })).toBeEnabled();
   });
 
   it("rejects invalid customer prices", async () => {
-    render(<PricingBulkYardOverrideDialog {...defaultProps} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /select hillcrest/i }));
+    render(<PricingBulkPricingDialog {...defaultProps} />);
 
     const customerInput = await screen.findByLabelText(/customer price/i);
     fireEvent.change(customerInput, { target: { value: "not-a-price" } });
 
-    expect(screen.getByRole("button", { name: /apply to hillcrest/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /apply as all yards default/i })).toBeDisabled();
   });
 
-  it("applies the same price payload for every option", async () => {
+  it("applies yard override payload for every option", async () => {
     const onSave = vi.fn().mockResolvedValue(true);
     const onOpenChange = vi.fn();
 
     render(
-      <PricingBulkYardOverrideDialog
-        {...defaultProps}
-        onSave={onSave}
-        onOpenChange={onOpenChange}
-      />
+      <PricingBulkPricingDialog {...defaultProps} onSave={onSave} onOpenChange={onOpenChange} />
     );
 
     fireEvent.click(screen.getByRole("button", { name: /select hillcrest/i }));
@@ -89,8 +88,7 @@ describe("PricingBulkYardOverrideDialog", () => {
 
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(
-        "loc-1",
-        "Hillcrest",
+        { type: "yard", locationId: "loc-1", locationName: "Hillcrest" },
         {
           Nissan: { customerPrice: "15", workerPrice: "8" },
           Ford: { customerPrice: "15", workerPrice: "8" },
@@ -103,16 +101,43 @@ describe("PricingBulkYardOverrideDialog", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("applies All yards default without valid-until field", async () => {
+    const onSave = vi.fn().mockResolvedValue(true);
+
+    render(<PricingBulkPricingDialog {...defaultProps} onSave={onSave} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /select all yards/i }));
+
+    fireEvent.change(await screen.findByLabelText(/customer price/i), {
+      target: { value: "10" },
+    });
+    fireEvent.change(screen.getByLabelText(/worker payment/i), {
+      target: { value: "5" },
+    });
+
+    expect(screen.queryByLabelText(/valid until/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /apply as all yards default/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        { type: "all-yards" },
+        {
+          Nissan: { customerPrice: "10", workerPrice: "5" },
+          Ford: { customerPrice: "10", workerPrice: "5" },
+          Kia: { customerPrice: "10", workerPrice: "5" },
+        },
+        ""
+      );
+    });
+  });
+
   it("stays open when save returns false", async () => {
     const onSave = vi.fn().mockResolvedValue(false);
     const onOpenChange = vi.fn();
 
     render(
-      <PricingBulkYardOverrideDialog
-        {...defaultProps}
-        onSave={onSave}
-        onOpenChange={onOpenChange}
-      />
+      <PricingBulkPricingDialog {...defaultProps} onSave={onSave} onOpenChange={onOpenChange} />
     );
 
     fireEvent.click(screen.getByRole("button", { name: /select hillcrest/i }));
