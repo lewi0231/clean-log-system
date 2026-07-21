@@ -13,7 +13,7 @@ vi.mock("@/lib/services", () => ({
 }));
 
 const mockUseOrganization = vi.hoisted(() =>
-  vi.fn(() => ({
+  vi.fn((): { organizationId: string | null; loading: boolean; error: string | null } => ({
     organizationId: "org-1",
     loading: false,
     error: null,
