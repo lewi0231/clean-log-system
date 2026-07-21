@@ -11,7 +11,9 @@ inputs:
   pnpm-version:
     description: pnpm version (major line or exact)
     required: false
-    default: "9"
+    # Must match lockfile authoring version. pnpm 9 rejects pnpm 10
+    # patchedDependencies entries (ERR_PNPM_LOCKFILE_CONFIG_MISMATCH).
+    default: "10"
 
 runs:
   using: composite
