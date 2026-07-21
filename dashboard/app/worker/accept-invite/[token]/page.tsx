@@ -14,28 +14,20 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { log } from "@/lib/logger";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
+import { buildWorkerSignupSchema } from "@/lib/worker-signup-schema";
+import { requiresContractorTaxDetails } from "@clean-log/shared/utils/workforce-engagement";
 import { Loader2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { z } from "zod";
+import React, { useEffect, useMemo, useState } from "react";
 
-const WorkerSignupSchema = z.object({
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters")
-    .max(20, "Password cannot be more than 20 characters")
-    .refine(
-      (password) => /[A-Z]/.test(password),
-      "Password must contain at least one uppercase letter"
-    )
-    .refine(
-      (password) => /[a-z]/.test(password),
-      "Password must contain at least one lowercase letter"
-    )
-    .refine((password) => /[0-9]/.test(password), "Password must contain at least one number"),
-  address: z.string().min(1, "Address is required"),
-  abn: z.string().min(1, "ABN is required"),
-});
+type InvitationPreview = {
+  invitation?: {
+    worker_email?: string;
+    workforce_engagement?: string | null;
+    engagement_type?: string | null;
+    worker?: { id?: string } | null;
+  };
+};
 
 function AcceptInvitePage() {
   const params = useParams();
@@ -46,14 +38,27 @@ function AcceptInvitePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchingInvitation, setFetchingInvitation] = useState(true);
+  const [invitationLoaded, setInvitationLoaded] = useState(false);
   const [workerEmail, setWorkerEmail] = useState<string | null>(null);
+  const [workforceEngagement, setWorkforceEngagement] = useState<string | null>(null);
+  const [engagementType, setEngagementType] = useState<string | null>(null);
 
   const router = useRouter();
 
-  const validate = () => {
-    log.debug("Accept Invite: Validating worker signup form");
+  // Only compute after preview succeeds — avoids hiding ABN for contractors when load failed.
+  const requireTaxDetails = useMemo(() => {
+    if (!invitationLoaded) return false;
+    return requiresContractorTaxDetails(workforceEngagement, engagementType);
+  }, [invitationLoaded, workforceEngagement, engagementType]);
 
-    const result = WorkerSignupSchema.safeParse({ password, address, abn });
+  const validate = () => {
+    log.debug("Accept Invite: Validating worker signup form", { requireTaxDetails });
+
+    const result = buildWorkerSignupSchema(requireTaxDetails).safeParse({
+      password,
+      address,
+      abn,
+    });
 
     if (!result.success) {
       const firstError = result.error.issues[0];
@@ -76,21 +81,32 @@ function AcceptInvitePage() {
       if (!token) {
         setError("Invalid invitation link");
         setFetchingInvitation(false);
+        setInvitationLoaded(false);
         return;
       }
 
       try {
         // Never log tokens or other secrets.
         log.debug("Accept Invite: Fetching invitation details", { hasToken: !!token });
-        const data = await invokeEdgeFunction<{ invitation?: { worker_email?: string } }>(
-          "get-worker",
-          token
-        );
+        const data = await invokeEdgeFunction<InvitationPreview>("get-worker", token);
 
-        if (data?.invitation) {
+        if (data?.invitation?.worker?.id) {
           setWorkerEmail(data.invitation.worker_email ?? null);
+          setWorkforceEngagement(data.invitation.workforce_engagement ?? null);
+          setEngagementType(data.invitation.engagement_type ?? null);
+          setInvitationLoaded(true);
           // Never log PII (emails).
-          log.debug("Accept Invite: Invitation loaded", { hasEmail: true });
+          log.debug("Accept Invite: Invitation loaded", {
+            hasEmail: true,
+            workforce_engagement: data.invitation.workforce_engagement ?? null,
+            engagement_type: data.invitation.engagement_type ?? null,
+          });
+        } else if (data?.invitation) {
+          setInvitationLoaded(false);
+          setError("Invitation is missing worker details. Contact your administrator.");
+        } else {
+          setInvitationLoaded(false);
+          setError("Invitation not found");
         }
       } catch (err) {
         const message =
@@ -98,6 +114,7 @@ function AcceptInvitePage() {
         log.error("Accept Invite: Error fetching invitation", {
           error: message,
         });
+        setInvitationLoaded(false);
         setError(message);
       } finally {
         setFetchingInvitation(false);
@@ -110,12 +127,18 @@ function AcceptInvitePage() {
   async function handleAccept(e: React.FormEvent) {
     try {
       e.preventDefault();
+      if (!invitationLoaded) {
+        setError("Invitation details are not available. Reload this page and try again.");
+        return;
+      }
+
       setLoading(true);
       setError("");
 
       const validatedData = validate();
       log.debug("Accept Invite: Calling accept-worker-invitation", {
         hasToken: !!token,
+        requireTaxDetails,
       });
 
       const data = await invokeEdgeFunction<{ success?: boolean; error?: string }>(
@@ -123,8 +146,8 @@ function AcceptInvitePage() {
         {
           invitation_token: token,
           password: validatedData.password,
-          address: validatedData.address,
-          abn: validatedData.abn,
+          address: validatedData.address ?? "",
+          abn: validatedData.abn ?? "",
         }
       );
 
@@ -166,6 +189,22 @@ function AcceptInvitePage() {
     );
   }
 
+  if (!invitationLoaded) {
+    return (
+      <div className="h-screen w-full flex justify-center items-center px-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Invitation unavailable</CardTitle>
+            <CardDescription>
+              We could not load this invitation. The link may be invalid or expired.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>{error && <p className="text-sm text-destructive">{error}</p>}</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-full flex justify-center items-center px-4">
       <Card className="w-full max-w-md">
@@ -200,42 +239,50 @@ function AcceptInvitePage() {
                 install later.
               </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Input
-                id="address"
-                name="address"
-                type="text"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  if (error) {
-                    setError("");
-                  }
-                }}
-                placeholder="123 Main St, City, State 12345"
-                aria-invalid={!!error}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="abn">ABN (Australian Business Number)</Label>
-              <Input
-                id="abn"
-                name="abn"
-                type="text"
-                value={abn}
-                onChange={(e) => {
-                  setAbn(e.target.value);
-                  if (error) {
-                    setError("");
-                  }
-                }}
-                placeholder="11 222 333 444"
-                aria-invalid={!!error}
-                required
-              />
-            </div>
+            {requireTaxDetails && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Business address</Label>
+                  <Input
+                    id="address"
+                    name="address"
+                    type="text"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      if (error) {
+                        setError("");
+                      }
+                    }}
+                    placeholder="123 Main St, City, State 12345"
+                    aria-invalid={!!error}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Used on contractor tax invoices.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="abn">ABN (Australian Business Number)</Label>
+                  <Input
+                    id="abn"
+                    name="abn"
+                    type="text"
+                    value={abn}
+                    onChange={(e) => {
+                      setAbn(e.target.value);
+                      if (error) {
+                        setError("");
+                      }
+                    }}
+                    placeholder="11 222 333 444"
+                    aria-invalid={!!error}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Required for contractor tax invoicing.
+                  </p>
+                </div>
+              </>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4 mt-4">

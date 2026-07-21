@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  QueryClient,
-  QueryClientProvider,
-  QueryKey,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, QueryKey } from "@tanstack/react-query";
 import { ReactNode, useState } from "react";
 
 // Lazy-init QueryClient so it isn't recreated on every render
@@ -29,26 +25,24 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             retry: 1,
           },
         },
-      }),
+      })
   );
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-export const workersLocationsKey = (orgId: string | null): QueryKey => [
-  "workers-locations",
-  orgId,
-];
+export const workersLocationsKey = (orgId: string | null): QueryKey => ["workers-locations", orgId];
 
 export const organizationUsersKey = (orgId: string | null): QueryKey => [
   "organization-users",
   orgId,
 ];
 
-export const jobsKey = (
-  orgId: string | null,
-  includeTests?: boolean,
-): QueryKey => ["jobs", orgId, includeTests ?? false];
+export const jobsKey = (orgId: string | null, includeTests?: boolean): QueryKey => [
+  "jobs",
+  orgId,
+  includeTests ?? false,
+];
 
 export const locationHierarchyKey = (orgId: string | null): QueryKey => [
   "location-hierarchy",
@@ -59,7 +53,7 @@ export const invoicesKey = (
   orgId: string | null,
   startDate?: string,
   endDate?: string,
-  includeTests?: boolean,
+  includeTests?: boolean
 ): QueryKey => ["invoices", orgId, startDate, endDate, includeTests ?? false];
 
 export const invoiceDetailsKey = (invoiceId: string | null): QueryKey => [
@@ -72,9 +66,13 @@ export const organizationSettingsKey = (orgId: string | null): QueryKey => [
   orgId,
 ];
 
-export const mobileConfigKey = (orgId: string | null): QueryKey => [
-  "mobile-config",
+export const mobileConfigKey = (orgId: string | null): QueryKey => ["mobile-config", orgId];
+
+/** Pricing / field-config list cache (separate from mobile-config form builder cache). */
+export const fieldConfigsKey = (orgId: string | null, locationId?: string | null): QueryKey => [
+  "field-configs",
   orgId,
+  locationId ?? null,
 ];
 
 export const workerPaymentHistoryKey = (orgId: string | null): QueryKey => [
@@ -82,10 +80,11 @@ export const workerPaymentHistoryKey = (orgId: string | null): QueryKey => [
   orgId,
 ];
 
-export const notificationsKey = (
-  orgId: string | null,
-  receiverId: string | null
-): QueryKey => ["notifications", orgId, receiverId];
+export const notificationsKey = (orgId: string | null, receiverId: string | null): QueryKey => [
+  "notifications",
+  orgId,
+  receiverId,
+];
 
 // Pricing query keys
 export const fieldPricingKey = (
@@ -95,7 +94,7 @@ export const fieldPricingKey = (
     locationHierarchyId?: string | null;
     locationId?: string | null;
     pricingContext?: "customer" | "worker";
-  },
+  }
 ): QueryKey => [
   "field-pricing",
   orgId,
@@ -113,7 +112,7 @@ export const optionPricingKey = (
     locationHierarchyId?: string | null;
     locationId?: string | null;
     pricingContext?: "customer" | "worker";
-  },
+  }
 ): QueryKey => [
   "option-pricing",
   orgId,
@@ -131,7 +130,7 @@ export const basePricingKey = (
     locationHierarchyId?: string | null;
     locationId?: string | null;
     pricingContext?: "customer" | "worker";
-  },
+  }
 ): QueryKey => [
   "base-pricing",
   orgId,
@@ -148,7 +147,7 @@ export const pricingHistoryKey = (
     dateTo?: string;
     pricingContext?: "customer" | "worker";
     refreshToken?: string | number;
-  },
+  }
 ): QueryKey => [
   "pricing-history",
   orgId,

@@ -21,8 +21,7 @@ const createMockSupabase = () => {
 
   const mockSelect = () => ({
     eq: () => ({
-      single: () =>
-        Promise.resolve(mockSingleResponse || { data: null, error: null }),
+      single: () => Promise.resolve(mockSingleResponse || { data: null, error: null }),
     }),
   });
 
@@ -37,117 +36,119 @@ const createMockSupabase = () => {
       mockSingleResponse = null;
     },
   } as unknown as SupabaseClient & {
-    _setMockSingleResponse: (
-      response: { data: unknown; error: unknown },
-    ) => void;
+    _setMockSingleResponse: (response: { data: unknown; error: unknown }) => void;
     _clearMock: () => void;
   };
 };
 
 // Jobs with locations tests
-Deno.test("P0: should use hierarchy billing email when location_email_source is hierarchy_billing_email and hierarchy has billing email", async () => {
-  const mockSupabase = createMockSupabase();
-  const jobContexts: JobContext[] = [
-    {
-      location_id: "loc-1",
-      location: {
-        id: "loc-1",
-        email: "location@example.com",
-        contact_person: "John Doe",
-        hierarchy_parent_id: "hier-1",
+Deno.test(
+  "P0: should use hierarchy billing email when location_email_source is hierarchy_billing_email and hierarchy has billing email",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
+      {
+        location_id: "loc-1",
+        location: {
+          id: "loc-1",
+          email: "location@example.com",
+          contact_person: "John Doe",
+          hierarchy_parent_id: "hier-1",
+        },
+        submission_data: {},
       },
-      submission_data: {},
-    },
-  ];
+    ];
 
-  const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "hierarchy_billing_email",
-    form_field_email: null,
-    default_email: null,
-  };
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "hierarchy_billing_email",
+      form_field_email: null,
+      default_email: null,
+    };
 
-  // Set up mock hierarchy response
-  (mockSupabase as unknown as {
-    _setMockSingleResponse: (
-      response: { data: unknown; error: unknown },
-    ) => void;
-  })._setMockSingleResponse({
-    data: {
-      id: "hier-1",
-      type: "organization",
-      metadata: {
-        billing_address: {
-          email: "billing@company.com",
+    // Set up mock hierarchy response
+    (
+      mockSupabase as unknown as {
+        _setMockSingleResponse: (response: { data: unknown; error: unknown }) => void;
+      }
+    )._setMockSingleResponse({
+      data: {
+        id: "hier-1",
+        type: "organization",
+        metadata: {
+          billing_address: {
+            email: "billing@company.com",
+          },
         },
       },
-    },
-    error: null,
-  });
+      error: null,
+    });
 
-  const fieldConfigMap = new Map();
+    const fieldConfigMap = new Map();
 
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
 
-  assertEquals(result, ["billing@company.com"]);
-  (mockSupabase as unknown as { _clearMock: () => void })._clearMock();
-});
+    assertEquals(result, ["billing@company.com"]);
+    (mockSupabase as unknown as { _clearMock: () => void })._clearMock();
+  }
+);
 
-Deno.test("P0: should return empty when hierarchy billing email not available (no fallback)", async () => {
-  const mockSupabase = createMockSupabase();
-  const jobContexts: JobContext[] = [
-    {
-      location_id: "loc-1",
-      location: {
-        id: "loc-1",
-        email: "location@example.com",
-        contact_person: "John Doe",
-        hierarchy_parent_id: "hier-1",
+Deno.test(
+  "P0: should fall back to location email when hierarchy has no billing email",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
+      {
+        location_id: "loc-1",
+        location: {
+          id: "loc-1",
+          email: "location@example.com",
+          contact_person: "John Doe",
+          hierarchy_parent_id: "hier-1",
+        },
+        submission_data: {},
       },
-      submission_data: {},
-    },
-  ];
+    ];
 
-  const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "hierarchy_billing_email",
-    form_field_email: null,
-    default_email: null,
-  };
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "hierarchy_billing_email",
+      form_field_email: null,
+      default_email: null,
+    };
 
-  // Mock hierarchy lookup - no billing email
-  (mockSupabase as unknown as {
-    _setMockSingleResponse: (
-      response: { data: unknown; error: unknown },
-    ) => void;
-  })._setMockSingleResponse({
-    data: {
-      id: "hier-1",
-      type: "organization",
-      metadata: {}, // No billing email
-    },
-    error: null,
-  });
+    // Mock hierarchy lookup - no billing email
+    (
+      mockSupabase as unknown as {
+        _setMockSingleResponse: (response: { data: unknown; error: unknown }) => void;
+      }
+    )._setMockSingleResponse({
+      data: {
+        id: "hier-1",
+        type: "organization",
+        metadata: {}, // No billing email
+      },
+      error: null,
+    });
 
-  const fieldConfigMap = new Map();
+    const fieldConfigMap = new Map();
 
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
 
-  // When hierarchy_billing_email is configured but not available,
-  // the code doesn't fallback to location.email - it returns empty
-  assertEquals(result, []);
-  (mockSupabase as unknown as { _clearMock: () => void })._clearMock();
-});
+    assertEquals(result, ["location@example.com"]);
+    (mockSupabase as unknown as { _clearMock: () => void })._clearMock();
+  }
+);
 
-Deno.test("P0: should use location.email when location_email_source is location_email", async () => {
+Deno.test("P0: should fall back to location email when hierarchy parent is missing", async () => {
   const mockSupabase = createMockSupabase();
   const jobContexts: JobContext[] = [
     {
@@ -163,128 +164,166 @@ Deno.test("P0: should use location.email when location_email_source is location_
   ];
 
   const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "location_email",
+    location_email_source: "hierarchy_billing_email",
     form_field_email: null,
     default_email: null,
   };
 
-  const fieldConfigMap = new Map();
-
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+  const result = await getInvoiceEmailRecipients(mockSupabase, jobContexts, emailConfig, new Map());
 
   assertEquals(result, ["location@example.com"]);
 });
 
-Deno.test("P0: should return empty when location email missing (default_email deprecated)", async () => {
-  const mockSupabase = createMockSupabase();
-  const jobContexts: JobContext[] = [
-    {
-      location_id: "loc-1",
-      location: {
-        id: "loc-1",
-        email: null,
-        contact_person: "John Doe",
-        hierarchy_parent_id: null,
+Deno.test(
+  "P0: should use location.email when location_email_source is location_email",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
+      {
+        location_id: "loc-1",
+        location: {
+          id: "loc-1",
+          email: "location@example.com",
+          contact_person: "John Doe",
+          hierarchy_parent_id: null,
+        },
+        submission_data: {},
       },
-      submission_data: {},
-    },
-  ];
+    ];
 
-  const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "location_email",
-    form_field_email: null,
-    default_email: "default@example.com",
-  };
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "location_email",
+      form_field_email: null,
+      default_email: null,
+    };
 
-  const fieldConfigMap = new Map();
+    const fieldConfigMap = new Map();
 
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
 
-  // default_email is deprecated and fallback was removed
-  assertEquals(result, []);
-});
+    assertEquals(result, ["location@example.com"]);
+  }
+);
 
-Deno.test("P0: should return empty array when no email source available and no default", async () => {
-  const mockSupabase = createMockSupabase();
-  const jobContexts: JobContext[] = [
-    {
-      location_id: "loc-1",
-      location: {
-        id: "loc-1",
-        email: null,
-        contact_person: "John Doe",
-        hierarchy_parent_id: null,
+Deno.test(
+  "P0: should return empty when location email missing (default_email deprecated)",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
+      {
+        location_id: "loc-1",
+        location: {
+          id: "loc-1",
+          email: null,
+          contact_person: "John Doe",
+          hierarchy_parent_id: null,
+        },
+        submission_data: {},
       },
-      submission_data: {},
-    },
-  ];
+    ];
 
-  const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "location_email",
-    form_field_email: null,
-    default_email: null,
-  };
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "location_email",
+      form_field_email: null,
+      default_email: "default@example.com",
+    };
 
-  const fieldConfigMap = new Map();
+    const fieldConfigMap = new Map();
 
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
 
-  assertEquals(result, []);
-});
+    // default_email is deprecated and fallback was removed
+    assertEquals(result, []);
+  }
+);
+
+Deno.test(
+  "P0: should return empty array when no email source available and no default",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
+      {
+        location_id: "loc-1",
+        location: {
+          id: "loc-1",
+          email: null,
+          contact_person: "John Doe",
+          hierarchy_parent_id: null,
+        },
+        submission_data: {},
+      },
+    ];
+
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "location_email",
+      form_field_email: null,
+      default_email: null,
+    };
+
+    const fieldConfigMap = new Map();
+
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
+
+    assertEquals(result, []);
+  }
+);
 
 // Jobs without locations tests
-Deno.test("P0: should extract email from form field when form_field_email is configured", async () => {
-  const mockSupabase = createMockSupabase();
-  const jobContexts: JobContext[] = [
-    {
-      location_id: null,
-      location: null,
-      submission_data: {
-        customer_email: "customer@example.com",
-      },
-    },
-  ];
-
-  const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "location_email",
-    form_field_email: "field-config-1", // Field config ID
-    default_email: null,
-  };
-
-  const fieldConfigMap = new Map([
-    [
-      "field-config-1",
+Deno.test(
+  "P0: should extract email from form field when form_field_email is configured",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
       {
-        name: "customer_email",
-        label: "Customer Email",
+        location_id: null,
+        location: null,
+        submission_data: {
+          customer_email: "customer@example.com",
+        },
       },
-    ],
-  ]);
+    ];
 
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "location_email",
+      form_field_email: "field-config-1", // Field config ID
+      default_email: null,
+    };
 
-  assertEquals(result, ["customer@example.com"]);
-});
+    const fieldConfigMap = new Map([
+      [
+        "field-config-1",
+        {
+          name: "customer_email",
+          label: "Customer Email",
+        },
+      ],
+    ]);
+
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
+
+    assertEquals(result, ["customer@example.com"]);
+  }
+);
 
 Deno.test("P0: should use field config name to lookup submission_data value", async () => {
   const mockSupabase = createMockSupabase();
@@ -318,7 +357,7 @@ Deno.test("P0: should use field config name to lookup submission_data value", as
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   assertEquals(result, ["contact@example.com"]);
@@ -356,51 +395,54 @@ Deno.test("P0: should validate email format (RFC compliant)", async () => {
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   // Invalid email should be rejected
   assertEquals(result, []);
 });
 
-Deno.test("P0: should return empty when form field email invalid (default_email deprecated)", async () => {
-  const mockSupabase = createMockSupabase();
-  const jobContexts: JobContext[] = [
-    {
-      location_id: null,
-      location: null,
-      submission_data: {
-        customer_email: "invalid-email",
-      },
-    },
-  ];
-
-  const emailConfig: InvoiceEmailRecipientConfig = {
-    location_email_source: "location_email",
-    form_field_email: "field-config-1",
-    default_email: "default@example.com",
-  };
-
-  const fieldConfigMap = new Map([
-    [
-      "field-config-1",
+Deno.test(
+  "P0: should return empty when form field email invalid (default_email deprecated)",
+  async () => {
+    const mockSupabase = createMockSupabase();
+    const jobContexts: JobContext[] = [
       {
-        name: "customer_email",
-        label: "Customer Email",
+        location_id: null,
+        location: null,
+        submission_data: {
+          customer_email: "invalid-email",
+        },
       },
-    ],
-  ]);
+    ];
 
-  const result = await getInvoiceEmailRecipients(
-    mockSupabase,
-    jobContexts,
-    emailConfig,
-    fieldConfigMap,
-  );
+    const emailConfig: InvoiceEmailRecipientConfig = {
+      location_email_source: "location_email",
+      form_field_email: "field-config-1",
+      default_email: "default@example.com",
+    };
 
-  // default_email is deprecated; invalid form email => no recipient
-  assertEquals(result, []);
-});
+    const fieldConfigMap = new Map([
+      [
+        "field-config-1",
+        {
+          name: "customer_email",
+          label: "Customer Email",
+        },
+      ],
+    ]);
+
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      jobContexts,
+      emailConfig,
+      fieldConfigMap
+    );
+
+    // default_email is deprecated; invalid form email => no recipient
+    assertEquals(result, []);
+  }
+);
 
 Deno.test("P0: should return empty array when no email available", async () => {
   const mockSupabase = createMockSupabase();
@@ -424,7 +466,7 @@ Deno.test("P0: should return empty array when no email available", async () => {
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   assertEquals(result, []);
@@ -461,7 +503,7 @@ Deno.test("P0: should handle null submission_data gracefully", async () => {
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   // default_email is deprecated; no submission_data => no recipient
@@ -492,7 +534,7 @@ Deno.test("P0: should handle missing field config in map", async () => {
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   // default_email is deprecated; no field config match => no recipient
@@ -526,7 +568,7 @@ Deno.test("P0: should handle empty string emails", async () => {
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   // default_email is deprecated; empty location email => no recipient
@@ -560,7 +602,7 @@ Deno.test("P0: should trim whitespace from emails", async () => {
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   assertEquals(result, ["location@example.com"]);
@@ -603,7 +645,7 @@ Deno.test("P0: should deduplicate email recipients for multiple jobs", async () 
     mockSupabase,
     jobContexts,
     emailConfig,
-    fieldConfigMap,
+    fieldConfigMap
   );
 
   assertEquals(result, ["same@example.com"]);

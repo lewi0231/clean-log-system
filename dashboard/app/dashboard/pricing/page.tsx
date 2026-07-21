@@ -1,7 +1,6 @@
 "use client";
 
 import BasePricingEditor from "@/components/pricing/base-pricing-editor";
-import { InvoiceAdjustmentsGstHint } from "@/components/pricing/invoice-adjustments-gst-hint";
 import BooleanPricingList from "@/components/pricing/boolean-pricing-list";
 import { useLocationFixedPricingGuard } from "@/components/pricing/location-fixed-pricing-guard";
 import NumberPricingList from "@/components/pricing/number-pricing-list";
@@ -153,6 +152,15 @@ function PricingPageContent({
 
   // Inner field type selection for sidebar navigation (S2 §4.1.2)
   const [innerFieldType, setInnerFieldType] = useState<InnerFieldType>(defaultFieldType);
+  // Sync tab only when loading finishes (true → false). Do not reset when
+  // defaultFieldType later changes from field edits — that kicks users off their tab.
+  const [wasFieldConfigsLoading, setWasFieldConfigsLoading] = useState(true);
+  if (wasFieldConfigsLoading !== fieldConfigsLoading) {
+    setWasFieldConfigsLoading(fieldConfigsLoading);
+    if (wasFieldConfigsLoading && !fieldConfigsLoading) {
+      setInnerFieldType(defaultFieldType);
+    }
+  }
 
   // Callback for "View history" from field cards (S2 §4.6.4)
   const handleNavigateToHistory = useCallback(() => {
@@ -248,8 +256,16 @@ function PricingPageContent({
           )}
 
           <div className="space-y-6">
-            {/* Smart Empty State for First-Time Users */}
-            {hasNoPriceableFields && (
+            {/* Loading: never flash the empty-state card while configs are still fetching */}
+            {fieldConfigsLoading && hasNoPriceableFields && (
+              <div className="space-y-6">
+                <div className="h-10 w-64 bg-muted animate-pulse rounded-md" />
+                <FormSkeleton fields={6} />
+              </div>
+            )}
+
+            {/* Smart Empty State for First-Time Users (only after load confirms zero fields) */}
+            {!fieldConfigsLoading && hasNoPriceableFields && (
               <Card className="border-dashed">
                 <CardContent className="py-12">
                   <div className="text-center space-y-6 max-w-lg mx-auto">
@@ -607,7 +623,6 @@ function PricingPageContent({
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <InvoiceAdjustmentsGstHint />
                 <BasePricingEditor
                   fieldConfigs={fieldConfigs}
                   locationHierarchyId={locationNodeId}

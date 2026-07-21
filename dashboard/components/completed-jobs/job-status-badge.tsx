@@ -1,12 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { JobApprovalStatus } from "@/lib/types";
 import { AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -33,7 +28,7 @@ const statusConfig: Record<
     className: "bg-green-500 hover:bg-green-600",
   },
   pending: {
-    label: "Pending",
+    label: "Pending confirmation",
     variant: "secondary",
     icon: <Clock className="h-3 w-3" />,
     className: "bg-yellow-500 text-white hover:bg-yellow-600",
@@ -67,10 +62,7 @@ export default function JobStatusBadge({
   }
 
   const badge = (
-    <Badge
-      variant={config.variant}
-      className={`${config.className} ${className} gap-1`}
-    >
+    <Badge variant={config.variant} className={`${config.className} ${className} gap-1`}>
       {config.icon}
       {config.label}
     </Badge>
@@ -90,9 +82,7 @@ export default function JobStatusBadge({
           <TooltipTrigger asChild>{badge}</TooltipTrigger>
           <TooltipContent>
             <p>{timeText}</p>
-            <p className="text-xs text-muted-foreground">
-              Awaiting colleague confirmation
-            </p>
+            <p className="text-xs text-muted-foreground">Awaiting colleague confirmation</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -107,9 +97,7 @@ export default function JobStatusBadge({
           <TooltipTrigger asChild>{badge}</TooltipTrigger>
           <TooltipContent>
             <p>This job has been flagged by a worker</p>
-            <p className="text-xs text-muted-foreground">
-              Requires admin review
-            </p>
+            <p className="text-xs text-muted-foreground">Requires admin review</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

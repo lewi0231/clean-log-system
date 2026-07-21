@@ -47,6 +47,17 @@ export function canSubmitTaxInvoice(
   return worker === "contractor";
 }
 
+/**
+ * ABN and business address are needed for contractor tax invoicing.
+ * Same gate as canSubmitTaxInvoice — employees-only orgs never require them.
+ */
+export function requiresContractorTaxDetails(
+  orgEngagement: WorkforceEngagement | string | null | undefined,
+  workerEngagement: WorkerEngagementType | string | null | undefined
+): boolean {
+  return canSubmitTaxInvoice(orgEngagement, workerEngagement);
+}
+
 /** Admin dashboard: show Tax invoices queue */
 export function canAdminSeeTaxInvoiceQueue(
   orgEngagement: WorkforceEngagement | string | null | undefined,

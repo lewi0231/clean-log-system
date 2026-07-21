@@ -638,8 +638,9 @@ export default function InvoiceTemplateSettings(
                 </div>
               </RadioGroup>
               <p className="text-xs text-muted-foreground pt-2">
-                Hierarchy billing email is only used when that option is selected. It comes from the
-                parent company&apos;s billing address in the location hierarchy.
+                Hierarchy billing email comes from the parent company&apos;s billing address in the
+                location hierarchy. If that email is missing (no hierarchy parent, or no billing
+                email on the parent), we fall back to the location email.
               </p>
             </div>
           ) : (

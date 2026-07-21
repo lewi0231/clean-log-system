@@ -11,12 +11,19 @@ import {
   type AuthUserLookup,
 } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
+import {
+  defaultWorkerEngagementForOrg,
+  normalizeWorkforceEngagement,
+  normalizeWorkerEngagementType,
+  requiresContractorTaxDetails,
+} from "../_utils/workforce-engagement.ts";
 
 type WorkerRow = {
   id: string;
   organization_id: string;
   email: string;
   auth_user_id?: string | null;
+  engagement_type?: string | null;
 };
 
 function isDuplicateAuthError(message: string | undefined): boolean {
@@ -104,28 +111,22 @@ serve(async (req) => {
   if (req.method === "POST") {
     try {
       const body = await req.json();
-      const validation = validateRequiredFields(body, [
-        "invitation_token",
-        "password",
-        "address",
-        "abn",
-      ]);
+      const validation = validateRequiredFields(body, ["invitation_token", "password"]);
 
       if (!validation.valid) {
-        return errorResponse(
-          "Missing required fields: invitation_token, password, address, and abn",
-          400
-        );
+        return errorResponse("Missing required fields: invitation_token and password", 400);
       }
 
-      const { invitation_token, password, address, abn } = body;
+      const { invitation_token, password } = body;
+      const addressRaw = typeof body.address === "string" ? body.address.trim() : "";
+      const abnRaw = typeof body.abn === "string" ? body.abn.trim() : "";
 
       const supabase = createServiceRoleClient();
 
       // Step 1: Verify invitation exists and not expired
       const { data: invitation, error: inviteError } = await supabase
         .from("worker_invitation")
-        .select("*, worker(id, organization_id, email, auth_user_id)")
+        .select("*, worker(id, organization_id, email, auth_user_id, engagement_type)")
         .eq("id", invitation_token)
         .single();
 
@@ -141,8 +142,37 @@ serve(async (req) => {
         return errorResponse("Invitation already used", 400);
       }
 
-      const worker = invitation.worker as WorkerRow;
+      const worker = invitation.worker as WorkerRow | null;
+      if (!worker?.id || !worker.organization_id) {
+        return errorResponse("Invitation is missing worker details", 400);
+      }
+
       const workerEmail = normalizeAuthEmail(invitation.worker_email);
+
+      const { data: orgSettings } = await supabase
+        .from("organization_settings")
+        .select("workforce_engagement")
+        .eq("organization_id", worker.organization_id)
+        .maybeSingle();
+
+      const workforceEngagement = normalizeWorkforceEngagement(orgSettings?.workforce_engagement);
+      const engagementType =
+        worker.engagement_type != null
+          ? normalizeWorkerEngagementType(worker.engagement_type)
+          : (defaultWorkerEngagementForOrg(workforceEngagement) ?? "employee");
+
+      const requireTaxDetails = requiresContractorTaxDetails(workforceEngagement, engagementType);
+      if (requireTaxDetails) {
+        if (!addressRaw) {
+          return errorResponse("Address is required for contractor tax invoicing", 400);
+        }
+        if (!abnRaw) {
+          return errorResponse("ABN is required for contractor tax invoicing", 400);
+        }
+      }
+
+      const address = addressRaw;
+      const abn = abnRaw;
 
       // Step 2: Create or link Supabase Auth user
       let authUserId: string | undefined;

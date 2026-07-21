@@ -7,6 +7,7 @@ vi.mock("@/lib/supabase", () => ({
   supabase: {
     auth: {
       onAuthStateChange: vi.fn(),
+      getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
       signOut: vi.fn(),
     },
   },
@@ -43,6 +44,10 @@ function mockInitialAuthState(
   } | null
 ) {
   const subscription = { unsubscribe: vi.fn() };
+  vi.mocked(supabase.auth.getSession).mockResolvedValue({
+    data: { session: session as never },
+    error: null,
+  });
   vi.mocked(supabase.auth.onAuthStateChange).mockImplementation((callback) => {
     queueMicrotask(() => callback("INITIAL_SESSION", session));
     return { data: { subscription } };
@@ -53,10 +58,15 @@ function mockInitialAuthState(
 describe("useAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
   });
 
   it("should initialize with loading state", () => {
     const subscription = { unsubscribe: vi.fn() };
+    vi.mocked(supabase.auth.getSession).mockReturnValue(new Promise(() => {}) as never);
     vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
       data: { subscription },
     });
@@ -157,5 +167,69 @@ describe("useAuth", () => {
     unmount();
 
     expect(subscription.unsubscribe).toHaveBeenCalled();
+  });
+
+  it("clears local session on invalid refresh token from getSession", async () => {
+    const subscription = { unsubscribe: vi.fn() };
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: { session: null },
+      error: {
+        name: "AuthApiError",
+        message: "Invalid Refresh Token: Refresh Token Not Found",
+      } as never,
+    });
+    vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
+      data: { subscription },
+    });
+    vi.mocked(supabase.auth.signOut).mockResolvedValue({ error: null });
+
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.user).toBe(null);
+    expect(result.current.session).toBe(null);
+    expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it("does not clear session on unrelated getSession AuthApiError", async () => {
+    const mockUser = {
+      id: "test-user-id",
+      email: "test@example.com",
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    };
+    const session = {
+      user: mockUser,
+      access_token: "test-token",
+      token_type: "bearer",
+      expires_in: 3600,
+      expires_at: Date.now() + 3600000,
+      refresh_token: "test-refresh",
+    };
+
+    const subscription = { unsubscribe: vi.fn() };
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: { session: session as never },
+      error: {
+        name: "AuthApiError",
+        message: "Email not confirmed",
+        status: 400,
+      } as never,
+    });
+    vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
+      data: { subscription },
+    });
+
+    const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.user).toEqual(mockUser);
+    expect(supabase.auth.signOut).not.toHaveBeenCalled();
   });
 });

@@ -74,7 +74,15 @@ export default function JobDetailScreen() {
     loadJob();
   }, [loadJob]);
 
-  const summaryRows = job?.submission_data ? formatSubmissionDataRows(job.submission_data) : [];
+  const workerNameById = job?.workers
+    ? Object.fromEntries(
+        job.workers.map((w) => [w.id, w.id === worker?.id ? "You" : w.name] as const)
+      )
+    : undefined;
+
+  const summaryRows = job?.submission_data
+    ? formatSubmissionDataRows(job.submission_data, { workerNameById })
+    : [];
 
   if (loading || orgLoading) {
     return (
@@ -132,8 +140,14 @@ export default function JobDetailScreen() {
         {job.approval_status ? (
           <View className="mb-4">
             <Text className="text-xs text-muted-foreground mb-1">Status</Text>
-            <Text className="text-sm font-medium text-foreground capitalize">
-              {job.approval_status}
+            <Text className="text-sm font-medium text-foreground">
+              {job.approval_status === "pending"
+                ? "Pending confirmation"
+                : job.approval_status === "flagged"
+                  ? "Flagged"
+                  : job.approval_status === "cancelled"
+                    ? "Cancelled"
+                    : "Approved"}
             </Text>
           </View>
         ) : null}
@@ -157,10 +171,31 @@ export default function JobDetailScreen() {
             <Text className="text-xs text-muted-foreground mb-2">Workers</Text>
             <View className="flex-row flex-wrap gap-2">
               {job.workers.map((w) => (
-                <View key={w.id} className="px-2 py-1 rounded-full bg-muted">
-                  <Text className="text-xs text-foreground">
+                <View
+                  key={w.id}
+                  className={`px-2 py-1 rounded-full ${
+                    w.confirmation_status === "confirmed"
+                      ? "bg-green-100 dark:bg-green-900/30"
+                      : w.confirmation_status === "flagged"
+                        ? "bg-red-100 dark:bg-red-900/30"
+                        : "bg-yellow-100 dark:bg-yellow-900/30"
+                  }`}
+                >
+                  <Text
+                    className={`text-xs ${
+                      w.confirmation_status === "confirmed"
+                        ? "text-green-700 dark:text-green-400"
+                        : w.confirmation_status === "flagged"
+                          ? "text-red-700 dark:text-red-400"
+                          : "text-yellow-700 dark:text-yellow-400"
+                    }`}
+                  >
                     {w.id === worker?.id ? "You" : w.name}
-                    {w.confirmation_status === "confirmed" ? " ✓" : ""}
+                    {w.confirmation_status === "confirmed"
+                      ? " ✓"
+                      : w.confirmation_status === "flagged"
+                        ? " ⚠"
+                        : " · pending"}
                   </Text>
                 </View>
               ))}

@@ -45,6 +45,14 @@ export function canSubmitTaxInvoice(
   return worker === "contractor";
 }
 
+/** ABN / business address for contractor tax invoicing (same gate as canSubmitTaxInvoice). */
+export function requiresContractorTaxDetails(
+  orgEngagement: WorkforceEngagement | string | null | undefined,
+  workerEngagement: WorkerEngagementType | string | null | undefined
+): boolean {
+  return canSubmitTaxInvoice(orgEngagement, workerEngagement);
+}
+
 export function canAdminSeeTaxInvoiceQueue(
   orgEngagement: WorkforceEngagement | string | null | undefined,
   hasHistoricalTaxInvoices = false

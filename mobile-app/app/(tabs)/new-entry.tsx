@@ -705,7 +705,7 @@ export default function NewEntryScreen() {
                 placeholder={
                   selectedColleagues.length > 0 ? "Add another colleague" : "Add a colleague"
                 }
-                size="medium"
+                size="large"
                 triggerClassName="border-0 h-12 pl-5"
               >
                 {filteredColleagues.map((colleague) => (
@@ -765,7 +765,7 @@ export default function NewEntryScreen() {
                   markFieldAsTouched("location");
                 }}
                 placeholder="Choose work location"
-                size="medium"
+                size="large"
                 triggerClassName="border-0 h-12 pl-5"
               >
                 {locations.map((location) => (
@@ -1219,26 +1219,52 @@ export default function NewEntryScreen() {
               </View>
             )}
 
-            {/* Start Time */}
-            {startTime && (
-              <View className="flex-row justify-between items-start">
-                <Text className="text-sm text-muted-foreground flex-1">Start Time</Text>
-                <Text className="text-base text-card-foreground flex-1 text-right">
-                  {startTime.getHours().toString().padStart(2, "0")}:
-                  {startTime.getMinutes().toString().padStart(2, "0")}
-                </Text>
+            {/* Times — per colleague when individual times are enabled */}
+            {useIndividualTimes && selectedColleagues.length > 1 ? (
+              <View className="flex-col gap-3">
+                <Text className="text-sm text-muted-foreground">Work times</Text>
+                {selectedColleagues.map((colleagueId) => {
+                  const times = workerTimes[colleagueId];
+                  const name =
+                    colleagueId === currentUserColleagueId ? "You" : getColleagueName(colleagueId);
+                  const formatHm = (d: Date | undefined) =>
+                    d
+                      ? `${d.getHours().toString().padStart(2, "0")}:${d
+                          .getMinutes()
+                          .toString()
+                          .padStart(2, "0")}`
+                      : "—";
+                  return (
+                    <View key={colleagueId} className="flex-row justify-between items-start gap-2">
+                      <Text className="text-sm text-muted-foreground flex-1">{name}</Text>
+                      <Text className="text-base text-card-foreground flex-1 text-right">
+                        {formatHm(times?.startTime)} – {formatHm(times?.finishTime)}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
-            )}
-
-            {/* Finish Time */}
-            {finishTime && (
-              <View className="flex-row justify-between items-start">
-                <Text className="text-sm text-muted-foreground flex-1">Finish Time</Text>
-                <Text className="text-base text-card-foreground flex-1 text-right">
-                  {finishTime.getHours().toString().padStart(2, "0")}:
-                  {finishTime.getMinutes().toString().padStart(2, "0")}
-                </Text>
-              </View>
+            ) : (
+              <>
+                {startTime && (
+                  <View className="flex-row justify-between items-start">
+                    <Text className="text-sm text-muted-foreground flex-1">Start Time</Text>
+                    <Text className="text-base text-card-foreground flex-1 text-right">
+                      {startTime.getHours().toString().padStart(2, "0")}:
+                      {startTime.getMinutes().toString().padStart(2, "0")}
+                    </Text>
+                  </View>
+                )}
+                {finishTime && (
+                  <View className="flex-row justify-between items-start">
+                    <Text className="text-sm text-muted-foreground flex-1">Finish Time</Text>
+                    <Text className="text-base text-card-foreground flex-1 text-right">
+                      {finishTime.getHours().toString().padStart(2, "0")}:
+                      {finishTime.getMinutes().toString().padStart(2, "0")}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>

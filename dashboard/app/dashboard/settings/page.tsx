@@ -90,6 +90,7 @@ export default function SettingsPage() {
     locale: "en-AU",
     default_exclusive_group_label: null,
     edit_window_minutes: 180,
+    colleague_confirmation_timeout_hours: 24,
     custom_email_domain_enabled: false,
     worker_payment_cycle_config: null,
     workforce_engagement: "employees",
@@ -155,6 +156,8 @@ export default function SettingsPage() {
           locale: data.settings.locale ?? "en-AU",
           default_exclusive_group_label: data.settings.default_exclusive_group_label ?? null,
           edit_window_minutes: data.settings.edit_window_minutes ?? 180,
+          colleague_confirmation_timeout_hours:
+            data.settings.colleague_confirmation_timeout_hours ?? 24,
           custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
           worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
           workforce_engagement: data.settings.workforce_engagement ?? "employees",
@@ -193,6 +196,8 @@ export default function SettingsPage() {
           locale: data.settings.locale ?? "en-AU",
           default_exclusive_group_label: data.settings.default_exclusive_group_label ?? null,
           edit_window_minutes: data.settings.edit_window_minutes ?? 180,
+          colleague_confirmation_timeout_hours:
+            data.settings.colleague_confirmation_timeout_hours ?? 24,
           custom_email_domain_enabled: data.settings.custom_email_domain_enabled ?? false,
           worker_payment_cycle_config: data.settings.worker_payment_cycle_config ?? null,
           workforce_engagement: data.settings.workforce_engagement ?? "employees",
@@ -1551,7 +1556,9 @@ export default function SettingsPage() {
                     <div className="space-y-0.5">
                       <Label className="text-base font-semibold">Prices include GST</Label>
                       <p className="text-sm text-muted-foreground">
-                        Your prices in Pricing are GST-inclusive
+                        {settings.gst_inclusive
+                          ? "On (recommended for most AU businesses): amounts in Pricing already include GST. Invoices show GST as part of that total — the invoice total matches your price."
+                          : "Off: amounts in Pricing are exclusive of GST. GST is added on top when creating invoices."}
                       </p>
                     </div>
                     <Switch
@@ -1692,9 +1699,9 @@ export default function SettingsPage() {
                     Job Edit Window
                   </Label>
                   <p className="text-sm text-muted-foreground">
-                    When a worker submits a job with colleagues, they have this amount of time to
-                    withdraw the job before colleagues are notified to confirm. This helps prevent
-                    mistakes from being sent for confirmation.
+                    How long the submitting worker can withdraw a multi-worker job after submission
+                    (e.g. if they selected the wrong colleagues). This is separate from the
+                    colleague confirmation window below.
                   </p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -1702,6 +1709,7 @@ export default function SettingsPage() {
                     value={String(settings.edit_window_minutes ?? 180)}
                     onValueChange={async (value) => {
                       const minutes = parseInt(value, 10);
+                      const previous = settings.edit_window_minutes ?? 180;
                       setSettings((prev) => ({
                         ...prev,
                         edit_window_minutes: minutes,
@@ -1715,6 +1723,10 @@ export default function SettingsPage() {
                           queryKey: organizationSettingsKey(organizationId),
                         });
                       } catch (err) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          edit_window_minutes: previous,
+                        }));
                         log.error("Failed to update edit window", {
                           error: err instanceof Error ? err.message : err,
                         });
@@ -1743,7 +1755,80 @@ export default function SettingsPage() {
                       <SelectItem value="1440">24 hours</SelectItem>
                     </SelectContent>
                   </Select>
-                  <span className="text-sm text-muted-foreground">after job submission</span>
+                  <span className="text-sm text-muted-foreground">
+                    to withdraw after submission
+                  </span>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Colleague Confirmation Timeout */}
+              <div className="space-y-4 p-4 border rounded-lg">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="colleague-confirmation-timeout"
+                    className="text-base font-semibold"
+                  >
+                    Colleague Confirmation Window
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    How long colleagues have to confirm (or flag) a job before it auto-approves.
+                    This is the countdown shown in the mobile app.
+                  </p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Select
+                    value={String(settings.colleague_confirmation_timeout_hours ?? 24)}
+                    onValueChange={async (value) => {
+                      const hours = parseInt(value, 10);
+                      const previous = settings.colleague_confirmation_timeout_hours ?? 24;
+                      setSettings((prev) => ({
+                        ...prev,
+                        colleague_confirmation_timeout_hours: hours,
+                      }));
+                      try {
+                        await invokeTypedEdge("update-organization-settings", {
+                          organization_id: organizationId,
+                          colleague_confirmation_timeout_hours: hours,
+                        });
+                        queryClient.invalidateQueries({
+                          queryKey: organizationSettingsKey(organizationId),
+                        });
+                      } catch (err) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          colleague_confirmation_timeout_hours: previous,
+                        }));
+                        log.error("Failed to update confirmation timeout", {
+                          error: err instanceof Error ? err.message : err,
+                        });
+                        setErrorDialog({
+                          open: true,
+                          title: "Update Failed",
+                          message:
+                            err instanceof Error
+                              ? err.message
+                              : "Failed to update colleague confirmation window.",
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="colleague-confirmation-timeout" className="w-[200px]">
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 hour</SelectItem>
+                      <SelectItem value="3">3 hours</SelectItem>
+                      <SelectItem value="6">6 hours</SelectItem>
+                      <SelectItem value="12">12 hours</SelectItem>
+                      <SelectItem value="24">24 hours (default)</SelectItem>
+                      <SelectItem value="48">48 hours</SelectItem>
+                      <SelectItem value="72">72 hours</SelectItem>
+                      <SelectItem value="168">1 week</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">until auto-approve</span>
                 </div>
               </div>
 
