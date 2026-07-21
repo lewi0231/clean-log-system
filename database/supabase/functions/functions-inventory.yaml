@@ -84,6 +84,7 @@ functions:
   list-workers-and-locations: secured
   manage-worker-rate-card: secured
   mark-overdue-invoices: privileged_batch
+  process-feedback-email-outbox: privileged_batch
   record-manual-payment: secured
   refresh-org-sending-domain-status: secured
   register-org-sending-domain: secured

@@ -73,7 +73,14 @@ export default function SettingsPage() {
     primary_contact_phone: null,
     business_address: null,
     invoice_send_immediately: false,
-    feedback_email_send_immediately: false,
+    feedback_requests_enabled: true,
+    feedback_auto_send: false,
+    feedback_request_mode: "internal",
+    public_review_url: null,
+    feedback_email_subject: null,
+    feedback_email_body: null,
+    feedback_email_reply_to: null,
+    feedback_send_delay_hours: 0,
     auto_generate_invoices_immediately: false,
     bank_transfer_bsb: null,
     bank_transfer_account_number: null,
@@ -135,7 +142,14 @@ export default function SettingsPage() {
           primary_contact_phone: data.settings.primary_contact_phone ?? null,
           business_address: data.settings.business_address ?? null,
           invoice_send_immediately: data.settings.invoice_send_immediately ?? false,
-          feedback_email_send_immediately: data.settings.feedback_email_send_immediately ?? false,
+          feedback_requests_enabled: data.settings.feedback_requests_enabled ?? true,
+          feedback_auto_send: data.settings.feedback_auto_send ?? false,
+          feedback_request_mode: data.settings.feedback_request_mode ?? "internal",
+          public_review_url: data.settings.public_review_url ?? null,
+          feedback_email_subject: data.settings.feedback_email_subject ?? null,
+          feedback_email_body: data.settings.feedback_email_body ?? null,
+          feedback_email_reply_to: data.settings.feedback_email_reply_to ?? null,
+          feedback_send_delay_hours: data.settings.feedback_send_delay_hours ?? 0,
           auto_generate_invoices_immediately:
             data.settings.auto_generate_invoices_immediately ?? false,
           bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
@@ -175,7 +189,14 @@ export default function SettingsPage() {
           primary_contact_phone: data.settings.primary_contact_phone ?? null,
           business_address: data.settings.business_address ?? null,
           invoice_send_immediately: data.settings.invoice_send_immediately ?? false,
-          feedback_email_send_immediately: data.settings.feedback_email_send_immediately ?? false,
+          feedback_requests_enabled: data.settings.feedback_requests_enabled ?? true,
+          feedback_auto_send: data.settings.feedback_auto_send ?? false,
+          feedback_request_mode: data.settings.feedback_request_mode ?? "internal",
+          public_review_url: data.settings.public_review_url ?? null,
+          feedback_email_subject: data.settings.feedback_email_subject ?? null,
+          feedback_email_body: data.settings.feedback_email_body ?? null,
+          feedback_email_reply_to: data.settings.feedback_email_reply_to ?? null,
+          feedback_send_delay_hours: data.settings.feedback_send_delay_hours ?? 0,
           auto_generate_invoices_immediately:
             data.settings.auto_generate_invoices_immediately ?? false,
           bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
@@ -630,13 +651,13 @@ export default function SettingsPage() {
       });
       const data = await invokeTypedEdge("update-organization-settings", {
         organization_id: organizationId,
-        feedback_email_send_immediately: checked,
+        feedback_auto_send: checked,
       });
       const updated = data.settings;
       if (updated) {
         setSettings((prev) => ({
           ...prev,
-          feedback_email_send_immediately: updated.feedback_email_send_immediately ?? false,
+          feedback_auto_send: updated.feedback_auto_send ?? false,
         }));
       }
       queryClient.invalidateQueries({
@@ -1662,21 +1683,18 @@ export default function SettingsPage() {
               <div className="space-y-4 p-4 border rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label
-                      htmlFor="feedback-email-send-immediately"
-                      className="text-base font-semibold"
-                    >
-                      Send Feedback Requests Immediately
+                    <Label htmlFor="feedback-auto-send" className="text-base font-semibold">
+                      Automatically send feedback requests
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      {settings.feedback_email_send_immediately
-                        ? "Feedback request emails will be sent to customers immediately after a job is completed"
-                        : "Feedback request emails will require manual action to send"}
+                      {settings.feedback_auto_send
+                        ? "Feedback request emails are queued after a job is completed (after any delay and edit window)"
+                        : "Feedback request emails require manual action to send"}
                     </p>
                   </div>
                   <Switch
-                    id="feedback-email-send-immediately"
-                    checked={settings.feedback_email_send_immediately ?? false}
+                    id="feedback-auto-send"
+                    checked={settings.feedback_auto_send ?? false}
                     onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
                     className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
                   />

@@ -1,5 +1,15 @@
 # Supabase
 
+## Edge secrets (feedback requests)
+
+| Variable                       | Required                            | Notes                                                                                            |
+| ------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `FEEDBACK_REVIEW_BASE_URL`     | For internal/both modes             | Base URL of the dashboard (e.g. `https://app.example.com`) used to build `/review/{token}` links |
+| `CRON_SHARED_SECRET`           | For `process-feedback-email-outbox` | Shared secret; poller rejects requests without matching `x-cron-secret` header                   |
+| `RESEND_API_KEY` / from domain | Existing                            | Unchanged                                                                                        |
+
+Schedule the poller every 5 minutes (Supabase Dashboard → Edge Functions → Schedules, or pg_cron Path A — see migration `20260721120400_schedule_feedback_email_outbox.sql`).
+
 ## Running Locally
 
 ```

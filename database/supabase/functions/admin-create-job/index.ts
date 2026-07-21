@@ -1,11 +1,6 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
-import {
-  type FeedbackEmailData,
-  generateFeedbackToken,
-  getFeedbackEmailRecipient,
-  sendFeedbackRequestEmail,
-} from "../_utils/feedback-email.ts";
+import { enqueueOrSendFeedback } from "../_utils/feedback-send.ts";
 import {
   errorResponse,
   extractErrorMessage,
@@ -13,10 +8,6 @@ import {
   handleCors,
   jsonResponse,
 } from "../_utils/http.ts";
-import type {
-  InvoiceEmailRecipientConfig,
-  JobContext,
-} from "../_utils/invoice-email.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -102,8 +93,7 @@ serve(async (req) => {
       throw orgError;
     }
 
-    const usePredefinedLocations = organization?.use_predefined_locations ??
-      true;
+    const usePredefinedLocations = organization?.use_predefined_locations ?? true;
     logger.debug("Organization settings fetched", {
       usePredefinedLocations,
     });
@@ -130,10 +120,7 @@ serve(async (req) => {
         provided: body.organization_id,
         expected: organizationId,
       });
-      return errorResponse(
-        "Organization ID does not match your organization",
-        403,
-      );
+      return errorResponse("Organization ID does not match your organization", 403);
     }
 
     // Validate submission_data
@@ -149,8 +136,7 @@ serve(async (req) => {
 
     // Normalize location_id (handle empty strings)
     const normalizedLocationId =
-      location_id && typeof location_id === "string" &&
-        location_id.trim() !== ""
+      location_id && typeof location_id === "string" && location_id.trim() !== ""
         ? location_id.trim()
         : null;
 
@@ -166,10 +152,7 @@ serve(async (req) => {
         usePredefinedLocations,
         hasLocationId: !!normalizedLocationId,
       });
-      return errorResponse(
-        "Location ID is required when predefined locations are enabled",
-        400,
-      );
+      return errorResponse("Location ID is required when predefined locations are enabled", 400);
     }
 
     // Validate location_id if provided (or required)
@@ -198,10 +181,7 @@ serve(async (req) => {
           locationId: normalizedLocationId,
           organizationId,
         });
-        return errorResponse(
-          "Location not found or does not belong to your organization",
-          400,
-        );
+        return errorResponse("Location not found or does not belong to your organization", 400);
       }
       logger.debug("Location validated", {
         locationId: location.id,
@@ -211,9 +191,7 @@ serve(async (req) => {
     // Validate worker_ids if provided
     const normalizedWorkerIds =
       Array.isArray(worker_ids) && worker_ids.length > 0
-        ? worker_ids.filter((id: unknown) =>
-          typeof id === "string" && id.trim() !== ""
-        )
+        ? worker_ids.filter((id: unknown) => typeof id === "string" && id.trim() !== "")
         : [];
 
     if (normalizedWorkerIds.length > 0) {
@@ -245,7 +223,7 @@ serve(async (req) => {
         });
         return errorResponse(
           "One or more workers not found or do not belong to your organization",
-          400,
+          400
         );
       }
       logger.debug("All workers validated", {
@@ -255,12 +233,11 @@ serve(async (req) => {
 
     // Normalize completed_at (default to now if not provided)
     const normalizedCompletedAt =
-      completed_at && typeof completed_at === "string"
-        ? completed_at
-        : new Date().toISOString();
+      completed_at && typeof completed_at === "string" ? completed_at : new Date().toISOString();
 
     // Determine whether this is test data (server-derived, not a trusted client flag)
-    const isTestJob = typeof submission_data === "object" &&
+    const isTestJob =
+      typeof submission_data === "object" &&
       submission_data !== null &&
       "_is_test" in (submission_data as Record<string, unknown>) &&
       (submission_data as Record<string, unknown>)._is_test === true;
@@ -354,212 +331,32 @@ serve(async (req) => {
       });
     }
 
-    // Handle feedback email sending if enabled
+    // Feedback email: shared helper (never fail job creation — PRESERVE-1)
     try {
-      logger.debug("Checking feedback email settings", {
-        organizationId,
+      const feedbackResult = await enqueueOrSendFeedback(supabaseAdmin, job.id, {
+        path: "auto",
       });
-
-      // Fetch organization settings to check if feedback emails are enabled
-      const { data: orgSettings, error: orgSettingsError } = await supabaseAdmin
-        .from("organization")
-        .select("feedback_email_send_immediately, name")
-        .eq("id", organizationId)
-        .single();
-
-      if (orgSettingsError) {
-        logger.warn("Error fetching organization settings for feedback email", {
-          error: orgSettingsError,
-          organizationId,
+      if (feedbackResult.sent) {
+        logger.info("Feedback email sent successfully", {
+          jobId: job.id,
+          emailId: feedbackResult.emailId,
         });
-        // Don't fail job creation if we can't check settings
-      } else if (orgSettings?.feedback_email_send_immediately) {
-        logger.debug("Feedback email sending is enabled");
-
-        // Generate feedback token
-        const feedbackToken = generateFeedbackToken();
-        logger.debug("Generated feedback token", {
-          tokenLength: feedbackToken.length,
+      } else if (feedbackResult.queued) {
+        logger.info("Feedback email queued", {
+          jobId: job.id,
+          outboxId: feedbackResult.outboxId,
         });
-
-        // Fetch invoice template config for email recipient configuration
-        const { data: templateConfig } = await supabaseAdmin
-          .from("invoice_template_config")
-          .select("email_recipient_config")
-          .eq("organization_id", organizationId)
-          .single();
-
-        const emailConfig: InvoiceEmailRecipientConfig = (templateConfig
-          ?.email_recipient_config as InvoiceEmailRecipientConfig) || {
-          location_email_source: "location_email",
-          form_field_email: null,
-          default_email: null,
-        };
-
-        // Fetch field configs for form field email mapping
-        const { data: fieldConfigs } = await supabaseAdmin
-          .from("organization_field_configs")
-          .select("id, name")
-          .eq("organization_id", organizationId)
-          .eq("active", true);
-
-        const fieldConfigMap = new Map<string, { name: string }>(
-          (fieldConfigs || []).map(
-            (fc: { id: string; name: string }) => [fc.id, { name: fc.name }],
-          ),
-        );
-
-        // Fetch job with location details for email recipient determination
-        const { data: jobWithLocation, error: jobLocationError } =
-          await supabaseAdmin
-            .from("job")
-            .select(
-              `
-              id,
-              location_id,
-              submission_data,
-              completed_at,
-              location:location_id (
-                id,
-                email,
-                contact_person,
-                name,
-                hierarchy_parent_id
-              )
-            `,
-            )
-            .eq("id", job.id)
-            .single();
-
-        if (jobLocationError || !jobWithLocation) {
-          logger.error(
-            "Error fetching job with location for feedback email",
-            jobLocationError,
-            {
-              jobId: job.id,
-            },
-          );
-          // Still update job with token for manual sending later
-          await supabaseAdmin
-            .from("job")
-            .update({ feedback_token: feedbackToken })
-            .eq("id", job.id);
-        } else {
-          // Handle location (Supabase returns it as array or object depending on query)
-          const locationData = Array.isArray(jobWithLocation.location)
-            ? jobWithLocation.location[0]
-            : jobWithLocation.location;
-
-          // Build job context for email recipient determination
-          const jobContext: JobContext = {
-            location_id: jobWithLocation.location_id,
-            location: locationData
-              ? {
-                id: locationData.id,
-                email: locationData.email || null,
-                contact_person: locationData.contact_person || null,
-                hierarchy_parent_id: locationData.hierarchy_parent_id || null,
-              }
-              : null,
-            submission_data: jobWithLocation.submission_data as
-              | Record<
-                string,
-                unknown
-              >
-              | null,
-          };
-
-          // Get email recipient
-          const recipientEmail = await getFeedbackEmailRecipient(
-            supabaseAdmin,
-            jobContext,
-            emailConfig,
-            fieldConfigMap,
-          );
-
-          if (recipientEmail) {
-            logger.debug("Found feedback email recipient", {
-              email: recipientEmail,
-              jobId: job.id,
-            });
-
-            // Get recipient name (from location contact_person or default)
-            const recipientName = locationData?.contact_person || null;
-
-            // Build feedback email data
-            const feedbackEmailData: FeedbackEmailData = {
-              recipientEmail,
-              recipientName,
-              organizationName: orgSettings.name || "Our Team",
-              organizationId: job.organization_id,
-              jobId: job.id,
-              jobCompletedAt: jobWithLocation.completed_at,
-              locationName: locationData?.name || null,
-              feedbackToken,
-              feedbackReviewUrl: "", // Will be set by sendFeedbackRequestEmail
-            };
-
-            // Send feedback email
-            const emailResult = await sendFeedbackRequestEmail(
-              supabaseAdmin,
-              feedbackEmailData,
-              false, // Don't throw on error - job creation should succeed
-            );
-
-            if (emailResult.success) {
-              logger.info("Feedback email sent successfully", {
-                emailId: emailResult.emailId,
-                jobId: job.id,
-                recipientEmail,
-              });
-
-              // Update job with token and email tracking
-              const { error: updateError } = await supabaseAdmin
-                .from("job")
-                .update({
-                  feedback_token: feedbackToken,
-                  feedback_email_sent: true,
-                  feedback_email_sent_at: new Date().toISOString(),
-                })
-                .eq("id", job.id);
-
-              if (updateError) {
-                logger.warn("Error updating job with feedback email tracking", {
-                  error: updateError,
-                  jobId: job.id,
-                });
-                // Job was created and email was sent, so this is non-critical
-              }
-            } else {
-              logger.error("Failed to send feedback email", emailResult.error, {
-                jobId: job.id,
-                recipientEmail,
-              });
-              // Still update job with token for manual sending later
-              await supabaseAdmin
-                .from("job")
-                .update({ feedback_token: feedbackToken })
-                .eq("id", job.id);
-            }
-          } else {
-            logger.warn("No feedback email recipient found for job", {
-              jobId: job.id,
-              locationId: jobWithLocation.location_id,
-            });
-            // Still update job with token for manual sending later
-            await supabaseAdmin
-              .from("job")
-              .update({ feedback_token: feedbackToken })
-              .eq("id", job.id);
-          }
-        }
-      } else {
-        logger.debug("Feedback email sending is disabled", {
-          organizationId,
+      } else if (feedbackResult.skipped) {
+        logger.debug("Feedback email skipped", {
+          jobId: job.id,
+          reason: feedbackResult.reason,
+        });
+      } else if (!feedbackResult.ok) {
+        logger.error("Feedback email enqueue/send failed", feedbackResult.reason, {
+          jobId: job.id,
         });
       }
     } catch (feedbackError) {
-      // Log error but don't fail job creation
       logger.error("Error in feedback email sending process", feedbackError, {
         jobId: job.id,
         organizationId,
@@ -582,14 +379,14 @@ serve(async (req) => {
           created_at: job.created_at,
         },
       },
-      201,
+      201
     );
   } catch (error) {
     logger.error("Admin create job error", error);
 
     return errorResponse(
       extractErrorMessage(error, "Failed to create job"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

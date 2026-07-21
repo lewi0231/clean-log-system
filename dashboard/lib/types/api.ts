@@ -149,6 +149,7 @@ export interface CreateLocationRequest {
   fixed_customer_price?: number | null;
   fixed_worker_payment?: number | null;
   fixed_price_currency?: string | null;
+  feedback_requests_enabled?: boolean;
 }
 
 export interface UpdateLocationRequest {
@@ -164,6 +165,7 @@ export interface UpdateLocationRequest {
   fixed_customer_price?: number | null;
   fixed_worker_payment?: number | null;
   fixed_price_currency?: string | null;
+  feedback_requests_enabled?: boolean;
 }
 
 export interface DeleteLocationRequest {

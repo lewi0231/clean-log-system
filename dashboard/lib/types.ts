@@ -126,6 +126,8 @@ export interface Location {
   fixed_customer_price?: number | null;
   fixed_worker_payment?: number | null;
   fixed_price_currency?: string | null;
+  /** When false, feedback request emails are muted for jobs at this location. */
+  feedback_requests_enabled?: boolean;
 }
 
 export type BusinessMode = "service_based" | "resource_tracking";
@@ -163,7 +165,14 @@ export interface OrganizationSettings {
   primary_contact_phone: string | null;
   business_address: string | null;
   invoice_send_immediately: boolean;
-  feedback_email_send_immediately: boolean;
+  feedback_requests_enabled: boolean;
+  feedback_auto_send: boolean;
+  feedback_request_mode: "internal" | "public" | "both";
+  public_review_url: string | null;
+  feedback_email_subject: string | null;
+  feedback_email_body: string | null;
+  feedback_email_reply_to: string | null;
+  feedback_send_delay_hours: number;
   rating_config: RatingConfig;
   stripe_account_id: string | null;
   payment_provider: string | null;

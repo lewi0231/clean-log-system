@@ -35,7 +35,7 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, custom_email_domain_enabled, colleague_confirmation_timeout_hours"
+        "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_requests_enabled, feedback_auto_send, feedback_request_mode, public_review_url, feedback_email_subject, feedback_email_body, feedback_email_reply_to, feedback_send_delay_hours, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, custom_email_domain_enabled, colleague_confirmation_timeout_hours"
       )
       .eq("id", organization_id)
       .single();
@@ -90,7 +90,14 @@ serve(async (req) => {
         primary_contact_phone: organization?.primary_contact_phone ?? null,
         business_address: organization?.business_address ?? null,
         invoice_send_immediately: organization?.invoice_send_immediately ?? false,
-        feedback_email_send_immediately: organization?.feedback_email_send_immediately ?? false,
+        feedback_requests_enabled: organization?.feedback_requests_enabled ?? true,
+        feedback_auto_send: organization?.feedback_auto_send ?? false,
+        feedback_request_mode: organization?.feedback_request_mode ?? "internal",
+        public_review_url: organization?.public_review_url ?? null,
+        feedback_email_subject: organization?.feedback_email_subject ?? null,
+        feedback_email_body: organization?.feedback_email_body ?? null,
+        feedback_email_reply_to: organization?.feedback_email_reply_to ?? null,
+        feedback_send_delay_hours: organization?.feedback_send_delay_hours ?? 0,
         rating_config: ratingConfig,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,
