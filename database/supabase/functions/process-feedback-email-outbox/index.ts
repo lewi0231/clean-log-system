@@ -1,17 +1,9 @@
 import { serve } from "server";
+import { requireCronSecret } from "../_utils/cron-secret.ts";
 import { processDueFeedbackOutbox } from "../_utils/feedback-send.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
-
-function requireCronSecret(req: Request): boolean {
-  const expected = Deno.env.get("CRON_SHARED_SECRET");
-  if (!expected) {
-    return false;
-  }
-  const provided = req.headers.get("x-cron-secret");
-  return !!provided && provided === expected;
-}
 
 serve(async (req: Request) => {
   const corsResponse = handleCors(req);
@@ -21,8 +13,13 @@ serve(async (req: Request) => {
     functionName: "process-feedback-email-outbox",
   });
 
-  if (!requireCronSecret(req)) {
-    logger.warn("Rejected feedback outbox poller: missing/invalid cron secret");
+  const auth = requireCronSecret(req);
+  if (!auth.ok) {
+    if (auth.reason === "missing_config") {
+      logger.error("CRON_SHARED_SECRET is not configured — refusing poller requests");
+    } else {
+      logger.warn("Rejected feedback outbox poller", { reason: auth.reason });
+    }
     return errorResponse("Unauthorized", 401);
   }
 

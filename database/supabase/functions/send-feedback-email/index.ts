@@ -90,11 +90,20 @@ serve(async (req) => {
         400
       );
     }
-    if (result.skipped && result.reason === "feedback_requests_disabled") {
+    if (
+      result.error_code === "feedback_requests_disabled" ||
+      (result.skipped && result.reason === "feedback_requests_disabled")
+    ) {
       return errorResponse("Feedback requests are disabled for this organization", 400);
     }
-    if (result.skipped && result.reason === "location_muted") {
+    if (
+      result.error_code === "location_muted" ||
+      (result.skipped && result.reason === "location_muted")
+    ) {
       return errorResponse("Feedback requests are muted for this location", 400);
+    }
+    if (result.error_code === "feedback_lookup_failed") {
+      return errorResponse("Could not verify existing feedback — try again shortly", 503);
     }
 
     if (result.sent || result.queued) {

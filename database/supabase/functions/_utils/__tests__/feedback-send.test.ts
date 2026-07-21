@@ -3,12 +3,62 @@
  */
 
 import { assertEquals } from "@std/assert";
+import { requireCronSecret, timingSafeEqualString } from "../cron-secret.ts";
 import { computeSendAfter, evaluateCancelGate } from "../feedback-send.ts";
 import {
   escapeHtml,
   renderFeedbackEmailContent,
+  resolveFeedbackReviewBaseUrl,
   type FeedbackEmailData,
 } from "../feedback-email.ts";
+
+Deno.test("resolveFeedbackReviewBaseUrl: prefers FEEDBACK_REVIEW_BASE_URL", () => {
+  Deno.env.set("FEEDBACK_REVIEW_BASE_URL", "https://reviews.example.com/");
+  Deno.env.set("WORKER_INVITATION_BASE_URL", "https://invite.example.com");
+  assertEquals(resolveFeedbackReviewBaseUrl(), "https://reviews.example.com");
+  Deno.env.delete("FEEDBACK_REVIEW_BASE_URL");
+  Deno.env.delete("WORKER_INVITATION_BASE_URL");
+});
+
+Deno.test("resolveFeedbackReviewBaseUrl: rejects send.tallyrunner.com and falls back", () => {
+  Deno.env.delete("FEEDBACK_REVIEW_BASE_URL");
+  Deno.env.delete("DASHBOARD_BASE_URL");
+  Deno.env.delete("NEXT_PUBLIC_APP_URL");
+  Deno.env.delete("WORKER_INVITATION_BASE_URL");
+  assertEquals(
+    resolveFeedbackReviewBaseUrl("https://send.tallyrunner.com"),
+    "https://app.tallyrunner.com"
+  );
+});
+
+Deno.test("timingSafeEqualString: equal and unequal", () => {
+  assertEquals(timingSafeEqualString("abc", "abc"), true);
+  assertEquals(timingSafeEqualString("abc", "abd"), false);
+  assertEquals(timingSafeEqualString("abc", "ab"), false);
+});
+
+Deno.test("requireCronSecret: missing config / mismatch / ok", () => {
+  const original = Deno.env.get("CRON_SHARED_SECRET");
+  Deno.env.delete("CRON_SHARED_SECRET");
+  assertEquals(
+    requireCronSecret(new Request("http://x", { headers: { "x-cron-secret": "x" } })).ok,
+    false
+  );
+  Deno.env.set("CRON_SHARED_SECRET", "super-secret-value");
+  assertEquals(requireCronSecret(new Request("http://x")).reason, "missing_header");
+  assertEquals(
+    requireCronSecret(new Request("http://x", { headers: { "x-cron-secret": "wrong" } })).ok,
+    false
+  );
+  assertEquals(
+    requireCronSecret(
+      new Request("http://x", { headers: { "x-cron-secret": "super-secret-value" } })
+    ).ok,
+    true
+  );
+  if (original) Deno.env.set("CRON_SHARED_SECRET", original);
+  else Deno.env.delete("CRON_SHARED_SECRET");
+});
 
 Deno.test("computeSendAfter: delay only when no edit window", () => {
   const base = new Date("2026-07-21T00:00:00.000Z");
@@ -43,6 +93,28 @@ Deno.test("computeSendAfter: delay wins when later than edit window", () => {
     delayHours: 5,
   });
   assertEquals(result.toISOString(), "2026-07-21T05:00:00.000Z");
+});
+
+Deno.test("computeSendAfter: falls back to createdAt when completedAt null", () => {
+  const created = new Date("2026-07-21T10:00:00.000Z");
+  const result = computeSendAfter({
+    completedAt: null,
+    createdAt: created.toISOString(),
+    editWindowExpiresAt: null,
+    delayHours: 1,
+  });
+  assertEquals(result.toISOString(), "2026-07-21T11:00:00.000Z");
+});
+
+Deno.test("computeSendAfter: clamps negative delayHours to 0", () => {
+  const base = new Date("2026-07-21T00:00:00.000Z");
+  const result = computeSendAfter({
+    completedAt: base.toISOString(),
+    createdAt: base.toISOString(),
+    editWindowExpiresAt: null,
+    delayHours: -3,
+  });
+  assertEquals(result.toISOString(), base.toISOString());
 });
 
 Deno.test("evaluateCancelGate: kill switch cancels", () => {

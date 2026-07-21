@@ -78,13 +78,46 @@ export async function getFeedbackEmailRecipient(
   return await getInvoiceEmailRecipient(supabase, job, config, fieldConfigMap);
 }
 
+/**
+ * Resolve the dashboard origin used for `/review/{token}` links.
+ *
+ * Precedence (first non-empty):
+ * 1. explicit override arg
+ * 2. `FEEDBACK_REVIEW_BASE_URL`
+ * 3. `DASHBOARD_BASE_URL` (same as invoice public links)
+ * 4. `NEXT_PUBLIC_APP_URL`
+ * 5. `WORKER_INVITATION_BASE_URL` (admin/dashboard origin in most envs)
+ * 6. `https://app.tallyrunner.com`
+ *
+ * Never use `RESEND_FROM_DOMAIN` / `send.tallyrunner.com` — that host is for
+ * Resend From: headers, not the web app that serves the review page.
+ */
+export function resolveFeedbackReviewBaseUrl(explicit?: string | null): string {
+  const candidates = [
+    explicit,
+    Deno.env.get("FEEDBACK_REVIEW_BASE_URL"),
+    Deno.env.get("DASHBOARD_BASE_URL"),
+    Deno.env.get("NEXT_PUBLIC_APP_URL"),
+    Deno.env.get("WORKER_INVITATION_BASE_URL"),
+    "https://app.tallyrunner.com",
+  ];
+  for (const raw of candidates) {
+    const value = raw?.trim();
+    if (!value) continue;
+    // Reject mail-only platform domains that cannot host /review.
+    if (/^https?:\/\/send\.tallyrunner\.com\/?$/i.test(value)) continue;
+    return value.replace(/\/$/, "");
+  }
+  return "https://app.tallyrunner.com";
+}
+
 export function buildInternalReviewUrl(
   feedbackToken: string,
   baseUrl?: string | null
 ): string | null {
-  const envBase = baseUrl ?? Deno.env.get("FEEDBACK_REVIEW_BASE_URL");
-  if (!envBase || !feedbackToken) return null;
-  return `${envBase.replace(/\/$/, "")}/review/${feedbackToken}`;
+  if (!feedbackToken) return null;
+  const origin = resolveFeedbackReviewBaseUrl(baseUrl);
+  return `${origin}/review/${feedbackToken}`;
 }
 
 function formatJobDate(iso: string, locale: string | null | undefined): string {
@@ -287,18 +320,10 @@ export async function sendFeedbackRequestEmail(
   const config = configResult.config;
   const mode: FeedbackRequestMode = data.mode ?? "internal";
 
-  if (mode !== "public") {
-    const feedbackReviewBaseUrl = Deno.env.get("FEEDBACK_REVIEW_BASE_URL");
-    if (!feedbackReviewBaseUrl) {
-      const error = "FEEDBACK_REVIEW_BASE_URL environment variable not set";
-      if (throwOnError) throw new Error(error);
-      return { success: false, error };
-    }
-    if (!data.feedbackToken) {
-      const error = "Feedback token required for internal review link";
-      if (throwOnError) throw new Error(error);
-      return { success: false, error };
-    }
+  if (mode !== "public" && !data.feedbackToken) {
+    const error = "Feedback token required for internal review link";
+    if (throwOnError) throw new Error(error);
+    return { success: false, error };
   }
 
   if (mode !== "internal") {

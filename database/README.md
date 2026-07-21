@@ -2,11 +2,23 @@
 
 ## Edge secrets (feedback requests)
 
-| Variable                       | Required                            | Notes                                                                                            |
-| ------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `FEEDBACK_REVIEW_BASE_URL`     | For internal/both modes             | Base URL of the dashboard (e.g. `https://app.example.com`) used to build `/review/{token}` links |
-| `CRON_SHARED_SECRET`           | For `process-feedback-email-outbox` | Shared secret; poller rejects requests without matching `x-cron-secret` header                   |
-| `RESEND_API_KEY` / from domain | Existing                            | Unchanged                                                                                        |
+| Variable                   | Required            | Notes                                                                                                                                                                                                                                                         |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FEEDBACK_REVIEW_BASE_URL` | Recommended         | Dashboard origin for `/review/{token}` (e.g. `https://app.tallyrunner.com`). If unset: `DASHBOARD_BASE_URL` → `NEXT_PUBLIC_APP_URL` → `WORKER_INVITATION_BASE_URL` → `https://app.tallyrunner.com`. **Never** use `send.tallyrunner.com` (Resend From: only). |
+| `CRON_SHARED_SECRET`       | Required for poller | Generate with `openssl rand -hex 32`. Set as Edge Function secret **and** send the same value as header `x-cron-secret` on the 5‑minute schedule. Local: `database/supabase/functions/.env`. No default — poller returns 401 until set.                       |
+| `RESEND_FROM_DOMAIN`       | Existing            | Platform mail From: host (typically `send.tallyrunner.com`). Not used for review links.                                                                                                                                                                       |
+| `RESEND_API_KEY`           | Existing            | Unchanged                                                                                                                                                                                                                                                     |
+
+### `CRON_SHARED_SECRET` placement
+
+1. Generate: `openssl rand -hex 32`
+2. Staging/prod: Supabase → Project Settings → Edge Functions → Secrets
+3. Scheduler: `x-cron-secret: <same value>` on `POST …/functions/v1/process-feedback-email-outbox`
+4. Local: `database/supabase/functions/.env`
+
+### Review URL vs org custom email domain
+
+Org custom sending domains only change the email **From:** header (`resolveOrgMailFrom`). Review links always point at the **dashboard** host that serves `/review/[token]`.
 
 Schedule the poller every 5 minutes (Supabase Dashboard → Edge Functions → Schedules, or pg_cron Path A — see migration `20260721120400_schedule_feedback_email_outbox.sql`).
 

@@ -207,15 +207,24 @@ async function resolveRecipient(
   return await getFeedbackEmailRecipient(supabase, jobContext, emailConfig, fieldConfigMap);
 }
 
-async function hasPrivateFeedback(supabase: SupabaseClient, jobId: string): Promise<boolean> {
+/**
+ * Returns whether private feedback exists.
+ * On DB error: fail-closed (`true`) so we never send a duplicate request.
+ */
+async function hasPrivateFeedback(
+  supabase: SupabaseClient,
+  jobId: string
+): Promise<{ exists: boolean; lookupFailed: boolean }> {
   const { data, error } = await supabase
     .from("feedback")
     .select("id")
     .eq("job_id", jobId)
     .limit(1)
     .maybeSingle();
-  if (error) return false;
-  return !!data;
+  if (error) {
+    return { exists: true, lookupFailed: true };
+  }
+  return { exists: !!data, lookupFailed: false };
 }
 
 async function cancelOutbox(
@@ -249,7 +258,8 @@ async function markOutboxFailed(
   await supabase
     .from("feedback_email_outbox")
     .update({
-      status: terminal ? "failed" : "failed",
+      // Both retryable and terminal use `failed`; poller re-picks via next_retry_at.
+      status: "failed",
       attempts: nextAttempts,
       last_error: lastError,
       next_retry_at: nextRetry,
@@ -361,7 +371,17 @@ async function performSend(
           jobId: job.id,
           error: tokenError,
         });
-        await markOutboxFailed(supabase, outboxId, 0, "failed_to_persist_token");
+        const { data: outboxRow } = await supabase
+          .from("feedback_email_outbox")
+          .select("attempts")
+          .eq("id", outboxId)
+          .maybeSingle();
+        await markOutboxFailed(
+          supabase,
+          outboxId,
+          outboxRow?.attempts ?? 0,
+          "failed_to_persist_token"
+        );
         return {
           ok: false,
           reason: "failed_to_persist_token",
@@ -477,6 +497,14 @@ export async function enqueueOrSendFeedback(
     );
 
     if (!org.feedback_requests_enabled) {
+      // Auto: soft-skip (create-job continues). Manual: hard error for API clients.
+      if (options.path === "manual") {
+        return {
+          ok: false,
+          reason: "feedback_requests_disabled",
+          error_code: "feedback_requests_disabled",
+        };
+      }
       return {
         ok: true,
         skipped: true,
@@ -485,6 +513,13 @@ export async function enqueueOrSendFeedback(
     }
 
     if (locationMuted) {
+      if (options.path === "manual") {
+        return {
+          ok: false,
+          reason: "location_muted",
+          error_code: "location_muted",
+        };
+      }
       return { ok: true, skipped: true, reason: "location_muted" };
     }
 
@@ -557,7 +592,15 @@ export async function enqueueOrSendFeedback(
       };
     }
 
-    if (await hasPrivateFeedback(supabase, job.id)) {
+    const feedbackLookup = await hasPrivateFeedback(supabase, job.id);
+    if (feedbackLookup.lookupFailed) {
+      return {
+        ok: false,
+        reason: "feedback_lookup_failed",
+        error_code: "feedback_lookup_failed",
+      };
+    }
+    if (feedbackLookup.exists) {
       return {
         ok: options.path === "auto",
         skipped: options.path === "auto",
@@ -714,13 +757,48 @@ export async function enqueueOrSendFeedback(
   }
 }
 
+const STUCK_PROCESSING_MS = 15 * 60 * 1000;
+
+/**
+ * Re-queue rows stuck in `processing` (crash mid-send) so the poller can retry.
+ */
+async function recoverStuckProcessingRows(supabase: SupabaseClient, now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - STUCK_PROCESSING_MS).toISOString();
+  const { data, error } = await supabase
+    .from("feedback_email_outbox")
+    .update({
+      status: "failed",
+      next_retry_at: now.toISOString(),
+      last_error: "stuck_processing_recovered",
+      updated_at: now.toISOString(),
+    })
+    .eq("status", "processing")
+    .lt("updated_at", cutoff)
+    .select("id");
+
+  if (error) {
+    createLoggerWithoutRequest({ functionName: "recoverStuckProcessingRows" }).warn(
+      "Failed to recover stuck processing rows",
+      { error }
+    );
+    return 0;
+  }
+  return data?.length ?? 0;
+}
+
 /**
  * Process due outbox rows (poller). Returns counts.
  */
 export async function processDueFeedbackOutbox(
   supabase: SupabaseClient,
   options?: { limit?: number; now?: Date }
-): Promise<{ claimed: number; sent: number; cancelled: number; failed: number }> {
+): Promise<{
+  claimed: number;
+  sent: number;
+  cancelled: number;
+  failed: number;
+  recovered: number;
+}> {
   const logger = createLoggerWithoutRequest({
     functionName: "processDueFeedbackOutbox",
   });
@@ -728,18 +806,21 @@ export async function processDueFeedbackOutbox(
   const limit = options?.limit ?? 25;
   const nowIso = now.toISOString();
 
+  const recovered = await recoverStuckProcessingRows(supabase, now);
+
+  // Quote ISO timestamps for PostgREST `.or()` filter safety.
   const { data: dueRows, error } = await supabase
     .from("feedback_email_outbox")
     .select("id, job_id, attempts, status, send_after, next_retry_at")
     .in("status", ["pending", "failed"])
     .lte("send_after", nowIso)
-    .or(`next_retry_at.is.null,next_retry_at.lte.${nowIso}`)
+    .or(`next_retry_at.is.null,next_retry_at.lte."${nowIso}"`)
     .order("send_after", { ascending: true })
     .limit(limit);
 
   if (error) {
     logger.error("Failed to list due feedback outbox rows", error);
-    return { claimed: 0, sent: 0, cancelled: 0, failed: 0 };
+    return { claimed: 0, sent: 0, cancelled: 0, failed: 0, recovered };
   }
 
   let claimed = 0;
@@ -767,7 +848,7 @@ export async function processDueFeedbackOutbox(
     }
   }
 
-  return { claimed, sent, cancelled, failed };
+  return { claimed, sent, cancelled, failed, recovered };
 }
 
 /**
@@ -876,7 +957,22 @@ export async function sendClaimedFeedbackOutbox(
     return { ok: true, cancelled: true, reason: "test_job", outboxId };
   }
 
-  if (await hasPrivateFeedback(supabase, job.id)) {
+  const feedbackLookup = await hasPrivateFeedback(supabase, job.id);
+  if (feedbackLookup.lookupFailed) {
+    const { data: outboxRow } = await supabase
+      .from("feedback_email_outbox")
+      .select("attempts")
+      .eq("id", outboxId)
+      .maybeSingle();
+    await markOutboxFailed(supabase, outboxId, outboxRow?.attempts ?? 0, "feedback_lookup_failed");
+    return {
+      ok: false,
+      reason: "feedback_lookup_failed",
+      error_code: "feedback_lookup_failed",
+      outboxId,
+    };
+  }
+  if (feedbackLookup.exists) {
     await cancelOutbox(supabase, outboxId, "feedback_already_submitted");
     return {
       ok: true,

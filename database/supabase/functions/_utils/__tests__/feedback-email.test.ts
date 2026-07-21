@@ -16,10 +16,7 @@ import {
   getFeedbackEmailRecipient,
   sendFeedbackRequestEmail,
 } from "../feedback-email.ts";
-import type {
-  InvoiceEmailRecipientConfig,
-  JobContext,
-} from "../invoice-email.ts";
+import type { InvoiceEmailRecipientConfig, JobContext } from "../invoice-email.ts";
 
 /** Supabase mock so `resolveOrgMailFrom` falls back to platform domain */
 const createMailResolverSupabase = (): SupabaseClient => {
@@ -55,8 +52,7 @@ const createMockSupabase = () => {
 
   const mockSelect = () => ({
     eq: () => ({
-      single: () =>
-        Promise.resolve(mockSingleResponse || { data: null, error: null }),
+      single: () => Promise.resolve(mockSingleResponse || { data: null, error: null }),
     }),
   });
 
@@ -71,9 +67,7 @@ const createMockSupabase = () => {
       mockSingleResponse = null;
     },
   } as unknown as SupabaseClient & {
-    _setMockSingleResponse: (
-      response: { data: unknown; error: unknown },
-    ) => void;
+    _setMockSingleResponse: (response: { data: unknown; error: unknown }) => void;
     _clearMock: () => void;
   };
 };
@@ -126,11 +120,7 @@ Deno.test("P0: should reuse invoice email recipient logic correctly", async () =
     default_email: null,
   };
 
-  const email = await getFeedbackEmailRecipient(
-    mockSupabase,
-    jobContext,
-    config,
-  );
+  const email = await getFeedbackEmailRecipient(mockSupabase, jobContext, config);
 
   assertEquals(email, "customer@example.com");
 });
@@ -155,11 +145,11 @@ Deno.test("P0: should handle hierarchy billing email source", async () => {
   };
 
   // Set up mock hierarchy response
-  (mockSupabase as unknown as {
-    _setMockSingleResponse: (
-      response: { data: unknown; error: unknown },
-    ) => void;
-  })._setMockSingleResponse({
+  (
+    mockSupabase as unknown as {
+      _setMockSingleResponse: (response: { data: unknown; error: unknown }) => void;
+    }
+  )._setMockSingleResponse({
     data: {
       id: "hier-1",
       type: "organization",
@@ -172,11 +162,7 @@ Deno.test("P0: should handle hierarchy billing email source", async () => {
     error: null,
   });
 
-  const email = await getFeedbackEmailRecipient(
-    mockSupabase,
-    jobContext,
-    config,
-  );
+  const email = await getFeedbackEmailRecipient(mockSupabase, jobContext, config);
 
   assertEquals(email, "billing@company.com");
   (mockSupabase as unknown as { _clearMock: () => void })._clearMock();
@@ -207,12 +193,7 @@ Deno.test("P0: should handle form field email source", async () => {
     ],
   ]);
 
-  const email = await getFeedbackEmailRecipient(
-    mockSupabase,
-    jobContext,
-    config,
-    fieldConfigMap,
-  );
+  const email = await getFeedbackEmailRecipient(mockSupabase, jobContext, config, fieldConfigMap);
 
   assertEquals(email, "form@example.com");
 });
@@ -231,11 +212,7 @@ Deno.test("P0: should return null when no email source (default_email deprecated
     default_email: "default@example.com",
   };
 
-  const email = await getFeedbackEmailRecipient(
-    mockSupabase,
-    jobContext,
-    config,
-  );
+  const email = await getFeedbackEmailRecipient(mockSupabase, jobContext, config);
 
   // default_email is deprecated and fallback was removed; no source => null
   assertEquals(email, null);
@@ -275,21 +252,14 @@ Deno.test("P0: should send to test address when RESEND_TEST_MODE=true", async ()
         capturedBody = JSON.parse(init.body as string);
       }
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ id: "test-email-id-123" }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ id: "test-email-id-123" }), { status: 200 })
       );
     }
     return originalFetch(input, init);
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -302,10 +272,7 @@ Deno.test("P0: should send to test address when RESEND_TEST_MODE=true", async ()
     };
 
     // Verify email was sent to test address
-    assertEquals(
-      body.to[0],
-      `delivered+feedback-${emailData.jobId}@resend.dev`,
-    );
+    assertEquals(body.to[0], `delivered+feedback-${emailData.jobId}@resend.dev`);
     assertEquals(body.subject.includes("[TEST]"), true);
     assertExists(body.tags);
     assertEquals(body.tags!.length, 3);
@@ -357,21 +324,14 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE=false", async
         capturedBody = JSON.parse(init.body as string);
       }
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ id: "test-email-id-123" }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ id: "test-email-id-123" }), { status: 200 })
       );
     }
     return originalFetch(input, init);
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -434,21 +394,14 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE unset", async
         capturedBody = JSON.parse(init.body as string);
       }
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ id: "test-email-id-123" }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ id: "test-email-id-123" }), { status: 200 })
       );
     }
     return originalFetch(input, init);
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -476,39 +429,53 @@ Deno.test("P0: should send to real recipient when RESEND_TEST_MODE unset", async
 });
 
 // Email Sending Tests
-Deno.test("P0: should handle missing FEEDBACK_REVIEW_BASE_URL gracefully", async () => {
-  Deno.env.set("RESEND_API_KEY", "test-key");
-  Deno.env.set("RESEND_FROM_DOMAIN", "test.com");
-  Deno.env.set("WORKER_INVITATION_BASE_URL", "https://test.com");
-  Deno.env.delete("FEEDBACK_REVIEW_BASE_URL");
+Deno.test(
+  "P0: falls back to WORKER_INVITATION_BASE_URL when FEEDBACK_REVIEW_BASE_URL unset",
+  async () => {
+    Deno.env.set("RESEND_API_KEY", "test-key");
+    Deno.env.set("RESEND_FROM_DOMAIN", "test.com");
+    Deno.env.set("WORKER_INVITATION_BASE_URL", "https://dashboard.example.com");
+    Deno.env.delete("FEEDBACK_REVIEW_BASE_URL");
+    Deno.env.delete("DASHBOARD_BASE_URL");
+    Deno.env.delete("NEXT_PUBLIC_APP_URL");
 
-  const emailData: FeedbackEmailData = {
-    recipientEmail: "customer@example.com",
-    recipientName: "John Doe",
-    organizationName: "Test Org",
-    organizationId: "00000000-0000-0000-0000-000000000001",
-    jobId: "job-123",
-    jobCompletedAt: new Date().toISOString(),
-    locationName: "Test Location",
-    feedbackToken: "test-token-123",
-    feedbackReviewUrl: "https://test.com/review/test-token-123",
-  };
+    const emailData: FeedbackEmailData = {
+      recipientEmail: "customer@example.com",
+      recipientName: "John Doe",
+      organizationName: "Test Org",
+      organizationId: "00000000-0000-0000-0000-000000000001",
+      jobId: "job-123",
+      jobCompletedAt: new Date().toISOString(),
+      locationName: "Test Location",
+      feedbackToken: "test-token-123",
+      feedbackReviewUrl: "",
+    };
 
-  const result = await sendFeedbackRequestEmail(
-    createMailResolverSupabase(),
-    emailData,
-    false,
-  );
+    const originalFetch = globalThis.fetch;
+    let capturedBody: unknown = null;
+    globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (typeof input === "string" && input.includes("api.resend.com")) {
+        if (init?.body) capturedBody = JSON.parse(init.body as string);
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: "test-email-id-123" }), { status: 200 })
+        );
+      }
+      return originalFetch(input, init);
+    };
 
-  assertEquals(result.success, false);
-  assertEquals(
-    result.error?.includes("FEEDBACK_REVIEW_BASE_URL"),
-    true,
-  );
-
-  Deno.env.delete("RESEND_API_KEY");
-  Deno.env.delete("RESEND_FROM_DOMAIN");
-});
+    try {
+      const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
+      assertEquals(result.success, true);
+      const body = capturedBody as { html: string };
+      assertEquals(body.html.includes("https://dashboard.example.com/review/test-token-123"), true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      Deno.env.delete("RESEND_API_KEY");
+      Deno.env.delete("RESEND_FROM_DOMAIN");
+      Deno.env.delete("WORKER_INVITATION_BASE_URL");
+    }
+  }
+);
 
 Deno.test("P0: should handle Resend API errors gracefully", async () => {
   Deno.env.set("RESEND_API_KEY", "test-key");
@@ -533,21 +500,14 @@ Deno.test("P0: should handle Resend API errors gracefully", async () => {
   globalThis.fetch = (input: RequestInfo | URL) => {
     if (typeof input === "string" && input.includes("api.resend.com")) {
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ message: "Invalid API key" }),
-          { status: 401 },
-        ),
+        new Response(JSON.stringify({ message: "Invalid API key" }), { status: 401 })
       );
     }
     return originalFetch(input);
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, false);
     assertExists(result.error);
@@ -583,21 +543,14 @@ Deno.test("P0: should return email ID on successful send", async () => {
   globalThis.fetch = (input: RequestInfo | URL) => {
     if (typeof input === "string" && input.includes("api.resend.com")) {
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ id: "resend-email-id-456" }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ id: "resend-email-id-456" }), { status: 200 })
       );
     }
     return originalFetch(input);
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, true);
     assertEquals(result.emailId, "resend-email-id-456");
