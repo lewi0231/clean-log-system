@@ -178,10 +178,8 @@ describe("Full Payment Flow Integration Test", () => {
     // Use shared test Supabase client to avoid multiple GoTrueClient instances
     supabase = createTestSupabaseClient();
 
-    // Initialize Stripe client
-    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-      apiVersion: "2025-11-17.clover",
-    });
+    // Initialize Stripe client (omit apiVersion — package pins LatestApiVersion)
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
     // Setup test database
     testData = await setupTestDatabase();
