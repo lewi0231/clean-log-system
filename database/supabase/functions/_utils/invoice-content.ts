@@ -1,6 +1,6 @@
 /**
- * Shared invoice content for HTML PDF + pdf-lib attachments (Bill To / service address).
- * Full GST/bank parity with React InvoiceDocument is out of v1 scope.
+ * Shared invoice content for HTML PDF + pdf-lib attachments.
+ * Aims for parity with React InvoiceDocument (title, GST, branding, bank).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,6 +16,13 @@ import {
   DEFAULT_LINE_ITEM_DISPLAY,
   type LineItemDisplayConfig,
 } from "./invoice-line-item-display.ts";
+import {
+  finiteMoney,
+  resolveInvoiceDocumentTitle,
+  TAX_INVOICE_THRESHOLD_AUD,
+} from "./invoice-tax.ts";
+
+export { TAX_INVOICE_THRESHOLD_AUD, resolveInvoiceDocumentTitle as resolveDocumentTitle };
 
 export interface InvoiceContentLocation {
   id?: string;
@@ -29,6 +36,7 @@ export interface InvoiceContentLocation {
 
 export interface InvoiceContentModel {
   invoiceNumber: string;
+  documentTitle: "TAX INVOICE" | "INVOICE";
   status: string;
   createdAt: string;
   dueDate: string;
@@ -36,9 +44,28 @@ export interface InvoiceContentModel {
   subtotal: number;
   adjustments: number;
   total: number;
+  totalPaid: number;
+  amountDue: number;
+  /** Match InvoiceDocument: only after a partial payment. */
+  showAmountDue: boolean;
+  /** Match InvoiceDocument: paid in full with at least one payment recorded. */
+  isPaidInFull: boolean;
   notes: string | null;
   orgName: string;
   orgAbn: string | null;
+  orgLogoUrl: string | null;
+  orgBusinessAddress: string | null;
+  orgContactEmail: string | null;
+  orgContactPhone: string | null;
+  gstRegistered: boolean;
+  showGstBreakdown: boolean;
+  gstAmount: number;
+  subtotalExGst: number;
+  showBankTransfer: boolean;
+  bankTransferBsb: string | null;
+  bankTransferAccountNumber: string | null;
+  bankTransferAccountName: string | null;
+  paymentMethodsText: string | null;
   serviceAddressLines: string[];
   billingAddressLines: string[];
   showBillingAddress: boolean;
@@ -49,6 +76,16 @@ export interface InvoiceContentModel {
     unit_price: number;
     amount: number;
   }>;
+}
+
+function normalizeLogoUrl(raw: string | null | undefined): string | null {
+  if (!raw || typeof raw !== "string") return null;
+  let logoUrl = raw.trim();
+  if (logoUrl.includes("kong:8000")) {
+    logoUrl = logoUrl.replace(/http:\/\/kong:8000/, "http://127.0.0.1:54321");
+  }
+  if (!logoUrl.startsWith("http")) return null;
+  return logoUrl;
 }
 
 /**
@@ -89,17 +126,41 @@ export async function buildInvoiceContentModel(
     throw new Error(invoiceError?.message || "Invoice not found");
   }
 
-  const { data: organization } = await supabase
+  const { data: organization, error: organizationError } = await supabase
     .from("organization")
-    .select("name, abn")
+    .select(
+      "name, abn, logo_url, business_address, primary_contact_email, primary_contact_phone, stripe_account_id"
+    )
     .eq("id", organizationId)
     .single();
 
-  const { data: templateConfig } = await supabase
-    .from("invoice_template_config")
-    .select("billing_address_config, service_address_config, line_item_display")
+  if (organizationError || !organization) {
+    throw new Error(organizationError?.message || "Organization not found for invoice");
+  }
+
+  const { data: orgSettings, error: orgSettingsError } = await supabase
+    .from("organization_settings")
+    .select(
+      "gst_registered, gst_inclusive, show_bank_transfer_on_invoices, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name"
+    )
     .eq("organization_id", organizationId)
     .maybeSingle();
+
+  if (orgSettingsError) {
+    throw new Error(`Failed to load organization settings: ${orgSettingsError.message}`);
+  }
+
+  const { data: templateConfig, error: templateError } = await supabase
+    .from("invoice_template_config")
+    .select(
+      "billing_address_config, service_address_config, line_item_display, show_logo, show_abn"
+    )
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  if (templateError) {
+    throw new Error(`Failed to load invoice template config: ${templateError.message}`);
+  }
 
   const billingEnabled =
     templateConfig?.billing_address_config &&
@@ -114,6 +175,9 @@ export async function buildInvoiceContentModel(
     location_fields?: string[];
     form_fields?: string[];
   };
+
+  const showLogo = templateConfig?.show_logo !== false;
+  const showAbn = templateConfig?.show_abn !== false;
 
   // Primary location = first invoice_job with a location (shared with InvoiceDocument / APIs)
   const invoiceJobs = Array.isArray(invoice.invoice_job) ? invoice.invoice_job : [];
@@ -155,59 +219,132 @@ export async function buildInvoiceContentModel(
 
   // Line items: prefer invoice_line_item rows; else build from calculation snapshot
   let lineItems: InvoiceContentModel["lineItems"] = [];
-  const { data: dbLines } = await supabase
+  const { data: dbLines, error: lineItemsError } = await supabase
     .from("invoice_line_item")
     .select("description, quantity, unit_price, amount")
     .eq("invoice_id", invoiceId)
     .order("created_at", { ascending: true });
 
+  if (lineItemsError) {
+    throw new Error(`Failed to load invoice line items: ${lineItemsError.message}`);
+  }
+
+  const snap = (invoice.calculation_snapshot ?? null) as {
+    gst_registered?: boolean;
+    gst_amount?: number;
+    subtotal_ex_gst?: number;
+    total?: number;
+    job_calculations?: Array<{
+      base_price?: number;
+      line_items?: Array<{
+        field_label: string;
+        option_value?: string | null;
+        quantity: number;
+        unit_price: number;
+        total: number;
+      }> | null;
+    }>;
+  } | null;
+
   if (dbLines && dbLines.length > 0) {
-    lineItems = dbLines.map((row) => ({
-      description: String(row.description ?? "—"),
-      quantity: Number(row.quantity ?? 1),
-      unit_price: Number(row.unit_price ?? 0),
-      amount: Number(row.amount ?? 0),
-    }));
-  } else if (invoice.calculation_snapshot) {
-    const snap = invoice.calculation_snapshot as {
-      job_calculations?: Array<{
-        base_price?: number;
-        line_items?: Array<{
-          field_label: string;
-          option_value?: string | null;
-          quantity: number;
-          unit_price: number;
-          total: number;
-        }> | null;
-      }>;
-    };
+    lineItems = dbLines.map(
+      (row: {
+        description?: string | null;
+        quantity?: number | null;
+        unit_price?: number | null;
+        amount?: number | null;
+      }) => ({
+        description: String(row.description ?? "—"),
+        quantity: finiteMoney(row.quantity, 1),
+        unit_price: finiteMoney(row.unit_price, 0),
+        amount: finiteMoney(row.amount, 0),
+      })
+    );
+  } else if (snap) {
     const displayConfig =
       (templateConfig?.line_item_display as LineItemDisplayConfig | null) ??
       DEFAULT_LINE_ITEM_DISPLAY;
-    for (const jc of snap.job_calculations ?? []) {
-      for (const row of buildInvoiceDisplayRows(jc, displayConfig)) {
-        lineItems.push({
-          description: row.description,
-          quantity: row.quantity ?? 1,
-          unit_price: row.unit_price ?? 0,
-          amount: row.amount ?? 0,
-        });
-      }
+    for (const row of buildInvoiceDisplayRows(snap.job_calculations ?? [], displayConfig)) {
+      lineItems.push({
+        description: row.description,
+        quantity: finiteMoney(row.quantity, 1),
+        unit_price: finiteMoney(row.unit_price, 0),
+        amount: finiteMoney(row.amount, 0),
+      });
     }
   }
 
+  const currency = String(invoice.currency ?? "AUD");
+  const total = finiteMoney(invoice.total ?? snap?.total, 0);
+  const totalPaid = finiteMoney(invoice.total_paid, 0);
+  const amountDue = Math.max(0, total - totalPaid);
+  // Parity with InvoiceDocument — do not show amount due on unpaid (zero paid) invoices.
+  const showAmountDue = totalPaid > 0 && totalPaid < total;
+  const isPaidInFull = totalPaid > 0 && totalPaid >= total;
+
+  const gstRegistered =
+    typeof snap?.gst_registered === "boolean"
+      ? snap.gst_registered
+      : (orgSettings?.gst_registered ?? false);
+  const gstAmount = finiteMoney(snap?.gst_amount, 0);
+  const subtotalExGst =
+    typeof snap?.subtotal_ex_gst === "number" && Number.isFinite(snap.subtotal_ex_gst)
+      ? snap.subtotal_ex_gst
+      : Math.max(0, total - gstAmount);
+  const showGstBreakdown = gstRegistered && gstAmount > 0;
+
+  const showBankTransfer = !!(
+    orgSettings?.show_bank_transfer_on_invoices !== false &&
+    orgSettings?.bank_transfer_bsb &&
+    orgSettings?.bank_transfer_account_number
+  );
+
+  const paymentMethodParts: string[] = [];
+  if (showBankTransfer) paymentMethodParts.push("Bank transfer");
+  if (organization.stripe_account_id) paymentMethodParts.push("Credit/Debit card");
+  const paymentMethodsText =
+    paymentMethodParts.length > 0 ? `Payment methods: ${paymentMethodParts.join(", ")}.` : null;
+
   return {
     invoiceNumber: String(invoice.invoice_number ?? ""),
+    documentTitle: resolveInvoiceDocumentTitle({ gstRegistered, currency, total }),
     status: String(invoice.status ?? ""),
     createdAt: String(invoice.created_at ?? ""),
     dueDate: String(invoice.due_date ?? ""),
-    currency: String(invoice.currency ?? "AUD"),
-    subtotal: Number(invoice.subtotal ?? 0),
-    adjustments: Number(invoice.adjustments ?? 0),
-    total: Number(invoice.total ?? 0),
+    currency,
+    subtotal: finiteMoney(invoice.subtotal, 0),
+    adjustments: finiteMoney(invoice.adjustments, 0),
+    total,
+    totalPaid,
+    amountDue,
+    showAmountDue,
+    isPaidInFull,
     notes: invoice.notes != null ? String(invoice.notes) : null,
-    orgName: organization?.name ? String(organization.name) : "Organization",
-    orgAbn: organization?.abn ? String(organization.abn) : null,
+    orgName: organization.name ? String(organization.name) : "Organization",
+    orgAbn: showAbn && organization.abn ? String(organization.abn) : null,
+    orgLogoUrl: showLogo ? normalizeLogoUrl(organization.logo_url) : null,
+    orgBusinessAddress: organization.business_address
+      ? String(organization.business_address)
+      : null,
+    orgContactEmail: organization.primary_contact_email
+      ? String(organization.primary_contact_email)
+      : null,
+    orgContactPhone: organization.primary_contact_phone
+      ? String(organization.primary_contact_phone)
+      : null,
+    gstRegistered,
+    showGstBreakdown,
+    gstAmount,
+    subtotalExGst,
+    showBankTransfer,
+    bankTransferBsb: orgSettings?.bank_transfer_bsb ? String(orgSettings.bank_transfer_bsb) : null,
+    bankTransferAccountNumber: orgSettings?.bank_transfer_account_number
+      ? String(orgSettings.bank_transfer_account_number)
+      : null,
+    bankTransferAccountName: orgSettings?.bank_transfer_account_name
+      ? String(orgSettings.bank_transfer_account_name)
+      : null,
+    paymentMethodsText,
     serviceAddressLines,
     billingAddressLines,
     showBillingAddress: billingEnabled && billingAddressLines.length > 0,

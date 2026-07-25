@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import type { FieldConfig } from "@clean-log/shared/types";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
+import { getCompletedJobStatusBadges } from "@/lib/completed-job-status-badges";
 import { Job, JobEdit } from "@/lib/types";
 import type {
   GetJobEditsRequest,
@@ -346,47 +347,6 @@ export default function CompletedJobsList({
     return key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
-  // Calculate feedback status
-  const getFeedbackStatus = (
-    job: Job
-  ): {
-    label: string;
-    variant: "default" | "secondary" | "destructive" | "outline";
-  } | null => {
-    // If feedback has been received, show "Feedback Received"
-    if (job.has_feedback) {
-      return {
-        label: "Feedback Received",
-        variant: "secondary",
-      };
-    }
-    // If feedback email has been sent but not received yet, show "Feedback Sent"
-    if (job.feedback_email_sent) {
-      return {
-        label: "Feedback Sent",
-        variant: "secondary",
-      };
-    }
-    if (job.feedback_token) {
-      return {
-        label: "Feedback Pending",
-        variant: "outline",
-      };
-    }
-    return null;
-  };
-
-  // Job-level invoice status: only whether an invoice exists for this job
-  const getJobInvoiceStatus = (
-    job: Job
-  ): { status: "not_invoiced" | "invoice_created"; label: string } => {
-    const invoices = job.invoice_job?.filter((ij) => ij.invoice !== null) || [];
-    if (invoices.length === 0) {
-      return { status: "not_invoiced", label: "Not Invoiced" };
-    }
-    return { status: "invoice_created", label: "Invoice Created" };
-  };
-
   if (loading) {
     return <TableSkeleton rows={5} columns={6} />;
   }
@@ -444,38 +404,15 @@ export default function CompletedJobsList({
                         status={job.approval_status || "approved"}
                         autoApproveAt={job.auto_approve_at}
                       />
-                      <Badge
-                        variant={
-                          getJobInvoiceStatus(job).status === "invoice_created"
-                            ? "secondary"
-                            : "outline"
-                        }
-                      >
-                        {getJobInvoiceStatus(job).label}
-                      </Badge>
+                      {getCompletedJobStatusBadges(job).map((badge) => (
+                        <Badge key={badge.key} variant={badge.variant} className={badge.className}>
+                          {badge.label}
+                        </Badge>
+                      ))}
                     </div>
                   </TableCell>
                   <TableCell className="mx-auto">
-                    <div className="flex flex-col gap-1">
-                      {(job.is_test || getFeedbackStatus(job)) && (
-                        <div className="flex flex-wrap gap-1">
-                          {job.is_test && (
-                            <Badge
-                              variant="destructive"
-                              className="w-fit text-[10px] tracking-wide"
-                            >
-                              TEST
-                            </Badge>
-                          )}
-                          {getFeedbackStatus(job) && (
-                            <Badge variant={getFeedbackStatus(job)!.variant} className="text-xs">
-                              {getFeedbackStatus(job)!.label}
-                            </Badge>
-                          )}
-                        </div>
-                      )}
-                      {job.location ? job.location.name : "-"}
-                    </div>
+                    {job.location ? job.location.name : "-"}
                   </TableCell>
                   <TableCell className="text-left">
                     {job.workers.length > 0 ? (

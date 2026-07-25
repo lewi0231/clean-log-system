@@ -1,5 +1,6 @@
 /**
  * Server-side invoice PDF generation for email attachments (pdf-lib).
+ * Content from buildInvoiceContentModel — parity with InvoiceDocument fields.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "npm:pdf-lib@1.17.1";
@@ -76,6 +77,55 @@ const PAGE_H = 841.89;
 const MARGIN = 48;
 const BOTTOM = 56;
 
+async function tryEmbedLogo(
+  pdfDoc: PDFDocument,
+  logoUrl: string | null
+): Promise<{
+  width: number;
+  height: number;
+  draw: (page: PDFPage, x: number, y: number) => void;
+} | null> {
+  // HTTPS only — avoids embedding http://localhost and reduces SSRF surface.
+  if (!logoUrl || !logoUrl.startsWith("https://")) return null;
+  try {
+    const res = await fetch(logoUrl, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return null;
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const contentType = (res.headers.get("content-type") || "").toLowerCase();
+    let image;
+    if (contentType.includes("png") || logoUrl.toLowerCase().endsWith(".png")) {
+      image = await pdfDoc.embedPng(bytes);
+    } else if (
+      contentType.includes("jpeg") ||
+      contentType.includes("jpg") ||
+      /\.jpe?g($|\?)/i.test(logoUrl)
+    ) {
+      image = await pdfDoc.embedJpg(bytes);
+    } else {
+      // Try PNG then JPG
+      try {
+        image = await pdfDoc.embedPng(bytes);
+      } catch {
+        image = await pdfDoc.embedJpg(bytes);
+      }
+    }
+    const maxW = 140;
+    const maxH = 48;
+    const scale = Math.min(maxW / image.width, maxH / image.height, 1);
+    const width = image.width * scale;
+    const height = image.height * scale;
+    return {
+      width,
+      height,
+      draw: (page, x, y) => {
+        page.drawImage(image, { x, y: y - height, width, height });
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function generateInvoicePdfBase64(
   supabase: SupabaseClient,
   invoiceId: string,
@@ -90,6 +140,7 @@ export async function generateInvoicePdfBase64(
   const pdfDoc = await PDFDocument.create();
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const logo = await tryEmbedLogo(pdfDoc, model.orgLogoUrl);
 
   let page: PDFPage = pdfDoc.addPage([PAGE_W, PAGE_H]);
   let y = PAGE_H - MARGIN;
@@ -125,13 +176,25 @@ export async function generateInvoicePdfBase64(
     });
   };
 
-  ensureSpace(80);
-  draw(`Invoice ${invoiceNumber}`, 18, true);
-  draw(orgName, 11);
-  if (model.orgAbn) {
-    draw(`ABN ${model.orgAbn}`, 10);
+  ensureSpace(100);
+  if (logo) {
+    logo.draw(page, MARGIN, y);
+    y -= logo.height + 10;
   }
-  y -= 6;
+
+  draw(model.documentTitle, 18, true);
+  draw(orgName, 11, true);
+  if (model.orgAbn) draw(`ABN ${model.orgAbn}`, 10);
+  if (model.orgBusinessAddress) {
+    for (const line of wrapLine(model.orgBusinessAddress, font, 9, PAGE_W - 2 * MARGIN)) {
+      draw(line, 9);
+    }
+  }
+  if (model.orgContactEmail) draw(model.orgContactEmail, 9);
+  if (model.orgContactPhone) draw(model.orgContactPhone, 9);
+
+  y -= 4;
+  draw(`Invoice ${invoiceNumber}`, 11, true);
   draw(`Status: ${String(model.status)}`, 9);
   draw(`Issued: ${formatDate(model.createdAt)}`, 9);
   draw(`Due: ${formatDate(model.dueDate)}`, 9);
@@ -211,17 +274,63 @@ export async function generateInvoicePdfBase64(
   }
 
   y -= 10;
-  ensureSpace(90);
+  ensureSpace(120);
   const subtotal = model.subtotal || 0;
   const adjustments = model.adjustments || 0;
   const total = model.total || 0;
 
-  drawRightAt(`Subtotal: ${formatCurrency(subtotal, currency)}`, 10, PAGE_W - MARGIN, y);
-  y -= 16;
-  drawRightAt(`Adjustments: ${formatCurrency(adjustments, currency)}`, 10, PAGE_W - MARGIN, y);
-  y -= 18;
+  if (model.showGstBreakdown) {
+    drawRightAt(
+      `Subtotal (ex. GST): ${formatCurrency(model.subtotalExGst, currency)}`,
+      10,
+      PAGE_W - MARGIN,
+      y
+    );
+    y -= 16;
+    drawRightAt(`GST: ${formatCurrency(model.gstAmount, currency)}`, 10, PAGE_W - MARGIN, y);
+    y -= 16;
+  } else {
+    drawRightAt(`Subtotal: ${formatCurrency(subtotal, currency)}`, 10, PAGE_W - MARGIN, y);
+    y -= 16;
+    if (adjustments !== 0) {
+      drawRightAt(`Adjustments: ${formatCurrency(adjustments, currency)}`, 10, PAGE_W - MARGIN, y);
+      y -= 16;
+    }
+  }
   drawRightAt(`Total: ${formatCurrency(total, currency)}`, 12, PAGE_W - MARGIN, y, true);
-  y -= 20;
+  y -= 18;
+
+  if (model.showAmountDue) {
+    drawRightAt(`Amount due: ${formatCurrency(model.amountDue, currency)}`, 10, PAGE_W - MARGIN, y);
+    y -= 16;
+  } else if (model.isPaidInFull) {
+    drawRightAt("Paid in full", 10, PAGE_W - MARGIN, y);
+    y -= 16;
+  }
+
+  if (model.paymentMethodsText) {
+    y -= 6;
+    ensureSpace(20);
+    draw(model.paymentMethodsText, 9, false, rgb(0.35, 0.35, 0.35));
+  }
+
+  if (model.showBankTransfer && model.bankTransferBsb && model.bankTransferAccountNumber) {
+    y -= 8;
+    ensureSpace(70);
+    draw("Payment via Bank Transfer", 10, true);
+    if (model.bankTransferAccountName) {
+      draw(`Account Name: ${model.bankTransferAccountName}`, 9);
+    }
+    draw(`BSB: ${model.bankTransferBsb}`, 9);
+    draw(`Account Number: ${model.bankTransferAccountNumber}`, 9);
+    draw(`Reference: ${invoiceNumber}`, 9);
+    draw(
+      "Payments via bank transfer will not be automatically tracked.",
+      8,
+      false,
+      rgb(0.4, 0.4, 0.4)
+    );
+  }
 
   if (model.notes && String(model.notes).trim()) {
     y -= 10;

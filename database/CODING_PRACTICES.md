@@ -25,7 +25,7 @@ Every edge function must have a `deno.json` file with the following content:
   "imports": {
     "@supabase/functions-js": "jsr:@supabase/functions-js@2",
     "server": "https://deno.land/std@0.168.0/http/server.ts",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.49.1",
     "dotenv": "jsr:@std/dotenv"
   },
   "compilerOptions": {
