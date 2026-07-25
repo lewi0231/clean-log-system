@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { FormSkeleton } from "@/components/ui/skeleton-loaders";
 import { Switch } from "@/components/ui/switch";
 import type { FieldConfig } from "@clean-log/shared/types";
+import { resolveInvoiceDocumentTitle } from "@clean-log/shared/utils/invoice-tax";
 import { useInvoiceTemplateConfig } from "@/hooks/use-invoice-template-config";
 import { useLocations } from "@/hooks/use-locations";
 import { useOrganizationSettings } from "@/hooks/use-organization-settings";
@@ -854,7 +855,9 @@ export default function InvoiceTemplateSettings(
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold">
-                  {orgSettings?.gst_registered ? "TAX INVOICE" : "INVOICE"}
+                  {resolveInvoiceDocumentTitle({
+                    gstRegistered: !!orgSettings?.gst_registered,
+                  })}
                 </p>
                 <p className="text-sm text-muted-foreground">Invoice #INV-00001</p>
                 <p className="text-sm text-muted-foreground">

@@ -10,7 +10,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TAX_INVOICE_THRESHOLD_AUD } from "@/lib/constants/invoice-constants";
 import { formatAbn } from "@/lib/utils/format-abn";
 import {
   formatLineItemDescription,
@@ -21,6 +20,7 @@ import {
   selectPrimaryInvoiceJob,
   type ResolvedHierarchyBilling,
 } from "@clean-log/shared/utils/hierarchy-billing";
+import { resolveInvoiceDocumentTitle } from "@clean-log/shared/utils/invoice-tax";
 import { format } from "date-fns";
 import Image from "next/image";
 import React, { useState } from "react";
@@ -175,11 +175,8 @@ export function InvoiceDocument({
   }
   if (logoUrl && !logoUrl.startsWith("http")) logoUrl = null;
 
-  // Title: "Invoice" vs "Tax Invoice" (ATO: guided by GST only – use "Invoice" when not GST-registered or when AUD total < $82.50)
-  const invoiceTitle =
-    gstRegistered && (currency !== "AUD" || total >= TAX_INVOICE_THRESHOLD_AUD)
-      ? "TAX INVOICE"
-      : "INVOICE";
+  // Title SoT: shared/utils/invoice-tax — GST-registered → TAX INVOICE (all amounts).
+  const invoiceTitle = resolveInvoiceDocumentTitle({ gstRegistered });
 
   // Sorted jobs for line-item sections; primary location/submission share one selector with Edge/PDF
   const invoiceJobs = invoice.invoice_job ?? [];

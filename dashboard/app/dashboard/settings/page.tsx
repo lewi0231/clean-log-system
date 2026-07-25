@@ -1477,9 +1477,10 @@ export default function SettingsPage() {
               <CardTitle>Tax / GST</CardTitle>
               <CardDescription>
                 Configure GST for Australian tax invoices. If you&apos;re not GST-registered (e.g.
-                under $75k), leave GST registered off. Invoices will show &quot;Invoice&quot; and no
-                GST. If registered, we use &quot;Tax Invoice&quot; and show a GST breakdown when the
-                total is $82.50 or more (AUD).
+                under $75k), leave GST registered off — documents show &quot;Invoice&quot; with no
+                GST. If registered, documents are titled &quot;Tax Invoice&quot; and show a GST
+                breakdown. The ATO $82.50 figure is when you must provide a tax invoice if asked; we
+                still title smaller GST sales as Tax Invoice (common AU practice).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

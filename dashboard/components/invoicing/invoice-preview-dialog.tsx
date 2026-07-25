@@ -49,23 +49,31 @@ export default function InvoicePreviewDialog({
       setGeneratingPdf(true);
       log.info("Opening invoice PDF view", { invoiceId });
 
-      const { html, invoiceNumber } = await InvoiceService.generatePdfHtml(
+      // Same pdf-lib binary as the email attachment — one document for open + send.
+      const { pdfBase64, filename, invoiceNumber } = await InvoiceService.generatePdf(
         invoiceId,
         organizationId
       );
 
-      const pdfWindow = window.open("", "_blank");
+      const binary = atob(pdfBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+
+      const pdfWindow = window.open(blobUrl, "_blank");
       if (!pdfWindow) {
+        URL.revokeObjectURL(blobUrl);
         toast.error("Please allow pop-ups to open the invoice PDF");
         return;
       }
 
-      pdfWindow.document.write(html);
-      pdfWindow.document.close();
-      pdfWindow.document.title = `Invoice-${invoiceNumber}`;
+      // Revoke after the tab has a chance to load the blob.
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
 
-      toast.success("Invoice opened", {
-        description: "Use Print → Save as PDF in the new tab if you need a file.",
+      toast.success("Invoice PDF opened", {
+        description: filename || `Invoice-${invoiceNumber}.pdf`,
       });
     } catch (err) {
       const msg = getInvokeErrorMessage(err);

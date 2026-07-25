@@ -332,40 +332,41 @@ export class InvoiceService {
   }
 
   /**
-   * Generate invoice PDF HTML
-   * Returns HTML that can be used for print/PDF generation
+   * Generate the same invoice PDF binary used for email attachments.
    */
-  static async generatePdfHtml(
+  static async generatePdf(
     invoiceId: string,
     organizationId: string
-  ): Promise<{ html: string; invoiceNumber: string }> {
+  ): Promise<{ pdfBase64: string; filename: string; invoiceNumber: string }> {
     try {
-      log.debug("InvoiceService: Generating invoice PDF HTML", {
+      log.debug("InvoiceService: Generating invoice PDF", {
         invoiceId,
         organizationId,
       });
 
       const response = await invokeEdgeFunction<{
         success: boolean;
-        html: string;
+        pdf_base64: string;
+        filename: string;
         invoice_number: string;
       }>("generate-invoice-pdf", {
         invoice_id: invoiceId,
         organization_id: organizationId,
       });
 
-      if (!response || !response.success || !response.html) {
+      if (!response || !response.success || !response.pdf_base64) {
         throw new Error("Failed to generate invoice PDF");
       }
 
-      log.info("InvoiceService: PDF HTML generated successfully");
+      log.info("InvoiceService: PDF generated successfully");
 
       return {
-        html: response.html,
+        pdfBase64: response.pdf_base64,
+        filename: response.filename || `Invoice-${response.invoice_number}.pdf`,
         invoiceNumber: response.invoice_number,
       };
     } catch (err) {
-      log.error("InvoiceService: Failed to generate PDF HTML", {
+      log.error("InvoiceService: Failed to generate PDF", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       throw err;
