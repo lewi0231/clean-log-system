@@ -1,6 +1,12 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser, resolveOrganizationWorkerId } from "../_utils/auth.ts";
 import { autoApproveExpiredJobs } from "../_utils/auto-approve-expired-jobs.ts";
+import { normalizeFeedbackRequestMode } from "../_utils/feedback-review-landing.ts";
+import {
+  computeFeedbackRequestStatus,
+  hasFeedbackRecipientHint,
+  type FeedbackOutboxStatus,
+} from "../_utils/feedback-request-status.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
@@ -179,7 +185,8 @@ serve(async (req) => {
           email,
           address,
           contact_person,
-          phone
+          phone,
+          feedback_requests_enabled
         ),
         invoice_job:invoice_job (
           invoice:invoice_id (
@@ -280,12 +287,142 @@ serve(async (req) => {
 
     const jobsWithFeedback = new Set(feedbackData?.map((f) => f.job_id) || []);
 
+    // Org feedback settings (one row) for status chips
+    const { data: orgRow, error: orgError } = await supabase
+      .from("organization")
+      .select("feedback_requests_enabled, feedback_request_mode, public_review_url")
+      .eq("id", organization_id)
+      .maybeSingle();
+
+    if (orgError) {
+      // Fail closed: do not advertise Ready/Send when settings cannot be loaded.
+      logger.warn("Error fetching organization feedback settings; status chips fail closed", {
+        error: orgError.message,
+      });
+    }
+
+    // Invoice recipient defaults for lightweight no_recipient hint
+    const { data: templateConfig, error: templateError } = await supabase
+      .from("invoice_template_config")
+      .select("email_recipient_config")
+      .eq("organization_id", organization_id)
+      .maybeSingle();
+
+    if (templateError) {
+      logger.warn("Error fetching invoice recipient config for feedback status", {
+        error: templateError.message,
+      });
+    }
+
+    const emailRecipientConfig =
+      (templateConfig?.email_recipient_config as {
+        default_email?: string | null;
+        form_field_email?: string | null;
+      } | null) || null;
+
+    let formFieldName: string | null = null;
+    if (emailRecipientConfig?.form_field_email) {
+      const { data: fieldRow, error: fieldError } = await supabase
+        .from("organization_field_configs")
+        .select("name")
+        .eq("id", emailRecipientConfig.form_field_email)
+        .eq("organization_id", organization_id)
+        .maybeSingle();
+      if (fieldError) {
+        logger.warn("Error resolving form-field email name for feedback status", {
+          error: fieldError.message,
+        });
+      }
+      formFieldName = fieldRow?.name ?? null;
+    }
+
+    // Latest outbox row per job (for queued/failed/sent chips)
+    const outboxByJobId = new Map<
+      string,
+      { status: FeedbackOutboxStatus; send_after: string | null; last_error: string | null }
+    >();
+    if (jobIds.length > 0) {
+      const { data: outboxRows, error: outboxError } = await supabase
+        .from("feedback_email_outbox")
+        .select("job_id, status, send_after, last_error, updated_at")
+        .in("job_id", jobIds)
+        .order("updated_at", { ascending: false });
+
+      if (outboxError) {
+        logger.warn("Error fetching feedback outbox for status chips", {
+          error: outboxError.message,
+        });
+      } else {
+        for (const row of outboxRows || []) {
+          if (outboxByJobId.has(row.job_id)) continue;
+          outboxByJobId.set(row.job_id, {
+            status: (row.status as FeedbackOutboxStatus) ?? null,
+            send_after: row.send_after ?? null,
+            last_error: row.last_error ?? null,
+          });
+        }
+      }
+    }
+
+    // Fail closed when org settings are unavailable (error or missing row).
+    const orgFeedbackEnabled =
+      !orgError && orgRow != null && orgRow.feedback_requests_enabled !== false;
+    const mode = normalizeFeedbackRequestMode(orgRow?.feedback_request_mode);
+    const hasPublicReviewUrl = !!(
+      typeof orgRow?.public_review_url === "string" &&
+      /^https:\/\//i.test(orgRow.public_review_url.trim())
+    );
+    const defaultEmail =
+      typeof emailRecipientConfig?.default_email === "string"
+        ? emailRecipientConfig.default_email.trim()
+        : "";
+
     // Combine jobs with their workers and feedback status
-    const jobsWithWorkers = jobs?.map((job) => ({
-      ...job,
-      workers: workersByJobId.get(job.id) || [],
-      has_feedback: jobsWithFeedback.has(job.id),
-    }));
+    const jobsWithWorkers = jobs?.map((job) => {
+      const location = Array.isArray(job.location) ? job.location[0] : job.location;
+      const locationMuted =
+        !!job.location_id &&
+        location != null &&
+        (location as { feedback_requests_enabled?: boolean }).feedback_requests_enabled === false;
+
+      const locationEmail = typeof location?.email === "string" ? location.email.trim() : "";
+      const submission = (job.submission_data || {}) as Record<string, unknown>;
+      const formEmail =
+        formFieldName && typeof submission[formFieldName] === "string"
+          ? String(submission[formFieldName]).trim()
+          : "";
+      const hasRecipientHint = hasFeedbackRecipientHint({
+        locationEmail,
+        defaultEmail,
+        formEmail,
+      });
+
+      const outbox = outboxByJobId.get(job.id);
+      const hasFeedback = jobsWithFeedback.has(job.id);
+
+      const feedback_request_status = computeFeedbackRequestStatus({
+        orgFeedbackEnabled,
+        locationMuted,
+        approvalStatus: job.approval_status,
+        hasPrivateFeedback: hasFeedback,
+        feedbackEmailSent: !!job.feedback_email_sent,
+        editWindowExpiresAt: job.edit_window_expires_at,
+        hasRecipientHint,
+        mode,
+        hasPublicReviewUrl,
+        isTest: !!job.is_test,
+        outboxStatus: outbox?.status ?? null,
+        sendAfter: outbox?.send_after ?? null,
+        lastError: outbox?.last_error ?? null,
+      });
+
+      return {
+        ...job,
+        workers: workersByJobId.get(job.id) || [],
+        has_feedback: hasFeedback,
+        feedback_request_status,
+      };
+    });
 
     return jsonResponse({
       success: true,

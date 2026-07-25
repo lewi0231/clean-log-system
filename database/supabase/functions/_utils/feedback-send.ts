@@ -904,13 +904,19 @@ export async function recomputePendingFeedbackSendAfter(
     delayHours: org.feedback_send_delay_hours ?? 0,
   });
 
-  await supabase
+  const { error: updateError } = await supabase
     .from("feedback_email_outbox")
     .update({
       send_after: sendAfter.toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", pending.id);
+
+  if (updateError) {
+    throw new Error(
+      `Failed to recompute feedback outbox send_after for job ${jobId}: ${updateError.message}`
+    );
+  }
 }
 
 /**

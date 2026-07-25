@@ -281,15 +281,27 @@ export interface GetJobEditsResponse {
   edits: JobEdit[];
 }
 
+/** Confirm flags for manual feedback send / resend (S2 §6.3). */
+export type SendFeedbackEmailOptions = {
+  confirm_flagged?: boolean;
+  confirm_test?: boolean;
+  confirm_resend?: boolean;
+};
+
 /** Edge function `send-feedback-email` */
-export interface SendFeedbackEmailRequest {
+export interface SendFeedbackEmailRequest extends SendFeedbackEmailOptions {
   job_id: string;
 }
 
 export interface SendFeedbackEmailResponse {
   success?: boolean;
   error?: string;
+  message?: string;
   emailId?: string;
+  sent?: boolean;
+  queued?: boolean;
+  outboxId?: string;
+  status?: string;
 }
 
 // Feedback API

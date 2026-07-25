@@ -6,7 +6,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { jobsKey } from "@/app/query-provider";
 import { JobsService } from "@/lib/services";
 import type { Job, JobEdit } from "@/lib/types";
-import type { CreateJobRequest, GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
+import type {
+  CreateJobRequest,
+  GetJobEditsRequest,
+  SendFeedbackEmailOptions,
+  SendFeedbackEmailResponse,
+  UpdateJobRequest,
+} from "@/lib/types/api";
 import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
@@ -18,7 +24,10 @@ interface UseJobsResult {
   createJob: (request: CreateJobRequest) => Promise<Job>;
   updateJob: (request: UpdateJobRequest) => Promise<Job>;
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
-  sendFeedbackEmail: (jobId: string) => Promise<void>;
+  sendFeedbackEmail: (
+    jobId: string,
+    options?: SendFeedbackEmailOptions
+  ) => Promise<SendFeedbackEmailResponse>;
 }
 
 async function fetchJobs(organizationId: string, includeTests?: boolean): Promise<Job[]> {
@@ -97,14 +106,18 @@ export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
   }, []);
 
   const sendFeedbackEmail = useCallback(
-    async (jobId: string): Promise<void> => {
-      await JobsService.sendFeedbackEmail(jobId);
+    async (
+      jobId: string,
+      options?: SendFeedbackEmailOptions
+    ): Promise<SendFeedbackEmailResponse> => {
+      const result = await JobsService.sendFeedbackEmail(jobId, options);
 
       // Invalidate and refetch jobs to get updated feedback status
       await queryClient.invalidateQueries({
         queryKey: jobsKey(organizationId, includeTests),
       });
       await query.refetch();
+      return result;
     },
     [queryClient, organizationId, query, includeTests]
   );

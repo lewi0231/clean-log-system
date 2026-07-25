@@ -256,7 +256,35 @@ export interface Job {
     } | null;
   }>;
   has_feedback?: boolean;
+  /** Computed by list-jobs (S2 F6). Prefer over ad-hoc feedback_email_sent checks. */
+  feedback_request_status?: FeedbackRequestStatus;
 }
+
+export type FeedbackRequestStatusChip =
+  | "responded"
+  | "feedback_off"
+  | "muted"
+  | "cancelled"
+  | "no_recipient"
+  | "edit_window"
+  | "queued"
+  | "failed"
+  | "sent"
+  | "ready"
+  | "config_error";
+
+export type FeedbackRequestStatus = {
+  chip: FeedbackRequestStatusChip;
+  label: string;
+  can_send: boolean;
+  block_reason: string | null;
+  requires_confirm_flagged: boolean;
+  requires_confirm_test: boolean;
+  requires_confirm_resend: boolean;
+  outbox_status: "pending" | "processing" | "succeeded" | "failed" | "cancelled" | null;
+  send_after: string | null;
+  last_error: string | null;
+};
 
 export type PricingType = "unit" | "fixed" | "tiered" | "percentage" | "conditional";
 export type WorkerPaymentType = "same_structure" | "percentage" | "fixed_rate";

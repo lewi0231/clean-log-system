@@ -13,7 +13,12 @@ import {
 import type { FieldConfig } from "@clean-log/shared/types";
 import { useMobileConfig } from "@/hooks/use-mobile-config";
 import { Job, JobEdit } from "@/lib/types";
-import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
+import type {
+  GetJobEditsRequest,
+  SendFeedbackEmailOptions,
+  SendFeedbackEmailResponse,
+  UpdateJobRequest,
+} from "@/lib/types/api";
 import { CheckCircle2 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import JobDetailDialog from "./job-detail-dialog";
@@ -27,7 +32,10 @@ interface CompletedJobsListProps {
   onJobUpdated?: () => void;
   updateJob: (request: UpdateJobRequest) => Promise<Job>;
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
-  sendFeedbackEmail: (jobId: string) => Promise<void>;
+  sendFeedbackEmail: (
+    jobId: string,
+    options?: SendFeedbackEmailOptions
+  ) => Promise<SendFeedbackEmailResponse>;
   organizationId: string | null;
   /** Field configs from the page (avoids useFieldConfigs in nested components). */
   fieldConfigs: FieldConfig[];

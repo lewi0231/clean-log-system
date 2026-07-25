@@ -114,6 +114,8 @@ serve(async (req) => {
           emailId: result.emailId,
           outboxId: result.outboxId,
           status: result.status,
+          sent: !!result.sent,
+          queued: !!result.queued,
         },
         200
       );

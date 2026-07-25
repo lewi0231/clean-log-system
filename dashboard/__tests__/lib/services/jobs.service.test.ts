@@ -63,7 +63,7 @@ describe("JobsService", () => {
       await expect(
         JobsService.list({
           organization_id: "org-1",
-        }),
+        })
       ).rejects.toThrow("Network error");
     });
 
@@ -95,6 +95,35 @@ describe("JobsService", () => {
 
       expect(result.success).toBe(true);
       expect(result.jobs).toEqual([]);
+    });
+  });
+
+  describe("sendFeedbackEmail", () => {
+    it("forwards confirm flags and returns queued result", async () => {
+      vi.mocked(supabase.functions.invoke).mockResolvedValue({
+        data: {
+          success: true,
+          queued: true,
+          message: "Feedback email queued",
+          outboxId: "obx-1",
+        },
+        error: null,
+      });
+
+      const result = await JobsService.sendFeedbackEmail("job-1", {
+        confirm_resend: true,
+        confirm_test: true,
+      });
+
+      expect(result.queued).toBe(true);
+      expect(supabase.functions.invoke).toHaveBeenCalledWith("send-feedback-email", {
+        body: {
+          job_id: "job-1",
+          confirm_flagged: undefined,
+          confirm_test: true,
+          confirm_resend: true,
+        },
+      });
     });
   });
 });
