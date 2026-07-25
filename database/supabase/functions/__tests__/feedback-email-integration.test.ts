@@ -2,7 +2,7 @@
  * Integration Tests: Feedback Email in Job Creation Flow
  *
  * These tests ensure feedback emails are sent correctly when jobs are created
- * with feedback_email_send_immediately enabled, including test mode support.
+ * with feedback_auto_send enabled, including test mode support.
  *
  * Run with: deno test --allow-all functions/__tests__/feedback-email-integration.test.ts
  */
@@ -40,30 +40,31 @@ const createMailResolverSupabase = (): SupabaseClient =>
 // For now, we'll test the logic patterns that can be unit tested
 // Full integration tests would require setting up test database
 
-Deno.test("P0: should generate feedback token when job created with feedback_email_send_immediately enabled", async () => {
-  // This test verifies the token generation logic
-  // In a real integration test, we would:
-  // 1. Create a job via create-job function
-  // 2. Check that feedback_token is set
-  // 3. Verify token is unique and valid format
+Deno.test(
+  "P0: should generate feedback token when job created with feedback_auto_send enabled",
+  async () => {
+    // This test verifies the token generation logic
+    // In a real integration test, we would:
+    // 1. Create a job via create-job function
+    // 2. Check that feedback_token is set
+    // 3. Verify token is unique and valid format
 
-  // For now, test token generation directly
-  const { generateFeedbackToken } = await import(
-    "../_utils/feedback-email.ts"
-  );
+    // For now, test token generation directly
+    const { generateFeedbackToken } = await import("../_utils/feedback-email.ts");
 
-  const token = generateFeedbackToken();
-  assertExists(token);
-  assertEquals(token.length >= 40, true);
-  assertEquals(token.includes("+"), false);
-  assertEquals(token.includes("/"), false);
-  assertEquals(token.includes("="), false);
-});
+    const token = generateFeedbackToken();
+    assertExists(token);
+    assertEquals(token.length >= 40, true);
+    assertEquals(token.includes("+"), false);
+    assertEquals(token.includes("/"), false);
+    assertEquals(token.includes("="), false);
+  }
+);
 
-Deno.test("P0: should not send email when feedback_email_send_immediately is disabled", () => {
+Deno.test("P0: should not send email when feedback_auto_send is disabled", () => {
   // This test verifies that emails are not sent when setting is false
   // In a real integration test, we would:
-  // 1. Set feedback_email_send_immediately = false
+  // 1. Set feedback_auto_send = false
   // 2. Create a job
   // 3. Verify no email was sent (check logs or database)
 
@@ -81,9 +82,7 @@ Deno.test("P0: should send email to test address when RESEND_TEST_MODE=true", as
   Deno.env.set("WORKER_INVITATION_BASE_URL", "https://test.com");
   Deno.env.set("WORKER_INVITATION_BASE_URL", "https://test.com");
 
-  const { sendFeedbackRequestEmail } = await import(
-    "../_utils/feedback-email.ts"
-  );
+  const { sendFeedbackRequestEmail } = await import("../_utils/feedback-email.ts");
 
   const emailData = {
     recipientEmail: "customer@example.com",
@@ -108,21 +107,14 @@ Deno.test("P0: should send email to test address when RESEND_TEST_MODE=true", as
         capturedBody = JSON.parse(init.body as string);
       }
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ id: "test-email-id-integration" }),
-          { status: 200 },
-        ),
+        new Response(JSON.stringify({ id: "test-email-id-integration" }), { status: 200 })
       );
     }
     return originalFetch(input, init);
   };
 
   try {
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, true);
     assertExists(capturedBody);
@@ -135,10 +127,7 @@ Deno.test("P0: should send email to test address when RESEND_TEST_MODE=true", as
     };
 
     // Verify email was sent to test address
-    assertEquals(
-      body.to[0],
-      `delivered+feedback-${emailData.jobId}@resend.dev`,
-    );
+    assertEquals(body.to[0], `delivered+feedback-${emailData.jobId}@resend.dev`);
     assertEquals(body.subject.includes("[TEST]"), true);
     assertExists(body.tags);
     assertEquals(body.tags![0].name, "test-mode");
@@ -168,9 +157,7 @@ Deno.test("P0: should handle missing email recipient gracefully", async () => {
   // 4. Verify no email was sent (but no error thrown)
 
   // For now, test the recipient resolution returns null gracefully
-  const { getFeedbackEmailRecipient } = await import(
-    "../_utils/feedback-email.ts"
-  );
+  const { getFeedbackEmailRecipient } = await import("../_utils/feedback-email.ts");
 
   // Create a simple mock supabase
   const mockSupabase = {
@@ -194,11 +181,7 @@ Deno.test("P0: should handle missing email recipient gracefully", async () => {
     default_email: null,
   };
 
-  const email = await getFeedbackEmailRecipient(
-    mockSupabase,
-    jobContext,
-    config,
-  );
+  const email = await getFeedbackEmailRecipient(mockSupabase, jobContext, config);
 
   // Should return null when no recipient available (not throw error)
   assertEquals(email, null);
@@ -207,7 +190,7 @@ Deno.test("P0: should handle missing email recipient gracefully", async () => {
 Deno.test("P0: should handle email send failure gracefully", async () => {
   // This test verifies that job creation succeeds even if email send fails
   // In a real integration test, we would:
-  // 1. Create a job with feedback_email_send_immediately = true
+  // 1. Create a job with feedback_auto_send = true
   // 2. Mock email send to fail
   // 3. Verify job is still created
   // 4. Verify token is still generated
@@ -218,9 +201,7 @@ Deno.test("P0: should handle email send failure gracefully", async () => {
   Deno.env.set("FEEDBACK_REVIEW_BASE_URL", "https://test.com");
   Deno.env.set("WORKER_INVITATION_BASE_URL", "https://test.com");
 
-  const { sendFeedbackRequestEmail } = await import(
-    "../_utils/feedback-email.ts"
-  );
+  const { sendFeedbackRequestEmail } = await import("../_utils/feedback-email.ts");
 
   const emailData = {
     recipientEmail: "customer@example.com",
@@ -239,10 +220,7 @@ Deno.test("P0: should handle email send failure gracefully", async () => {
   globalThis.fetch = (input: RequestInfo | URL) => {
     if (typeof input === "string" && input.includes("api.resend.com")) {
       return Promise.resolve(
-        new Response(
-          JSON.stringify({ message: "API Error" }),
-          { status: 500 },
-        ),
+        new Response(JSON.stringify({ message: "API Error" }), { status: 500 })
       );
     }
     return originalFetch(input);
@@ -250,11 +228,7 @@ Deno.test("P0: should handle email send failure gracefully", async () => {
 
   try {
     // Should not throw, but return error result
-    const result = await sendFeedbackRequestEmail(
-      createMailResolverSupabase(),
-      emailData,
-      false,
-    );
+    const result = await sendFeedbackRequestEmail(createMailResolverSupabase(), emailData, false);
 
     assertEquals(result.success, false);
     assertExists(result.error);

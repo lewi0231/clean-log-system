@@ -148,9 +148,13 @@ export class InvoiceService {
         ...data.invoice,
         calculation: data.calculation,
         template_config: data.template_config,
+        hierarchy_metadata: data.hierarchy_metadata,
+        resolved_billing: data.resolved_billing ?? null,
       } as InvoiceWithJobs & {
         calculation: CalculateInvoiceResponse["calculation"];
         template_config?: InvoiceTemplateConfig | null;
+        hierarchy_metadata?: GetInvoiceDetailsResponse["hierarchy_metadata"];
+        resolved_billing?: GetInvoiceDetailsResponse["resolved_billing"];
       };
     } catch (err) {
       log.error("InvoiceService: Failed to get invoice details", {

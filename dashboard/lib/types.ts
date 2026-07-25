@@ -126,6 +126,8 @@ export interface Location {
   fixed_customer_price?: number | null;
   fixed_worker_payment?: number | null;
   fixed_price_currency?: string | null;
+  /** When false, feedback request emails are muted for jobs at this location. */
+  feedback_requests_enabled?: boolean;
 }
 
 export type BusinessMode = "service_based" | "resource_tracking";
@@ -163,7 +165,14 @@ export interface OrganizationSettings {
   primary_contact_phone: string | null;
   business_address: string | null;
   invoice_send_immediately: boolean;
-  feedback_email_send_immediately: boolean;
+  feedback_requests_enabled: boolean;
+  feedback_auto_send: boolean;
+  feedback_request_mode: "internal" | "public" | "both";
+  public_review_url: string | null;
+  feedback_email_subject: string | null;
+  feedback_email_body: string | null;
+  feedback_email_reply_to: string | null;
+  feedback_send_delay_hours: number;
   rating_config: RatingConfig;
   stripe_account_id: string | null;
   payment_provider: string | null;
@@ -247,7 +256,35 @@ export interface Job {
     } | null;
   }>;
   has_feedback?: boolean;
+  /** Computed by list-jobs (S2 F6). Prefer over ad-hoc feedback_email_sent checks. */
+  feedback_request_status?: FeedbackRequestStatus;
 }
+
+export type FeedbackRequestStatusChip =
+  | "responded"
+  | "feedback_off"
+  | "muted"
+  | "cancelled"
+  | "no_recipient"
+  | "edit_window"
+  | "queued"
+  | "failed"
+  | "sent"
+  | "ready"
+  | "config_error";
+
+export type FeedbackRequestStatus = {
+  chip: FeedbackRequestStatusChip;
+  label: string;
+  can_send: boolean;
+  block_reason: string | null;
+  requires_confirm_flagged: boolean;
+  requires_confirm_test: boolean;
+  requires_confirm_resend: boolean;
+  outbox_status: "pending" | "processing" | "succeeded" | "failed" | "cancelled" | null;
+  send_after: string | null;
+  last_error: string | null;
+};
 
 export type PricingType = "unit" | "fixed" | "tiered" | "percentage" | "conditional";
 export type WorkerPaymentType = "same_structure" | "percentage" | "fixed_rate";

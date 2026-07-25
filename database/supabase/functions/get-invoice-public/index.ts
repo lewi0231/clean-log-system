@@ -1,5 +1,11 @@
 import { serve } from "server";
 import {
+  loadHierarchyMetadataForParentIds,
+  resolveHierarchyBilling,
+  selectPrimaryInvoiceJob,
+  unwrapRelation,
+} from "../_utils/hierarchy-billing.ts";
+import {
   errorResponse,
   extractErrorMessage,
   getErrorStatusCode,
@@ -7,11 +13,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
-import {
-  checkRateLimit,
-  RATE_LIMIT_CONFIGS,
-  rateLimitResponse,
-} from "../_utils/rate-limit.ts";
+import { checkRateLimit, RATE_LIMIT_CONFIGS, rateLimitResponse } from "../_utils/rate-limit.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
 
@@ -75,7 +77,7 @@ serve(async (req) => {
             )
           )
         )
-        `,
+        `
       )
       .eq("id", invoice_id)
       .single();
@@ -115,13 +117,15 @@ serve(async (req) => {
     }
 
     // Call calculate-invoice function to get line items and calculations
-    const { data: calculationData, error: calcError } = await supabase.functions
-      .invoke("calculate-invoice", {
+    const { data: calculationData, error: calcError } = await supabase.functions.invoke(
+      "calculate-invoice",
+      {
         body: {
           organization_id: invoice.organization_id,
           job_ids: jobIds,
         },
-      });
+      }
+    );
 
     if (calcError) throw calcError;
 
@@ -133,7 +137,7 @@ serve(async (req) => {
     const { data: organization, error: orgError } = await supabase
       .from("organization")
       .select(
-        "name, abn, logo_url, primary_contact_email, business_address, primary_contact_phone, stripe_account_id",
+        "name, abn, logo_url, primary_contact_email, business_address, primary_contact_phone, stripe_account_id"
       )
       .eq("id", invoice.organization_id)
       .single();
@@ -149,7 +153,7 @@ serve(async (req) => {
     const { data: orgSettings } = await supabase
       .from("organization_settings")
       .select(
-        "default_invoice_due_days, show_bank_transfer_on_invoices, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name",
+        "default_invoice_due_days, show_bank_transfer_on_invoices, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name"
       )
       .eq("organization_id", invoice.organization_id)
       .maybeSingle();
@@ -158,15 +162,11 @@ serve(async (req) => {
     const organizationForDisplay = organization
       ? {
           ...organization,
-          default_invoice_due_days: orgSettings?.default_invoice_due_days ??
-            30,
-          show_bank_transfer_on_invoices:
-            orgSettings?.show_bank_transfer_on_invoices ?? true,
+          default_invoice_due_days: orgSettings?.default_invoice_due_days ?? 30,
+          show_bank_transfer_on_invoices: orgSettings?.show_bank_transfer_on_invoices ?? true,
           bank_transfer_bsb: orgSettings?.bank_transfer_bsb ?? null,
-          bank_transfer_account_number:
-            orgSettings?.bank_transfer_account_number ?? null,
-          bank_transfer_account_name:
-            orgSettings?.bank_transfer_account_name ?? null,
+          bank_transfer_account_number: orgSettings?.bank_transfer_account_number ?? null,
+          bank_transfer_account_name: orgSettings?.bank_transfer_account_name ?? null,
         }
       : null;
 
@@ -187,13 +187,7 @@ serve(async (req) => {
         bill_to_fields: [],
         service_address_config: {
           source: "auto",
-          location_fields: [
-            "name",
-            "address",
-            "contact_person",
-            "email",
-            "phone",
-          ],
+          location_fields: ["name", "address", "contact_person", "email", "phone"],
         },
         billing_address_config: {
           enabled: false,
@@ -221,13 +215,7 @@ serve(async (req) => {
         bill_to_fields: billToFields,
         service_address_config: configData.service_address_config ?? {
           source: "auto",
-          location_fields: [
-            "name",
-            "address",
-            "contact_person",
-            "email",
-            "phone",
-          ],
+          location_fields: ["name", "address", "contact_person", "email", "phone"],
         },
         billing_address_config: configData.billing_address_config ?? {
           enabled: false,
@@ -247,13 +235,7 @@ serve(async (req) => {
         bill_to_fields: [],
         service_address_config: {
           source: "auto",
-          location_fields: [
-            "name",
-            "address",
-            "contact_person",
-            "email",
-            "phone",
-          ],
+          location_fields: ["name", "address", "contact_person", "email", "phone"],
         },
         billing_address_config: {
           enabled: false,
@@ -267,36 +249,27 @@ serve(async (req) => {
       };
     }
 
-    // Fetch location hierarchy metadata for billing address detection
+    // Fetch location hierarchy metadata + resolved Bill To (primary location)
     const hierarchyParentIds: string[] = [];
+    const invoiceJobs = Array.isArray(invoice.invoice_job) ? invoice.invoice_job : [];
 
-    if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
-      for (const invoiceJob of invoice.invoice_job) {
-        if (invoiceJob.job?.location?.hierarchy_parent_id) {
-          hierarchyParentIds.push(invoiceJob.job.location.hierarchy_parent_id);
-        }
+    for (const invoiceJob of invoiceJobs) {
+      const job = unwrapRelation<{ location?: unknown }>(invoiceJob?.job);
+      const loc = unwrapRelation<{ hierarchy_parent_id?: string | null }>(job?.location);
+      if (loc?.hierarchy_parent_id) {
+        hierarchyParentIds.push(loc.hierarchy_parent_id);
       }
     }
 
-    const hierarchyMetadata: Record<string, unknown> = {};
-    if (hierarchyParentIds.length > 0) {
-      const uniqueHierarchyIds = [...new Set(hierarchyParentIds)];
-      const { data: hierarchyNodes, error: hierarchyError } = await supabase
-        .from("location_hierarchy")
-        .select("id, type, name, metadata")
-        .in("id", uniqueHierarchyIds);
+    const primary = selectPrimaryInvoiceJob(invoiceJobs);
 
-      if (!hierarchyError && hierarchyNodes) {
-        for (const node of hierarchyNodes) {
-          hierarchyMetadata[node.id] = {
-            id: node.id,
-            type: node.type,
-            name: node.name,
-            metadata: node.metadata,
-          };
-        }
-      }
-    }
+    const hierarchyMetadata = await loadHierarchyMetadataForParentIds(supabase, hierarchyParentIds);
+
+    const resolved_billing = await resolveHierarchyBilling(
+      supabase,
+      primary.hierarchy_parent_id,
+      "display"
+    );
 
     return jsonResponse({
       success: true,
@@ -304,14 +277,12 @@ serve(async (req) => {
       calculation: calculationData.calculation,
       template_config: templateConfig,
       hierarchy_metadata: hierarchyMetadata,
+      resolved_billing,
       organization: organizationForDisplay,
     });
   } catch (error) {
     logger.error("Get public invoice details error", error);
-    const errorMessage = extractErrorMessage(
-      error,
-      "Failed to get invoice details",
-    );
+    const errorMessage = extractErrorMessage(error, "Failed to get invoice details");
     const statusCode = getErrorStatusCode(error);
     return errorResponse(errorMessage, statusCode);
   }

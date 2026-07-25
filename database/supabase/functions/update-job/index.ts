@@ -1,6 +1,7 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser } from "../_utils/auth.ts";
 import { autoGenerateInvoiceForJob } from "../_utils/auto-invoice.ts";
+import { recomputePendingFeedbackSendAfter } from "../_utils/feedback-send.ts";
 import {
   errorResponse,
   extractErrorMessage,
@@ -8,6 +9,7 @@ import {
   handleCors,
   jsonResponse,
 } from "../_utils/http.ts";
+import { resolveWorkerTimeRange, withJobWorkerTimes } from "../_utils/job-worker-times.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -104,13 +106,7 @@ serve(async (req: Request) => {
       return errorResponse("Job ID is required", 400);
     }
 
-    const {
-      id: jobId,
-      submission_data,
-      worker_ids,
-      location_id,
-      completed_at,
-    } = body;
+    const { id: jobId, submission_data, worker_ids, location_id, completed_at } = body;
 
     // Verify job exists and belongs to organization
     // Fetch full job data for audit trail
@@ -124,7 +120,7 @@ serve(async (req: Request) => {
         submission_data,
         completed_at,
         created_at
-      `,
+      `
       )
       .eq("id", jobId)
       .eq("organization_id", organizationId)
@@ -136,10 +132,7 @@ serve(async (req: Request) => {
         jobId,
         organizationId,
       });
-      return errorResponse(
-        "Job not found or does not belong to your organization",
-        404,
-      );
+      return errorResponse("Job not found or does not belong to your organization", 404);
     }
 
     logger.debug("Job found for update", {
@@ -160,8 +153,7 @@ serve(async (req: Request) => {
       throw orgError;
     }
 
-    const usePredefinedLocations = organization?.use_predefined_locations ??
-      true;
+    const usePredefinedLocations = organization?.use_predefined_locations ?? true;
 
     // Build update object with only provided fields
     const updateData: {
@@ -182,17 +174,13 @@ serve(async (req: Request) => {
     // Normalize location_id (handle empty strings)
     if (location_id !== undefined) {
       const normalizedLocationId =
-        location_id && typeof location_id === "string" &&
-          location_id.trim() !== ""
+        location_id && typeof location_id === "string" && location_id.trim() !== ""
           ? location_id.trim()
           : null;
 
       // Check if location_id is required based on organization settings
       if (usePredefinedLocations && !normalizedLocationId) {
-        return errorResponse(
-          "Location ID is required when predefined locations are enabled",
-          400,
-        );
+        return errorResponse("Location ID is required when predefined locations are enabled", 400);
       }
 
       // Validate location_id if provided (or required)
@@ -213,10 +201,7 @@ serve(async (req: Request) => {
         }
 
         if (!location) {
-          return errorResponse(
-            "Location not found or does not belong to your organization",
-            400,
-          );
+          return errorResponse("Location not found or does not belong to your organization", 400);
         }
       }
 
@@ -268,9 +253,7 @@ serve(async (req: Request) => {
     if (worker_ids !== undefined) {
       const normalizedWorkerIds =
         Array.isArray(worker_ids) && worker_ids.length > 0
-          ? worker_ids.filter((id: unknown) =>
-            typeof id === "string" && id.trim() !== ""
-          )
+          ? worker_ids.filter((id: unknown) => typeof id === "string" && id.trim() !== "")
           : [];
 
       // Validate worker_ids if provided
@@ -293,7 +276,7 @@ serve(async (req: Request) => {
         if (!workers || workers.length !== normalizedWorkerIds.length) {
           return errorResponse(
             "One or more workers not found or do not belong to your organization",
-            400,
+            400
           );
         }
       }
@@ -305,25 +288,25 @@ serve(async (req: Request) => {
         .eq("job_id", jobId);
 
       if (deleteError) {
-        logger.error(
-          "Error deleting existing job_worker entries",
-          deleteError,
-          {
-            jobId,
-            organizationId,
-          },
-        );
+        logger.error("Error deleting existing job_worker entries", deleteError, {
+          jobId,
+          organizationId,
+        });
         throw deleteError;
       }
 
       // Create new job_worker entries if worker_ids provided
       if (normalizedWorkerIds.length > 0) {
-        const jobWorkerEntries = normalizedWorkerIds.map((
-          workerId: string,
-        ) => ({
-          job_id: jobId,
-          worker_id: workerId,
-        }));
+        const submissionForTimes = (
+          submission_data !== undefined ? submission_data : existingJob.submission_data
+        ) as Record<string, unknown> | null;
+        const jobWorkerEntries = withJobWorkerTimes(
+          normalizedWorkerIds.map((workerId: string) => ({
+            job_id: jobId,
+            worker_id: workerId,
+          })),
+          submissionForTimes
+        );
 
         const { error: jobWorkerError } = await supabaseAdmin
           .from("job_worker")
@@ -361,6 +344,51 @@ serve(async (req: Request) => {
       }
     }
 
+    // When submission times change without replacing workers, sync job_worker clocks
+    if (submission_data !== undefined && worker_ids === undefined) {
+      const { data: existingWorkers, error: existingWorkersError } = await supabaseAdmin
+        .from("job_worker")
+        .select("worker_id")
+        .eq("job_id", jobId);
+
+      if (existingWorkersError) {
+        logger.warn("Failed to load job_worker rows for time sync", {
+          jobId,
+          error: existingWorkersError.message,
+        });
+      } else if (existingWorkers && existingWorkers.length > 0) {
+        const submissionForTimes = submission_data as Record<string, unknown>;
+        const syncResults = await Promise.all(
+          existingWorkers.map(async (row) => {
+            const range = resolveWorkerTimeRange(row.worker_id, submissionForTimes);
+            const { error: timeSyncError } = await supabaseAdmin
+              .from("job_worker")
+              .update({
+                start_time: range?.start_time ?? null,
+                end_time: range?.end_time ?? null,
+              })
+              .eq("job_id", jobId)
+              .eq("worker_id", row.worker_id);
+            return { workerId: row.worker_id, error: timeSyncError };
+          })
+        );
+        for (const result of syncResults) {
+          if (result.error) {
+            logger.warn("Failed to sync job_worker times from submission_data", {
+              jobId,
+              workerId: result.workerId,
+              error: result.error.message,
+            });
+          }
+        }
+        logger.debug("Synced job_worker times from submission_data", {
+          jobId,
+          workerCount: existingWorkers.length,
+          failedCount: syncResults.filter((r) => r.error).length,
+        });
+      }
+    }
+
     // Fetch updated job with relationships
     const { data: finalJob, error: fetchError } = await supabaseAdmin
       .from("job")
@@ -382,7 +410,7 @@ serve(async (req: Request) => {
           contact_person,
           phone
         )
-      `,
+      `
       )
       .eq("id", jobId)
       .single();
@@ -406,7 +434,7 @@ serve(async (req: Request) => {
           email,
           phone
         )
-      `,
+      `
       )
       .eq("job_id", jobId);
 
@@ -419,14 +447,15 @@ serve(async (req: Request) => {
     }
 
     // Format workers array
-    const workers = (jobWorkers || []).map((jw: { worker: unknown }) => {
-      const worker = Array.isArray(jw.worker) ? jw.worker[0] : jw.worker;
-      return worker;
-    }).filter(Boolean);
+    const workers = (jobWorkers || [])
+      .map((jw: { worker: unknown }) => {
+        const worker = Array.isArray(jw.worker) ? jw.worker[0] : jw.worker;
+        return worker;
+      })
+      .filter(Boolean);
 
     // Log edit to audit trail if any changes were made
-    const hasChanges = Object.keys(updateData).length > 0 ||
-      worker_ids !== undefined;
+    const hasChanges = Object.keys(updateData).length > 0 || worker_ids !== undefined;
 
     if (hasChanges && existingJob) {
       try {
@@ -460,17 +489,15 @@ serve(async (req: Request) => {
         };
 
         // Log to job_edits table
-        const { error: auditError } = await supabaseAdmin
-          .from("job_edits")
-          .insert({
-            job_id: jobId,
-            edited_by_email: userEmail,
-            edited_by_user_id: authUser.id,
-            action: "UPDATE",
-            old_data: oldData,
-            new_data: newData,
-            changed_fields: changedFields,
-          });
+        const { error: auditError } = await supabaseAdmin.from("job_edits").insert({
+          job_id: jobId,
+          edited_by_email: userEmail,
+          edited_by_user_id: authUser.id,
+          action: "UPDATE",
+          old_data: oldData,
+          new_data: newData,
+          changed_fields: changedFields,
+        });
 
         if (auditError) {
           // Log error but don't fail the update
@@ -498,9 +525,9 @@ serve(async (req: Request) => {
 
     // Auto-generate invoice if job was just completed and setting is enabled
     // Uses shared utility to avoid code duplication with create-job
-    const wasJustCompleted = updateData.completed_at !== undefined &&
-      (!existingJob.completed_at ||
-        existingJob.completed_at !== updateData.completed_at);
+    const wasJustCompleted =
+      updateData.completed_at !== undefined &&
+      (!existingJob.completed_at || existingJob.completed_at !== updateData.completed_at);
 
     if (wasJustCompleted) {
       const autoInvoiceResult = await autoGenerateInvoiceForJob({
@@ -525,6 +552,18 @@ serve(async (req: Request) => {
       }
     }
 
+    // Refresh or cancel pending feedback outbox when timing/mute inputs change
+    if (updateData.completed_at !== undefined || updateData.location_id !== undefined) {
+      try {
+        await recomputePendingFeedbackSendAfter(supabaseAdmin, finalJob.id);
+      } catch (feedbackOutboxError) {
+        logger.warn("Failed to recompute feedback outbox send_after", {
+          jobId: finalJob.id,
+          error: feedbackOutboxError,
+        });
+      }
+    }
+
     logger.info("Job update completed successfully", {
       jobId: finalJob.id,
       organizationId,
@@ -543,7 +582,7 @@ serve(async (req: Request) => {
 
     return errorResponse(
       extractErrorMessage(error, "Failed to update job"),
-      getErrorStatusCode(error),
+      getErrorStatusCode(error)
     );
   }
 });

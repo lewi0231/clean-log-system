@@ -21,7 +21,13 @@ import { WorkerPaymentService } from "@/lib/services/worker-payment.service";
 
 import { log } from "@/lib/logger";
 import { InvoiceStatus, Job, JobEdit } from "@/lib/types";
-import type { GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
+import { buildFeedbackSendConfirms, getFeedbackSendButtonState } from "@/lib/feedback-send-ui";
+import type {
+  GetJobEditsRequest,
+  SendFeedbackEmailOptions,
+  SendFeedbackEmailResponse,
+  UpdateJobRequest,
+} from "@/lib/types/api";
 import {
   AlertTriangle,
   Calculator,
@@ -45,11 +51,34 @@ interface JobDetailDialogProps {
   onEditSuccess?: () => void;
   updateJob: (request: UpdateJobRequest) => Promise<Job>;
   getJobEdits: (request: GetJobEditsRequest) => Promise<JobEdit[]>;
-  sendFeedbackEmail: (jobId: string) => Promise<void>;
+  sendFeedbackEmail: (
+    jobId: string,
+    options?: SendFeedbackEmailOptions
+  ) => Promise<SendFeedbackEmailResponse>;
   jobs: Job[];
   organizationId: string | null;
   /** Field configs from the page for the edit dialog (avoids useFieldConfigs in nested components). */
   fieldConfigsForEdit: FieldConfig[];
+}
+
+function feedbackChipVariant(
+  chip: NonNullable<Job["feedback_request_status"]>["chip"]
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (chip) {
+    case "responded":
+    case "sent":
+      return "secondary";
+    case "failed":
+    case "cancelled":
+    case "config_error":
+      return "destructive";
+    case "queued":
+    case "edit_window":
+    case "ready":
+      return "default";
+    default:
+      return "outline";
+  }
 }
 
 // Standard fields that should be displayed in a specific order
@@ -425,6 +454,11 @@ export default function JobDetailDialog({
                     autoApproveAt={job.auto_approve_at}
                   />
                   {jobStatus && <Badge variant={jobStatus.variant}>{jobStatus.label}</Badge>}
+                  {job.feedback_request_status && (
+                    <Badge variant={feedbackChipVariant(job.feedback_request_status.chip)}>
+                      Feedback: {job.feedback_request_status.label}
+                    </Badge>
+                  )}
                 </div>
               </div>
               {isAdmin && (
@@ -440,36 +474,80 @@ export default function JobDetailDialog({
                       Calculate Payment
                     </Button>
                   )}
-                  {!job.feedback_email_sent && (
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        if (!job.id) return;
-                        setSendingFeedback(true);
-                        try {
-                          await sendFeedbackEmail(job.id);
-                          toast.success("Feedback email sent successfully", {
-                            description: "The feedback request has been emailed to the customer.",
-                          });
-                          onEditSuccess?.();
-                        } catch (err) {
-                          log.error("JobDetailDialog: Failed to send feedback email", {
-                            error: err instanceof Error ? err.message : "Unknown error",
-                            jobId: job.id,
-                          });
-                          toast.error("Failed to send feedback email", {
-                            description: err instanceof Error ? err.message : "Please try again.",
-                          });
-                        } finally {
-                          setSendingFeedback(false);
-                        }
-                      }}
-                      disabled={sendingFeedback}
-                    >
-                      <Mail className="mr-2 h-4 w-4" />
-                      {sendingFeedback ? "Sending..." : "Send Feedback Email"}
-                    </Button>
-                  )}
+                  {(() => {
+                    const sendState = getFeedbackSendButtonState(job);
+                    if (!sendState.visible) return null;
+
+                    return (
+                      <Button
+                        variant="outline"
+                        title={sendState.blockReason ?? undefined}
+                        onClick={async () => {
+                          if (!job.id) return;
+
+                          if (sendState.disabled) {
+                            toast.error("Cannot send feedback", {
+                              description: sendState.blockReason || "Send is blocked for this job.",
+                            });
+                            return;
+                          }
+
+                          const answers = {
+                            flagged: sendState.confirms.requireFlagged
+                              ? window.confirm(
+                                  "This job is flagged. Send a feedback request anyway?"
+                                )
+                              : undefined,
+                            test: sendState.confirms.requireTest
+                              ? window.confirm(
+                                  "This is a test job. Send a feedback request anyway?"
+                                )
+                              : undefined,
+                            resend: sendState.confirms.requireResend
+                              ? window.confirm(
+                                  "A feedback request was already sent. Resend another email?"
+                                )
+                              : undefined,
+                          };
+                          const confirms = buildFeedbackSendConfirms(sendState, answers);
+                          if (!confirms) return;
+
+                          setSendingFeedback(true);
+                          try {
+                            const result = await sendFeedbackEmail(job.id, confirms);
+                            if (result.queued) {
+                              toast.success("Feedback email queued", {
+                                description:
+                                  result.message ||
+                                  "The feedback request will be sent when the outbox processes it.",
+                              });
+                            } else {
+                              toast.success("Feedback email sent successfully", {
+                                description:
+                                  result.message ||
+                                  "The feedback request has been emailed to the customer.",
+                              });
+                            }
+                            onEditSuccess?.();
+                          } catch (err) {
+                            log.error("JobDetailDialog: Failed to send feedback email", {
+                              error: err instanceof Error ? err.message : "Unknown error",
+                              jobId: job.id,
+                            });
+                            toast.error("Failed to send feedback email", {
+                              description: err instanceof Error ? err.message : "Please try again.",
+                            });
+                          } finally {
+                            setSendingFeedback(false);
+                          }
+                        }}
+                        disabled={sendingFeedback || sendState.disabled}
+                      >
+                        <Mail className="mr-2 h-4 w-4" />
+                        {sendingFeedback ? "Sending..." : sendState.label}
+                      </Button>
+                    );
+                  })()}
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -561,7 +639,38 @@ export default function JobDetailDialog({
                     Feedback Status
                   </div>
                   <div className="text-base">
-                    {job.feedback_email_sent ? (
+                    {job.feedback_request_status ? (
+                      <div className="flex flex-col gap-1">
+                        <Badge variant={feedbackChipVariant(job.feedback_request_status.chip)}>
+                          {job.feedback_request_status.label}
+                        </Badge>
+                        {job.feedback_request_status.send_after &&
+                          job.feedback_request_status.chip === "queued" && (
+                            <span className="text-xs text-muted-foreground">
+                              Send after{" "}
+                              {new Date(job.feedback_request_status.send_after).toLocaleString()}
+                            </span>
+                          )}
+                        {job.feedback_email_sent_at &&
+                          job.feedback_request_status.chip === "sent" && (
+                            <span className="text-xs text-muted-foreground">
+                              Sent on {new Date(job.feedback_email_sent_at).toLocaleString()}
+                            </span>
+                          )}
+                        {job.feedback_request_status.block_reason &&
+                          !job.feedback_request_status.can_send && (
+                            <span className="text-xs text-muted-foreground">
+                              {job.feedback_request_status.block_reason}
+                            </span>
+                          )}
+                        {job.feedback_request_status.last_error &&
+                          job.feedback_request_status.chip === "failed" && (
+                            <span className="text-xs text-destructive">
+                              {job.feedback_request_status.last_error}
+                            </span>
+                          )}
+                      </div>
+                    ) : job.feedback_email_sent ? (
                       <div className="flex flex-col gap-1">
                         <Badge variant="secondary">Feedback Email Sent</Badge>
                         {job.feedback_email_sent_at && (

@@ -79,9 +79,39 @@ export interface GetInvoiceDetailsRequest {
   invoice_id: string;
 }
 
+export interface ResolvedHierarchyBillingPayload {
+  hierarchy_node_id: string;
+  hierarchy_node_type: "company" | "region";
+  hierarchy_node_name: string;
+  billing_address: {
+    name?: string | null;
+    contact_person?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    address_line1?: string | null;
+    address_line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postcode?: string | null;
+    country?: string | null;
+    address?: string | null;
+  };
+}
+
 export interface GetInvoiceDetailsResponse {
   success: boolean;
   invoice: InvoiceWithJobs;
   calculation: CalculateInvoiceResponse["calculation"];
   template_config?: InvoiceTemplateConfig | null;
+  hierarchy_metadata?: Record<
+    string,
+    {
+      id: string;
+      type: string;
+      name: string;
+      parent_id?: string | null;
+      metadata?: Record<string, unknown> | null;
+    }
+  >;
+  resolved_billing?: ResolvedHierarchyBillingPayload | null;
 }

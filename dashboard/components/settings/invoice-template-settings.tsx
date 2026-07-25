@@ -577,7 +577,7 @@ export default function InvoiceTemplateSettings(
             <div className="space-y-0.5">
               <Label htmlFor="billing-address-enabled">Show Billing Address</Label>
               <p className="text-sm text-muted-foreground">
-                Display company billing address from hierarchy when available
+                Display resolved hierarchy billing address (region or company) when available
               </p>
             </div>
             <Switch
@@ -590,8 +590,9 @@ export default function InvoiceTemplateSettings(
           {billingAddressConfig.enabled && (
             <div className="rounded-lg bg-muted/50 border border-muted p-3">
               <p className="text-sm text-muted-foreground">
-                When enabled, the billing address from the parent company in the location hierarchy
-                will be shown separately from the service address.
+                When enabled, the Bill To address from the location hierarchy (region by default, or
+                company when override is set / region is empty) is shown separately from the service
+                address.
               </p>
             </div>
           )}
@@ -633,14 +634,14 @@ export default function InvoiceTemplateSettings(
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="hierarchy_billing_email" id="email-hierarchy" />
                   <Label htmlFor="email-hierarchy" className="font-normal cursor-pointer">
-                    Hierarchy billing email (from parent company billing address)
+                    Hierarchy billing email (resolved region or company)
                   </Label>
                 </div>
               </RadioGroup>
               <p className="text-xs text-muted-foreground pt-2">
-                Hierarchy billing email comes from the parent company&apos;s billing address in the
-                location hierarchy. If that email is missing (no hierarchy parent, or no billing
-                email on the parent), we fall back to the location email.
+                Uses the resolved hierarchy billing email (region first, then company — or company
+                when &quot;use company billing for all regions&quot; is on). If missing, we fall
+                back to the location email.
               </p>
             </div>
           ) : (

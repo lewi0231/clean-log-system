@@ -40,6 +40,7 @@ interface LocationFormProps {
       phone?: string;
       hierarchy_parent_id?: string | null;
       active?: boolean;
+      feedback_requests_enabled?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -55,6 +56,7 @@ interface LocationFormProps {
     contact_person: string | null;
     phone: string | null;
     active?: boolean;
+    feedback_requests_enabled?: boolean;
     hierarchy_parent_id?: string | null;
     pricing_mode?: "field_based" | "fixed_price";
     fixed_customer_price?: number | null;
@@ -79,6 +81,7 @@ export default function LocationForm({
     phone?: string;
     hierarchy_parent_id?: string | null;
     active?: boolean;
+    feedback_requests_enabled?: boolean;
     pricing_mode?: "field_based" | "fixed_price";
     fixed_customer_price?: number;
     fixed_worker_payment?: number;
@@ -94,6 +97,7 @@ export default function LocationForm({
       phone: location?.phone || "",
       hierarchy_parent_id: location?.hierarchy_parent_id || null,
       active: location?.active ?? true, // Default to active for new locations
+      feedback_requests_enabled: location?.feedback_requests_enabled ?? true,
       pricing_mode: "field_based", // Always default to field-based
       fixed_customer_price: undefined,
       fixed_worker_payment: undefined,
@@ -126,6 +130,12 @@ export default function LocationForm({
     control,
     name: "active",
     defaultValue: defaultValues.active,
+  });
+
+  const feedbackRequestsEnabled = useWatch({
+    control,
+    name: "feedback_requests_enabled",
+    defaultValue: defaultValues.feedback_requests_enabled,
   });
 
   // Build a flat list with indentation for display
@@ -162,6 +172,7 @@ export default function LocationForm({
       phone: values.phone || undefined,
       hierarchy_parent_id: values.hierarchy_parent_id ?? null,
       active: values.active ?? true,
+      feedback_requests_enabled: values.feedback_requests_enabled ?? true,
       pricing_mode: "field_based" as const,
       fixed_customer_price: null,
       fixed_worker_payment: null,
@@ -301,6 +312,23 @@ export default function LocationForm({
                 tab to enable regional pricing for this location.
               </p>
             )}
+          </div>
+
+          <div className="flex items-center justify-between gap-8 rounded-lg border p-4">
+            <div className="space-y-0.5 flex-1">
+              <Label htmlFor="feedback_requests_enabled" className="text-sm font-medium">
+                Allow feedback requests
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                When off, feedback request emails are muted for jobs at this location.
+              </p>
+            </div>
+            <Switch
+              id="feedback_requests_enabled"
+              checked={feedbackRequestsEnabled ?? true}
+              onCheckedChange={(checked) => setValue("feedback_requests_enabled", checked)}
+              className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
+            />
           </div>
 
           {/* Active Status - Only show in edit mode */}

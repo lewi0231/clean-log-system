@@ -4,11 +4,8 @@ import { InvoiceDocument } from "@/components/invoicing/invoice-document";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { log } from "@/lib/logger";
 import { invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
-import type {
-  BillingAddressConfig,
-  InvoiceWithJobs,
-  ServiceAddressConfig,
-} from "@/lib/types";
+import type { BillingAddressConfig, InvoiceWithJobs, ServiceAddressConfig } from "@/lib/types";
+import type { ResolvedHierarchyBilling } from "@clean-log/shared/utils/hierarchy-billing";
 import { useEffect, useState } from "react";
 
 interface InvoicePreviewProps {
@@ -33,9 +30,11 @@ interface InvoicePreviewProps {
         id: string;
         type: string;
         name: string;
-        metadata?: Record<string, unknown>;
+        parent_id?: string | null;
+        metadata?: Record<string, unknown> | null;
       }
     >;
+    resolved_billing?: ResolvedHierarchyBilling | null;
     invoice_job?: Array<{
       job: {
         id: string;
@@ -85,7 +84,7 @@ export default function InvoicePreview({
       try {
         const data = await invokeEdgeFunction<{ settings?: Partial<OrganizationInfo> }>(
           "get-organization-settings",
-          { organization_id: organizationId },
+          { organization_id: organizationId }
         );
 
         if (data?.settings) {
@@ -97,13 +96,10 @@ export default function InvoicePreview({
             primary_contact_email: data.settings.primary_contact_email ?? null,
             primary_contact_phone: data.settings.primary_contact_phone ?? null,
             default_invoice_due_days: data.settings.default_invoice_due_days ?? 30,
-            show_bank_transfer_on_invoices:
-              data.settings.show_bank_transfer_on_invoices ?? true,
+            show_bank_transfer_on_invoices: data.settings.show_bank_transfer_on_invoices ?? true,
             bank_transfer_bsb: data.settings.bank_transfer_bsb ?? null,
-            bank_transfer_account_number:
-              data.settings.bank_transfer_account_number ?? null,
-            bank_transfer_account_name:
-              data.settings.bank_transfer_account_name ?? null,
+            bank_transfer_account_number: data.settings.bank_transfer_account_number ?? null,
+            bank_transfer_account_name: data.settings.bank_transfer_account_name ?? null,
             stripe_account_id: data.settings.stripe_account_id ?? null,
           });
         }
@@ -146,6 +142,7 @@ export default function InvoicePreview({
         total_paid: invoice.total_paid ?? undefined,
         template_config: invoice.template_config ?? undefined,
         hierarchy_metadata: invoice.hierarchy_metadata,
+        resolved_billing: invoice.resolved_billing,
         invoice_job: invoice.invoice_job,
       }}
       calculation={{

@@ -2,9 +2,21 @@ import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
+import { requireOrgAdminFromRequest } from "../_utils/org-sending-domain-edge.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateBusinessMode, validateRequiredFields } from "../_utils/validation.ts";
 import { isWorkforceEngagement } from "../_utils/workforce-engagement.ts";
+
+const FEEDBACK_SETTINGS_KEYS = [
+  "feedback_requests_enabled",
+  "feedback_auto_send",
+  "feedback_request_mode",
+  "public_review_url",
+  "feedback_email_subject",
+  "feedback_email_body",
+  "feedback_email_reply_to",
+  "feedback_send_delay_hours",
+] as const;
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
@@ -33,7 +45,14 @@ serve(async (req) => {
       primary_contact_phone,
       business_address,
       invoice_send_immediately,
-      feedback_email_send_immediately,
+      feedback_requests_enabled,
+      feedback_auto_send,
+      feedback_request_mode,
+      public_review_url,
+      feedback_email_subject,
+      feedback_email_body,
+      feedback_email_reply_to,
+      feedback_send_delay_hours,
       rating_config,
       stripe_account_id,
       payment_provider,
@@ -65,6 +84,14 @@ serve(async (req) => {
     );
     if (!membershipCheck) {
       return errorResponse("You do not have permission to access this organization", 403);
+    }
+
+    const feedbackFieldPresent = FEEDBACK_SETTINGS_KEYS.some((key) => body[key] !== undefined);
+    if (feedbackFieldPresent) {
+      const adminGate = await requireOrgAdminFromRequest(req, organization_id, supabase, body);
+      if (!adminGate.ok) {
+        return errorResponse(adminGate.message, adminGate.status);
+      }
     }
 
     const updateData: Record<string, unknown> = {};
@@ -128,11 +155,109 @@ serve(async (req) => {
       updateData.invoice_send_immediately = invoice_send_immediately;
     }
 
-    if (feedback_email_send_immediately !== undefined) {
-      if (typeof feedback_email_send_immediately !== "boolean") {
-        return errorResponse("feedback_email_send_immediately must be a boolean", 400);
+    if (feedback_requests_enabled !== undefined) {
+      if (typeof feedback_requests_enabled !== "boolean") {
+        return errorResponse("feedback_requests_enabled must be a boolean", 400);
       }
-      updateData.feedback_email_send_immediately = feedback_email_send_immediately;
+      updateData.feedback_requests_enabled = feedback_requests_enabled;
+    }
+
+    if (feedback_auto_send !== undefined) {
+      if (typeof feedback_auto_send !== "boolean") {
+        return errorResponse("feedback_auto_send must be a boolean", 400);
+      }
+      updateData.feedback_auto_send = feedback_auto_send;
+    }
+
+    if (feedback_request_mode !== undefined) {
+      if (!["internal", "public", "both"].includes(feedback_request_mode)) {
+        return errorResponse("feedback_request_mode must be internal, public, or both", 400);
+      }
+      updateData.feedback_request_mode = feedback_request_mode;
+    }
+
+    if (public_review_url !== undefined) {
+      if (public_review_url === null || public_review_url === "") {
+        updateData.public_review_url = null;
+      } else if (typeof public_review_url !== "string") {
+        return errorResponse("public_review_url must be a string or null", 400);
+      } else if (!/^https:\/\//i.test(public_review_url.trim())) {
+        return errorResponse("public_review_url must start with https://", 400);
+      } else {
+        updateData.public_review_url = public_review_url.trim();
+      }
+    }
+
+    if (feedback_email_subject !== undefined) {
+      if (feedback_email_subject === null || feedback_email_subject === "") {
+        updateData.feedback_email_subject = null;
+      } else if (typeof feedback_email_subject !== "string") {
+        return errorResponse("feedback_email_subject must be a string or null", 400);
+      } else if (feedback_email_subject.length > 200) {
+        return errorResponse("feedback_email_subject must be ≤ 200 characters", 400);
+      } else {
+        updateData.feedback_email_subject = feedback_email_subject;
+      }
+    }
+
+    if (feedback_email_body !== undefined) {
+      if (feedback_email_body === null || feedback_email_body === "") {
+        updateData.feedback_email_body = null;
+      } else if (typeof feedback_email_body !== "string") {
+        return errorResponse("feedback_email_body must be a string or null", 400);
+      } else if (feedback_email_body.length > 10000) {
+        return errorResponse("feedback_email_body must be ≤ 10000 characters", 400);
+      } else {
+        updateData.feedback_email_body = feedback_email_body;
+      }
+    }
+
+    if (feedback_email_reply_to !== undefined) {
+      if (feedback_email_reply_to === null || feedback_email_reply_to === "") {
+        updateData.feedback_email_reply_to = null;
+      } else if (typeof feedback_email_reply_to !== "string") {
+        return errorResponse("feedback_email_reply_to must be a string or null", 400);
+      } else {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(feedback_email_reply_to.trim())) {
+          return errorResponse("feedback_email_reply_to must be a valid email", 400);
+        }
+        updateData.feedback_email_reply_to = feedback_email_reply_to.trim();
+      }
+    }
+
+    if (feedback_send_delay_hours !== undefined) {
+      if (
+        typeof feedback_send_delay_hours !== "number" ||
+        !Number.isInteger(feedback_send_delay_hours) ||
+        feedback_send_delay_hours < 0 ||
+        feedback_send_delay_hours > 168
+      ) {
+        return errorResponse("feedback_send_delay_hours must be an integer from 0 to 168", 400);
+      }
+      updateData.feedback_send_delay_hours = feedback_send_delay_hours;
+    }
+
+    const effectiveMode = (updateData.feedback_request_mode ?? feedback_request_mode) as
+      | string
+      | undefined;
+    if (effectiveMode === "public" || effectiveMode === "both") {
+      // If mode is being set to public/both, ensure URL present (from this request or DB)
+      let url = updateData.public_review_url as string | null | undefined;
+      if (url === undefined && public_review_url === undefined) {
+        const { data: existingOrg } = await supabase
+          .from("organization")
+          .select("public_review_url")
+          .eq("id", organization_id)
+          .maybeSingle();
+        url = existingOrg?.public_review_url ?? null;
+      }
+      if (url === null || url === "" || (typeof url === "string" && !/^https:\/\//i.test(url))) {
+        return errorResponse(
+          "public_review_url (https://) is required when feedback_request_mode is public or both",
+          400
+        );
+      }
     }
 
     if (stripe_account_id !== undefined) {
@@ -542,7 +667,7 @@ serve(async (req) => {
         .update(updateData)
         .eq("id", organization_id)
         .select(
-          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, colleague_confirmation_timeout_hours"
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_requests_enabled, feedback_auto_send, feedback_request_mode, public_review_url, feedback_email_subject, feedback_email_body, feedback_email_reply_to, feedback_send_delay_hours, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, colleague_confirmation_timeout_hours"
         )
         .single();
 
@@ -553,7 +678,7 @@ serve(async (req) => {
       const { data: orgData, error: fetchError } = await supabase
         .from("organization")
         .select(
-          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_email_send_immediately, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, colleague_confirmation_timeout_hours"
+          "name, use_predefined_locations, business_mode, abn, logo_url, primary_contact_email, primary_contact_phone, business_address, invoice_send_immediately, feedback_requests_enabled, feedback_auto_send, feedback_request_mode, public_review_url, feedback_email_subject, feedback_email_body, feedback_email_reply_to, feedback_send_delay_hours, rating_config, stripe_account_id, payment_provider, currency, locale, default_exclusive_group_label, colleague_confirmation_timeout_hours"
         )
         .eq("id", organization_id)
         .single();
@@ -609,7 +734,14 @@ serve(async (req) => {
         primary_contact_phone: organization?.primary_contact_phone ?? null,
         business_address: organization?.business_address ?? null,
         invoice_send_immediately: organization?.invoice_send_immediately ?? false,
-        feedback_email_send_immediately: organization?.feedback_email_send_immediately ?? false,
+        feedback_requests_enabled: organization?.feedback_requests_enabled ?? true,
+        feedback_auto_send: organization?.feedback_auto_send ?? false,
+        feedback_request_mode: organization?.feedback_request_mode ?? "internal",
+        public_review_url: organization?.public_review_url ?? null,
+        feedback_email_subject: organization?.feedback_email_subject ?? null,
+        feedback_email_body: organization?.feedback_email_body ?? null,
+        feedback_email_reply_to: organization?.feedback_email_reply_to ?? null,
+        feedback_send_delay_hours: organization?.feedback_send_delay_hours ?? 0,
         rating_config: ratingConfig,
         stripe_account_id: organization?.stripe_account_id ?? null,
         payment_provider: organization?.payment_provider ?? null,

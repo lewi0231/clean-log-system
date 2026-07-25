@@ -15,14 +15,18 @@ import {
   type JobContext,
 } from "../invoice-email.ts";
 
-// Mock supabase client for Deno tests
+// Mock supabase client for Deno tests (supports .single() and .maybeSingle())
 const createMockSupabase = () => {
   let mockSingleResponse: { data: unknown; error: unknown } | null = null;
 
   const mockSelect = () => ({
-    eq: () => ({
-      single: () => Promise.resolve(mockSingleResponse || { data: null, error: null }),
-    }),
+    eq: () => {
+      const result = () => Promise.resolve(mockSingleResponse || { data: null, error: null });
+      return {
+        single: result,
+        maybeSingle: result,
+      };
+    },
   });
 
   return {
@@ -73,7 +77,10 @@ Deno.test(
     )._setMockSingleResponse({
       data: {
         id: "hier-1",
-        type: "organization",
+        type: "company",
+        name: "Test Co",
+        parent_id: null,
+        active: true,
         metadata: {
           billing_address: {
             email: "billing@company.com",
@@ -128,7 +135,10 @@ Deno.test(
     )._setMockSingleResponse({
       data: {
         id: "hier-1",
-        type: "organization",
+        type: "company",
+        name: "Test Co",
+        parent_id: null,
+        active: true,
         metadata: {}, // No billing email
       },
       error: null,
@@ -145,6 +155,129 @@ Deno.test(
 
     assertEquals(result, ["location@example.com"]);
     (mockSupabase as unknown as { _clearMock: () => void })._clearMock();
+  }
+);
+
+Deno.test(
+  "P0: hierarchy_billing_email walks region → company when region has no email",
+  async () => {
+    const nodes: Record<string, unknown> = {
+      "region-1": {
+        id: "region-1",
+        type: "region",
+        name: "South",
+        parent_id: "company-1",
+        active: true,
+        metadata: {},
+      },
+      "company-1": {
+        id: "company-1",
+        type: "company",
+        name: "Metro",
+        parent_id: null,
+        active: true,
+        metadata: {
+          billing_address: { email: "ap@company.com" },
+        },
+      },
+    };
+
+    const mockSupabase = {
+      from: () => ({
+        select: () => ({
+          eq: (_col: string, id: string) => {
+            const result = () => Promise.resolve({ data: nodes[id] ?? null, error: null });
+            return { single: result, maybeSingle: result };
+          },
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      [
+        {
+          location_id: "loc-1",
+          location: {
+            id: "loc-1",
+            email: "location@example.com",
+            contact_person: null,
+            hierarchy_parent_id: "region-1",
+          },
+          submission_data: {},
+        },
+      ],
+      {
+        location_email_source: "hierarchy_billing_email",
+        form_field_email: null,
+      },
+      new Map()
+    );
+
+    assertEquals(result, ["ap@company.com"]);
+  }
+);
+
+Deno.test(
+  "P0: company override with no company email falls back to location (not region)",
+  async () => {
+    const nodes: Record<string, unknown> = {
+      "region-1": {
+        id: "region-1",
+        type: "region",
+        name: "South",
+        parent_id: "company-1",
+        active: true,
+        metadata: {
+          billing_address: { email: "region@example.com" },
+        },
+      },
+      "company-1": {
+        id: "company-1",
+        type: "company",
+        name: "Metro",
+        parent_id: null,
+        active: true,
+        metadata: {
+          use_company_billing_for_children: true,
+          billing_address: { name: "Metro AP" },
+        },
+      },
+    };
+
+    const mockSupabase = {
+      from: () => ({
+        select: () => ({
+          eq: (_col: string, id: string) => {
+            const result = () => Promise.resolve({ data: nodes[id] ?? null, error: null });
+            return { single: result, maybeSingle: result };
+          },
+        }),
+      }),
+    } as unknown as SupabaseClient;
+
+    const result = await getInvoiceEmailRecipients(
+      mockSupabase,
+      [
+        {
+          location_id: "loc-1",
+          location: {
+            id: "loc-1",
+            email: "location@example.com",
+            contact_person: null,
+            hierarchy_parent_id: "region-1",
+          },
+          submission_data: {},
+        },
+      ],
+      {
+        location_email_source: "hierarchy_billing_email",
+        form_field_email: null,
+      },
+      new Map()
+    );
+
+    assertEquals(result, ["location@example.com"]);
   }
 );
 

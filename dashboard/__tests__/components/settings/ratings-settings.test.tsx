@@ -1,7 +1,7 @@
 /**
  * Tests for ratings settings (Settings → Features tab)
  *
- * Ensures that changing "Send Feedback Requests Immediately" and "Rating
+ * Ensures that changing "Automatically send feedback requests" and "Rating
  * Configuration" triggers update-organization-settings with the correct
  * payloads. Ratings settings live under the Features tab.
  */
@@ -70,7 +70,14 @@ vi.mock("@/components/settings/invoice-template-settings", () => ({
 
 const defaultSettings = {
   name: "Test Org",
-  feedback_email_send_immediately: false,
+  feedback_requests_enabled: true,
+  feedback_auto_send: false,
+  feedback_request_mode: "internal" as const,
+  public_review_url: null,
+  feedback_email_subject: null,
+  feedback_email_body: null,
+  feedback_email_reply_to: null,
+  feedback_send_delay_hours: 0,
   rating_config: { type: "single" as const, dimensions: ["overall"] as const },
 };
 
@@ -162,7 +169,7 @@ describe("Ratings settings", () => {
     const featuresTab = screen.getByRole("tab", { name: /features/i });
     fireEvent.click(featuresTab);
     await waitFor(() => {
-      expect(screen.getByText("Send Feedback Requests Immediately")).toBeInTheDocument();
+      expect(screen.getByText("Automatically send feedback requests")).toBeInTheDocument();
     });
   }
 
@@ -175,12 +182,12 @@ describe("Ratings settings", () => {
       });
       await openFeaturesTab();
 
-      expect(screen.getByText("Send Feedback Requests Immediately")).toBeInTheDocument();
+      expect(screen.getByText("Automatically send feedback requests")).toBeInTheDocument();
       expect(screen.getByText("Rating Configuration")).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: /Single Overall Rating/i })).toBeInTheDocument();
     });
 
-    it("should call update-organization-settings when toggling Send Feedback Requests Immediately", async () => {
+    it("should call update-organization-settings when toggling Automatically send feedback requests", async () => {
       render(<SettingsPage />, { wrapper: createWrapper() });
       await waitFor(() =>
         expect(screen.getByRole("tab", { name: /features/i })).toBeInTheDocument()
@@ -188,7 +195,7 @@ describe("Ratings settings", () => {
       await openFeaturesTab();
 
       const switchControl = screen.getByRole("switch", {
-        name: /Send Feedback Requests Immediately/i,
+        name: /Automatically send feedback requests/i,
       });
       fireEvent.click(switchControl);
 
@@ -198,7 +205,7 @@ describe("Ratings settings", () => {
           expect.objectContaining({
             body: expect.objectContaining({
               organization_id: "org-1",
-              feedback_email_send_immediately: true,
+              feedback_auto_send: true,
             }),
           })
         );

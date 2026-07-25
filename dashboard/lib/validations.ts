@@ -26,6 +26,7 @@ export const locationSchema = z
     phone: z.string().optional(),
     hierarchy_parent_id: z.string().uuid().nullable().optional(),
     active: z.boolean().optional(),
+    feedback_requests_enabled: z.boolean().optional(),
     pricing_mode: z.enum(["field_based", "fixed_price"]).optional(),
     fixed_customer_price: z.number().nonnegative().optional(),
     fixed_worker_payment: z.number().nonnegative().optional(),
@@ -47,10 +48,9 @@ export const locationSchema = z
       return true;
     },
     {
-      message:
-        "Fixed customer price is required when pricing mode is fixed price",
+      message: "Fixed customer price is required when pricing mode is fixed price",
       path: ["fixed_customer_price"],
-    },
+    }
   );
 
 export type LocationFormData = z.infer<typeof locationSchema>;
@@ -90,7 +90,7 @@ export const validationRulesSchema = z
     {
       message: "Min length must be less than or equal to max length",
       path: ["minLength"],
-    },
+    }
   )
   .refine(
     (data) => {
@@ -102,7 +102,7 @@ export const validationRulesSchema = z
     {
       message: "Min value must be less than or equal to max value",
       path: ["min"],
-    },
+    }
   )
   .refine(
     (data) => {
@@ -114,7 +114,7 @@ export const validationRulesSchema = z
     {
       message: "Min items must be less than or equal to max items",
       path: ["min_items"],
-    },
+    }
   );
 
 export const fieldConfigSchema = z
@@ -122,10 +122,7 @@ export const fieldConfigSchema = z
     name: z
       .string()
       .min(1, "Name is required")
-      .regex(
-        /^[a-z0-9_]+$/,
-        "Name must contain only lowercase letters, numbers, and underscores",
-      ),
+      .regex(/^[a-z0-9_]+$/, "Name must contain only lowercase letters, numbers, and underscores"),
     label: z.string().min(1, "Label is required"),
     field_type: fieldTypeSchema,
     description: z.string().nullable(),
@@ -138,19 +135,15 @@ export const fieldConfigSchema = z
   })
   .refine(
     (data) => {
-      if (
-        data.field_type === "select" ||
-        data.field_type === "grouped_breakdown"
-      ) {
+      if (data.field_type === "select" || data.field_type === "grouped_breakdown") {
         return data.options !== null && data.options.length > 0;
       }
       return true;
     },
     {
-      message:
-        "Options are required for select and grouped_breakdown field types",
+      message: "Options are required for select and grouped_breakdown field types",
       path: ["options"],
-    },
+    }
   )
   .refine(
     (data) => {
@@ -163,21 +156,17 @@ export const fieldConfigSchema = z
     {
       message: "Group cluster requires a mutually exclusive group to be set",
       path: ["group_cluster"],
-    },
+    }
   );
 
 export type FieldConfigFormData = z.infer<typeof fieldConfigSchema>;
 
 export const organizationSettingsSchema = z.object({
   use_predefined_locations: z.boolean().default(true),
-  business_mode: z
-    .enum(["service_based", "resource_tracking"])
-    .default("service_based"),
+  business_mode: z.enum(["service_based", "resource_tracking"]).default("service_based"),
 });
 
-export type OrganizationSettingsFormData = z.infer<
-  typeof organizationSettingsSchema
->;
+export type OrganizationSettingsFormData = z.infer<typeof organizationSettingsSchema>;
 
 // Auth schemas
 export const loginSchema = z.object({
@@ -194,16 +183,13 @@ export const signUpSchema = z.object({
     .max(20, "Password cannot be more than 20 characters")
     .refine(
       (password) => /[A-Z]/.test(password),
-      "Password must contain at least one uppercase letter",
+      "Password must contain at least one uppercase letter"
     )
     .refine(
       (password) => /[a-z]/.test(password),
-      "Password must contain at least one lowercase letter",
+      "Password must contain at least one lowercase letter"
     )
-    .refine(
-      (password) => /[0-9]/.test(password),
-      "Password must contain at least one number",
-    ),
+    .refine((password) => /[0-9]/.test(password), "Password must contain at least one number"),
 });
 
 export type LoginFormData = z.infer<typeof loginSchema>;
@@ -231,8 +217,7 @@ export const phoneSchema = z
       return patterns.some((pattern) => pattern.test(cleaned));
     },
     {
-      message:
-        "Invalid phone number format. Use formats like +1 555 123 4567 or (555) 123-4567",
+      message: "Invalid phone number format. Use formats like +1 555 123 4567 or (555) 123-4567",
     }
   );
 
@@ -251,7 +236,7 @@ export type OrganizationUserFormData = z.infer<typeof organizationUserSchema>;
  * Convert Zod validation errors to a field errors object
  */
 export function formatZodErrors<T extends Record<string, unknown>>(
-  error: z.ZodError,
+  error: z.ZodError
 ): Partial<Record<keyof T, string>> {
   const fieldErrors: Partial<Record<keyof T, string>> = {};
 

@@ -5,20 +5,22 @@ description: Install Node, enable pnpm, and install workspace dependencies from 
 
 inputs:
   node-version:
-    description: Node.js major version line
+    description: Node.js major version line (Active LTS)
     required: false
-    default: "20"
+    # Node 20 Actions runtime is deprecated on GitHub runners; keep CI on Node 22 LTS.
+    default: "22"
 
 runs:
   using: composite
   steps:
     # Do not pass `version` here — package.json `packageManager` is the single
-    # source of truth. pnpm/action-setup errors if both are set.
+    # source of truth. pnpm/action-setup errors if both are set
+    # ("Multiple versions of pnpm specified").
     - name: Setup pnpm
-      uses: pnpm/action-setup@v4
+      uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
 
     - name: Setup Node.js
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: ${{ inputs.node-version }}
         cache: pnpm

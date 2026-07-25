@@ -34,8 +34,16 @@ serve(async (req) => {
       return errorResponse("Missing required fields", 400);
     }
 
-    const { name, email, address, contact_person, phone, organization_id, hierarchy_parent_id } =
-      body;
+    const {
+      name,
+      email,
+      address,
+      contact_person,
+      phone,
+      organization_id,
+      hierarchy_parent_id,
+      feedback_requests_enabled,
+    } = body;
 
     const supabase = createServiceRoleClient();
 
@@ -81,6 +89,8 @@ serve(async (req) => {
         phone: phone || null,
         hierarchy_parent_id: hierarchy_parent_id || null,
         active: true,
+        feedback_requests_enabled:
+          typeof feedback_requests_enabled === "boolean" ? feedback_requests_enabled : true,
       })
       .select(
         `

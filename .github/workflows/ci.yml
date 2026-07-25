@@ -7,9 +7,17 @@ on:
     branches: [main, staging]
     types: [opened, synchronize, reopened]
   workflow_dispatch:
+    inputs:
+      full_format_check:
+        description: Run Prettier on the entire repository (slow; leave false for normal staging re-runs)
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # PRs: isolate by number so pushes to different PRs do not cancel each other.
+  # Branches/dispatch: one active run per ref.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -63,13 +71,10 @@ jobs:
       - name: Prettier check (changed files — PR)
         if: github.event_name == 'pull_request'
         run: |
-          FILES=$(git diff --name-only --diff-filter=d ${{ github.event.pull_request.base.sha }} ${{ github.sha }} \
-            | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
-          if [ -z "$FILES" ]; then
-            echo "No matching files changed"
-            exit 0
-          fi
-          echo "$FILES" | xargs pnpm exec prettier --check
+          chmod +x .github/scripts/prettier-check-changed.sh
+          .github/scripts/prettier-check-changed.sh \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.sha }}"
 
       - name: Prettier check (changed files — push)
         if: github.event_name == 'push'
@@ -77,26 +82,31 @@ jobs:
           # Diff the whole push (all commits), not only HEAD~1..HEAD. Otherwise a batch push
           # can leave earlier commits' files unchecked; Prettier failures surface on the next
           # unrelated one-file commit (looks like "staging formatter is flaky").
+          chmod +x .github/scripts/prettier-check-changed.sh
           BEFORE="${{ github.event.before }}"
           if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            RANGE_SPEC="single-commit fallback HEAD~1 HEAD"
-            RANGE_ARGS=(HEAD~1 HEAD)
+            echo "Prettier file list: single-commit fallback HEAD~1..HEAD"
+            .github/scripts/prettier-check-changed.sh HEAD~1 HEAD
           else
-            RANGE_SPEC="push range $BEFORE..${{ github.sha }}"
-            RANGE_ARGS=("$BEFORE" "${{ github.sha }}")
+            echo "Prettier file list: push range $BEFORE..${{ github.sha }}"
+            .github/scripts/prettier-check-changed.sh "$BEFORE" "${{ github.sha }}"
           fi
-          echo "Prettier file list: $RANGE_SPEC"
-          FILES=$(git diff --name-only --diff-filter=d "${RANGE_ARGS[@]}" 2>/dev/null \
-            | grep -E '\.(js|jsx|ts|tsx|json|md|yml|yaml|css|mjs|cjs)$' || true)
-          if [ -z "$FILES" ]; then
-            echo "No matching files changed in this push"
-            exit 0
-          fi
-          echo "$FILES" | xargs pnpm exec prettier --check
 
       - name: Prettier check (manual run)
         if: github.event_name == 'workflow_dispatch'
-        run: pnpm format:check
+        run: |
+          # Full-repo format:check previously failed staging re-runs with 400+ drifted files
+          # and blocked promote-staging-to-main after auto-merge dispatched CI.
+          # Default: tip commit only (matches the squash-merge that triggered the dispatch).
+          # Opt into full-tree with workflow_dispatch input full_format_check=true.
+          chmod +x .github/scripts/prettier-check-changed.sh
+          if [ "${{ github.event.inputs.full_format_check }}" = "true" ]; then
+            echo "Full-repository Prettier check (manual opt-in)"
+            pnpm format:check
+          else
+            echo "Prettier file list: workflow_dispatch tip commit HEAD~1..HEAD"
+            .github/scripts/prettier-check-changed.sh HEAD~1 HEAD
+          fi
 
       - name: ESLint (workspace)
         run: pnpm lint
@@ -305,6 +315,8 @@ jobs:
       github.base_ref == 'staging' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]' &&
+      !startsWith(github.head_ref, 'dependabot/') &&
       needs.ci-required.result == 'success'
     permissions:
       contents: write
@@ -573,9 +585,10 @@ jobs:
     if: failure()
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
-      - name: Post commit comment
+      - name: Post failure notice
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
@@ -591,9 +604,10 @@ jobs:
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${{ github.run_id }}`;
             const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
             const commitMsg =
-              (context.payload.head_commit?.message || '').split(/\r?\n/).shift() ||
-              '(no message)';
-            const branch = '${{ github.ref_name }}';
+              (context.payload.head_commit?.message ||
+                context.payload.pull_request?.title ||
+                '').split(/\r?\n/).shift() || '(no message)';
+            const branch = '${{ github.head_ref || github.ref_name }}';
             const codeBlock = [
               '```bash',
               'pnpm install',
@@ -619,9 +633,21 @@ jobs:
               '### Local verification',
               codeBlock,
             ].join('\n');
-            await github.rest.repos.createCommitComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: context.sha,
-              body,
-            });
+
+            // Prefer PR comments (visible in the PR timeline). Commit comments on
+            // Dependabot/feature SHAs were noisy and easy to miss.
+            if (context.eventName === 'pull_request' && context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            } else {
+              await github.rest.repos.createCommitComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.sha,
+                body,
+              });
+            }

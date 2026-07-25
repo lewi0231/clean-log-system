@@ -4,6 +4,7 @@
  */
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { isBillingEmailFormat, resolveHierarchyBilling } from "./hierarchy-billing.ts";
 
 /**
  * Validate email address using RFC-compliant regex
@@ -12,15 +13,9 @@ import { SupabaseClient } from "@supabase/supabase-js";
  */
 export function isValidEmail(email: string): boolean {
   if (!email || typeof email !== "string") return false;
-
   const trimmed = email.trim();
   if (trimmed === "") return false;
-
-  // RFC 5322 compliant regex (simplified but covers most cases)
-  const emailRegex =
-    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-  return emailRegex.test(trimmed);
+  return isBillingEmailFormat(trimmed);
 }
 
 export interface InvoiceEmailRecipientConfig {
@@ -39,30 +34,6 @@ export interface JobContext {
     hierarchy_parent_id: string | null;
   } | null;
   submission_data: Record<string, unknown> | null;
-}
-
-export interface HierarchyNode {
-  id: string;
-  type: string;
-  metadata: Record<string, unknown> | null;
-}
-
-/**
- * Get email from hierarchy metadata billing address
- */
-function getHierarchyBillingEmail(hierarchyNode: HierarchyNode | null): string | null {
-  if (!hierarchyNode || !hierarchyNode.metadata) return null;
-
-  const billingAddress = hierarchyNode.metadata.billing_address;
-  if (!billingAddress || typeof billingAddress !== "object" || !("email" in billingAddress)) {
-    return null;
-  }
-
-  const email = billingAddress.email;
-  if (typeof email === "string" && email.trim() !== "") {
-    return email.trim();
-  }
-  return null;
 }
 
 /**
@@ -88,17 +59,14 @@ export async function getInvoiceEmailRecipient(
     // if hierarchy is missing or has no valid billing email.
     if (config.location_email_source === "hierarchy_billing_email") {
       if (location.hierarchy_parent_id) {
-        const { data: hierarchyNode } = await supabase
-          .from("location_hierarchy")
-          .select("id, type, metadata")
-          .eq("id", location.hierarchy_parent_id)
-          .single();
-
-        if (hierarchyNode) {
-          const email = getHierarchyBillingEmail(hierarchyNode);
-          if (email && isValidEmail(email)) {
-            return email;
-          }
+        const resolved = await resolveHierarchyBilling(
+          supabase,
+          location.hierarchy_parent_id,
+          "email"
+        );
+        const email = resolved?.billing_address.email?.trim();
+        if (email && isValidEmail(email)) {
+          return email;
         }
       }
 

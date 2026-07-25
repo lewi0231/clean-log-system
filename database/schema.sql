@@ -529,6 +529,33 @@ COMMENT ON TABLE "public"."invoice_send_outbox" IS 'Outbox for invoice sending. 
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."feedback_email_outbox" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "job_id" "uuid" NOT NULL,
+    "organization_id" "uuid" NOT NULL,
+    "send_after" timestamp with time zone NOT NULL,
+    "status" "text" DEFAULT 'pending'::"text" NOT NULL,
+    "attempts" integer DEFAULT 0 NOT NULL,
+    "last_error" "text",
+    "email_id" "text",
+    "mode_at_send" "text",
+    "public_review_url_at_send" "text",
+    "is_resend" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "processed_at" timestamp with time zone,
+    "next_retry_at" timestamp with time zone,
+    CONSTRAINT "feedback_email_outbox_status_check" CHECK (("status" = ANY (ARRAY['pending'::"text", 'processing'::"text", 'succeeded'::"text", 'failed'::"text", 'cancelled'::"text"])))
+);
+
+
+ALTER TABLE "public"."feedback_email_outbox" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."feedback_email_outbox" IS 'Outbox for feedback request emails. RLS enabled; service role only.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."invoice_template_config" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "organization_id" "uuid" NOT NULL,
@@ -588,6 +615,8 @@ CREATE TABLE IF NOT EXISTS "public"."job" (
     "submission_data" "jsonb",
     "feedback_email_sent" boolean DEFAULT false,
     "feedback_email_sent_at" timestamp with time zone,
+    "feedback_mode_at_send" "text",
+    "public_review_url_at_send" "text",
     "is_test" boolean DEFAULT false NOT NULL
 );
 
@@ -599,7 +628,7 @@ COMMENT ON COLUMN "public"."job"."location_id" IS 'Location where job was perfor
 
 
 
-COMMENT ON COLUMN "public"."job"."feedback_token" IS 'Unique token for secure feedback submission via public URL. Generated when job is created if feedback_email_send_immediately is enabled.';
+COMMENT ON COLUMN "public"."job"."feedback_token" IS 'Unique token for secure feedback submission via public URL. Minted when an internal/both feedback request is queued or sent.';
 
 
 
@@ -713,6 +742,7 @@ CREATE TABLE IF NOT EXISTS "public"."location" (
     "fixed_customer_price" numeric(12,4),
     "fixed_worker_payment" numeric(12,4),
     "fixed_price_currency" "public"."currency_code" DEFAULT 'USD'::"public"."currency_code",
+    "feedback_requests_enabled" boolean DEFAULT true NOT NULL,
     CONSTRAINT "check_location_email_format" CHECK (("email" ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'::"text")),
     CONSTRAINT "location_fixed_price_check" CHECK ((("pricing_mode" = 'field_based'::"text") OR (("pricing_mode" = 'fixed_price'::"text") AND ("fixed_customer_price" IS NOT NULL)))),
     CONSTRAINT "location_pricing_mode_check" CHECK (("pricing_mode" = ANY (ARRAY['field_based'::"text", 'fixed_price'::"text"])))
@@ -763,7 +793,14 @@ CREATE TABLE IF NOT EXISTS "public"."organization" (
     "invoice_send_immediately" boolean DEFAULT false,
     "stripe_account_id" "text",
     "payment_provider" "text",
-    "feedback_email_send_immediately" boolean DEFAULT false,
+    "feedback_requests_enabled" boolean DEFAULT true NOT NULL,
+    "feedback_auto_send" boolean DEFAULT false NOT NULL,
+    "feedback_request_mode" "text" DEFAULT 'internal'::"text" NOT NULL,
+    "public_review_url" "text",
+    "feedback_email_subject" "text",
+    "feedback_email_body" "text",
+    "feedback_email_reply_to" "text",
+    "feedback_send_delay_hours" integer DEFAULT 0 NOT NULL,
     "currency" "public"."currency_code" DEFAULT 'AUD'::"public"."currency_code",
     "locale" "text" DEFAULT 'en-AU'::"text",
     "default_exclusive_group_label" "text",
@@ -772,7 +809,9 @@ CREATE TABLE IF NOT EXISTS "public"."organization" (
     "onboarding_data" "jsonb",
     "business_address" "text",
     "primary_contact_phone" "text",
-    CONSTRAINT "organization_business_mode_check" CHECK (("business_mode" = ANY (ARRAY['service_based'::"text", 'resource_tracking'::"text"])))
+    CONSTRAINT "organization_business_mode_check" CHECK (("business_mode" = ANY (ARRAY['service_based'::"text", 'resource_tracking'::"text"]))),
+    CONSTRAINT "organization_feedback_request_mode_check" CHECK (("feedback_request_mode" = ANY (ARRAY['internal'::"text", 'public'::"text", 'both'::"text"]))),
+    CONSTRAINT "organization_feedback_send_delay_hours_check" CHECK ((("feedback_send_delay_hours" >= 0) AND ("feedback_send_delay_hours" <= 168)))
 );
 
 
@@ -807,7 +846,11 @@ COMMENT ON COLUMN "public"."organization"."payment_provider" IS 'Payment provide
 
 
 
-COMMENT ON COLUMN "public"."organization"."feedback_email_send_immediately" IS 'If true, feedback request emails are sent immediately after a job is completed. If false, feedback requests require manual action.';
+COMMENT ON COLUMN "public"."organization"."feedback_requests_enabled" IS 'Master kill switch for feedback request emails (auto + manual).';
+
+
+
+COMMENT ON COLUMN "public"."organization"."feedback_auto_send" IS 'If true (and feedback_requests_enabled), enqueue/send feedback requests after job completion.';
 
 
 
