@@ -1,26 +1,13 @@
-import {
-  finiteMoney,
-  resolveInvoiceDocumentTitle,
-  TAX_INVOICE_THRESHOLD_AUD,
-} from "@clean-log/shared/utils/invoice-tax";
+import { finiteMoney, resolveInvoiceDocumentTitle } from "@clean-log/shared/utils/invoice-tax";
 import { describe, expect, it } from "vitest";
 
 describe("resolveInvoiceDocumentTitle", () => {
-  it("matches ATO threshold boundary", () => {
-    expect(
-      resolveInvoiceDocumentTitle({
-        gstRegistered: true,
-        currency: "AUD",
-        total: TAX_INVOICE_THRESHOLD_AUD,
-      })
-    ).toBe("TAX INVOICE");
-    expect(
-      resolveInvoiceDocumentTitle({
-        gstRegistered: true,
-        currency: "AUD",
-        total: TAX_INVOICE_THRESHOLD_AUD - 0.01,
-      })
-    ).toBe("INVOICE");
+  it("uses TAX INVOICE for all amounts when GST-registered", () => {
+    expect(resolveInvoiceDocumentTitle({ gstRegistered: true })).toBe("TAX INVOICE");
+  });
+
+  it("uses INVOICE when not GST-registered", () => {
+    expect(resolveInvoiceDocumentTitle({ gstRegistered: false })).toBe("INVOICE");
   });
 });
 

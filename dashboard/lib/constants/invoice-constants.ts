@@ -79,8 +79,9 @@ export const DEFAULT_AUTO_SEND_TIME = "09:00" as const;
 // Default currency
 export const DEFAULT_CURRENCY = "AUD" as const;
 
-// GST/Tax (Australian) — threshold SoT: @clean-log/shared/utils/invoice-tax
+// GST/Tax (Australian) — title + obligation-threshold SoT: @clean-log/shared/utils/invoice-tax
 export const GST_RATE_DEFAULT = 10;
+/** ATO obligation reference ($82.50). Title uses gst_registered only — see resolveInvoiceDocumentTitle. */
 export { TAX_INVOICE_THRESHOLD_AUD } from "@clean-log/shared/utils/invoice-tax";
 
 // ABN (Australian Business Number) - 11 digits

@@ -1,21 +1,21 @@
 /**
- * Shared tax-invoice title rules (ATO-aligned) used by InvoiceDocument + PDF/HTML.
+ * Shared tax-invoice title rules used by InvoiceDocument + PDF attachments.
+ *
+ * Product default (AU SMB SaaS): GST-registered orgs always title documents
+ * "TAX INVOICE". The ATO $82.50 figure is an *obligation* threshold (when you
+ * must provide a tax invoice if asked), not a ban on the title for smaller sales.
  */
 
-/** AUD total at/above which a GST-registered invoice is titled TAX INVOICE. */
+/**
+ * ATO reference: taxable sales of $82.50 or less (inc. GST) do not require a
+ * tax invoice unless the customer asks. Kept for help copy — not used for title.
+ */
 export const TAX_INVOICE_THRESHOLD_AUD = 82.5;
 
 export function resolveInvoiceDocumentTitle(params: {
   gstRegistered: boolean;
-  currency: string;
-  total: number;
 }): "TAX INVOICE" | "INVOICE" {
-  const { gstRegistered, currency, total } = params;
-  if (!gstRegistered || !Number.isFinite(total)) return "INVOICE";
-  if (currency !== "AUD" || total >= TAX_INVOICE_THRESHOLD_AUD) {
-    return "TAX INVOICE";
-  }
-  return "INVOICE";
+  return params.gstRegistered ? "TAX INVOICE" : "INVOICE";
 }
 
 /** Coerce to a finite number; invalid / NaN → fallback. */

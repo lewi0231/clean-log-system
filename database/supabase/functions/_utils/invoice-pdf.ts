@@ -1,6 +1,7 @@
 /**
- * Server-side invoice PDF generation for email attachments (pdf-lib).
- * Content from buildInvoiceContentModel — parity with InvoiceDocument fields.
+ * Sole customer-invoice PDF renderer (pdf-lib).
+ * Used by Open PDF (`generate-invoice-pdf`) and email attachments (send / auto-send).
+ * Content from buildInvoiceContentModel — do not add a parallel HTML PDF path.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "npm:pdf-lib@1.17.1";
@@ -198,6 +199,9 @@ export async function generateInvoicePdfBase64(
   draw(`Status: ${String(model.status)}`, 9);
   draw(`Issued: ${formatDate(model.createdAt)}`, 9);
   draw(`Due: ${formatDate(model.dueDate)}`, 9);
+  if (model.paymentTermsText) {
+    draw(`Payment terms: ${model.paymentTermsText}`, 9);
+  }
   y -= 8;
 
   if (model.serviceAddressLines.length > 0) {

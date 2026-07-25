@@ -8,8 +8,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { gateOrganizationRequest } from "../_utils/gate-organization-request.ts";
-import { buildInvoiceContentModel } from "../_utils/invoice-content.ts";
-import { generateInvoiceHtml } from "../_utils/invoice-html.ts";
+import { generateInvoicePdfBase64 } from "../_utils/invoice-pdf.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { uuidSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
@@ -29,8 +28,8 @@ const generateInvoicePdfSchema = z.object({
 /**
  * Generate Invoice PDF Edge Function
  *
- * Generates HTML for client-side print/PDF (Open PDF).
- * Email attachments use pdf-lib via `_utils/invoice-pdf.ts` from the same content model.
+ * Returns the same pdf-lib binary used for email attachments so Open PDF
+ * and Send Invoice share one document.
  */
 serve(async (req: Request) => {
   await loadEnvIfLocal();
@@ -62,18 +61,19 @@ serve(async (req: Request) => {
       organization_id,
     });
 
-    const model = await buildInvoiceContentModel(supabase, invoice_id, organization_id);
-    const html = generateInvoiceHtml(model);
+    const pdf = await generateInvoicePdfBase64(supabase, invoice_id, organization_id);
 
-    logger.info("Invoice HTML generated successfully", {
+    logger.info("Invoice PDF generated successfully", {
       invoice_id,
       organization_id,
+      filename: pdf.filename,
     });
 
     return jsonResponse({
       success: true,
-      html,
-      invoice_number: model.invoiceNumber,
+      pdf_base64: pdf.base64,
+      filename: pdf.filename,
+      invoice_number: pdf.invoiceNumber,
     });
   } catch (error) {
     logger.error("Generate invoice PDF error", error);

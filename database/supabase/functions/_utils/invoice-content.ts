@@ -1,5 +1,5 @@
 /**
- * Shared invoice content for HTML PDF + pdf-lib attachments.
+ * Shared invoice content model for the sole pdf-lib customer PDF path.
  * Aims for parity with React InvoiceDocument (title, GST, branding, bank).
  */
 
@@ -16,13 +16,9 @@ import {
   DEFAULT_LINE_ITEM_DISPLAY,
   type LineItemDisplayConfig,
 } from "./invoice-line-item-display.ts";
-import {
-  finiteMoney,
-  resolveInvoiceDocumentTitle,
-  TAX_INVOICE_THRESHOLD_AUD,
-} from "./invoice-tax.ts";
+import { finiteMoney, resolveInvoiceDocumentTitle } from "./invoice-tax.ts";
 
-export { TAX_INVOICE_THRESHOLD_AUD, resolveInvoiceDocumentTitle as resolveDocumentTitle };
+export { resolveInvoiceDocumentTitle as resolveDocumentTitle };
 
 export interface InvoiceContentLocation {
   id?: string;
@@ -66,6 +62,9 @@ export interface InvoiceContentModel {
   bankTransferAccountNumber: string | null;
   bankTransferAccountName: string | null;
   paymentMethodsText: string | null;
+  /** Match InvoiceDocument payment terms row; null when not configured. */
+  paymentTermsDays: number | null;
+  paymentTermsText: string | null;
   serviceAddressLines: string[];
   billingAddressLines: string[];
   showBillingAddress: boolean;
@@ -141,7 +140,7 @@ export async function buildInvoiceContentModel(
   const { data: orgSettings, error: orgSettingsError } = await supabase
     .from("organization_settings")
     .select(
-      "gst_registered, gst_inclusive, show_bank_transfer_on_invoices, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name"
+      "gst_registered, gst_inclusive, show_bank_transfer_on_invoices, bank_transfer_bsb, bank_transfer_account_number, bank_transfer_account_name, default_invoice_due_days"
     )
     .eq("organization_id", organizationId)
     .maybeSingle();
@@ -217,18 +216,8 @@ export async function buildInvoiceContentModel(
       ? formatBillingAddressLines(resolvedBilling.billing_address)
       : [];
 
-  // Line items: prefer invoice_line_item rows; else build from calculation snapshot
-  let lineItems: InvoiceContentModel["lineItems"] = [];
-  const { data: dbLines, error: lineItemsError } = await supabase
-    .from("invoice_line_item")
-    .select("description, quantity, unit_price, amount")
-    .eq("invoice_id", invoiceId)
-    .order("created_at", { ascending: true });
-
-  if (lineItemsError) {
-    throw new Error(`Failed to load invoice line items: ${lineItemsError.message}`);
-  }
-
+  // Line items SoT: invoice.calculation_snapshot (same as get-invoice-details / InvoiceDocument).
+  // There is no public.invoice_line_item table — do not query one.
   const snap = (invoice.calculation_snapshot ?? null) as {
     gst_registered?: boolean;
     gst_amount?: number;
@@ -246,33 +235,18 @@ export async function buildInvoiceContentModel(
     }>;
   } | null;
 
-  if (dbLines && dbLines.length > 0) {
-    lineItems = dbLines.map(
-      (row: {
-        description?: string | null;
-        quantity?: number | null;
-        unit_price?: number | null;
-        amount?: number | null;
-      }) => ({
-        description: String(row.description ?? "—"),
-        quantity: finiteMoney(row.quantity, 1),
-        unit_price: finiteMoney(row.unit_price, 0),
-        amount: finiteMoney(row.amount, 0),
-      })
-    );
-  } else if (snap) {
-    const displayConfig =
-      (templateConfig?.line_item_display as LineItemDisplayConfig | null) ??
-      DEFAULT_LINE_ITEM_DISPLAY;
-    for (const row of buildInvoiceDisplayRows(snap.job_calculations ?? [], displayConfig)) {
-      lineItems.push({
-        description: row.description,
-        quantity: finiteMoney(row.quantity, 1),
-        unit_price: finiteMoney(row.unit_price, 0),
-        amount: finiteMoney(row.amount, 0),
-      });
-    }
-  }
+  const displayConfig =
+    (templateConfig?.line_item_display as LineItemDisplayConfig | null) ??
+    DEFAULT_LINE_ITEM_DISPLAY;
+  const lineItems: InvoiceContentModel["lineItems"] = buildInvoiceDisplayRows(
+    snap?.job_calculations ?? [],
+    displayConfig
+  ).map((row) => ({
+    description: row.description,
+    quantity: finiteMoney(row.quantity, 1),
+    unit_price: finiteMoney(row.unit_price, 0),
+    amount: finiteMoney(row.amount, 0),
+  }));
 
   const currency = String(invoice.currency ?? "AUD");
   const total = finiteMoney(invoice.total ?? snap?.total, 0);
@@ -305,9 +279,17 @@ export async function buildInvoiceContentModel(
   const paymentMethodsText =
     paymentMethodParts.length > 0 ? `Payment methods: ${paymentMethodParts.join(", ")}.` : null;
 
+  const dueDaysRaw = orgSettings?.default_invoice_due_days;
+  const paymentTermsDays =
+    typeof dueDaysRaw === "number" && Number.isFinite(dueDaysRaw) && dueDaysRaw > 0
+      ? Math.floor(dueDaysRaw)
+      : null;
+  const paymentTermsText =
+    paymentTermsDays != null ? `Payment due within ${paymentTermsDays} days of issue` : null;
+
   return {
     invoiceNumber: String(invoice.invoice_number ?? ""),
-    documentTitle: resolveInvoiceDocumentTitle({ gstRegistered, currency, total }),
+    documentTitle: resolveInvoiceDocumentTitle({ gstRegistered }),
     status: String(invoice.status ?? ""),
     createdAt: String(invoice.created_at ?? ""),
     dueDate: String(invoice.due_date ?? ""),
@@ -345,6 +327,8 @@ export async function buildInvoiceContentModel(
       ? String(orgSettings.bank_transfer_account_name)
       : null,
     paymentMethodsText,
+    paymentTermsDays,
+    paymentTermsText,
     serviceAddressLines,
     billingAddressLines,
     showBillingAddress: billingEnabled && billingAddressLines.length > 0,
