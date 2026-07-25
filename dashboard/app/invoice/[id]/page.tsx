@@ -2,6 +2,7 @@
 
 import type { InvoiceDocumentOrgInfo } from "@/components/invoicing/invoice-document";
 import { InvoiceDocument } from "@/components/invoicing/invoice-document";
+import type { ResolvedHierarchyBilling } from "@clean-log/shared/utils/hierarchy-billing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,6 +69,7 @@ interface InvoiceData extends Omit<InvoiceWithJobs, "invoice_job"> {
       metadata?: Record<string, unknown>;
     }
   >;
+  resolved_billing?: ResolvedHierarchyBilling | null;
   invoice_job?: InvoiceJob[];
 }
 
@@ -112,6 +114,7 @@ function InvoicePageContent() {
           calculation?: CalculateInvoiceResponse["calculation"];
           template_config?: InvoiceData["template_config"];
           hierarchy_metadata?: InvoiceData["hierarchy_metadata"];
+          resolved_billing?: InvoiceData["resolved_billing"];
           organization?: Record<string, unknown>;
         }>("get-invoice-public", { invoice_id: invoiceId });
 
@@ -131,6 +134,7 @@ function InvoicePageContent() {
           hierarchy_metadata: data.hierarchy_metadata as
             | InvoiceData["hierarchy_metadata"]
             | undefined,
+          resolved_billing: data.resolved_billing ?? null,
         });
 
         const org = data.organization;
@@ -348,6 +352,7 @@ function InvoicePageContent() {
               total_paid: invoice.total_paid ?? undefined,
               template_config: invoice.template_config ?? undefined,
               hierarchy_metadata: invoice.hierarchy_metadata,
+              resolved_billing: invoice.resolved_billing,
               invoice_job: invoice.invoice_job,
             }}
             calculation={{

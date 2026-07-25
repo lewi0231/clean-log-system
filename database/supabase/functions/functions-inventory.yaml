@@ -98,6 +98,7 @@ functions:
   review-worker-tax-invoice: secured
   save-worker-payment: secured
   send-feedback-email: secured_custom
+  send-feedback-test-email: secured
   send-invoice-reminder: secured
   send-test-org-sending-domain-email: secured
   send-worker-remittance-email: secured

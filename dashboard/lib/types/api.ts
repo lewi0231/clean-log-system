@@ -390,6 +390,18 @@ export interface SendTestOrgSendingDomainEmailResponse {
   skipped?: boolean;
 }
 
+/** `send-feedback-test-email` */
+export interface SendFeedbackTestEmailRequest {
+  organization_id: string;
+}
+
+export interface SendFeedbackTestEmailResponse {
+  success: boolean;
+  to: string;
+  email_id?: string | null;
+  skipped?: boolean;
+}
+
 // Field Pricing API
 export interface ListFieldPricingRequest {
   organization_id: string;

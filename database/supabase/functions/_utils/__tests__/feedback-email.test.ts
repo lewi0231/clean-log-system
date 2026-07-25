@@ -51,9 +51,13 @@ const createMockSupabase = () => {
   let mockSingleResponse: { data: unknown; error: unknown } | null = null;
 
   const mockSelect = () => ({
-    eq: () => ({
-      single: () => Promise.resolve(mockSingleResponse || { data: null, error: null }),
-    }),
+    eq: () => {
+      const result = () => Promise.resolve(mockSingleResponse || { data: null, error: null });
+      return {
+        single: result,
+        maybeSingle: result,
+      };
+    },
   });
 
   return {
@@ -152,7 +156,10 @@ Deno.test("P0: should handle hierarchy billing email source", async () => {
   )._setMockSingleResponse({
     data: {
       id: "hier-1",
-      type: "organization",
+      type: "company",
+      name: "Test Co",
+      parent_id: null,
+      active: true,
       metadata: {
         billing_address: {
           email: "billing@company.com",

@@ -8,6 +8,7 @@ import {
   handleCors,
   jsonResponse,
 } from "../_utils/http.ts";
+import { withJobWorkerTimes } from "../_utils/job-worker-times.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createNotification } from "../_utils/notifications.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -303,14 +304,22 @@ serve(async (req) => {
 
     // Create job_worker entries if worker_ids provided
     if (normalizedWorkerIds.length > 0) {
-      const jobWorkerEntries = normalizedWorkerIds.map((workerId: string) => ({
-        job_id: job.id,
-        worker_id: workerId,
-      }));
+      const submissionForTimes =
+        submission_data && typeof submission_data === "object"
+          ? (submission_data as Record<string, unknown>)
+          : null;
+      const jobWorkerEntries = withJobWorkerTimes(
+        normalizedWorkerIds.map((workerId: string) => ({
+          job_id: job.id,
+          worker_id: workerId,
+        })),
+        submissionForTimes
+      );
 
       logger.debug("Creating job_worker entries", {
         jobId: job.id,
         entriesCount: jobWorkerEntries.length,
+        timedCount: jobWorkerEntries.filter((e) => e.start_time && e.end_time).length,
       });
 
       const { error: jobWorkerError } = await supabaseAdmin

@@ -8,11 +8,7 @@ import {
   jsonResponse,
 } from "../_utils/http.ts";
 import { gateOrganizationRequest } from "../_utils/gate-organization-request.ts";
-import {
-  buildInvoiceDisplayRows,
-  type LineItemDisplayConfig,
-} from "../_utils/invoice-line-item-display.ts";
-import { DEFAULT_LINE_ITEM_DISPLAY } from "../_utils/invoice-template-defaults.ts";
+import { buildInvoiceContentModel, type InvoiceContentModel } from "../_utils/invoice-content.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { uuidSchema, validateRequest } from "../_utils/zod-schemas.ts";
 
@@ -69,36 +65,45 @@ function escapeHtml(value: unknown): string {
     .replace(/"/g, "&quot;");
 }
 
+function addressBlockHtml(title: string, lines: string[]): string {
+  if (lines.length === 0) {
+    return `
+      <div>
+        <h3>${escapeHtml(title)}</h3>
+        <p style="color:#6b7280;">—</p>
+      </div>`;
+  }
+  return `
+      <div>
+        <h3>${escapeHtml(title)}</h3>
+        ${lines.map((l) => `<p>${escapeHtml(l)}</p>`).join("")}
+      </div>`;
+}
+
 /**
  * Generate HTML content for the invoice
  */
-function generateInvoiceHtml(
-  invoice: Record<string, unknown>,
-  organization: Record<string, unknown>,
-  lineItems: Array<Record<string, unknown>>
-): string {
-  const invoiceNumber = escapeHtml(invoice.invoice_number);
-  const createdAt = invoice.created_at as string;
-  const dueDate = invoice.due_date as string;
-  const subtotal = invoice.subtotal as number;
-  const adjustments = invoice.adjustments as number;
-  const total = invoice.total as number;
-  const currency = invoice.currency as string;
-  const notes = invoice.notes as string | null;
-  const status = invoice.status as string;
+function generateInvoiceHtml(model: InvoiceContentModel): string {
+  const invoiceNumber = escapeHtml(model.invoiceNumber);
+  const createdAt = model.createdAt;
+  const dueDate = model.dueDate;
+  const subtotal = model.subtotal;
+  const adjustments = model.adjustments;
+  const total = model.total;
+  const currency = model.currency;
+  const status = model.status;
 
-  const orgName = escapeHtml(organization.name);
-  const orgAbn = organization.abn ? escapeHtml(organization.abn) : null;
+  const orgName = escapeHtml(model.orgName);
+  const orgAbn = model.orgAbn ? escapeHtml(model.orgAbn) : null;
 
-  // Generate line items rows
-  const lineItemsHtml = lineItems
+  const lineItemsHtml = model.lineItems
     .map(
       (item) => `
     <tr>
       <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.description)}</td>
       <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${escapeHtml(item.quantity ?? 1)}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency((item.unit_price as number) || 0, currency)}</td>
-      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency((item.amount as number) || 0, currency)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.unit_price || 0, currency)}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.amount || 0, currency)}</td>
     </tr>
   `
     )
@@ -119,7 +124,11 @@ function generateInvoiceHtml(
       ? "Pending Review"
       : status.charAt(0).toUpperCase() + status.slice(1)
   );
-  const safeNotes = notes ? escapeHtml(notes) : null;
+  const safeNotes = model.notes ? escapeHtml(model.notes) : null;
+  const serviceHtml = addressBlockHtml("Service Address", model.serviceAddressLines);
+  const billingHtml = model.showBillingAddress
+    ? addressBlockHtml("Billing Address", model.billingAddressLines)
+    : "";
 
   return `
 <!DOCTYPE html>
@@ -315,6 +324,11 @@ function generateInvoiceHtml(
       </div>
     </div>
 
+    <div class="details-section">
+      ${serviceHtml}
+      ${billingHtml}
+    </div>
+
     <table>
       <thead>
         <tr>
@@ -403,153 +417,24 @@ serve(async (req: Request) => {
     const gated = await gateOrganizationRequest(req, organization_id, logger);
     if (!gated.ok) return gated.response;
     const supabase = gated.ctx.supabase;
-    const userEmail = gated.ctx.userEmail;
 
     logger.info("Generating invoice PDF", {
       invoice_id,
       organization_id,
     });
 
-    const { data: invoice, error: invoiceError } = await supabase
-      .from("invoice")
-      .select(
-        `
-        id,
-        invoice_number,
-        created_at,
-        due_date,
-        subtotal,
-        total,
-        currency,
-        notes,
-        status,
-        organization_id,
-        calculation_snapshot,
-        invoice_job:invoice_job (
-          job:job_id (
-            id
-          )
-        )
-      `
-      )
-      .eq("id", invoice_id)
-      .eq("organization_id", organization_id)
-      .single();
-
-    if (invoiceError || !invoice) {
-      logger.warn("Invoice not found", { invoice_id, organization_id });
-      return errorResponse("Invoice not found", 404);
-    }
-
-    const jobIds: string[] = [];
-    const invoiceJobs = invoice.invoice_job as Array<{ job?: { id?: string } }> | null;
-    if (invoiceJobs && Array.isArray(invoiceJobs)) {
-      for (const invoiceJob of invoiceJobs) {
-        if (invoiceJob.job?.id) {
-          jobIds.push(invoiceJob.job.id);
-        }
-      }
-    }
-
-    if (jobIds.length === 0) {
-      return errorResponse("Invoice has no associated jobs", 404);
-    }
-
-    type PdfCalculation = {
-      total_adjustments?: number;
-      job_calculations?: Array<{
-        base_price?: number;
-        line_items: Array<{
-          field_label: string;
-          option_value?: string;
-          quantity: number;
-          unit_price: number;
-          total: number;
-        }>;
-      }>;
-    };
-
-    let calculation =
-      (invoice as { calculation_snapshot?: PdfCalculation | null }).calculation_snapshot ?? null;
-
-    if (!calculation?.job_calculations) {
-      const { data: calculationData, error: calcError } = await supabase.functions.invoke(
-        "calculate-invoice",
-        {
-          body: {
-            organization_id,
-            job_ids: jobIds,
-            email: userEmail,
-          },
-        }
-      );
-
-      if (calcError) {
-        logger.error("Failed to calculate invoice for PDF", calcError);
-        return errorResponse("Failed to calculate invoice line items", 500);
-      }
-
-      calculation = calculationData?.calculation as PdfCalculation | null;
-
-      if (!calculation?.job_calculations) {
-        return errorResponse("Failed to calculate invoice line items", 500);
-      }
-    }
-
-    // Get organization details
-    const { data: organization, error: orgError } = await supabase
-      .from("organization")
-      .select("name, abn")
-      .eq("id", organization_id)
-      .single();
-
-    if (orgError || !organization) {
-      logger.error("Failed to fetch organization", orgError);
-      return errorResponse("Organization not found", 404);
-    }
-
-    const { data: templateConfig, error: templateError } = await supabase
-      .from("invoice_template_config")
-      .select("line_item_display")
-      .eq("organization_id", organization_id)
-      .maybeSingle();
-
-    if (templateError) {
-      logger.warn("Failed to load invoice template config; using defaults", {
-        organization_id,
-        error: templateError,
-      });
-    }
-
-    const lineItemDisplay =
-      (templateConfig?.line_item_display as LineItemDisplayConfig | null) ??
-      DEFAULT_LINE_ITEM_DISPLAY;
-
-    const lineItems = buildInvoiceDisplayRows(calculation.job_calculations, lineItemDisplay);
-    const adjustments =
-      calculation.total_adjustments ?? Number(invoice.total) - Number(invoice.subtotal);
-
-    // Generate HTML
-    const html = generateInvoiceHtml(
-      {
-        ...invoice,
-        adjustments,
-      } as Record<string, unknown>,
-      organization as Record<string, unknown>,
-      lineItems
-    );
+    const model = await buildInvoiceContentModel(supabase, invoice_id, organization_id);
+    const html = generateInvoiceHtml(model);
 
     logger.info("Invoice HTML generated successfully", {
       invoice_id,
-      invoice_number: invoice.invoice_number,
+      invoice_number: model.invoiceNumber,
     });
 
-    // Return JSON with HTML and metadata
-    // Client can use browser print-to-PDF or a library like jsPDF/html2pdf
     return jsonResponse({
       success: true,
       html,
-      invoice_number: invoice.invoice_number,
+      invoice_number: model.invoiceNumber,
     });
   } catch (error) {
     logger.error("Generate invoice PDF error", error);

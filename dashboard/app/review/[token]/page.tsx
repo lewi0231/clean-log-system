@@ -15,13 +15,12 @@ import {
   getRatingDimensionLabel,
 } from "@/lib/constants/rating-config";
 import { log } from "@/lib/logger";
-import {
-  EdgeFunctionError,
-  invokeEdgeFunction,
-} from "@/lib/supabase/invoke-edge-function";
+import { EdgeFunctionError, invokeEdgeFunction } from "@/lib/supabase/invoke-edge-function";
 import { CheckCircle2, Loader2, Star } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+
+type FeedbackRequestMode = "internal" | "public" | "both";
 
 interface JobDetails {
   id: string;
@@ -40,6 +39,9 @@ interface JobDetails {
     type: "single" | "three_dimensions" | "rater";
     dimensions: string[];
   };
+  feedback_request_mode?: FeedbackRequestMode;
+  public_review_url?: string | null;
+  approval_status?: string;
 }
 
 export default function ReviewPage() {
@@ -53,12 +55,12 @@ export default function ReviewPage() {
   const [rating, setRating] = useState<number | null>(null);
   const [ratings, setRatings] = useState<Record<string, number | null>>({});
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
-  const [hoveredRatings, setHoveredRatings] = useState<
-    Record<string, number | null>
-  >({});
+  const [hoveredRatings, setHoveredRatings] = useState<Record<string, number | null>>({});
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  /** For mode=both: choose path before showing the private form. */
+  const [reviewPath, setReviewPath] = useState<"choose" | "internal">("choose");
 
   useEffect(() => {
     const fetchJobDetails = async () => {
@@ -73,6 +75,7 @@ export default function ReviewPage() {
           success?: boolean;
           job?: JobDetails;
           error?: string;
+          reject_reason?: string;
         }>("get-job-by-token", { token });
 
         if (!data?.success || !data?.job) {
@@ -81,14 +84,20 @@ export default function ReviewPage() {
           return;
         }
 
-        // Check if feedback already submitted
+        setJobDetails(data.job);
+
         if (data.job.hasFeedback) {
-          setError("Feedback has already been submitted for this job.");
+          setSuccess(true);
           setLoading(false);
           return;
         }
 
-        setJobDetails(data.job);
+        const mode = data.job.feedback_request_mode ?? "internal";
+        if (mode === "internal") {
+          setReviewPath("internal");
+        } else if (mode === "both") {
+          setReviewPath("choose");
+        }
       } catch (err) {
         const message =
           err instanceof EdgeFunctionError
@@ -136,9 +145,7 @@ export default function ReviewPage() {
       );
       if (missingDimensions.length > 0) {
         setError(
-          `Please rate all dimensions: ${missingDimensions
-            .map(getRatingDimensionLabel)
-            .join(", ")}`
+          `Please rate all dimensions: ${missingDimensions.map(getRatingDimensionLabel).join(", ")}`
         );
         return;
       }
@@ -173,7 +180,7 @@ export default function ReviewPage() {
           rating: ratingsToSubmit.overall, // Keep for backward compatibility
           ratings: ratingsToSubmit, // New multi-dimensional ratings
           comment: comment.trim() || null,
-        },
+        }
       );
 
       if (!data?.success) {
@@ -241,6 +248,9 @@ export default function ReviewPage() {
   }
 
   if (success) {
+    const publicUrl = jobDetails?.public_review_url?.trim();
+    const showPublicAfterPrivate =
+      jobDetails?.feedback_request_mode === "both" && !!publicUrl && /^https:\/\//i.test(publicUrl);
     return (
       <div className="min-h-screen w-full flex justify-center items-center px-4">
         <Card className="w-full max-w-2xl">
@@ -250,14 +260,22 @@ export default function ReviewPage() {
             </div>
             <CardTitle className="text-center">Thank You!</CardTitle>
             <CardDescription className="text-center">
-              Your feedback has been submitted successfully.
+              {jobDetails?.hasFeedback
+                ? "Your feedback is already on file — thank you."
+                : "Your feedback has been submitted successfully."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <p className="text-sm text-center text-muted-foreground">
-              We appreciate you taking the time to share your experience with
-              us.
+              We appreciate you taking the time to share your experience with us.
             </p>
+            {showPublicAfterPrivate && (
+              <Button className="w-full" asChild>
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                  Leave a Public Review
+                </a>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -266,6 +284,75 @@ export default function ReviewPage() {
 
   if (!jobDetails) {
     return null;
+  }
+
+  const mode = jobDetails.feedback_request_mode ?? "internal";
+  const publicUrl = jobDetails.public_review_url?.trim() || "";
+  const hasPublicUrl = !!publicUrl && /^https:\/\//i.test(publicUrl);
+
+  if (mode === "public") {
+    return (
+      <div className="min-h-screen w-full flex justify-center items-center px-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle>Leave a Public Review</CardTitle>
+            <CardDescription>
+              We&apos;d love a public review of your recent service
+              {jobDetails.location ? ` at ${jobDetails.location.name}` : ""}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {hasPublicUrl ? (
+              <Button className="w-full" asChild>
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                  Continue to review site
+                </a>
+              </Button>
+            ) : (
+              <p className="text-sm text-destructive">
+                This review link is misconfigured. Please contact the service provider.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (mode === "both" && reviewPath === "choose") {
+    return (
+      <div className="min-h-screen w-full flex justify-center items-center px-4">
+        <Card className="w-full max-w-2xl">
+          <CardHeader>
+            <CardTitle>How would you like to share feedback?</CardTitle>
+            <CardDescription>
+              Choose private feedback for the business, a public review, or both over time — either
+              option is equally welcome.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <Button
+              type="button"
+              className="w-full h-auto py-6"
+              onClick={() => setReviewPath("internal")}
+            >
+              Leave Private Feedback
+            </Button>
+            {hasPublicUrl ? (
+              <Button type="button" variant="outline" className="w-full h-auto py-6" asChild>
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                  Leave a Public Review
+                </a>
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" className="w-full h-auto py-6" disabled>
+                Public review unavailable
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -285,8 +372,7 @@ export default function ReviewPage() {
               <div className="space-y-1 text-sm text-muted-foreground">
                 {jobDetails.location && (
                   <p>
-                    <span className="font-medium">Location:</span>{" "}
-                    {jobDetails.location.name}
+                    <span className="font-medium">Location:</span> {jobDetails.location.name}
                   </p>
                 )}
                 <p>
@@ -431,9 +517,7 @@ export default function ReviewPage() {
                 maxLength={5000}
                 className="resize-none"
               />
-              <p className="text-xs text-muted-foreground">
-                {comment.length}/5000 characters
-              </p>
+              <p className="text-xs text-muted-foreground">{comment.length}/5000 characters</p>
             </div>
 
             {error && (
@@ -450,9 +534,7 @@ export default function ReviewPage() {
                 submitting ||
                 (jobDetails?.rating_config?.type === "single"
                   ? !rating
-                  : jobDetails?.rating_config?.dimensions.some(
-                      (dim) => !ratings[dim]
-                    ) ?? true)
+                  : (jobDetails?.rating_config?.dimensions.some((dim) => !ratings[dim]) ?? true))
               }
             >
               {submitting ? (

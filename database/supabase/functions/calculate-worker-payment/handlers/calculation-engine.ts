@@ -1,3 +1,4 @@
+import { hoursFromTimeRange, resolveWorkerTimeRange } from "../../_utils/job-worker-times.ts";
 import {
   computePoolSplitEffectives,
   splitPoolToShares,
@@ -758,9 +759,14 @@ export function calculateWorkerSplits({
 
     let hoursWorked = 0;
     if (worker.start_time && worker.end_time) {
-      const start = new Date(worker.start_time);
-      const end = new Date(worker.end_time);
-      hoursWorked = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60));
+      hoursWorked = hoursFromTimeRange(worker.start_time, worker.end_time);
+    }
+    // Fallback when columns missing, zero-length, or end ≤ start (legacy / bad data)
+    if (hoursWorked <= 0) {
+      const fromSubmission = resolveWorkerTimeRange(worker.worker_id, submissionData);
+      if (fromSubmission) {
+        hoursWorked = hoursFromTimeRange(fromSubmission.start_time, fromSubmission.end_time);
+      }
     }
 
     return {

@@ -16,6 +16,11 @@ import {
   formatLineItemDescription,
   shouldShowBasePriceSeparately,
 } from "@/lib/utils/invoice-line-item-display";
+import {
+  formatBillingAddressLines,
+  selectPrimaryInvoiceJob,
+  type ResolvedHierarchyBilling,
+} from "@clean-log/shared/utils/hierarchy-billing";
 import { format } from "date-fns";
 import Image from "next/image";
 import React, { useState } from "react";
@@ -109,8 +114,15 @@ export interface InvoiceDocumentProps {
     template_config?: InvoiceDocumentTemplateConfig | null;
     hierarchy_metadata?: Record<
       string,
-      { id: string; type: string; name: string; metadata?: Record<string, unknown> }
+      {
+        id: string;
+        type: string;
+        name: string;
+        parent_id?: string | null;
+        metadata?: Record<string, unknown> | null;
+      }
     >;
+    resolved_billing?: ResolvedHierarchyBilling | null;
     invoice_job?: Array<{
       job: {
         id: string;
@@ -169,7 +181,7 @@ export function InvoiceDocument({
       ? "TAX INVOICE"
       : "INVOICE";
 
-  // Sorted jobs and primary location
+  // Sorted jobs for line-item sections; primary location/submission share one selector with Edge/PDF
   const invoiceJobs = invoice.invoice_job ?? [];
   const sortedJobs =
     invoiceJobs
@@ -180,12 +192,9 @@ export function InvoiceDocument({
         const dateB = new Date(b.completed_at || b.created_at).getTime();
         return dateA - dateB;
       }) || [];
-  const firstJob = sortedJobs[0];
-  const submissionData = firstJob?.submission_data;
-  const primaryLocation = (invoiceJobs[0]?.job?.location ??
-    (invoiceJobs.length > 0 && invoiceJobs.some((ij) => ij.job?.location)
-      ? invoiceJobs.find((ij) => ij.job?.location)?.job.location
-      : null)) as LocationWithHierarchy | null | undefined;
+  const primary = selectPrimaryInvoiceJob(invoiceJobs);
+  const submissionData = primary.submission_data;
+  const primaryLocation = primary.location as LocationWithHierarchy | null | undefined;
 
   const serviceAddressConfig = templateConfig?.service_address_config ?? {
     source: "auto",
@@ -233,22 +242,10 @@ export function InvoiceDocument({
     enabled: false,
     source: "auto",
   };
-  const billingAddressLines: string[] = [];
-  const hierarchyMetadata = invoice.hierarchy_metadata ?? {};
-  const hierarchyParentId = primaryLocation?.hierarchy_parent_id;
-  if (billingAddressConfig.enabled && hierarchyParentId && hierarchyMetadata[hierarchyParentId]) {
-    const node = hierarchyMetadata[hierarchyParentId];
-    if (node.type === "company") {
-      const billing = node.metadata?.billing_address as Record<string, unknown> | undefined;
-      if (billing) {
-        if (billing.name) billingAddressLines.push(String(billing.name));
-        if (billing.address) billingAddressLines.push(String(billing.address));
-        if (billing.contact_person) billingAddressLines.push(String(billing.contact_person));
-        if (billing.email) billingAddressLines.push(String(billing.email));
-        if (billing.phone) billingAddressLines.push(String(billing.phone));
-      }
-    }
-  }
+  const billingAddressLines: string[] =
+    billingAddressConfig.enabled && invoice.resolved_billing
+      ? formatBillingAddressLines(invoice.resolved_billing.billing_address)
+      : [];
 
   const jobCalculationsMap = new Map(calculation.job_calculations.map((c) => [c.job_id, c]));
 

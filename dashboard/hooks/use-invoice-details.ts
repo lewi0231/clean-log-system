@@ -6,34 +6,28 @@ import { invoiceDetailsKey } from "@/app/query-provider";
 import type { CalculateInvoiceResponse } from "@/lib/services/invoice.service";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import type { InvoiceTemplateConfig, InvoiceWithJobs } from "@/lib/types";
+import type { GetInvoiceDetailsResponse } from "@/lib/types/invoice-edge";
 import { useCallback } from "react";
 
+type InvoiceDetails = InvoiceWithJobs & {
+  calculation: CalculateInvoiceResponse["calculation"];
+  template_config?: InvoiceTemplateConfig | null;
+  hierarchy_metadata?: GetInvoiceDetailsResponse["hierarchy_metadata"];
+  resolved_billing?: GetInvoiceDetailsResponse["resolved_billing"];
+};
+
 interface UseInvoiceDetailsResult {
-  invoice:
-    | (InvoiceWithJobs & {
-      calculation: CalculateInvoiceResponse["calculation"];
-      template_config?: InvoiceTemplateConfig | null;
-    })
-    | null;
+  invoice: InvoiceDetails | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 }
 
-async function fetchInvoiceDetails(
-  invoiceId: string,
-): Promise<
-  InvoiceWithJobs & {
-    calculation: CalculateInvoiceResponse["calculation"];
-    template_config?: InvoiceTemplateConfig | null;
-  }
-> {
+async function fetchInvoiceDetails(invoiceId: string): Promise<InvoiceDetails> {
   return InvoiceService.getInvoiceDetails(invoiceId);
 }
 
-export function useInvoiceDetails(
-  invoiceId: string | null,
-): UseInvoiceDetailsResult {
+export function useInvoiceDetails(invoiceId: string | null): UseInvoiceDetailsResult {
   const query = useQuery({
     queryKey: invoiceDetailsKey(invoiceId),
     enabled: !!invoiceId,

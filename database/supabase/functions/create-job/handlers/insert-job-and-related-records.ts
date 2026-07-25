@@ -1,3 +1,4 @@
+import { withJobWorkerTimes } from "../../_utils/job-worker-times.ts";
 import { createLogger } from "../../_utils/logger.ts";
 import { createNotification } from "../../_utils/notifications.ts";
 import type { CreateJobContext, ValidatedCreateJobRequest } from "./types.ts";
@@ -108,25 +109,29 @@ export async function insertJobAndRelatedRecords(
 
   if (colleagueIds && Array.isArray(colleagueIds) && colleagueIds.length > 0) {
     const confirmedAt = now.toISOString();
-    const jobWorkerEntries = colleagueIds.map((workerId) => {
-      const isSubmitter = workerId === submittingWorkerId;
-      const isConfirmed = !needsConfirmation || isSubmitter;
+    const jobWorkerEntries = withJobWorkerTimes(
+      colleagueIds.map((workerId) => {
+        const isSubmitter = workerId === submittingWorkerId;
+        const isConfirmed = !needsConfirmation || isSubmitter;
 
-      if (!isConfirmed) {
-        colleaguesNeedingNotification.push(workerId);
-      }
+        if (!isConfirmed) {
+          colleaguesNeedingNotification.push(workerId);
+        }
 
-      return {
-        job_id: job.id,
-        worker_id: workerId,
-        confirmation_status: isConfirmed ? "confirmed" : "pending",
-        confirmed_at: isConfirmed ? confirmedAt : null,
-      };
-    });
+        return {
+          job_id: job.id,
+          worker_id: workerId,
+          confirmation_status: isConfirmed ? "confirmed" : "pending",
+          confirmed_at: isConfirmed ? confirmedAt : null,
+        };
+      }),
+      submissionDataJsonb
+    );
 
     logger.debug("Creating job_worker entries", {
       jobId: job.id,
       entriesCount: jobWorkerEntries.length,
+      timedCount: jobWorkerEntries.filter((e) => e.start_time && e.end_time).length,
       confirmedCount: jobWorkerEntries.filter((e) => e.confirmation_status === "confirmed").length,
       pendingCount: jobWorkerEntries.filter((e) => e.confirmation_status === "pending").length,
     });

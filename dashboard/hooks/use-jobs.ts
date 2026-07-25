@@ -6,11 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { jobsKey } from "@/app/query-provider";
 import { JobsService } from "@/lib/services";
 import type { Job, JobEdit } from "@/lib/types";
-import type {
-  CreateJobRequest,
-  GetJobEditsRequest,
-  UpdateJobRequest,
-} from "@/lib/types/api";
+import type { CreateJobRequest, GetJobEditsRequest, UpdateJobRequest } from "@/lib/types/api";
 import { useCallback } from "react";
 import useOrganization from "./useOrganization";
 
@@ -25,10 +21,7 @@ interface UseJobsResult {
   sendFeedbackEmail: (jobId: string) => Promise<void>;
 }
 
-async function fetchJobs(
-  organizationId: string,
-  includeTests?: boolean,
-): Promise<Job[]> {
+async function fetchJobs(organizationId: string, includeTests?: boolean): Promise<Job[]> {
   const response = await JobsService.list({
     organization_id: organizationId,
     include_tests: includeTests,
@@ -43,14 +36,18 @@ export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
 
   log.debug("Logging from use jobs:", organizationId);
 
+  // Realtime: `RealtimeSubscriptions` mounts `useRealtimeJobs` once for the app.
+  // Focus/reconnect/mount refetch cover the case when Realtime WebSocket is down.
   const query = useQuery({
     queryKey: jobsKey(organizationId, includeTests),
     enabled: !!organizationId && !loading,
     queryFn: () => fetchJobs(organizationId as string, includeTests),
     select: (data) => data ?? [],
     placeholderData: (previous) => previous,
-    staleTime: 5 * 60 * 1000,
-    refetchOnMount: false,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchOnMount: "always",
   });
 
   const createJob = useCallback(
@@ -76,7 +73,7 @@ export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
         workers: [],
       };
     },
-    [queryClient, organizationId, query, includeTests],
+    [queryClient, organizationId, query, includeTests]
   );
 
   const updateJob = useCallback(
@@ -91,16 +88,13 @@ export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
 
       return response.job;
     },
-    [queryClient, organizationId, query, includeTests],
+    [queryClient, organizationId, query, includeTests]
   );
 
-  const getJobEdits = useCallback(
-    async (request: GetJobEditsRequest): Promise<JobEdit[]> => {
-      const response = await JobsService.getEdits(request);
-      return response.edits || [];
-    },
-    [],
-  );
+  const getJobEdits = useCallback(async (request: GetJobEditsRequest): Promise<JobEdit[]> => {
+    const response = await JobsService.getEdits(request);
+    return response.edits || [];
+  }, []);
 
   const sendFeedbackEmail = useCallback(
     async (jobId: string): Promise<void> => {
@@ -112,7 +106,7 @@ export function useJobs(options?: { includeTests?: boolean }): UseJobsResult {
       });
       await query.refetch();
     },
-    [queryClient, organizationId, query, includeTests],
+    [queryClient, organizationId, query, includeTests]
   );
 
   return {

@@ -1,6 +1,7 @@
 "use client";
 
 import { organizationSettingsKey } from "@/app/query-provider";
+import { FeedbackReviewSettingsCard } from "@/components/settings/feedback-review-settings-card";
 import InvoiceTemplateSettings from "@/components/settings/invoice-template-settings";
 import { OrgSendingDomainCard } from "@/components/settings/org-sending-domain-card";
 import { WorkerPayPeriodSettingsCard } from "@/components/settings/worker-pay-period-settings-card";
@@ -19,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -38,9 +38,7 @@ import { log } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { invokeTypedEdge } from "@/lib/supabase/invoke-edge-function";
 import { isSendInvoicesImmediatelyEnabled } from "@/lib/utils";
-import { getRatingConfigPreset, RATING_DIMENSION_LABELS } from "@/lib/constants/rating-config";
 import { BusinessMode, OrganizationSettings, SupportedCurrency } from "@/lib/types";
-import type { RatingConfigType } from "@/lib/types";
 import { useQueryClient } from "@tanstack/react-query";
 import { DollarSign, ExternalLink, Upload, X } from "lucide-react";
 import Image from "next/image";
@@ -633,78 +631,6 @@ export default function SettingsPage() {
       log.info("Settings: Auto-generate invoices updated");
     } catch (err) {
       log.error("Settings: Failed to update auto-generate invoices", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Update Failed",
-        message: "Failed to update setting. Please try again.",
-      });
-    }
-  };
-
-  const handleFeedbackEmailSendImmediatelyChange = async (checked: boolean) => {
-    if (!organizationId) return;
-    try {
-      log.info("Settings: Updating feedback email send immediately", {
-        checked,
-      });
-      const data = await invokeTypedEdge("update-organization-settings", {
-        organization_id: organizationId,
-        feedback_auto_send: checked,
-      });
-      const updated = data.settings;
-      if (updated) {
-        setSettings((prev) => ({
-          ...prev,
-          feedback_auto_send: updated.feedback_auto_send ?? false,
-        }));
-      }
-      queryClient.invalidateQueries({
-        queryKey: organizationSettingsKey(organizationId),
-      });
-      log.info("Settings: Feedback email send immediately updated");
-    } catch (err) {
-      log.error("Settings: Failed to update feedback email send immediately", {
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
-      setErrorDialog({
-        open: true,
-        title: "Update Failed",
-        message: "Failed to update setting. Please try again.",
-      });
-    }
-  };
-
-  const handleRatingConfigChange = async (value: string) => {
-    const newType = value as RatingConfigType;
-    const newConfig = getRatingConfigPreset(newType);
-    if (!organizationId) return;
-    try {
-      log.info("Settings: Updating rating configuration", {
-        type: newType,
-        dimensions: newConfig.dimensions,
-      });
-      const data = await invokeTypedEdge("update-organization-settings", {
-        organization_id: organizationId,
-        rating_config: newConfig,
-      });
-      const updated = data.settings;
-      if (updated) {
-        setSettings((prev) => ({
-          ...prev,
-          rating_config: updated.rating_config ?? {
-            type: "single",
-            dimensions: ["overall"],
-          },
-        }));
-      }
-      queryClient.invalidateQueries({
-        queryKey: organizationSettingsKey(organizationId),
-      });
-      log.info("Settings: Rating configuration updated");
-    } catch (err) {
-      log.error("Settings: Failed to update rating configuration", {
         error: err instanceof Error ? err.message : "Unknown error",
       });
       setErrorDialog({
@@ -1679,34 +1605,25 @@ export default function SettingsPage() {
               </div>
               <Separator />
 
-              {/* Feedback & Rating Settings */}
-              <div className="space-y-4 p-4 border rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="feedback-auto-send" className="text-base font-semibold">
-                      Automatically send feedback requests
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {settings.feedback_auto_send
-                        ? "Feedback request emails are queued after a job is completed (after any delay and edit window)"
-                        : "Feedback request emails require manual action to send"}
-                    </p>
-                  </div>
-                  <Switch
-                    id="feedback-auto-send"
-                    checked={settings.feedback_auto_send ?? false}
-                    onCheckedChange={handleFeedbackEmailSendImmediatelyChange}
-                    className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/50 data-[state=unchecked]:border-2 data-[state=unchecked]:border-muted-foreground/30"
-                  />
-                </div>
-                <Link
-                  href="/dashboard/ratings"
-                  className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                >
-                  View customer ratings
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
+              {organizationId && (
+                <FeedbackReviewSettingsCard
+                  organizationId={organizationId}
+                  isAdmin={userRole === "admin"}
+                  settings={settings}
+                  onSettingsPatch={(patch) =>
+                    setSettings((prev) => ({
+                      ...prev,
+                      ...patch,
+                    }))
+                  }
+                  onError={(title, message) => setErrorDialog({ open: true, title, message })}
+                  onInvalidate={() =>
+                    queryClient.invalidateQueries({
+                      queryKey: organizationSettingsKey(organizationId),
+                    })
+                  }
+                />
+              )}
 
               <Separator />
 
@@ -1848,74 +1765,6 @@ export default function SettingsPage() {
                   </Select>
                   <span className="text-sm text-muted-foreground">until auto-approve</span>
                 </div>
-              </div>
-
-              <Separator />
-
-              {/* Rating Configuration */}
-              <div className="space-y-4 p-4 border rounded-lg">
-                <div className="space-y-2">
-                  <Label className="text-base font-semibold">Rating Configuration</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Choose how customers rate your service. Based on industry best practices.
-                  </p>
-                </div>
-                <RadioGroup
-                  value={settings.rating_config?.type ?? "single"}
-                  onValueChange={(v) => handleRatingConfigChange(v)}
-                >
-                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
-                    <RadioGroupItem value="single" id="rating-single" className="mt-1" />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor="rating-single" className="font-normal cursor-pointer">
-                        Single Overall Rating
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Customers provide one overall satisfaction rating (1-5 stars). Simple and
-                        quick.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Dimensions: Overall Satisfaction
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
-                    <RadioGroupItem value="three_dimensions" id="rating-three" className="mt-1" />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor="rating-three" className="font-normal cursor-pointer">
-                        Three Dimensions
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Customers rate Service Quality, Communication, and Value for Money.
-                        Recommended for most service businesses.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Dimensions:{" "}
-                        {["quality", "communication", "value"]
-                          .map((d) => RATING_DIMENSION_LABELS[d])
-                          .join(", ")}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-2 space-y-0 rounded-md border p-4">
-                    <RadioGroupItem value="rater" id="rating-rater" className="mt-1" />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor="rating-rater" className="font-normal cursor-pointer">
-                        Full RATER Framework
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Comprehensive 5-dimension rating system: Reliability, Assurance, Tangibles,
-                        Empathy, and Responsiveness. Best for detailed feedback analysis.
-                      </p>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Dimensions:{" "}
-                        {["reliability", "assurance", "tangibles", "empathy", "responsiveness"]
-                          .map((d) => RATING_DIMENSION_LABELS[d])
-                          .join(", ")}
-                      </div>
-                    </div>
-                  </div>
-                </RadioGroup>
               </div>
             </CardContent>
           </Card>

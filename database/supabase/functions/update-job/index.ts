@@ -9,6 +9,7 @@ import {
   handleCors,
   jsonResponse,
 } from "../_utils/http.ts";
+import { resolveWorkerTimeRange, withJobWorkerTimes } from "../_utils/job-worker-times.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
 import { validateRequiredFields } from "../_utils/validation.ts";
@@ -296,10 +297,16 @@ serve(async (req: Request) => {
 
       // Create new job_worker entries if worker_ids provided
       if (normalizedWorkerIds.length > 0) {
-        const jobWorkerEntries = normalizedWorkerIds.map((workerId: string) => ({
-          job_id: jobId,
-          worker_id: workerId,
-        }));
+        const submissionForTimes = (
+          submission_data !== undefined ? submission_data : existingJob.submission_data
+        ) as Record<string, unknown> | null;
+        const jobWorkerEntries = withJobWorkerTimes(
+          normalizedWorkerIds.map((workerId: string) => ({
+            job_id: jobId,
+            worker_id: workerId,
+          })),
+          submissionForTimes
+        );
 
         const { error: jobWorkerError } = await supabaseAdmin
           .from("job_worker")
@@ -334,6 +341,51 @@ serve(async (req: Request) => {
             error: auditError,
           });
         }
+      }
+    }
+
+    // When submission times change without replacing workers, sync job_worker clocks
+    if (submission_data !== undefined && worker_ids === undefined) {
+      const { data: existingWorkers, error: existingWorkersError } = await supabaseAdmin
+        .from("job_worker")
+        .select("worker_id")
+        .eq("job_id", jobId);
+
+      if (existingWorkersError) {
+        logger.warn("Failed to load job_worker rows for time sync", {
+          jobId,
+          error: existingWorkersError.message,
+        });
+      } else if (existingWorkers && existingWorkers.length > 0) {
+        const submissionForTimes = submission_data as Record<string, unknown>;
+        const syncResults = await Promise.all(
+          existingWorkers.map(async (row) => {
+            const range = resolveWorkerTimeRange(row.worker_id, submissionForTimes);
+            const { error: timeSyncError } = await supabaseAdmin
+              .from("job_worker")
+              .update({
+                start_time: range?.start_time ?? null,
+                end_time: range?.end_time ?? null,
+              })
+              .eq("job_id", jobId)
+              .eq("worker_id", row.worker_id);
+            return { workerId: row.worker_id, error: timeSyncError };
+          })
+        );
+        for (const result of syncResults) {
+          if (result.error) {
+            logger.warn("Failed to sync job_worker times from submission_data", {
+              jobId,
+              workerId: result.workerId,
+              error: result.error.message,
+            });
+          }
+        }
+        logger.debug("Synced job_worker times from submission_data", {
+          jobId,
+          workerCount: existingWorkers.length,
+          failedCount: syncResults.filter((r) => r.error).length,
+        });
       }
     }
 
