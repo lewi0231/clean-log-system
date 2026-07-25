@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser, resolveOrganizationWorkerId } from "../_utils/auth.ts";
+import { autoApproveExpiredJobs } from "../_utils/auto-approve-expired-jobs.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { requireAuthenticatedOrgMember } from "../_utils/require-authenticated-org-member.ts";
@@ -65,6 +66,16 @@ serve(async (req) => {
         });
       }
       return orgGate.response;
+    }
+
+    // Opportunistic auto-approve so completed-jobs UI does not show stale
+    // "pending confirmation" after the colleague timeout when cron is idle.
+    try {
+      await autoApproveExpiredJobs(supabase, { sideEffects: true });
+    } catch (autoApproveError) {
+      logger.warn("Opportunistic auto-approve failed; continuing with list-jobs", {
+        error: autoApproveError instanceof Error ? autoApproveError.message : "Unknown error",
+      });
     }
 
     let scopedJobIds: string[] | null = null;

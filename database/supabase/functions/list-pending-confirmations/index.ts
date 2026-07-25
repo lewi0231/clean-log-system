@@ -1,5 +1,9 @@
 import { serve } from "server";
 import { extractAuthToken, getAuthUser, resolveWorkerIdForAuthUser } from "../_utils/auth.ts";
+import {
+  autoApproveExpiredJobs,
+  filterActivePendingConfirmations,
+} from "../_utils/auto-approve-expired-jobs.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -48,6 +52,23 @@ serve(async (req) => {
     }
 
     logger.debug("Fetching pending confirmations", { workerId });
+
+    // Opportunistic auto-approve: cron may be idle (local) or delayed.
+    // Approve expired colleague-pending jobs before listing so they disappear.
+    try {
+      const approved = await autoApproveExpiredJobs(supabase, {
+        sideEffects: true,
+      });
+      if (approved.jobsApproved > 0) {
+        logger.info("Auto-approved expired jobs before listing pending confirmations", {
+          jobsApproved: approved.jobsApproved,
+        });
+      }
+    } catch (autoApproveError) {
+      logger.warn("Opportunistic auto-approve failed; continuing with list", {
+        error: autoApproveError instanceof Error ? autoApproveError.message : "Unknown error",
+      });
+    }
 
     // Find all job_worker entries where this worker has pending confirmation status
     // and the job is still in pending status
@@ -145,29 +166,35 @@ serve(async (req) => {
       });
     });
 
-    // Format response
-    const pendingConfirmations = activeJobs
-      .map((pj) => {
-        const job = Array.isArray(pj.job) ? pj.job[0] : pj.job;
-        if (!job) return null;
+    // Format response — exclude past-deadline rows even if auto-approve raced
+    const pendingConfirmations = filterActivePendingConfirmations(
+      activeJobs
+        .map((pj) => {
+          const job = Array.isArray(pj.job) ? pj.job[0] : pj.job;
+          if (!job) return null;
 
-        const location = Array.isArray(job.location) ? job.location[0] : job.location;
-        const submitter = Array.isArray(job.submitter) ? job.submitter[0] : job.submitter;
+          const location = Array.isArray(job.location) ? job.location[0] : job.location;
+          const submitter = Array.isArray(job.submitter) ? job.submitter[0] : job.submitter;
 
-        return {
-          job_id: job.id,
-          location_name: location?.name || null,
-          location_address: location?.address || null,
-          completed_at: job.completed_at,
-          created_at: job.created_at,
-          auto_approve_at: job.auto_approve_at,
-          submitted_by: submitter?.name || "Unknown",
-          submitted_by_worker_id: job.submitted_by_worker_id,
-          workers: workersByJobId.get(job.id) || [],
-          submission_data: job.submission_data ?? {},
-        };
-      })
-      .filter(Boolean);
+          return {
+            job_id: job.id,
+            location_name: location?.name || null,
+            location_address: location?.address || null,
+            completed_at: job.completed_at,
+            created_at: job.created_at,
+            auto_approve_at: job.auto_approve_at as string | null,
+            submitted_by: submitter?.name || "Unknown",
+            submitted_by_worker_id: job.submitted_by_worker_id,
+            workers: workersByJobId.get(job.id) || [],
+            submission_data: job.submission_data ?? {},
+          };
+        })
+        .filter(Boolean) as Array<{
+        job_id: string;
+        auto_approve_at: string | null;
+        [key: string]: unknown;
+      }>
+    );
 
     logger.debug("Found pending confirmations", {
       workerId,

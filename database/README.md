@@ -22,6 +22,10 @@ Org custom sending domains only change the email **From:** header (`resolveOrgMa
 
 Schedule the poller every 5 minutes (Supabase Dashboard → Edge Functions → Schedules, or pg_cron Path A — see migration `20260721120400_schedule_feedback_email_outbox.sql`).
 
+### Colleague confirmation auto-approve
+
+`auto-approve-jobs` should also run every ~5 minutes in each environment. If the schedule is missing, expired joint jobs stay `pending` until something lists them — `list-jobs` and `list-pending-confirmations` now call auto-approve opportunistically so the UI self-heals, but a schedule is still recommended for invoices/notifications when nobody opens the app.
+
 ## Running Locally
 
 ```
