@@ -7,6 +7,8 @@ import type {
   GetJobEditsResponse,
   ListJobsRequest,
   ListJobsResponse,
+  SendFeedbackEmailOptions,
+  SendFeedbackEmailResponse,
   UpdateJobRequest,
   UpdateJobResponse,
 } from "@/lib/types/api";
@@ -135,7 +137,10 @@ export class JobsService {
   /**
    * Send feedback request email for a job
    */
-  static async sendFeedbackEmail(jobId: string): Promise<void> {
+  static async sendFeedbackEmail(
+    jobId: string,
+    options?: SendFeedbackEmailOptions
+  ): Promise<SendFeedbackEmailResponse> {
     try {
       log.debug("JobsService: Sending feedback email", {
         jobId,
@@ -143,17 +148,22 @@ export class JobsService {
 
       const data = await invokeTypedEdge("send-feedback-email", {
         job_id: jobId,
+        confirm_flagged: options?.confirm_flagged,
+        confirm_test: options?.confirm_test,
+        confirm_resend: options?.confirm_resend,
       });
 
       if (!data || !data.success) {
         throw new Error(data?.error || "Failed to send feedback email");
       }
 
-      log.info("JobsService: Feedback email sent successfully", {
+      log.info("JobsService: Feedback email request accepted", {
         jobId,
+        queued: !!data.queued,
         // Avoid logging provider IDs; only log presence.
         hasEmailId: !!data.emailId,
       });
+      return data;
     } catch (err) {
       log.error("JobsService: Failed to send feedback email", {
         error: err instanceof Error ? err.message : "Unknown error",

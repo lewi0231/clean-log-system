@@ -143,28 +143,24 @@ const faqEntries = [
   },
   {
     id: "send-feedback-requests-immediately",
-    question: "What does 'Send Feedback Requests Immediately' do?",
+    question: "What does 'Automatically send feedback requests' do?",
     answer: (
       <>
-        The <strong>Send Feedback Requests Immediately</strong> toggle is in{" "}
+        The <strong>Automatically send feedback requests</strong> toggle is in{" "}
         <Link
           href="/dashboard/settings?tab=features"
           className="font-medium text-primary hover:underline"
         >
           Settings → Features
         </Link>
-        . It controls when we email customers to ask for a rating or feedback after a job is
-        completed.
+        . It controls whether we email customers after a job is completed (after any configured
+        delay and the job edit window). You can also choose the destination: private ratings in
+        Tally Runner, a public review link (e.g. Google), or both.
         <br />
         <br />
-        When it’s <strong>on</strong>, we send the feedback request email automatically as soon as
-        the job is marked complete. When it’s <strong>off</strong>, we don’t send it automatically;
-        you can still send feedback requests manually from the{" "}
-        <Link href="/dashboard/ratings" className="font-medium text-primary hover:underline">
-          Customer Ratings
-        </Link>{" "}
-        page or via the relevant job actions. Turning it off is useful if you prefer to review jobs
-        first or send feedback requests in batches.
+        When it’s <strong>on</strong>, feedback emails are queued automatically. When it’s{" "}
+        <strong>off</strong>, you send them manually from Completed Jobs. Use Locations to mute
+        feedback for specific sites.
       </>
     ),
   },

@@ -69,6 +69,8 @@ import type {
   ResolveFlaggedJobResponse,
   SendFeedbackEmailRequest,
   SendFeedbackEmailResponse,
+  SendFeedbackTestEmailRequest,
+  SendFeedbackTestEmailResponse,
   SendTestOrgSendingDomainEmailRequest,
   SendTestOrgSendingDomainEmailResponse,
   DraftWorkerTaxInvoiceRequest,
@@ -266,6 +268,10 @@ export interface EdgeContracts {
   "send-feedback-email": {
     body: SendFeedbackEmailRequest;
     response: SendFeedbackEmailResponse;
+  };
+  "send-feedback-test-email": {
+    body: SendFeedbackTestEmailRequest;
+    response: SendFeedbackTestEmailResponse;
   };
   "send-test-org-sending-domain-email": {
     body: SendTestOrgSendingDomainEmailRequest;

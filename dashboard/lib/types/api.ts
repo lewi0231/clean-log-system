@@ -149,6 +149,7 @@ export interface CreateLocationRequest {
   fixed_customer_price?: number | null;
   fixed_worker_payment?: number | null;
   fixed_price_currency?: string | null;
+  feedback_requests_enabled?: boolean;
 }
 
 export interface UpdateLocationRequest {
@@ -164,6 +165,7 @@ export interface UpdateLocationRequest {
   fixed_customer_price?: number | null;
   fixed_worker_payment?: number | null;
   fixed_price_currency?: string | null;
+  feedback_requests_enabled?: boolean;
 }
 
 export interface DeleteLocationRequest {
@@ -279,15 +281,27 @@ export interface GetJobEditsResponse {
   edits: JobEdit[];
 }
 
+/** Confirm flags for manual feedback send / resend (S2 §6.3). */
+export type SendFeedbackEmailOptions = {
+  confirm_flagged?: boolean;
+  confirm_test?: boolean;
+  confirm_resend?: boolean;
+};
+
 /** Edge function `send-feedback-email` */
-export interface SendFeedbackEmailRequest {
+export interface SendFeedbackEmailRequest extends SendFeedbackEmailOptions {
   job_id: string;
 }
 
 export interface SendFeedbackEmailResponse {
   success?: boolean;
   error?: string;
+  message?: string;
   emailId?: string;
+  sent?: boolean;
+  queued?: boolean;
+  outboxId?: string;
+  status?: string;
 }
 
 // Feedback API
@@ -384,6 +398,18 @@ export interface SendTestOrgSendingDomainEmailResponse {
   to: string;
   from: string;
   domain_name: string;
+  email_id?: string | null;
+  skipped?: boolean;
+}
+
+/** `send-feedback-test-email` */
+export interface SendFeedbackTestEmailRequest {
+  organization_id: string;
+}
+
+export interface SendFeedbackTestEmailResponse {
+  success: boolean;
+  to: string;
   email_id?: string | null;
   skipped?: boolean;
 }

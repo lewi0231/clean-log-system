@@ -235,13 +235,14 @@ export default function PendingConfirmationsScreen() {
   };
 
   const formatTimeUntilAutoApprove = (autoApproveAt: string | null): string => {
-    if (!autoApproveAt) return "Soon";
+    if (!autoApproveAt) return "Pending";
 
     const now = new Date();
     const autoApprove = new Date(autoApproveAt);
     const diffMs = autoApprove.getTime() - now.getTime();
 
-    if (diffMs <= 0) return "Soon";
+    // Past deadline: should be filtered server-side; show clear copy if stale.
+    if (diffMs <= 0) return "Auto-approving…";
 
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));

@@ -497,6 +497,12 @@ verify_jwt = false
 import_map = "./functions/apply-field-config-template/deno.json"
 entrypoint = "./functions/apply-field-config-template/index.ts"
 
+[functions.auto-approve-jobs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/auto-approve-jobs/deno.json"
+entrypoint = "./functions/auto-approve-jobs/index.ts"
+
 [functions.auto-send-invoices]
 enabled = true
 verify_jwt = false
@@ -658,6 +664,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/send-feedback-email/deno.json"
 entrypoint = "./functions/send-feedback-email/index.ts"
+
+[functions.process-feedback-email-outbox]
+enabled = true
+verify_jwt = false
+import_map = "./functions/process-feedback-email-outbox/deno.json"
+entrypoint = "./functions/process-feedback-email-outbox/index.ts"
 
 [functions.list-form-sections]
 enabled = true
@@ -918,6 +930,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/send-test-org-sending-domain-email/deno.json"
 entrypoint = "./functions/send-test-org-sending-domain-email/index.ts"
+
+[functions.send-feedback-test-email]
+enabled = true
+verify_jwt = false
+import_map = "./functions/send-feedback-test-email/deno.json"
+entrypoint = "./functions/send-feedback-test-email/index.ts"
 
 [functions.draft-worker-tax-invoice]
 enabled = true

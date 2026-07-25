@@ -67,6 +67,7 @@ interface LocationListProps {
       phone?: string;
       hierarchy_parent_id?: string | null;
       active?: boolean;
+      feedback_requests_enabled?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -107,6 +108,7 @@ export default function LocationList({
       phone?: string;
       hierarchy_parent_id?: string | null;
       active?: boolean;
+      feedback_requests_enabled?: boolean;
       pricing_mode?: "field_based" | "fixed_price";
       fixed_customer_price?: number | null;
       fixed_worker_payment?: number | null;
@@ -164,6 +166,14 @@ export default function LocationList({
                     >
                       {location.active ? "Active" : "Inactive"}
                     </span>
+                    {location.feedback_requests_enabled === false && (
+                      <span
+                        className="ml-2 inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-muted text-muted-foreground"
+                        title="Feedback request emails are muted for this location"
+                      >
+                        Feedback off
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <HierarchyBadges

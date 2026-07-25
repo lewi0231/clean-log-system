@@ -332,6 +332,8 @@ describe("InvoiceService", () => {
       expect(result).toEqual({
         ...mockInvoice,
         calculation: mockCalculation,
+        hierarchy_metadata: undefined,
+        resolved_billing: null,
         template_config: undefined,
       });
       expect(supabase.functions.invoke).toHaveBeenCalledWith("get-invoice-details", {

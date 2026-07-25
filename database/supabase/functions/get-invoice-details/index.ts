@@ -1,5 +1,11 @@
 import { serve } from "server";
 import { verifyOrganizationMembershipFromRequest } from "../_utils/auth.ts";
+import {
+  loadHierarchyMetadataForParentIds,
+  resolveHierarchyBilling,
+  selectPrimaryInvoiceJob,
+  unwrapRelation,
+} from "../_utils/hierarchy-billing.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLogger } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -187,42 +193,27 @@ serve(async (req) => {
       };
     }
 
-    // Fetch location hierarchy metadata for billing address detection
-    const locationIds: string[] = [];
+    // Fetch location hierarchy metadata + resolved Bill To (primary location)
     const hierarchyParentIds: string[] = [];
+    const invoiceJobs = Array.isArray(invoice.invoice_job) ? invoice.invoice_job : [];
 
-    if (invoice.invoice_job && Array.isArray(invoice.invoice_job)) {
-      for (const invoiceJob of invoice.invoice_job) {
-        if (invoiceJob.job?.location?.id) {
-          locationIds.push(invoiceJob.job.location.id);
-        }
-        if (invoiceJob.job?.location?.hierarchy_parent_id) {
-          hierarchyParentIds.push(invoiceJob.job.location.hierarchy_parent_id);
-        }
+    for (const invoiceJob of invoiceJobs) {
+      const job = unwrapRelation<{ location?: unknown }>(invoiceJob?.job);
+      const loc = unwrapRelation<{ hierarchy_parent_id?: string | null }>(job?.location);
+      if (loc?.hierarchy_parent_id) {
+        hierarchyParentIds.push(loc.hierarchy_parent_id);
       }
     }
 
-    // Fetch hierarchy nodes for billing address detection
-    const hierarchyMetadata: Record<string, unknown> = {};
-    if (hierarchyParentIds.length > 0) {
-      const uniqueHierarchyIds = [...new Set(hierarchyParentIds)];
-      const { data: hierarchyNodes, error: hierarchyError } = await supabase
-        .from("location_hierarchy")
-        .select("id, type, name, metadata")
-        .in("id", uniqueHierarchyIds);
+    const primary = selectPrimaryInvoiceJob(invoiceJobs);
 
-      if (!hierarchyError && hierarchyNodes) {
-        // Build metadata map keyed by hierarchy ID
-        for (const node of hierarchyNodes) {
-          hierarchyMetadata[node.id] = {
-            id: node.id,
-            type: node.type,
-            name: node.name,
-            metadata: node.metadata,
-          };
-        }
-      }
-    }
+    const hierarchyMetadata = await loadHierarchyMetadataForParentIds(supabase, hierarchyParentIds);
+
+    const resolved_billing = await resolveHierarchyBilling(
+      supabase,
+      primary.hierarchy_parent_id,
+      "display"
+    );
 
     return jsonResponse({
       success: true,
@@ -230,6 +221,7 @@ serve(async (req) => {
       calculation,
       template_config: templateConfig,
       hierarchy_metadata: hierarchyMetadata,
+      resolved_billing,
     });
   } catch (error) {
     logger.error("Get invoice details error", error);
