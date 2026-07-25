@@ -1,5 +1,6 @@
 import { serve } from "server";
 import { autoApproveExpiredJobs } from "../_utils/auto-approve-expired-jobs.ts";
+import { requireCronSecret } from "../_utils/cron-secret.ts";
 import { errorResponse, handleCors, jsonResponse } from "../_utils/http.ts";
 import { createLoggerWithoutRequest } from "../_utils/logger.ts";
 import { createServiceRoleClient } from "../_utils/supabase.ts";
@@ -10,9 +11,10 @@ import { createServiceRoleClient } from "../_utils/supabase.ts";
  * Scheduled function that runs periodically to auto-approve jobs
  * that have passed their auto_approve_at timestamp without action.
  *
- * Prefer scheduling every 5 minutes (Dashboard Schedules or pg_cron).
- * List endpoints also call autoApproveExpiredJobs opportunistically when
- * cron is not running (e.g. local dev).
+ * Requires header `x-cron-secret` matching `CRON_SHARED_SECRET`.
+ * Schedule every ~5 minutes (Dashboard Schedules or pg_cron).
+ * list-jobs / list-pending-confirmations also call autoApproveExpiredJobs
+ * in-process when cron is idle.
  */
 serve(async (req) => {
   const logger = createLoggerWithoutRequest({ functionName: "auto-approve-jobs" });
@@ -21,6 +23,16 @@ serve(async (req) => {
 
   if (req.method !== "POST") {
     return errorResponse("Method not allowed", 405);
+  }
+
+  const auth = requireCronSecret(req);
+  if (!auth.ok) {
+    if (auth.reason === "missing_config") {
+      logger.error("CRON_SHARED_SECRET is not configured — refusing auto-approve-jobs");
+    } else {
+      logger.warn("Rejected auto-approve-jobs", { reason: auth.reason });
+    }
+    return errorResponse("Unauthorized", 401);
   }
 
   try {

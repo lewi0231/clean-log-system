@@ -497,6 +497,12 @@ verify_jwt = false
 import_map = "./functions/apply-field-config-template/deno.json"
 entrypoint = "./functions/apply-field-config-template/index.ts"
 
+[functions.auto-approve-jobs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/auto-approve-jobs/deno.json"
+entrypoint = "./functions/auto-approve-jobs/index.ts"
+
 [functions.auto-send-invoices]
 enabled = true
 verify_jwt = false

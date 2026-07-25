@@ -24,7 +24,7 @@ Schedule the poller every 5 minutes (Supabase Dashboard → Edge Functions → S
 
 ### Colleague confirmation auto-approve
 
-`auto-approve-jobs` should also run every ~5 minutes in each environment. If the schedule is missing, expired joint jobs stay `pending` until something lists them — `list-jobs` and `list-pending-confirmations` now call auto-approve opportunistically so the UI self-heals, but a schedule is still recommended for invoices/notifications when nobody opens the app.
+`auto-approve-jobs` should run every ~5 minutes in each environment with the same `CRON_SHARED_SECRET` / `x-cron-secret` headers as the feedback outbox poller. If the schedule is missing, expired joint jobs stay `pending` until something lists them — `list-jobs` and `list-pending-confirmations` call auto-approve in-process so the UI self-heals, but a schedule is still recommended for invoices/notifications when nobody opens the app.
 
 ## Running Locally
 
