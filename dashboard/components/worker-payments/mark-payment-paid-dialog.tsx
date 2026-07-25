@@ -108,6 +108,11 @@ export default function MarkPaymentPaidDialog({
               <Label htmlFor="payment-method">
                 Payment Method <span className="text-destructive">*</span>
               </Label>
+              {/*
+                Do not pass required to Radix Select: it forwards to a hidden native
+                <select>, which blocks form submit via HTML5 validation before
+                handleSubmit (and toast.error) can run.
+              */}
               <Select
                 value={paymentMethod}
                 onValueChange={(value) =>
@@ -115,7 +120,6 @@ export default function MarkPaymentPaidDialog({
                     value as "bank_transfer" | "cash" | "check" | "payroll_system" | "other"
                   )
                 }
-                required
               >
                 <SelectTrigger id="payment-method" className="cursor-pointer">
                   <SelectValue placeholder="Select payment method" />
