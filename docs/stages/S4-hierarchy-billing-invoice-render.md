@@ -49,15 +49,16 @@
 | Settings copy             | Billing + email copy say “parent company” while locations usually hang off regions                                                                                                                                                                        |
 | Edge update semantics     | `update-location-hierarchy` **replaces** entire `metadata` JSONB with client payload — client merge is the only safety net                                                                                                                                |
 
-### Invoice presentation duplication
+### Invoice presentation (canonical)
 
-| Path        | File                                                  | Used by                                                                      | Bill To / service                            |
-| ----------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------- |
-| A — React   | `dashboard/components/invoicing/invoice-document.tsx` | Detail, preview dialog, public `/invoice/[id]`                               | Yes if `enabled` + company parent            |
-| B — HTML    | `generate-invoice-pdf/index.ts`                       | Open PDF (`InvoiceService.generatePdfHtml` → edge)                           | **No** (also no GST/bank — thinner document) |
-| C — pdf-lib | `_utils/invoice-pdf.ts`                               | **auto-send-invoices** + **update-invoice-status** (manual send) attachments | **No**                                       |
+| Path        | File                                                  | Used by                                                                                               |
+| ----------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| A — React   | `dashboard/components/invoicing/invoice-document.tsx` | Detail, preview dialog, public `/invoice/[id]` (on-screen). Title via `resolveInvoiceDocumentTitle`.  |
+| B — pdf-lib | `_utils/invoice-pdf.ts` + `invoice-content.ts`        | **Sole** customer PDF binary: Open PDF (`generate-invoice-pdf`) + email attachments (send/auto-send). |
 
-Public “Download PDF” uses `window.print()` on React (Path A), not Path B. Detail-page Print clones `#invoice-preview` (Path A).
+**Removed:** `_utils/invoice-html.ts` / HTML Open-PDF path — do not reintroduce a second PDF renderer.
+
+Public “Download PDF” / detail Print may still use `window.print()` on React (Path A). Email/Open PDF always use Path B.
 
 ---
 
@@ -200,14 +201,14 @@ Wire resolve into:
 
 ### W4 — PDF content parity (narrowed)
 
-| Step | ID  | Action                                                                                                                                                                                                                | File(s)                                                                 | Cx  | Pri | Depends | Verify                                                       |
-| ---- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --- | --- | ------- | ------------------------------------------------------------ |
-| 5.13 | P1  | Shared **invoice content** helper for: org name/ABN (existing), **service address lines**, **Bill To lines** (from resolve + `enabled`), dates, line items, subtotal/total/notes — **not** full GST/bank parity in v1 | `_utils/invoice-content.ts` (new) using H2 + existing line-item display | L   | P0  | H2, D2  | Unit: fixture → expected Bill To / service                   |
-| 5.14 | P2  | `generateInvoiceHtml` consumes P1 for Bill To + service sections                                                                                                                                                      | `generate-invoice-pdf/index.ts`                                         | M   | P0  | P1      | Open PDF Bill To/service match React for fixture (toggle ON) |
-| 5.15 | P3  | `invoice-pdf.ts` draws Bill To + service (used by auto-send **and** update-invoice-status)                                                                                                                            | `_utils/invoice-pdf.ts`                                                 | M   | P0  | P1      | Attachment contains Bill To when V1 data present             |
-| 5.16 | P4  | Do **not** add a fourth path; keep detail Print / public print on Path A                                                                                                                                              | —                                                                       | —   | —   | N/A     |
+| Step | ID  | Action                                                                                                                                                                                                                | File(s)                                                                 | Cx  | Pri | Depends | Verify                                           |
+| ---- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --- | --- | ------- | ------------------------------------------------ |
+| 5.13 | P1  | Shared **invoice content** helper for: org name/ABN (existing), **service address lines**, **Bill To lines** (from resolve + `enabled`), dates, line items, subtotal/total/notes — **not** full GST/bank parity in v1 | `_utils/invoice-content.ts` (new) using H2 + existing line-item display | L   | P0  | H2, D2  | Unit: fixture → expected Bill To / service       |
+| 5.14 | P2  | ~~HTML Open PDF~~ **Removed** — `generate-invoice-pdf` returns pdf-lib binary only (`invoice-pdf.ts`)                                                                                                                 | `generate-invoice-pdf/index.ts`                                         | —   | —   | P1      | Open PDF === email attachment bytes              |
+| 5.15 | P3  | `invoice-pdf.ts` draws Bill To + service (Open PDF, auto-send, **and** update-invoice-status)                                                                                                                         | `_utils/invoice-pdf.ts`                                                 | M   | P0  | P1      | Attachment contains Bill To when V1 data present |
+| 5.16 | P4  | Do **not** reintroduce a second PDF renderer; keep detail Print / public print on Path A                                                                                                                              | —                                                                       | —   | —   | N/A     |
 
-> Follow-up (not blocking G4): GST breakdown, bank transfer block, Tax Invoice title rules on Path B/C.
+> Title SoT: `shared/utils/invoice-tax.ts` (`gst_registered` → TAX INVOICE). PDF + React both call `resolveInvoiceDocumentTitle`.
 
 ### W5 — Tests + docs
 
